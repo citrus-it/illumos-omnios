@@ -22,9 +22,9 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 
-LIBRARY= libresolv.a
+LIBRARY= libresolv_sys.a
 VERS= .2
 
 BSDOBJS=	putenv.o	strcasecmp.o	strsep.o \
@@ -86,29 +86,21 @@ include ../../Makefile.rootfs
 CCVERBOSE=
 
 SRCDIR =	../common
-SRCS=		$(BSDOBJS:%.o=../common/bsd/%.c) \
-		$(DSTOBJS:%.o=../common/dst/%.c) \
-		$(INETOBJS:%.o=../common/inet/%.c) \
-		$(IRSOBJS:%.o=../common/irs/%.c) \
-		$(ISCOBJS:%.o=../common/isc/%.c) \
-		$(NAMESEROBJS:%.o=../common/nameser/%.c) \
-		$(RESOLVOBJS:%.o=../common/resolv/%.c) \
-		$(SUNWOBJS:%.o=../common/sunw/%.c)
-
 LIBS =		$(DYNLIB)
 
-
 # Local Libresolv definitions
+#
+PARENT =	$(SRC)/lib/libresolv2
 
 SOLCOMPAT =	-Dsocket=_socket
 CRYPTFLAGS=	-DHMAC_MD5 -DUSE_MD5
 
 LOCFLAGS +=	$(CRYPTFLAGS)
 LOCFLAGS +=	-D_SYS_STREAM_H -D_REENTRANT -DSVR4 -DSUNW_OPTIONS \
-		$(SOLCOMPAT) -I../include
+		$(SOLCOMPAT) -I$(PARENT)/include
 
 CPPFLAGS +=	$(LOCFLAGS)
-CPPFLAGS +=	-DRESOLV_HEADER="<resolv.h>"
+CPPFLAGS +=	-DRESOLV_SYS -DRESOLV_HEADER="<resolv_sys.h>"
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
@@ -123,38 +115,37 @@ LDLIBS +=	-lsocket -lnsl -lc -lmd
 
 all:	$(LIBS)
 
-
 # include library targets
 include ../../Makefile.targ
 
-pics/%.o: ../common/bsd/%.c
+pics/%.o: $(PARENT)/common/bsd/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../common/dst/%.c
+pics/%.o: $(PARENT)/common/dst/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../common/inet/%.c
+pics/%.o: $(PARENT)/common/inet/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../common/irs/%.c
+pics/%.o: $(PARENT)/common/irs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../common/isc/%.c
+pics/%.o: $(PARENT)/common/isc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../common/nameser/%.c
+pics/%.o: $(PARENT)/common/nameser/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../common/resolv/%.c
+pics/%.o: $(PARENT)/common/resolv/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o: ../common/sunw/%.c
+pics/%.o: $(PARENT)/common/sunw/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
