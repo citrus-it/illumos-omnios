@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -326,6 +326,7 @@ smb_pre_open_andx(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
 	uint16_t flags;
+	uint32_t alloc_size;
 	uint32_t creation_time;
 	uint16_t file_attr, sattr;
 	int rc;
@@ -334,12 +335,13 @@ smb_pre_open_andx(smb_request_t *sr)
 
 	rc = smbsr_decode_vwv(sr, "b.wwwwwlwll4.", &sr->andx_com,
 	    &sr->andx_off, &flags, &op->omode, &sattr,
-	    &file_attr, &creation_time, &op->ofun, &op->dsize, &op->timeo);
+	    &file_attr, &creation_time, &op->ofun, &alloc_size, &op->timeo);
 
 	if (rc == 0) {
 		rc = smbsr_decode_data(sr, "%u", sr, &op->fqi.fq_path.pn_path);
 
 		op->dattr = file_attr;
+		op->dsize = alloc_size;
 
 		if (flags & 2)
 			op->op_oplock_level = SMB_OPLOCK_EXCLUSIVE;

@@ -640,9 +640,15 @@ smb_open_subr(smb_request_t *sr)
 				op->dattr &= ~FILE_ATTRIBUTE_READONLY;
 			}
 
+			/*
+			 * Truncate the file data here.
+			 * We set alloc_size = op->dsize later,
+			 * after we have an ofile.  See:
+			 * smb_set_open_attributes
+			 */
 			bzero(&new_attr, sizeof (new_attr));
 			new_attr.sa_dosattr = op->dattr;
-			new_attr.sa_vattr.va_size = op->dsize;
+			new_attr.sa_vattr.va_size = 0;
 			new_attr.sa_mask = SMB_AT_DOSATTR | SMB_AT_SIZE;
 			rc = smb_fsop_setattr(sr, sr->user_cr, node, &new_attr);
 			if (rc != 0) {
@@ -678,6 +684,12 @@ smb_open_subr(smb_request_t *sr)
 			/*
 			 * FILE_OPEN or FILE_OPEN_IF.
 			 */
+			/*
+			 * Ignore any user-specified alloc_size for
+			 * existing files, to avoid truncation in
+			 * smb_set_open_attributes
+			 */
+			op->dsize = 0L;
 			op->action_taken = SMB_OACT_OPENED;
 			break;
 		}
@@ -729,10 +741,11 @@ smb_open_subr(smb_request_t *sr)
 			new_attr.sa_mask |=
 			    SMB_AT_DOSATTR | SMB_AT_TYPE | SMB_AT_MODE;
 
-			if (op->dsize) {
-				new_attr.sa_vattr.va_size = op->dsize;
-				new_attr.sa_mask |= SMB_AT_SIZE;
-			}
+			/*
+			 * We set alloc_size = op->dsize later,
+			 * after we have an ofile.  See:
+			 * smb_set_open_attributes
+			 */
 
 			rc = smb_fsop_create(sr, sr->user_cr, dnode,
 			    op->fqi.fq_last_comp, &new_attr, &op->fqi.fq_fnode);
@@ -995,6 +1008,11 @@ smb_set_open_attributes(smb_request_t *sr, smb_ofile_t *of)
 	if (op->created_readonly) {
 		attr.sa_dosattr = op->dattr | FILE_ATTRIBUTE_READONLY;
 		attr.sa_mask |= SMB_AT_DOSATTR;
+	}
+
+	if (op->dsize != 0) {
+		attr.sa_allocsz = op->dsize;
+		attr.sa_mask |= SMB_AT_ALLOCSZ;
 	}
 
 	if ((op->mtime.tv_sec != 0) && (op->mtime.tv_sec != UINT_MAX)) {
