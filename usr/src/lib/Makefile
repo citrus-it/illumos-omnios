@@ -143,6 +143,7 @@ SUBDIRS +=				\
 	libgss		\
 	libhotplug	\
 	libidmap	\
+	libidspace	\
 	libilb		\
 	libima		\
 	libinetsvc	\
@@ -417,6 +418,7 @@ HDRSUBDIRS=				\
 	libgen		\
 	libgrubmgmt	\
 	libidmap	\
+	libidspace	\
 	libilb		\
 	libima		\
 	libinetsvc	\
@@ -644,6 +646,7 @@ libfsmgt:	libkstat
 libgrubmgmt:	libdevinfo libzfs libfstyp libefi
 $(INTEL_BLD)libgrubmgmt: libfdisk
 libidmap:	libavl libuutil
+libidspace:	libumem
 libinetsvc:	libscf
 libinetutil:	libsocket
 libinstzones:	libzonecfg libcontract
