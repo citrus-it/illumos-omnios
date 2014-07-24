@@ -188,6 +188,7 @@ SUBDIRS +=				\
 	libpthread	\
 	libraidcfg	\
 	librcm		\
+	librename	\
 	libreparse	\
 	libresolv	\
 	libresolv2	\
@@ -436,6 +437,7 @@ HDRSUBDIRS=				\
 	libproc		\
 	libraidcfg	\
 	librcm		\
+	librename	\
 	libreparse	\
 	librestart	\
 	librpcsvc	\
