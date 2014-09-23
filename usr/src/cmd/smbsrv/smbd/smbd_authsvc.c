@@ -101,22 +101,25 @@ int smbd_authsvc_slowdown = 0;
 /*
  * These are the mechanisms we support, in order of preference.
  * But note: it's really the _client's_ preference that matters.
- * See the spnegoIsMechTypeAvailable() calls below.
+ * See &pref in the spnegoIsMechTypeAvailable() calls below.
+ * Careful with this table; the code below knows its format and
+ * may skip the fist two entries to omit Kerberos.
  */
 static const spnego_mech_handler_t
 mech_table[] = {
-	{
-		spnego_mech_oid_Kerberos_V5_Legacy,
-		smbd_krb5ssp_init,
-		smbd_krb5ssp_work,
-		smbd_krb5ssp_fini
-	},
 	{
 		spnego_mech_oid_Kerberos_V5,
 		smbd_krb5ssp_init,
 		smbd_krb5ssp_work,
 		smbd_krb5ssp_fini
 	},
+	{
+		spnego_mech_oid_Kerberos_V5_Legacy,
+		smbd_krb5ssp_init,
+		smbd_krb5ssp_work,
+		smbd_krb5ssp_fini
+	},
+#define	MECH_TBL_IDX_NTLMSSP	2
 	{
 		spnego_mech_oid_NTLMSSP,
 		smbd_ntlmssp_init,
@@ -578,7 +581,7 @@ static int
 smbd_authsvc_esfirst(authsvc_context_t *ctx)
 {
 	const spnego_mech_handler_t *mh;
-	int i, pref, rc;
+	int idx, pref, rc;
 	int best_pref = 1000;
 	int best_mhidx = -1;
 
@@ -627,8 +630,16 @@ smbd_authsvc_esfirst(authsvc_context_t *ctx)
 	 * interface to walk the token's mech list, so we have to
 	 * ask about each mech type we know and keep track of which
 	 * was earliest in the token's mech list.
+	 *
+	 * Also, if not in domain mode, skip the Kerberos.
 	 */
-	for (i = 0, mh = mech_table; mh->mh_init != NULL; i++, mh++) {
+	idx = 0;
+	mh = mech_table;
+	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN) {
+		idx = MECH_TBL_IDX_NTLMSSP;
+		mh = &mech_table[idx];
+	}
+	for (; mh->mh_init != NULL; idx++, mh++) {
 
 		if (spnegoIsMechTypeAvailable(ctx->ctx_itoken,
 		    mh->mh_oid, &pref) != 0)
@@ -636,7 +647,7 @@ smbd_authsvc_esfirst(authsvc_context_t *ctx)
 
 		if (pref < best_pref) {
 			best_pref = pref;
-			best_mhidx = i;
+			best_mhidx = idx;
 		}
 	}
 	if (best_mhidx == -1) {
@@ -770,7 +781,7 @@ smbd_authsvc_escmn(authsvc_context_t *ctx)
 		/* tell the client the selected mech. */
 		oid = ctx->ctx_mech_oid;
 	} else {
-		/* Ommit the "supported mech." field. */
+		/* Omit the "supported mech." field. */
 		oid = spnego_mech_oid_NotUsed;
 	}
 
@@ -903,11 +914,13 @@ smbd_authsvc_gettoken(authsvc_context_t *ctx)
 
 /*
  * Initialization time code to figure out what mechanisms we support.
+ * Careful with this table; the code below knows its format and may
+ * skip the fist two entries to omit Kerberos.
  */
-
 static SPNEGO_MECH_OID MechTypeList[] = {
-	spnego_mech_oid_Kerberos_V5_Legacy,
 	spnego_mech_oid_Kerberos_V5,
+	spnego_mech_oid_Kerberos_V5_Legacy,
+#define	MECH_OID_IDX_NTLMSSP	2
 	spnego_mech_oid_NTLMSSP,
 };
 static int MechTypeCnt = sizeof (MechTypeList) /
@@ -924,13 +937,23 @@ static char IgnoreSPN[] = "not_defined_in_RFC4178@please_ignore";
 void
 smbd_get_authconf(smb_kmod_cfg_t *kcfg)
 {
+	SPNEGO_MECH_OID *mechList = MechTypeList;
+	int mechCnt = MechTypeCnt;
 	SPNEGO_TOKEN_HANDLE hSpnegoToken = NULL;
 	uchar_t *pBuf = kcfg->skc_negtok;
 	uint32_t *pBufLen = &kcfg->skc_negtok_len;
 	ulong_t tLen = sizeof (kcfg->skc_negtok);
 	int rc;
 
-	rc = spnegoCreateNegTokenHint(MechTypeList, MechTypeCnt,
+	/*
+	 * If not in domain mode, skip Kerberos.
+	 */
+	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN) {
+		mechList += MECH_OID_IDX_NTLMSSP;
+		mechCnt  -= MECH_OID_IDX_NTLMSSP;
+	}
+
+	rc = spnegoCreateNegTokenHint(mechList, mechCnt,
 	    (uchar_t *)IgnoreSPN, &hSpnegoToken);
 	if (rc != SPNEGO_E_SUCCESS) {
 		syslog(LOG_DEBUG, "smb_config_get_negtok: "
