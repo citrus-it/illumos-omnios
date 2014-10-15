@@ -25,20 +25,116 @@
  * structures used by the hardware.
  *
  *
- * NVMe devices can have up to 65536 I/O queues, each holding up to 65536 I/O
- * commands. The driver configures one I/O queue per CPU. The hardware uses a
- * single special queue that is used only for admin commands. Admin commands are
- * currently only issued at attach time. All completed commands are dispatched
- * to a taskq for completion processing.
+ * Interrupt Usage:
  *
- * The driver depends on FIXED and MSI-X interrupts being supported. FIXED
- * interrupts are only used in early stages of initialization, then MSI-X is
- * configured. Ideally there is one interrupt vector per queue, but if less are
- * available the interrupt vectors are shared among the queues.
+ * The driver will use a FIXED interrupt while configuring the device as the
+ * specification requires. Later in the attach process it will switch to MSI-X
+ * or MSI if supported. The driver wants to have one interrupt vector per CPU,
+ * but it will work correctly if less are available. Interrupts can be shared
+ * by queues, the interrupt handler will iterate through the I/O queue array by
+ * steps of n_intr_cnt. Usually only the admin queue will share an interrupt
+ * with one I/O queue. The interrupt handler will retrieve completed commands
+ * from all queues sharing an interrupt vector and will post them to a taskq
+ * for completion processing.
  *
- * Error handling is currently limited to detecting fatal hardware errors, which
- * will cause FMA to fault the device. Errors are reported by the hardware
- * either as command status or by asynchronous events.
+ *
+ * Command Processing:
+ *
+ * NVMe devices can have up to 65536 I/O queue pairs, with each queue holding up
+ * to 65536 I/O commands. The driver will configure one I/O queue pair per
+ * available interrupt vector, with the queue length usually much smaller than
+ * the maximum of 65536. If the hardware doesn't provide enough queues, fewer
+ * interrupt vectors will be used.
+ *
+ * Additionally the hardware provides a single special admin queue pair that can
+ * hold up to 4096 admin commands.
+ *
+ * From the hardware perspective both queues of a queue pair are independent,
+ * but they share some driver state: the command array (holding pointers to
+ * commands currently being processed by the hardware) and the active command
+ * counter. Access to the submission side of a queue pair and the shared state
+ * is protected by nq_mutex. The completion side of a queue pair does not need
+ * that protection apart from its access to the shared state; it is called only
+ * in the interrupt handler which does not run concurrently for the same
+ * interrupt vector.
+ *
+ * When a command is submitted to a queue pair the active command counter is
+ * incremented and a pointer to the command is stored in the command array. The
+ * array index is used as command identifier (CID) in the submission queue
+ * entry. Some commands may take a very long time to complete, and if the queue
+ * wraps around in that time a submission may find the next array slot to still
+ * be used by a long-running command. In this case the array is sequentially
+ * searched for the next free slot. The length of the command array is the same
+ * as the configured queue length.
+ *
+ *
+ * Namespace Support:
+ *
+ * NVMe devices can have multiple namespaces, each being a independent data
+ * store. The driver supports multiple namespaces and creates a blkdev interface
+ * for each namespace found. Namespaces can have various attributes to support
+ * thin provisioning, extended LBAs, and protection information. This driver
+ * does not support any of this and ignores namespaces that have these
+ * attributes.
+ *
+ *
+ * Blkdev Interface:
+ *
+ * This driver uses blkdev to do all the heavy lifting involved with presenting
+ * a disk device to the system. As a result, the processing of I/O requests is
+ * relatively simple as blkdev takes care of partitioning, boundary checks, DMA
+ * setup, and splitting of transfers into manageable chunks.
+ *
+ * I/O requests coming in from blkdev are turned into NVM commands and posted to
+ * an I/O queue. The queue is selected by taking the CPU id modulo the number of
+ * queues. There is currently no timeout handling of I/O commands.
+ *
+ * Blkdev also supports querying device/media information and generating a
+ * devid. The driver reports the best block size as determined by the namespace
+ * format back to blkdev as physical block size to support partition and block
+ * alignment. The devid is composed using the device vendor ID, model number,
+ * serial number, and the namespace ID.
+ *
+ *
+ * Error Handling:
+ *
+ * Error handling is currently limited to detecting fatal hardware errors,
+ * either by asynchronous events, or synchronously through command status or
+ * admin command timeouts. In case of severe errors the device is fenced off,
+ * all further requests will return EIO. FMA is then called to fault the device.
+ *
+ * The hardware has a limit for outstanding asynchronous event requests. Before
+ * this limit is known the driver assumes it is at least 1 and posts a single
+ * asynchronous request. Later when the limit is known more asynchronous event
+ * requests are posted to allow quicker reception of error information. When an
+ * asynchronous event is posted by the hardware the driver will parse the error
+ * status fields and log information or fault the device, depending on the
+ * severity of the asynchronous event. The asynchronous event request is then
+ * reused and posted to the admin queue again.
+ *
+ * On command completion the command status is checked for errors. In case of
+ * errors indicating a driver bug the driver panics. Almost all other error
+ * status values just cause EIO to be returned.
+ *
+ * Command timeouts are currently detected for all admin commands except
+ * asynchronous event requests. If a command times out and the hardware appears
+ * to be healthy the driver attempts to abort the command. If this fails the
+ * driver assumes the device to be dead, fences it off, and calls FMA to retire
+ * it. In general admin commands are issued at attach time only. No timeout
+ * handling of normal I/O commands is presently done.
+ *
+ * In some cases it may be possible that the ABORT command times out, too. In
+ * that case the device is also declared dead and fenced off.
+ *
+ *
+ * Quiesce / Fast Reboot:
+ *
+ * The driver currently does not support fast reboot. A quiesce(9E) entry point
+ * is still provided which is used to send a shutdown notification to the
+ * device.
+ *
+ *
+ * Driver Configuration:
  *
  * The following driver properties can be changed to control some aspects of the
  * drivers operation:
@@ -53,12 +149,22 @@
  *
  *
  * TODO:
+ * - figure out sane default for I/O queue depth reported to blkdev
  * - polled I/O support to support kernel core dumping
  * - FMA handling of media errors
+ * - support for the Volatile Write Cache
+ * - support for devices supporting very large I/O requests using chained PRPs
+ * - support for querying log pages from user space
  * - support for configuring hardware parameters like interrupt coalescing
  * - support for media formatting and hard partitioning into namespaces
  * - support for big-endian systems
+ * - support for fast reboot
  */
+
+#include <sys/byteorder.h>
+#ifdef _BIG_ENDIAN
+#error nvme driver needs porting for big-endian platforms
+#endif
 
 #include <sys/modctl.h>
 #include <sys/conf.h>
@@ -569,8 +675,7 @@ nvme_submit_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 
 	mutex_enter(&qp->nq_mutex);
 
-	if (qp->nq_active_cmds == qp->nq_nentry ||
-	    ((qp->nq_sqtail + 1) % qp->nq_nentry) == qp->nq_sqhead) {
+	if (qp->nq_active_cmds == qp->nq_nentry) {
 		mutex_exit(&qp->nq_mutex);
 		return (DDI_FAILURE);
 	}
@@ -580,7 +685,8 @@ nvme_submit_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 	/*
 	 * Try to insert the cmd into the active cmd array at the nq_next_cmd
 	 * slot. If the slot is already occupied advance to the next slot and
-	 * try again.
+	 * try again. This can happen for long running commands like async event
+	 * requests.
 	 */
 	while (qp->nq_cmd[qp->nq_next_cmd] != NULL)
 		qp->nq_next_cmd = (qp->nq_next_cmd + 1) % qp->nq_nentry;
@@ -1822,8 +1928,8 @@ nvme_init(nvme_t *nvme)
 	nvme->n_error_log_len = nvme->n_idctl->id_elpe + 1;
 
 	/*
-	 * XXX: until the code to fill chained PRPs has been tested, limit
-	 * n_max_data_transfer_size to what we can handle in one PRP.
+	 * Limit n_max_data_transfer_size to what we can handle in one PRP.
+	 * Chained PRPs are currently unsupported.
 	 *
 	 * This is a no-op on hardware which doesn't support a transfer size
 	 * big enough to require chained PRPs.
@@ -2415,7 +2521,7 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (nvme->n_ioq_count > 0) {
 		for (i = 1; i != nvme->n_ioq_count + 1; i++) {
 			if (nvme->n_ioq[i] != NULL) {
-				/* XXX: send destroy queue commands */
+				/* TODO: send destroy queue commands */
 				nvme_free_qpair(nvme->n_ioq[i]);
 			}
 		}
@@ -2608,7 +2714,7 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 	/*
 	 * blkdev maintains one queue size per instance (namespace),
 	 * but all namespace share the I/O queues.
-	 * XXX: need to figure out a sane default, or use per-NS I/O queues,
+	 * TODO: need to figure out a sane default, or use per-NS I/O queues,
 	 * or change blkdev to handle EAGAIN
 	 */
 	drive->d_qsize = nvme->n_ioq_count * nvme->n_io_queue_len
