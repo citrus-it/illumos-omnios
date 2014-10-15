@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
@@ -93,6 +93,7 @@ _MANFILES=	aac.7d		\
 		myri10ge.7d	\
 		null.7d		\
 		nulldriver.7d	\
+		nvme.7d		\
 		nxge.7d		\
 		ohci.7d		\
 		openprom.7d	\

@@ -284,6 +284,7 @@ DRV_KMODS	+= nca
 DRV_KMODS	+= nsmb
 DRV_KMODS	+= nulldriver
 DRV_KMODS	+= nv_sata
+DRV_KMODS	+= nvme
 DRV_KMODS	+= nxge
 DRV_KMODS	+= oce
 DRV_KMODS	+= openeepr
