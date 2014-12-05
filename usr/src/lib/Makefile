@@ -98,6 +98,7 @@ SUBDIRS +=				\
 	libbrand	\
 	libbsdmalloc	\
 	libbsm		\
+	libbunyan	\
 	libc_db		\
 	libcfgadm	\
 	libcmd		\
@@ -385,6 +386,7 @@ HDRSUBDIRS=				\
 	libast		\
 	libbrand	\
 	libbsm		\
+	libbunyan	\
 	libc		\
 	libcmd		\
 	libcmdutils	\
@@ -611,6 +613,7 @@ libadutils:	libldap5 libresolv2
 libbe:		libzfs libinstzones libuuid libgen libdevinfo libefi libficl \
 		libzfsbootenv
 libbsm:		libinetutil libscf libsecdb libtsol
+libbunyan:	libnvpair libumem
 libcfgadm:	libdevinfo
 libcontract:	libnvpair
 libcmd:		libsum libast
