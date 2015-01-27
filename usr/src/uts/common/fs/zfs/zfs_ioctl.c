@@ -150,6 +150,7 @@
 #include <sys/spa_impl.h>
 #include <sys/vdev.h>
 #include <sys/priv_impl.h>
+#include <sys/autosnap.h>
 #include <sys/dmu.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_dataset.h>
@@ -2379,23 +2380,6 @@ zfs_ioc_objset_zplprops(zfs_cmd_t *zc)
 	return (err);
 }
 
-static boolean_t
-dataset_name_hidden(const char *name)
-{
-	/*
-	 * Skip over datasets that are not visible in this zone,
-	 * internal datasets (which have a $ in their name), and
-	 * temporary datasets (which have a % in their name).
-	 */
-	if (strchr(name, '$') != NULL)
-		return (B_TRUE);
-	if (strchr(name, '%') != NULL)
-		return (B_TRUE);
-	if (!INGLOBALZONE(curproc) && !zone_dataset_visible(name, NULL))
-		return (B_TRUE);
-	return (B_FALSE);
-}
-
 /*
  * inputs:
  * zc_name		name of filesystem
@@ -2848,6 +2832,10 @@ retry:
 		}
 		VFS_RELE(zfsvfs->z_vfs);
 	}
+
+	if (rv != 0)
+		autosnap_force_snap_by_name(dsname, B_FALSE);
+
 
 	return (rv);
 }
@@ -3533,11 +3521,19 @@ zfs_ioc_clone(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 {
 	int error = 0;
 	nvlist_t *nvprops = NULL;
-	char *origin_name;
+	char *origin_name, *origin_snap;
 	nvlist_t *event;
 
 	if (nvlist_lookup_string(innvl, "origin", &origin_name) != 0)
 		return (SET_ERROR(EINVAL));
+
+	origin_snap = strchr(origin_name, '@');
+	if (!origin_snap)
+		return (SET_ERROR(EINVAL));
+	origin_snap++;
+	if (strncmp(origin_snap, AUTOSNAP_PREFIX, AUTOSNAP_PREFIX_LEN) == 0)
+		return (SET_ERROR(EPERM));
+
 	(void) nvlist_lookup_nvlist(innvl, "props", &nvprops);
 
 	if (strchr(fsname, '@') ||
@@ -3613,6 +3609,10 @@ zfs_ioc_snapshot(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 		if (cp == NULL ||
 		    zfs_component_namecheck(cp + 1, NULL, NULL) != 0)
 			return (SET_ERROR(EINVAL));
+
+		if (strncmp(cp + 1, AUTOSNAP_PREFIX,
+		    AUTOSNAP_PREFIX_LEN) == 0)
+			return (EINVAL);
 
 		/*
 		 * The snap must be in the specified pool.
@@ -3755,6 +3755,32 @@ zfs_destroy_unmount_origin(const char *fsname)
 	}
 }
 
+static int
+zfs_destroy_check_autosnap(spa_t *spa, const char *name)
+{
+	const char *snap = strchr(name, '@');
+
+	if (snap == NULL)
+		return (EINVAL);
+	snap++;
+
+	if (strncmp(snap, AUTOSNAP_PREFIX,
+	    AUTOSNAP_PREFIX_LEN) == 0) {
+		autosnap_zone_t *rzone;
+		zfs_autosnap_t *autosnap;
+
+		autosnap = spa_get_autosnap(spa);
+		mutex_enter(&autosnap->autosnap_lock);
+		rzone = autosnap_find_zone(spa,
+		    name, B_TRUE);
+		mutex_exit(&autosnap->autosnap_lock);
+		if (rzone)
+			return (EBUSY);
+	}
+
+	return (0);
+}
+
 /*
  * innvl: {
  *     "snaps" -> { snapshot1, snapshot2 }
@@ -3771,8 +3797,9 @@ zfs_ioc_destroy_snaps(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 	nvlist_t *snaps;
 	nvpair_t *pair;
 	boolean_t defer;
-	int error;
+	int error = 0;
 	nvlist_t *event;
+	spa_t *spa;
 
 	if (zfs_is_wormed(poolname))
 		return (SET_ERROR(EPERM));
@@ -3780,6 +3807,22 @@ zfs_ioc_destroy_snaps(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 	if (nvlist_lookup_nvlist(innvl, "snaps", &snaps) != 0)
 		return (SET_ERROR(EINVAL));
 	defer = nvlist_exists(innvl, "defer");
+
+	error = spa_open(poolname, &spa, FTAG);
+	if (spa == NULL)
+		return (error);
+
+	for (pair = nvlist_next_nvpair(snaps, NULL);
+	    pair != NULL; pair = nvlist_next_nvpair(snaps, pair)) {
+		error = zfs_destroy_check_autosnap(spa, nvpair_name(pair));
+		if (error)
+			fnvlist_add_int32(outnvl, nvpair_name(pair), error);
+	}
+
+	spa_close(spa, FTAG);
+
+	if (error)
+		return (error);
 
 	for (pair = nvlist_next_nvpair(snaps, NULL); pair != NULL;
 	    pair = nvlist_next_nvpair(snaps, pair)) {
@@ -3897,6 +3940,7 @@ zfs_ioc_destroy_bookmarks(const char *poolname, nvlist_t *innvl,
  * zc_name		name of dataset to destroy
  * zc_objset_type	type of objset
  * zc_defer_destroy	mark for deferred destroy
+ * zc_guid		if set, do atomical recursive destroy
  *
  * outputs:		none
  */
@@ -3915,10 +3959,43 @@ zfs_ioc_destroy(zfs_cmd_t *zc)
 			return (err);
 	}
 
-	if (strchr(zc->zc_name, '@'))
-		err = dsl_destroy_snapshot(zc->zc_name, zc->zc_defer_destroy);
-	else
-		err = dsl_destroy_head(zc->zc_name);
+	if (zc->zc_guid) {
+		spa_t *spa;
+
+		if ((err = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+			return (err);
+		err = autosnap_lock(spa);
+		if (!err) {
+			err = wrc_walk_lock(spa);
+			if (err)
+				autosnap_unlock(spa);
+		}
+		if (!err) {
+			err = dsl_destroy_atomically(zc->zc_name,
+			    zc->zc_defer_destroy);
+			wrc_walk_unlock(spa);
+			autosnap_unlock(spa);
+		}
+		spa_close(spa, FTAG);
+	} else {
+		if (strchr(zc->zc_name, '@')) {
+			spa_t *spa;
+
+			err = spa_open(zc->zc_name, &spa, FTAG);
+			if (spa == NULL)
+				return (err);
+
+			err = zfs_destroy_check_autosnap(spa, zc->zc_name);
+			if (!err) {
+				err = dsl_destroy_snapshot(zc->zc_name,
+				    zc->zc_defer_destroy);
+			}
+
+			spa_close(spa, FTAG);
+		} else {
+			err = dsl_destroy_head(zc->zc_name);
+		}
+	}
 	if (zc->zc_objset_type == DMU_OST_ZVOL && err == 0)
 		(void) zvol_remove_minor(zc->zc_name);
 
@@ -4425,74 +4502,31 @@ next:
 static boolean_t zfs_ioc_recv_inject_err;
 #endif
 
-/*
- * inputs:
- * zc_name		name of containing filesystem
- * zc_nvlist_src{_size}	nvlist of properties to apply
- * zc_value		name of snapshot to create
- * zc_string		name of clone origin (if DRR_FLAG_CLONE)
- * zc_cookie		file descriptor to recv from
- * zc_begin_record	the BEGIN record of the stream (not byteswapped)
- * zc_guid		force flag
- * zc_cleanup_fd	cleanup-on-exit file descriptor
- * zc_action_handle	handle for this guid/ds mapping (or zero on first call)
- *
- * outputs:
- * zc_cookie		number of bytes read
- * zc_nvlist_dst{_size} error for each unapplied received property
- * zc_obj		zprop_errflags_t
- * zc_action_handle	handle for this guid/ds mapping
- */
-static int
-zfs_ioc_recv(zfs_cmd_t *zc)
+int
+dmu_recv_impl(int fd, char *tofs, char *tosnap, char *origin,
+    struct drr_begin *drrb, nvlist_t *props, nvlist_t *errors, uint64_t *errf,
+    int cfd, uint64_t *ahdl, uint64_t *sz, boolean_t force,
+    dmu_krrp_task_t * krrp_task)
 {
-	file_t *fp;
+	file_t *fp = getf(fd);
 	dmu_recv_cookie_t drc;
-	boolean_t force = (boolean_t)zc->zc_guid;
-	int fd;
 	int error = 0;
 	int props_error = 0;
-	nvlist_t *errors;
 	offset_t off;
-	nvlist_t *props = NULL; /* sent properties */
 	nvlist_t *origprops = NULL; /* existing properties */
-	char *origin = NULL;
-	char *tosnap;
-	char tofs[ZFS_MAXNAMELEN];
 	boolean_t first_recvd_props = B_FALSE;
 	nvlist_t *event;
+	boolean_t force_cksum =
+	    !krrp_task || krrp_task->buffer_args.force_cksum;
 
-	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
-	    strchr(zc->zc_value, '@') == NULL ||
-	    strchr(zc->zc_value, '%'))
-		return (SET_ERROR(EINVAL));
-
-	(void) strcpy(tofs, zc->zc_value);
-	tosnap = strchr(tofs, '@');
-	*tosnap++ = '\0';
-
-	if (zc->zc_nvlist_src != NULL &&
-	    (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
-	    zc->zc_iflags, &props)) != 0)
-		return (error);
-
-	fd = zc->zc_cookie;
-	fp = getf(fd);
-	if (fp == NULL) {
-		nvlist_free(props);
-		return (SET_ERROR(EBADF));
-	}
-
-	VERIFY(nvlist_alloc(&errors, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-
-	if (zc->zc_string[0])
-		origin = zc->zc_string;
+	ASSERT(fp || krrp_task);
 
 	error = dmu_recv_begin(tofs, tosnap,
-	    &zc->zc_begin_record, force, origin, &drc);
+	    drrb, force, force_cksum, origin, &drc);
 	if (error != 0)
 		goto out;
 
+	drc.drc_krrp_task = krrp_task;
 	/*
 	 * Set properties before we receive the stream so that they are applied
 	 * to the new data. Note that we must call dmu_recv_stream() if
@@ -4527,9 +4561,9 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 
 			if (clear_received_props(tofs, origprops,
 			    first_recvd_props ? NULL : props) != 0)
-				zc->zc_obj |= ZPROP_ERR_NOCLEAR;
+				*errf |= ZPROP_ERR_NOCLEAR;
 		} else {
-			zc->zc_obj |= ZPROP_ERR_NOCLEAR;
+			*errf |= ZPROP_ERR_NOCLEAR;
 		}
 	}
 
@@ -4542,19 +4576,13 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 		}
 	}
 
-	if (zc->zc_nvlist_dst_size != 0 &&
-	    (nvlist_smush(errors, zc->zc_nvlist_dst_size) != 0 ||
-	    put_nvlist(zc, errors) != 0)) {
-		/*
-		 * Caller made zc->zc_nvlist_dst less than the minimum expected
-		 * size or supplied an invalid address.
-		 */
-		props_error = SET_ERROR(EINVAL);
+	if (fp) {
+		off = fp->f_offset;
+	} else {
+		off = 0;
 	}
-
-	off = fp->f_offset;
-	error = dmu_recv_stream(&drc, fp->f_vnode, &off, zc->zc_cleanup_fd,
-	    &zc->zc_action_handle);
+	error = dmu_recv_stream(&drc, fp ? fp->f_vnode : NULL,
+	    &off, cfd, ahdl, krrp_task);
 
 	if (error == 0) {
 		zfsvfs_t *zfsvfs = NULL;
@@ -4579,16 +4607,26 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 		}
 	}
 
-	zc->zc_cookie = off - fp->f_offset;
-	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
-		fp->f_offset = off;
+	if (fp) {
+		*sz = off - fp->f_offset;
+		if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
+			fp->f_offset = off;
+	} else {
+		*sz = off;
+	}
 	if (error == 0) {
+		char val[MAXNAMELEN];
+
+		(void) strcpy(val, tofs);
+		(void) strcat(val, "@");
+		(void) strcat(val, tosnap);
+
 		event = fnvlist_alloc();
 		if (props != NULL)
 			fnvlist_add_nvlist(event, "props", props);
-		fnvlist_add_string(event, "origin", zc->zc_name);
-		fnvlist_add_string(event, "tosnap", zc->zc_value);
-		fnvlist_add_uint64(event, "bytes", zc->zc_cookie);
+		fnvlist_add_string(event, "origin", tofs);
+		fnvlist_add_string(event, "tosnap", val);
+		fnvlist_add_uint64(event, "bytes", *sz);
 		zfs_event_post(ZFS_EC_STATUS, "recv", event);
 	}
 
@@ -4608,14 +4646,14 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 			 * Since we may have left a $recvd value on the
 			 * system, we can't clear the $hasrecvd flag.
 			 */
-			zc->zc_obj |= ZPROP_ERR_NORESTORE;
+			*errf |= ZPROP_ERR_NORESTORE;
 		} else if (first_recvd_props) {
 			dsl_prop_unset_hasrecvd(tofs);
 		}
 
 		if (origprops == NULL && !drc.drc_newfs) {
 			/* We failed to stash the original properties. */
-			zc->zc_obj |= ZPROP_ERR_NORESTORE;
+			*errf |= ZPROP_ERR_NORESTORE;
 		}
 
 		/*
@@ -4632,19 +4670,88 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 			 * We stashed the original properties but failed to
 			 * restore them.
 			 */
-			zc->zc_obj |= ZPROP_ERR_NORESTORE;
+			*errf |= ZPROP_ERR_NORESTORE;
 		}
 	}
 out:
-	nvlist_free(props);
 	nvlist_free(origprops);
-	nvlist_free(errors);
-	releasef(fd);
+	if (fp)
+		releasef(fd);
 
 	if (error == 0)
 		error = props_error;
 
 	return (error);
+}
+
+/*
+ * inputs:
+ * zc_name		name of containing filesystem
+ * zc_nvlist_src{_size}	nvlist of properties to apply
+ * zc_value		name of snapshot to create
+ * zc_string		name of clone origin (if DRR_FLAG_CLONE)
+ * zc_cookie		file descriptor to recv from
+ * zc_begin_record	the BEGIN record of the stream (not byteswapped)
+ * zc_guid		force flag
+ * zc_cleanup_fd	cleanup-on-exit file descriptor
+ * zc_action_handle	handle for this guid/ds mapping (or zero on first call)
+ *
+ * outputs:
+ * zc_cookie		number of bytes read
+ * zc_nvlist_dst{_size} error for each unapplied received property
+ * zc_obj		zprop_errflags_t
+ * zc_action_handle	handle for this guid/ds mapping
+ */
+static int
+zfs_ioc_recv(zfs_cmd_t *zc)
+{
+	int fd = zc->zc_cookie;
+	char tofs[ZFS_MAXNAMELEN];
+	char *tosnap;
+	char *origin = NULL;
+	nvlist_t *errors;
+	nvlist_t *props = NULL; /* sent properties */
+	boolean_t force = (boolean_t)zc->zc_guid;
+	int err;
+
+	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
+	    strchr(zc->zc_value, '@') == NULL ||
+	    strchr(zc->zc_value, '%'))
+		return (SET_ERROR(EINVAL));
+
+	(void) strcpy(tofs, zc->zc_value);
+	tosnap = strchr(tofs, '@');
+	*tosnap++ = '\0';
+
+	if (zc->zc_string[0])
+		origin = zc->zc_string;
+
+	if (zc->zc_nvlist_src != NULL &&
+	    (err = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    zc->zc_iflags, &props)) != 0)
+		return (err);
+
+	VERIFY(nvlist_alloc(&errors, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+
+	err = dmu_recv_impl(fd, tofs, tosnap, origin,
+	    &zc->zc_begin_record, props, errors, &zc->zc_obj,
+	    zc->zc_cleanup_fd, &zc->zc_action_handle, &zc->zc_cookie,
+	    force, NULL);
+
+	if (zc->zc_nvlist_dst_size != 0 &&
+	    (nvlist_smush(errors, zc->zc_nvlist_dst_size) != 0 ||
+	    put_nvlist(zc, errors) != 0)) {
+		/*
+		 * Caller made zc->zc_nvlist_dst less than the minimum expected
+		 * size or supplied an invalid address.
+		 */
+		err = SET_ERROR(EINVAL);
+	}
+
+	nvlist_free(errors);
+	nvlist_free(props);
+	return (err);
+
 }
 
 /*
@@ -6382,6 +6489,53 @@ zfs_ioc_pool_get_props_nvl(const char *poolname, nvlist_t *innvl,
 	return (error);
 }
 
+/* ARGSUSED */
+static int
+zfs_ioc_check_krrp(const char *dataset, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	dsl_pool_t *dp;
+	autosnap_zone_t *rzone, *zone, *gzone;
+	boolean_t children_zone, gzone_active;
+	zfs_autosnap_t *autosnap;
+	spa_t *spa;
+	int err = 0;
+
+	err = dsl_pool_hold(dataset, FTAG, &dp);
+
+	if (err)
+		return (err);
+
+	spa = dp->dp_spa;
+
+	autosnap = spa_get_autosnap(spa);
+
+	mutex_enter(&autosnap->autosnap_lock);
+
+	rzone = autosnap_find_zone(spa, dataset, B_TRUE);
+	zone = autosnap_find_zone(spa, dataset, B_FALSE);
+	children_zone = autosnap_has_children_zone(spa, dataset);
+	gzone = &autosnap->autosnap_global;
+	gzone_active = rzone || (list_head(&gzone->listeners) != NULL &&
+	    (gzone->flags & AUTOSNAP_CREATOR));
+
+	if (zone) {
+		err = EBUSY;
+	} else if (children_zone) {
+		err = ECHILD;
+	} else if (rzone) {
+		err = EUSERS;
+	} else if (gzone_active) {
+		err = 0;
+	} else {
+		err = ENOTSUP;
+	}
+
+	mutex_exit(&autosnap->autosnap_lock);
+	dsl_pool_rele(dp, FTAG);
+
+	return (err);
+}
+
 static void
 zfs_ioctl_init(void)
 {
@@ -6416,6 +6570,10 @@ zfs_ioctl_init(void)
 	zfs_ioctl_register("destroy_snaps", ZFS_IOC_DESTROY_SNAPS,
 	    zfs_ioc_destroy_snaps, zfs_secpolicy_destroy_snaps, POOL_NAME,
 	    POOL_CHECK_SUSPENDED | POOL_CHECK_READONLY, B_TRUE, B_TRUE);
+
+	zfs_ioctl_register("check_krrp", ZFS_IOC_CHECK_KRRP,
+	    zfs_ioc_check_krrp, zfs_secpolicy_read, DATASET_NAME,
+	    POOL_CHECK_NONE, B_FALSE, B_FALSE);
 
 	zfs_ioctl_register("pool_stats_nvl", ZFS_IOC_POOL_STATS_NVL,
 	    zfs_ioc_pool_stats_nvl, zfs_secpolicy_read, POOL_NAME,

@@ -40,6 +40,7 @@
 #include <sys/ddt.h>
 #include <sys/blkptr.h>
 #include <sys/special.h>
+#include <sys/blkptr.h>
 #include <sys/zfeature.h>
 #include <sys/dkioc_free_util.h>
 
@@ -2080,7 +2081,10 @@ zio_write_gang_block(zio_t *pio)
 	int gbh_copies = MIN(copies + 1, spa_max_replication(spa));
 	zio_prop_t zp;
 	int error;
-	metaslab_class_t *mc = spa_select_class(spa, &pio->io_prop);
+	metaslab_class_t *mc = spa_select_class(spa, pio);
+
+	if (mc == spa_special_class(spa))
+		mc = spa_normal_class(spa);
 
 	error = metaslab_alloc(spa, mc, SPA_GANGBLOCKSIZE,
 	    bp, gbh_copies, txg, pio == gio ? NULL : gio->io_bp,
@@ -2637,7 +2641,7 @@ static int
 zio_dva_allocate(zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
-	metaslab_class_t *mc = spa_select_class(spa, &zio->io_prop);
+	metaslab_class_t *mc = spa_select_class(spa, zio);
 
 	blkptr_t *bp = zio->io_bp;
 	int error;
@@ -2662,6 +2666,7 @@ zio_dva_allocate(zio_t *zio)
 	flags |= (zio->io_flags & ZIO_FLAG_NODATA) ? METASLAB_GANG_AVOID : 0;
 	flags |= (zio->io_flags & ZIO_FLAG_GANG_CHILD) ?
 	    METASLAB_GANG_CHILD : 0;
+
 	error = metaslab_alloc(spa, mc, zio->io_size, bp,
 	    zio->io_prop.zp_copies, zio->io_txg, NULL, flags);
 

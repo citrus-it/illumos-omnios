@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -56,6 +56,7 @@ typedef struct traverse_data {
 	uint64_t td_objset;
 	blkptr_t *td_rootbp;
 	uint64_t td_min_txg;
+	uint64_t td_max_txg;
 	zbookmark_phys_t *td_resume;
 	int td_flags;
 	prefetch_data_t *td_pfd;
@@ -190,7 +191,8 @@ traverse_prefetch_metadata(traverse_data_t *td,
 	 */
 	if (td->td_resume != NULL && !ZB_IS_ZERO(td->td_resume))
 		return;
-	if (BP_IS_HOLE(bp) || bp->blk_birth <= td->td_min_txg)
+	if (BP_IS_HOLE(bp) || bp->blk_birth <= td->td_min_txg ||
+	    bp->blk_birth >= td->td_max_txg)
 		return;
 	if (BP_GET_LEVEL(bp) == 0 && BP_GET_TYPE(bp) != DMU_OT_DNODE)
 		return;
@@ -243,13 +245,15 @@ traverse_visitbp(traverse_data_t *td, const dnode_phys_t *dnp,
 		 * created before or after the min_txg for this
 		 * traversal, so we cannot skip it.
 		 */
-		if (td->td_hole_birth_enabled_txg < td->td_min_txg)
+		if (td->td_hole_birth_enabled_txg < td->td_min_txg ||
+		    td->td_hole_birth_enabled_txg > td->td_max_txg)
 			return (0);
-	} else if (bp->blk_birth <= td->td_min_txg) {
+	} else if (bp->blk_birth <= td->td_min_txg ||
+	    bp->blk_birth >= td->td_max_txg) {
 		return (0);
 	}
 
-	if (pd != NULL && !pd->pd_exited && prefetch_needed(pd, bp)) {
+	if (pd && !pd->pd_exited && prefetch_needed(pd, bp)) {
 		mutex_enter(&pd->pd_mtx);
 		ASSERT(pd->pd_blks_fetched >= 0);
 		while (pd->pd_blks_fetched == 0 && !pd->pd_exited)
@@ -271,6 +275,9 @@ traverse_visitbp(traverse_data_t *td, const dnode_phys_t *dnp,
 		    td->td_arg);
 		if (err == TRAVERSE_VISIT_NO_CHILDREN)
 			return (0);
+		/* handle pausing at a common point */
+		if (err == ERESTART)
+			td->td_paused = B_TRUE;
 		if (err != 0)
 			goto post;
 	}
@@ -395,6 +402,12 @@ post:
 		td->td_paused = B_TRUE;
 	}
 
+	/* if we walked over all bp bookmark must be cleared */
+	if (!err && !td->td_paused && td->td_resume != NULL &&
+	    bp == td->td_rootbp && td->td_pfd != NULL) {
+		bzero(td->td_resume, sizeof (*td->td_resume));
+	}
+
 	return (err);
 }
 
@@ -492,8 +505,8 @@ traverse_prefetch_thread(void *arg)
  */
 static int
 traverse_impl(spa_t *spa, dsl_dataset_t *ds, uint64_t objset, blkptr_t *rootbp,
-    uint64_t txg_start, zbookmark_phys_t *resume, int flags,
-    blkptr_cb_t func, void *arg)
+    uint64_t txg_start, uint64_t txg_finish, zbookmark_phys_t *resume,
+    int flags, blkptr_cb_t func, void *arg)
 {
 	traverse_data_t td;
 	prefetch_data_t pd = { 0 };
@@ -513,6 +526,7 @@ traverse_impl(spa_t *spa, dsl_dataset_t *ds, uint64_t objset, blkptr_t *rootbp,
 	td.td_objset = objset;
 	td.td_rootbp = rootbp;
 	td.td_min_txg = txg_start;
+	td.td_max_txg = txg_finish;
 	td.td_resume = resume;
 	td.td_func = func;
 	td.td_arg = arg;
@@ -580,7 +594,8 @@ traverse_dataset(dsl_dataset_t *ds, uint64_t txg_start, int flags,
     blkptr_cb_t func, void *arg)
 {
 	return (traverse_impl(ds->ds_dir->dd_pool->dp_spa, ds, ds->ds_object,
-	    &dsl_dataset_phys(ds)->ds_bp, txg_start, NULL, flags, func, arg));
+	    &dsl_dataset_phys(ds)->ds_bp, txg_start, UINT64_MAX, NULL, flags,
+	    func, arg));
 }
 
 int
@@ -589,7 +604,7 @@ traverse_dataset_destroyed(spa_t *spa, blkptr_t *blkptr,
     blkptr_cb_t func, void *arg)
 {
 	return (traverse_impl(spa, NULL, ZB_DESTROYED_OBJSET,
-	    blkptr, txg_start, resume, flags, func, arg));
+	    blkptr, txg_start, UINT64_MAX, resume, flags, func, arg));
 }
 
 int
@@ -597,30 +612,34 @@ traverse_dataset_resume(dsl_dataset_t *ds, uint64_t txg_start,
     zbookmark_phys_t *resume, int flags, blkptr_cb_t func, void *arg)
 {
 	return (traverse_impl(ds->ds_dir->dd_pool->dp_spa, ds, ds->ds_object,
-	    &dsl_dataset_phys(ds)->ds_bp, txg_start, resume, flags, func, arg));
+	    &dsl_dataset_phys(ds)->ds_bp, txg_start, UINT64_MAX, resume, flags,
+	    func, arg));
 }
 
 /*
  * NB: pool must not be changing on-disk (eg, from zdb or sync context).
  */
 int
-traverse_pool(spa_t *spa, uint64_t txg_start, int flags,
-    blkptr_cb_t func, void *arg)
+traverse_pool(spa_t *spa, uint64_t txg_start, uint64_t txg_finish, int flags,
+    blkptr_cb_t func, void *arg, zbookmark_phys_t *zb)
 {
-	int err;
+	int err = 0, lasterr = 0;
 	uint64_t obj;
 	dsl_pool_t *dp = spa_get_dsl(spa);
 	objset_t *mos = dp->dp_meta_objset;
 	boolean_t hard = (flags & TRAVERSE_HARD);
 
 	/* visit the MOS */
-	err = traverse_impl(spa, NULL, 0, spa_get_rootblkptr(spa),
-	    txg_start, NULL, flags, func, arg);
-	if (err != 0)
-		return (err);
+	if (!zb || (zb->zb_objset == 0 && zb->zb_object == 0)) {
+		err = traverse_impl(spa, NULL, 0, spa_get_rootblkptr(spa),
+		    txg_start, txg_finish, NULL, flags, func, arg);
+		if (err != 0)
+			return (err);
+	}
 
 	/* visit each dataset */
-	for (obj = 1; err == 0;
+	for (obj = (zb && !ZB_IS_ZERO(zb))? zb->zb_objset : 1;
+	    err == 0 || (err != ESRCH && hard);
 	    err = dmu_object_next(mos, &obj, FALSE, txg_start)) {
 		dmu_object_info_t doi;
 
@@ -633,7 +652,11 @@ traverse_pool(spa_t *spa, uint64_t txg_start, int flags,
 
 		if (doi.doi_bonus_type == DMU_OT_DSL_DATASET) {
 			dsl_dataset_t *ds;
+			dsl_dataset_t *nds;
+			objset_t *os, *nos;
 			uint64_t txg = txg_start;
+			uint64_t ctxg;
+			uint64_t max_txg = txg_finish;
 
 			dsl_pool_config_enter(dp, FTAG);
 			err = dsl_dataset_hold_obj(dp, obj, FTAG, &ds);
@@ -643,15 +666,81 @@ traverse_pool(spa_t *spa, uint64_t txg_start, int flags,
 					continue;
 				break;
 			}
-			if (dsl_dataset_phys(ds)->ds_prev_snap_txg > txg)
+
+			dsl_pool_config_enter(dp, FTAG);
+			err = dmu_objset_from_ds(ds, &os);
+			dsl_pool_config_exit(dp, FTAG);
+			if (err != 0) {
+				dsl_dataset_rele(ds, FTAG);
+				if (hard)
+					continue;
+				break;
+			}
+			ctxg = dsl_dataset_phys(ds)->ds_creation_txg;
+			if (max_txg != UINT64_MAX) {
+				dsl_pool_config_enter(dp, FTAG);
+				err = dsl_dataset_hold_obj(dp,
+				    dsl_dataset_phys(ds)->ds_next_snap_obj,
+				    FTAG, &nds);
+				if (!err) {
+					err = dmu_objset_from_ds(nds, &nos);
+					if (err)
+						dsl_dataset_rele(nds, FTAG);
+				}
+				dsl_pool_config_exit(dp, FTAG);
+				if (err == 0) {
+					dsl_dataset_phys_t *pnds =
+					    dsl_dataset_phys(nds);
+					uint64_t ntxg =
+					    pnds->ds_creation_txg;
+					if (dmu_objset_is_snapshot(nos) &&
+					    ntxg < max_txg) {
+						dsl_dataset_rele(ds, FTAG);
+						dsl_dataset_rele(nds, FTAG);
+						continue;
+					}
+					dsl_dataset_rele(nds, FTAG);
+				}
+			}
+
+			/* uplimited traverse walks over shapshots only */
+			if (max_txg != UINT64_MAX &&
+			    !dmu_objset_is_snapshot(os)) {
+				dsl_dataset_rele(ds, FTAG);
+				continue;
+			}
+			if (max_txg != UINT64_MAX && ctxg >= max_txg) {
+				dsl_dataset_rele(ds, FTAG);
+				continue;
+			}
+			if (dmu_objset_is_snapshot(os) &&
+			    ctxg <= txg_start) {
+				dsl_dataset_rele(ds, FTAG);
+				continue;
+			}
+			if (max_txg == UINT64_MAX &&
+			    dsl_dataset_phys(ds)->ds_prev_snap_txg > txg)
 				txg = dsl_dataset_phys(ds)->ds_prev_snap_txg;
-			err = traverse_dataset(ds, txg, flags, func, arg);
+			if (txg > max_txg)
+				max_txg = txg;
+			err = traverse_impl(spa, ds, ds->ds_object,
+			    &dsl_dataset_phys(ds)->ds_bp,
+			    txg, max_txg, zb, flags, func, arg);
 			dsl_dataset_rele(ds, FTAG);
-			if (err != 0)
+			if (err != 0) {
+				if (!hard)
+					return (err);
+				lasterr = err;
+			}
+			if (zb && !ZB_IS_ZERO(zb))
 				break;
 		}
 	}
-	if (err == ESRCH)
+	if (err == ESRCH) {
+		/* zero bookmark means we are done */
+		if (zb)
+			bzero(zb, sizeof (*zb));
 		err = 0;
-	return (err);
+	}
+	return (err != 0 ? err : lasterr);
 }

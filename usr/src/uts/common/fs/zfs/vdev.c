@@ -90,6 +90,12 @@ vdev_getops(const char *type)
 	return (ops);
 }
 
+boolean_t
+vdev_is_special(vdev_t *vd)
+{
+	return (vd ? vd->vdev_isspecial : B_FALSE);
+}
+
 /*
  * Default asize function: return the MAX of psize with the asize of
  * all children.  This is what's used by anything other than RAID-Z.
@@ -466,6 +472,36 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_FRU, &vd->vdev_fru) == 0)
 		vd->vdev_fru = spa_strdup(vd->vdev_fru);
 
+#ifdef _KERNEL
+	if (vd->vdev_path) {
+		char dev_path[MAXPATHLEN];
+		char *last_slash;
+		kstat_t *exist = NULL;
+
+		/* strip slice tag */
+		last_slash = strrchr(vd->vdev_path, '/');
+		(void) strcpy(dev_path,
+		    last_slash ? (last_slash + 1) : vd->vdev_path);
+
+		(void) strcat(dev_path, "_zfs");
+
+		exist = kstat_hold_byname("zfs", 0, dev_path, ALL_ZONES);
+
+		if (!exist) {
+			vd->vdev_iokstat = kstat_create("zfs", 0, dev_path,
+			    "disk", KSTAT_TYPE_IO, 1, 0);
+
+			if (vd->vdev_iokstat) {
+				vd->vdev_iokstat->ks_lock =
+				    &spa->spa_iokstat_lock;
+				kstat_install(vd->vdev_iokstat);
+			}
+		} else {
+			kstat_rele(exist);
+		}
+	}
+#endif
+
 	/*
 	 * Set the whole_disk property.  If it's not specified, leave the value
 	 * as -1.
@@ -656,6 +692,10 @@ vdev_free(vdev_t *vd)
 	}
 	mutex_exit(&vd->vdev_dtl_lock);
 
+	if (vd->vdev_iokstat) {
+		kstat_delete(vd->vdev_iokstat);
+		vd->vdev_iokstat = NULL;
+	}
 	mutex_destroy(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_stat_lock);
 	mutex_destroy(&vd->vdev_probe_lock);
@@ -2801,6 +2841,11 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 	if (type == ZIO_TYPE_WRITE && !vdev_is_dead(vd))
 		vs->vs_write_errors++;
 	mutex_exit(&vd->vdev_stat_lock);
+
+	if (vd->vdev_isspecial && (vs->vs_checksum_errors ||
+	    vs->vs_read_errors || vs->vs_write_errors)) {
+		wrc_enter_fault_state(vd->vdev_spa);
+	}
 
 	if (type == ZIO_TYPE_WRITE && txg != 0 &&
 	    (!(flags & ZIO_FLAG_IO_REPAIR) ||

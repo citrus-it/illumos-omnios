@@ -830,6 +830,9 @@ typedef struct l1arc_buf_hdr {
 	void			*b_thawed;
 #endif
 
+	/* number of krrp tasks using this buffer */
+	uint64_t		b_krrp;
+
 	arc_buf_t		*b_buf;
 	uint32_t		b_datacnt;
 	/* for waiting on writes to complete */
@@ -1373,6 +1376,14 @@ retry:
 	}
 }
 
+/* wait until krrp releases the buffer */
+static inline void
+arc_wait_for_krrp(arc_buf_hdr_t *hdr)
+{
+	while (HDR_HAS_L1HDR(hdr) && hdr->b_l1hdr.b_krrp != 0)
+		cv_wait(&hdr->b_l1hdr.b_cv, HDR_LOCK(hdr));
+}
+
 /*
  * Transition between the two allocation states for the arc_buf_hdr struct.
  * The arc_buf_hdr struct can be allocated with (hdr_full_cache) or without
@@ -1394,6 +1405,7 @@ arc_hdr_realloc(arc_buf_hdr_t *hdr, kmem_cache_t *old, kmem_cache_t *new)
 	nhdr = kmem_cache_alloc(new, KM_PUSHPAGE);
 
 	ASSERT(MUTEX_HELD(HDR_LOCK(hdr)));
+	arc_wait_for_krrp(hdr);
 	buf_hash_remove(hdr);
 
 	bcopy(hdr, nhdr, HDR_L2ONLY_SIZE);
@@ -1781,8 +1793,10 @@ arc_change_state(arc_state_t *new_state, arc_buf_hdr_t *hdr,
 	}
 
 	ASSERT(!BUF_EMPTY(hdr));
-	if (new_state == arc_anon && HDR_IN_HASH_TABLE(hdr))
+	if (new_state == arc_anon && HDR_IN_HASH_TABLE(hdr)) {
+		arc_wait_for_krrp(hdr);
 		buf_hash_remove(hdr);
+	}
 
 	/* adjust state sizes (ignore arc_l2c_only) */
 	if (to_delta && new_state != arc_l2c_only)
@@ -1892,6 +1906,7 @@ arc_buf_alloc(spa_t *spa, int32_t size, void *tag, arc_buf_contents_t type)
 	ASSERT3P(hdr->b_freeze_cksum, ==, NULL);
 	hdr->b_size = size;
 	hdr->b_spa = spa_load_guid(spa);
+	hdr->b_l1hdr.b_krrp = 0;
 
 	buf = kmem_cache_alloc(buf_cache, KM_PUSHPAGE);
 	buf->b_hdr = hdr;
@@ -2302,6 +2317,7 @@ arc_buf_free(arc_buf_t *buf, void *tag)
 
 		(void) remove_reference(hdr, hash_lock, tag);
 		if (hdr->b_l1hdr.b_datacnt > 1) {
+			arc_wait_for_krrp(hdr);
 			arc_buf_destroy(buf, TRUE);
 		} else {
 			ASSERT(buf == hdr->b_l1hdr.b_buf);
@@ -2353,6 +2369,7 @@ arc_buf_remove_ref(arc_buf_t *buf, void* tag)
 
 	(void) remove_reference(hdr, hash_lock, tag);
 	if (hdr->b_l1hdr.b_datacnt > 1) {
+		arc_wait_for_krrp(hdr);
 		if (no_callback)
 			arc_buf_destroy(buf, TRUE);
 	} else if (no_callback) {
@@ -2434,6 +2451,8 @@ arc_evict_hdr(arc_buf_hdr_t *hdr, kmutex_t *hash_lock)
 
 	ASSERT(MUTEX_HELD(hash_lock));
 	ASSERT(HDR_HAS_L1HDR(hdr));
+
+	arc_wait_for_krrp(hdr);
 
 	state = hdr->b_l1hdr.b_state;
 	if (GHOST_STATE(state)) {
@@ -4097,8 +4116,11 @@ arc_read_done(zio_t *zio)
 		hdr->b_flags |= ARC_FLAG_IO_ERROR;
 		if (hdr->b_l1hdr.b_state != arc_anon)
 			arc_change_state(arc_anon, hdr, hash_lock);
-		if (HDR_IN_HASH_TABLE(hdr))
+		if (HDR_IN_HASH_TABLE(hdr)) {
+			if (hash_lock)
+				arc_wait_for_krrp(hdr);
 			buf_hash_remove(hdr);
+		}
 		freeable = refcount_is_zero(&hdr->b_l1hdr.b_refcnt);
 	}
 
@@ -4138,6 +4160,55 @@ arc_read_done(zio_t *zio)
 
 	if (freeable)
 		arc_hdr_destroy(hdr);
+}
+
+/*
+ * The function to process data from arc by a callback
+ * The main purpose is to directly copy data from arc to a target buffer
+ */
+int
+arc_io_bypass(spa_t *spa, const blkptr_t *bp,
+    arc_bypass_io_func func, void *arg)
+{
+	arc_buf_hdr_t *hdr;
+	kmutex_t *hash_lock = NULL;
+	int error = 0;
+	uint64_t guid = spa_load_guid(spa);
+
+top:
+	hdr = buf_hash_find(guid, bp, &hash_lock);
+	if (hdr && HDR_HAS_L1HDR(hdr) && hdr->b_l1hdr.b_datacnt > 0 &&
+	    hdr->b_l1hdr.b_buf->b_data) {
+		if (HDR_IO_IN_PROGRESS(hdr)) {
+			cv_wait(&hdr->b_l1hdr.b_cv, hash_lock);
+			mutex_exit(hash_lock);
+			DTRACE_PROBE(arc_bypass_wait);
+			goto top;
+		}
+
+		/*
+		 * As the func is an arbitrary callback, which can block, lock
+		 * should be released not to block other threads from
+		 * performing. A counter is used to hold a reference to block
+		 * which are held by krrp.
+		 */
+
+		hdr->b_l1hdr.b_krrp++;
+		mutex_exit(hash_lock);
+
+		error = func(hdr->b_l1hdr.b_buf->b_data, hdr->b_size, arg);
+
+		mutex_enter(hash_lock);
+		hdr->b_l1hdr.b_krrp--;
+		cv_broadcast(&hdr->b_l1hdr.b_cv);
+		mutex_exit(hash_lock);
+
+		return (error);
+	} else {
+		if (hash_lock)
+			mutex_exit(hash_lock);
+		return (ENODATA);
+	}
 }
 
 /*
@@ -4558,6 +4629,7 @@ arc_clear_callback(arc_buf_t *buf)
 	hash_lock = HDR_LOCK(hdr);
 	mutex_enter(hash_lock);
 	hdr = buf->b_hdr;
+	arc_wait_for_krrp(hdr);
 	ASSERT3P(hash_lock, ==, HDR_LOCK(hdr));
 
 	ASSERT3U(refcount_count(&hdr->b_l1hdr.b_refcnt), <,
@@ -4725,6 +4797,8 @@ arc_release(arc_buf_t *buf, void *tag)
 		nhdr->b_freeze_cksum = NULL;
 
 		(void) refcount_add(&nhdr->b_l1hdr.b_refcnt, tag);
+		nhdr->b_l1hdr.b_krrp = 0;
+
 		buf->b_hdr = nhdr;
 		mutex_exit(&buf->b_evict_lock);
 		atomic_add_64(&arc_anon->arcs_size, blksz);
@@ -4860,6 +4934,7 @@ arc_write_done(zio_t *zio)
 				ASSERT(refcount_is_zero(
 				    &exists->b_l1hdr.b_refcnt));
 				arc_change_state(arc_anon, exists, hash_lock);
+				arc_wait_for_krrp(exists);
 				mutex_exit(hash_lock);
 				arc_hdr_destroy(exists);
 				exists = buf_hash_insert(hdr, &hash_lock);

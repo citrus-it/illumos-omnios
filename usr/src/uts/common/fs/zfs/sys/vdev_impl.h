@@ -153,6 +153,15 @@ struct vdev_queue {
 	kmutex_t	vq_lock;
 };
 
+typedef struct vdev_io_stat {
+	uint64_t run_last_time;
+	uint64_t wait_last_time;
+	uint64_t run_len_time;
+	uint64_t wait_len_time;
+	uint64_t read_op;
+	uint64_t write_op;
+} vdev_io_stat_t;
+
 /*
  * Virtual device descriptor
  */
@@ -249,6 +258,9 @@ struct vdev {
 	vdev_aux_t	vdev_label_aux;	/* on-disk aux state		*/
 
 	char		*vdev_spare_group; /* spare group name */
+
+	struct kstat	*vdev_iokstat;
+	vdev_io_stat_t	vdev_iostat;
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must
 	 * remain at the end of the structure.  DTrace will use the kernel's

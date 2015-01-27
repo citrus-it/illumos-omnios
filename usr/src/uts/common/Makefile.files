@@ -23,7 +23,7 @@
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -1375,6 +1375,7 @@ TRANS_OBJS += mdtrans.o trans_ioctl.o trans_log.o
 
 ZFS_COMMON_OBJS +=		\
 	arc.o			\
+	autosnap.o		\
 	blkptr.o		\
 	bplist.o		\
 	bpobj.o			\
@@ -1385,6 +1386,7 @@ ZFS_COMMON_OBJS +=		\
 	dmu.o			\
 	dmu_diff.o		\
 	dmu_send.o		\
+	dmu_krrp.o		\
 	dmu_object.o		\
 	dmu_objset.o		\
 	dmu_traverse.o		\
@@ -1924,6 +1926,14 @@ ATGE_OBJS += atge_main.o atge_l1e.o atge_mii.o atge_l1.o atge_l1c.o
 YGE_OBJS = yge.o
 
 SKD_OBJS = skd.o
+
+KRRP_SHARED_OBJS += krrp_error.o krrp_ioctl_common.o krrp_params.o
+
+KRRP_OBJS += krrp.o krrp_svc.o krrp_ioctl.o krrp_server.o \
+			krrp_session.o krrp_pdu.o krrp_dblk.o \
+			krrp_protocol.o krrp_connection.o krrp_queue.o \
+			krrp_stream.o krrp_stream_task.o krrp_autosnap.o\
+			$(KRRP_SHARED_OBJS)
 
 #
 #	Build up defines and paths.

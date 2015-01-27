@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_SYNCTASK_H
@@ -85,6 +86,7 @@ int dsl_sync_task(const char *, dsl_checkfunc_t *,
     dsl_syncfunc_t *, void *, int, zfs_space_check_t);
 void dsl_sync_task_nowait(struct dsl_pool *, dsl_syncfunc_t *,
     void *, int, zfs_space_check_t, dmu_tx_t *);
+#define	DST_AVG_BLKSHIFT 14
 
 #ifdef	__cplusplus
 }

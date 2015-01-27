@@ -1104,6 +1104,26 @@ zpool_do_destroy(int argc, char **argv)
 		return (1);
 	}
 
+	ret = zfs_check_krrp(g_zfs, argv[0]);
+	/*
+	 * ENOTSUP means that autosnaper doesn't handle this pool.
+	 */
+	if (ret != ENOTSUP) {
+		if (ret == ECHILD || ret == EBUSY || ret == EUSERS)
+			ret = EBUSY;
+
+		if (ret) {
+			(void) zpool_standard_error(g_zfs,
+			    ret, gettext("cannnot destroy pool because "
+			    "of krrp"));
+			zpool_close(zhp);
+			ret = 1;
+			return (ret);
+		}
+	} else {
+		ret = 0;
+	}
+
 	if (zpool_disable_datasets(zhp, force) != 0) {
 		(void) fprintf(stderr, gettext("could not destroy '%s': "
 		    "could not unmount datasets\n"), zpool_get_name(zhp));
@@ -1183,6 +1203,26 @@ zpool_do_export(int argc, char **argv)
 		if ((zhp = zpool_open_canfail(g_zfs, argv[i])) == NULL) {
 			ret = 1;
 			continue;
+		}
+
+		ret = zfs_check_krrp(g_zfs, argv[0]);
+		/*
+		 * ENOTSUP means that autosnaper doesn't handle this pool.
+		 */
+		if (ret != ENOTSUP) {
+			if (ret == ECHILD || ret == EBUSY || ret == EUSERS)
+				ret = EBUSY;
+
+			if (ret) {
+				(void) zpool_standard_error(g_zfs,
+				    ret, gettext("cannnot export pool because "
+				    "of krrp"));
+				zpool_close(zhp);
+				ret = 1;
+				continue;
+			}
+		} else {
+			ret = 0;
 		}
 
 		if (zpool_disable_datasets_ex(zhp, force, n_threads) != 0) {

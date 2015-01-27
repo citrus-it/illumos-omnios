@@ -24,14 +24,16 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
+#include <sys/spa_impl.h>
 #include <sys/vdev_impl.h>
 #include <sys/zio.h>
+#include <sys/wrcache.h>
 #include <sys/fs/zfs.h>
 
 /*
@@ -307,8 +309,34 @@ vdev_mirror_io_start(zio_t *zio)
 	mirror_map_t *mm;
 	mirror_child_t *mc;
 	int c, children;
+	boolean_t spec_stop = B_FALSE;
+	boolean_t spec_case = B_FALSE;
+	spa_t *spa = zio->io_spa;
+	blkptr_t *bp = zio->io_bp;
 
 	mm = vdev_mirror_map_alloc(zio);
+
+	/*
+	 * offset zero tells us that it's not a physical zio, but logical,
+	 * so we need to check for the special case
+	 */
+	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
+	/*
+	 * wrc is persistent and can not be turned off so if it is disabled
+	 * there are no special blocks for sure
+	 */
+	if (spa_wrc_present(spa) && zio->io_child_type != ZIO_CHILD_VDEV) {
+		if (BP_GET_NDVAS(zio->io_bp) >= 2) {
+			vdev_t *v1 = vdev_lookup_top(spa,
+			    DVA_GET_VDEV(&bp->blk_dva[0]));
+			vdev_t *v2 = vdev_lookup_top(spa,
+			    DVA_GET_VDEV(&bp->blk_dva[1]));
+
+			if (vdev_is_special(v1) && !vdev_is_special(v2))
+				spec_case = B_TRUE;
+		}
+	}
+	spa_config_exit(spa, SCL_VDEV, FTAG);
 
 	if (zio->io_type == ZIO_TYPE_READ) {
 		if ((zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_replacing) {
@@ -328,6 +356,24 @@ vdev_mirror_io_start(zio_t *zio)
 					 */
 					continue;
 				}
+
+				/*
+				 * check btxg against the window and choose an
+				 * approproate dva
+				 */
+				if (spec_case) {
+					boolean_t cont;
+					uint64_t stxg;
+
+					mutex_enter(&spa->spa_wrc.wrc_lock);
+
+					stxg = spa->spa_wrc.wrc_start_txg;
+					cont = BP_PHYSICAL_BIRTH(bp) < stxg &&
+					    c == 0 || c == 1;
+					mutex_exit(&spa->spa_wrc.wrc_lock);
+					if (cont)
+						continue;
+				}
 				zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
 				    mc->mc_vd, mc->mc_offset,
 				    zio_buf_alloc(zio->io_size), zio->io_size,
@@ -340,7 +386,43 @@ vdev_mirror_io_start(zio_t *zio)
 		/*
 		 * For normal reads just pick one child.
 		 */
-		c = vdev_mirror_child_select(zio);
+
+		if (spec_case) {
+			/*
+			 * if birth_txg is less than windows, then block is on
+			 * normal device only otherwise it can be found on
+			 * special, because deletion goes under lock and until
+			 * deletion is done, the block is accessible on special
+			 */
+			wrc_data_t *wrc_data = &spa->spa_wrc;
+			uint64_t stxg;
+			uint64_t ftxg;
+
+			mutex_enter(&wrc_data->wrc_lock);
+
+			stxg = wrc_data->wrc_start_txg;
+			ftxg = wrc_data->wrc_finish_txg;
+
+			if (ftxg && BP_PHYSICAL_BIRTH(bp) > ftxg) {
+				DTRACE_PROBE(wrc_read_special);
+				c = WRC_SPECIAL_DVA;
+			} else if (BP_PHYSICAL_BIRTH(bp) >= stxg) {
+				if (!ftxg && wrc_data->wrc_delete) {
+					DTRACE_PROBE(wrc_read_normal);
+					c = WRC_NORMAL_DVA;
+				} else {
+					DTRACE_PROBE(wrc_read_special);
+					c = WRC_SPECIAL_DVA;
+				}
+			} else {
+				DTRACE_PROBE(wrc_read_normal);
+				c = WRC_NORMAL_DVA;
+			}
+
+			mutex_exit(&wrc_data->wrc_lock);
+		} else {
+			c = vdev_mirror_child_select(zio);
+		}
 		children = (c >= 0);
 	} else {
 		ASSERT(zio->io_type == ZIO_TYPE_WRITE);
@@ -352,7 +434,7 @@ vdev_mirror_io_start(zio_t *zio)
 		children = mm->mm_children;
 	}
 
-	for (;children--; ++c) {
+	for (; children-- && !spec_stop; ++c) {
 		mc = &mm->mm_child[c];
 		if (mc->mc_vd == NULL) {
 			/*
@@ -360,6 +442,14 @@ vdev_mirror_io_start(zio_t *zio)
 			 * Just skip this vdev.
 			 */
 			continue;
+		}
+		/*
+		 * we need to stop after spawning first child if
+		 * wrcache write or wrcache move is performed
+		 */
+		if (zio->io_child_type != ZIO_CHILD_VDEV) {
+			if (c == 0 && vdev_is_special(mc->mc_vd) && spec_case)
+				spec_stop = B_TRUE;
 		}
 		zio_nowait(zio_vdev_child_io(zio, zio->io_bp, mc->mc_vd,
 		    mc->mc_offset, zio->io_data, zio->io_size, zio->io_type,

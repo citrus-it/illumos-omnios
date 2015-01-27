@@ -20,10 +20,10 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2014 HybridCluster. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -52,6 +52,7 @@
 #include <sys/blkptr.h>
 #include <sys/dsl_bookmark.h>
 #include <sys/zfeature.h>
+#include <sys/autosnap.h>
 
 /* Set this tunable to TRUE to replace corrupt data with 0x2f5baddb10c */
 int zfs_send_corrupt_data = B_FALSE;
@@ -69,11 +70,22 @@ dump_bytes(dmu_sendarg_t *dsp, void *buf, int len)
 
 	dsp->dsa_err = 0;
 	if (!dsp->sendsize) {
-		fletcher_4_incremental_native(buf, len, &dsp->dsa_zc);
-		dsp->dsa_err = vn_rdwr(UIO_WRITE, dsp->dsa_vp,
-		    (caddr_t)buf, len,
-		    0, UIO_SYSSPACE, FAPPEND, RLIM64_INFINITY,
-		    CRED(), &resid);
+		/* on-wire checksum can be disabled for krrp */
+		if (!dsp->dsa_krrp_task ||
+		    dsp->dsa_krrp_task->buffer_args.force_cksum)
+			fletcher_4_incremental_native(buf, len, &dsp->dsa_zc);
+
+		/* if vp is NULL, then the send is from krrp */
+		if (dsp->dsa_vp != NULL) {
+			dsp->dsa_err = vn_rdwr(UIO_WRITE, dsp->dsa_vp,
+			    (caddr_t)buf, len,
+			    0, UIO_SYSSPACE, FAPPEND, RLIM64_INFINITY,
+			    CRED(), &resid);
+		} else {
+			ASSERT(dsp->dsa_krrp_task != NULL);
+			dsp->dsa_err = dmu_krrp_buffer_write(buf, len,
+			    dsp->dsa_krrp_task);
+		}
 	}
 	mutex_enter(&ds->ds_sendstream_lock);
 	*dsp->dsa_off += len;
@@ -175,10 +187,14 @@ dump_free(dmu_sendarg_t *dsp, uint64_t object, uint64_t offset,
 }
 
 static int
-dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type,
-    uint64_t object, uint64_t offset, int blksz, const blkptr_t *bp, void *data)
+dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type, uint64_t object,
+    uint64_t offset, int blksz, const blkptr_t *bp, const zbookmark_phys_t *zb)
 {
 	struct drr_write *drrw = &(dsp->dsa_drr->drr_u.drr_write);
+
+	enum arc_flags aflags = ARC_FLAG_WAIT;
+	arc_buf_t *abuf = NULL;
+	void *buf = NULL;
 
 	/*
 	 * We send data in increasing object, offset order.
@@ -229,9 +245,66 @@ dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type,
 	}
 
 	if (dump_bytes(dsp, dsp->dsa_drr, sizeof (dmu_replay_record_t)) != 0)
-		return (SET_ERROR(EINTR));
-	if (dump_bytes(dsp, data, blksz) != 0)
-		return (SET_ERROR(EINTR));
+		return (EINTR);
+
+	/*
+	 * if dsa_krrp task is not NULL, then the send is from krrp and we can
+	 * try to bypass copying data to an intermediate buffer.
+	 * Embedded blocks do not need to be bypassed as the data is inside
+	 * blockpointers itself
+	 */
+	if (!dsp->sendsize && dsp->dsa_krrp_task != NULL &&
+	    !BP_IS_EMBEDDED(bp)) {
+		dmu_krrp_arc_bypass_t bypass = {
+			.krrp_task = dsp->dsa_krrp_task,
+			.zc = &dsp->dsa_zc,
+			.cb = dmu_krrp_buffer_write,
+		};
+		int error = arc_io_bypass(dsp->dsa_os->os_spa, bp,
+		    dmu_krrp_arc_bypass, &bypass);
+
+		if (!error) {
+			DTRACE_PROBE(krrp_send_arc_bypass);
+			return (0);
+		}
+		if (error == ENODATA) {
+			DTRACE_PROBE(krrp_send_disk_read);
+			error = 0;
+		}
+		if (error)
+			return (error);
+	}
+
+	if (!dsp->sendsize) {
+		ASSERT0(zb->zb_level);
+		DTRACE_PROBE(arc_read_send);
+		if (arc_read(NULL, dsp->dsa_os->os_spa, bp, arc_getbuf_func,
+		    &abuf, ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL,
+		    &aflags, zb) != 0) {
+			if (zfs_send_corrupt_data) {
+			/* Send a block filled with 0x"zfs badd bloc" */
+				abuf = arc_buf_alloc(dsp->dsa_os->os_spa,
+				    blksz, &abuf,
+				    ARC_BUFC_DATA);
+				uint64_t *ptr;
+				for (ptr = abuf->b_data;
+				    (char *)ptr <
+				    (char *)abuf->b_data + blksz;
+				    ptr++)
+					*ptr = 0x2f5baddb10c;
+			} else {
+				return (EIO);
+			}
+		}
+		buf = abuf->b_data;
+	}
+
+	if (dump_bytes(dsp, buf, blksz) != 0)
+		return (EINTR);
+
+	if (!dsp->sendsize) {
+		(void) arc_buf_remove_ref(abuf, &abuf);
+	}
 	return (0);
 }
 
@@ -273,9 +346,12 @@ dump_write_embedded(dmu_sendarg_t *dsp, uint64_t object, uint64_t offset,
 }
 
 static int
-dump_spill(dmu_sendarg_t *dsp, uint64_t object, int blksz, void *data)
+dump_spill(dmu_sendarg_t *dsp, uint64_t object, int blksz,
+    const blkptr_t *bp, const zbookmark_phys_t *zb)
 {
 	struct drr_spill *drrs = &(dsp->dsa_drr->drr_u.drr_spill);
+	enum arc_flags aflags = ARC_FLAG_WAIT;
+	arc_buf_t *abuf;
 
 	if (dsp->dsa_pending_op != PENDING_NONE) {
 		if (dump_bytes(dsp, dsp->dsa_drr,
@@ -293,8 +369,40 @@ dump_spill(dmu_sendarg_t *dsp, uint64_t object, int blksz, void *data)
 
 	if (dump_bytes(dsp, dsp->dsa_drr, sizeof (dmu_replay_record_t)))
 		return (SET_ERROR(EINTR));
-	if (dump_bytes(dsp, data, blksz))
+
+	/*
+	 * if dsa_krrp task is not NULL, then the send is from krrp and we can
+	 * try to bypass copying data to an intermediate buffer.
+	 */
+	if (!dsp->sendsize && dsp->dsa_krrp_task != NULL) {
+		dmu_krrp_arc_bypass_t bypass = {
+			.krrp_task = dsp->dsa_krrp_task,
+			.zc = &dsp->dsa_zc,
+			.cb = dmu_krrp_buffer_write,
+		};
+		int error = arc_io_bypass(dsp->dsa_os->os_spa, bp,
+		    dmu_krrp_arc_bypass, &bypass);
+
+		if (!error)
+			return (0);
+		if (error == EAGAIN)
+			error = 0;
+		if (error)
+			return (error);
+	}
+
+	if (arc_read(NULL, dsp->dsa_os->os_spa, bp, arc_getbuf_func, &abuf,
+	    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL,
+	    &aflags, zb) != 0)
+		return (SET_ERROR(EIO));
+
+
+	if (dump_bytes(dsp, abuf->b_data, blksz)) {
+		(void) arc_buf_remove_ref(abuf, &abuf);
 		return (SET_ERROR(EINTR));
+	}
+	(void) arc_buf_remove_ref(abuf, &abuf);
+
 	return (0);
 }
 
@@ -436,7 +544,7 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	dmu_object_type_t type = bp ? BP_GET_TYPE(bp) : DMU_OT_NONE;
 	int err = 0;
 
-	if (issig(JUSTLOOKING) && issig(FORREAL))
+	if (dsp->dsa_vp && issig(JUSTLOOKING) && issig(FORREAL))
 		return (SET_ERROR(EINTR));
 
 	if (zb->zb_object != DMU_META_DNODE_OBJECT &&
@@ -480,53 +588,17 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		}
 		(void) arc_buf_remove_ref(abuf, &abuf);
 	} else if (type == DMU_OT_SA) {
-		arc_flags_t aflags = ARC_FLAG_WAIT;
-		arc_buf_t *abuf;
 		int blksz = BP_GET_LSIZE(bp);
 
-		if (arc_read(NULL, spa, bp, arc_getbuf_func, &abuf,
-		    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL,
-		    &aflags, zb) != 0)
-			return (SET_ERROR(EIO));
-
-		err = dump_spill(dsp, zb->zb_object, blksz, abuf->b_data);
-		(void) arc_buf_remove_ref(abuf, &abuf);
+		err = dump_spill(dsp, zb->zb_object, blksz, bp, zb);
 	} else if (backup_do_embed(dsp, bp)) {
 		/* it's an embedded level-0 block of a regular object */
 		int blksz = dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT;
 		err = dump_write_embedded(dsp, zb->zb_object,
 		    zb->zb_blkid * blksz, blksz, bp);
 	} else { /* it's a level-0 block of a regular object */
-		arc_flags_t aflags = ARC_FLAG_WAIT;
-		arc_buf_t *abuf = NULL;
-		char *buf = NULL;
 		int blksz = BP_GET_LSIZE(bp);
-		uint64_t offset;
-
-		if (!dsp->sendsize) {
-			ASSERT3U(blksz, ==, dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT);
-			ASSERT0(zb->zb_level);
-			if (arc_read(NULL, spa, bp, arc_getbuf_func, &abuf,
-			    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL,
-			    &aflags, zb) != 0) {
-				if (zfs_send_corrupt_data) {
-				/* Send a block filled with 0x"zfs badd bloc" */
-					abuf = arc_buf_alloc(spa, blksz, &abuf,
-					    ARC_BUFC_DATA);
-					uint64_t *ptr;
-					for (ptr = abuf->b_data;
-					    (char *)ptr <
-					    (char *)abuf->b_data + blksz;
-					    ptr++)
-						*ptr = 0x2f5baddb10c;
-				} else {
-					return (SET_ERROR(EIO));
-				}
-			}
-			buf = abuf->b_data;
-		}
-
-		offset = zb->zb_blkid * blksz;
+		uint64_t offset = zb->zb_blkid * blksz;
 
 		if (!(dsp->dsa_featureflags &
 		    DMU_BACKUP_FEATURE_LARGE_BLOCKS) &&
@@ -534,17 +606,13 @@ backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 			while (blksz > 0 && err == 0) {
 				int n = MIN(blksz, SPA_OLD_MAXBLOCKSIZE);
 				err = dump_write(dsp, type, zb->zb_object,
-				    offset, n, NULL, buf);
+				    offset, n, bp, zb);
 				offset += n;
-				buf += n;
 				blksz -= n;
 			}
 		} else {
 			err = dump_write(dsp, type, zb->zb_object,
-			    offset, blksz, bp, buf);
-		}
-		if (!dsp->sendsize) {
-			(void) arc_buf_remove_ref(abuf, &abuf);
+			    offset, blksz, bp, zb);
 		}
 	}
 
@@ -560,7 +628,7 @@ static int
 dmu_send_impl_ss(void *tag, dsl_pool_t *dp, dsl_dataset_t *ds,
     zfs_bookmark_phys_t *fromzb, boolean_t is_clone, boolean_t embedok,
     boolean_t large_block_ok, int outfd, vnode_t *vp, offset_t *off,
-    boolean_t sendsize)
+    boolean_t sendsize, dmu_krrp_task_t *krrp_task)
 {
 	objset_t *os;
 	dmu_replay_record_t *drr;
@@ -637,11 +705,13 @@ dmu_send_impl_ss(void *tag, dsl_pool_t *dp, dsl_dataset_t *ds,
 	dsp->dsa_os = os;
 	dsp->dsa_off = off;
 	dsp->dsa_toguid = dsl_dataset_phys(ds)->ds_guid;
+	dsp->dsa_krrp_task = krrp_task;
 	ZIO_SET_CHECKSUM(&dsp->dsa_zc, 0, 0, 0, 0);
 	dsp->dsa_pending_op = PENDING_NONE;
 	dsp->dsa_incremental = (fromzb != NULL);
 	dsp->dsa_featureflags = featureflags;
 	dsp->sendsize = sendsize;
+	dsp->dsa_featureflags = featureflags;
 
 	mutex_enter(&ds->ds_sendstream_lock);
 	list_insert_head(&ds->ds_sendstreams, dsp);
@@ -697,13 +767,15 @@ out:
 
 	return (err);
 }
-static int
+
+int
 dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *ds,
     zfs_bookmark_phys_t *fromzb, boolean_t is_clone, boolean_t embedok,
-    boolean_t large_block_ok, int outfd, vnode_t *vp, offset_t *off)
+    boolean_t large_block_ok, int outfd, vnode_t *vp, offset_t *off,
+    dmu_krrp_task_t *krrp_task)
 {
 	return (dmu_send_impl_ss(tag, dp, ds, fromzb, is_clone, embedok,
-	    large_block_ok, outfd, vp, off, B_FALSE));
+	    large_block_ok, outfd, vp, off, B_FALSE, krrp_task));
 }
 
 int
@@ -745,10 +817,10 @@ dmu_send_obj_ss(const char *pool, uint64_t tosnap, uint64_t fromsnap,
 		is_clone = (fromds->ds_dir != ds->ds_dir);
 		dsl_dataset_rele(fromds, FTAG);
 		err = dmu_send_impl_ss(FTAG, dp, ds, &zb, is_clone,
-		    embedok, large_block_ok, outfd, vp, off, sendsize);
+		    embedok, large_block_ok, outfd, vp, off, sendsize, NULL);
 	} else {
 		err = dmu_send_impl_ss(FTAG, dp, ds, NULL, B_FALSE,
-		    embedok, large_block_ok, outfd, vp, off, sendsize);
+		    embedok, large_block_ok, outfd, vp, off, sendsize, NULL);
 	}
 	dsl_dataset_rele(ds, FTAG);
 	return (err);
@@ -824,10 +896,10 @@ dmu_send(const char *tosnap, const char *fromsnap,
 			return (err);
 		}
 		err = dmu_send_impl(FTAG, dp, ds, &zb, is_clone,
-		    embedok, large_block_ok, outfd, vp, off);
+		    embedok, large_block_ok, outfd, vp, off, NULL);
 	} else {
 		err = dmu_send_impl(FTAG, dp, ds, NULL, B_FALSE,
-		    embedok, large_block_ok, outfd, vp, off);
+		    embedok, large_block_ok, outfd, vp, off, NULL);
 	}
 	if (owned)
 		dsl_dataset_disown(ds, FTAG);
@@ -905,18 +977,41 @@ typedef struct dmu_recv_begin_arg {
 
 static int
 recv_begin_check_existing_impl(dmu_recv_begin_arg_t *drba, dsl_dataset_t *ds,
-    uint64_t fromguid)
+    uint64_t fromguid, dmu_tx_t *tx)
 {
 	uint64_t val;
 	int error;
 	dsl_pool_t *dp = ds->ds_dir->dd_pool;
 
-	/* temporary clone name must not exist */
-	error = zap_lookup(dp->dp_meta_objset,
-	    dsl_dir_phys(ds->ds_dir)->dd_child_dir_zapobj, recv_clone_name,
-	    8, 1, &val);
-	if (error != ENOENT)
-		return (error == 0 ? EBUSY : error);
+	if (dmu_tx_is_syncing(tx)) {
+		/* temporary clone name must not exist */
+		error = zap_lookup(dp->dp_meta_objset,
+		    dsl_dir_phys(ds->ds_dir)->dd_child_dir_zapobj,
+		    recv_clone_name, 8, 1, &val);
+		if (error == 0) {
+			dsl_dataset_t *tds;
+
+			/* check that if it is currently used */
+			error = dsl_dataset_own_obj(dp, val, FTAG, &tds);
+			if (!error) {
+				char name[ZFS_MAXNAMELEN];
+
+				dsl_dataset_name(tds, name);
+				dsl_dataset_disown(tds, FTAG);
+
+				error = dsl_dataset_hold(dp, name, FTAG, &tds);
+				if (!error) {
+					dsl_destroy_head_sync_impl(tds, tx);
+					dsl_dataset_rele(tds, FTAG);
+					error = ENOENT;
+				}
+			} else {
+				error = 0;
+			}
+		}
+		if (error != ENOENT)
+			return (error == 0 ? EBUSY : error);
+	}
 
 	/* new snapshot name must not exist */
 	error = zap_lookup(dp->dp_meta_objset,
@@ -1046,7 +1141,7 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 			return (SET_ERROR(EINVAL));
 		}
 
-		error = recv_begin_check_existing_impl(drba, ds, fromguid);
+		error = recv_begin_check_existing_impl(drba, ds, fromguid, tx);
 		dsl_dataset_rele(ds, FTAG);
 	} else if (error == ENOENT) {
 		/* target fs does not exist; must be a full backup or clone */
@@ -1191,7 +1286,8 @@ dmu_recv_begin_sync(void *arg, dmu_tx_t *tx)
  */
 int
 dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
-    boolean_t force, char *origin, dmu_recv_cookie_t *drc)
+    boolean_t force, boolean_t force_cksum, char *origin,
+    dmu_recv_cookie_t *drc)
 {
 	dmu_recv_begin_arg_t drba = { 0 };
 	dmu_replay_record_t *drr;
@@ -1211,12 +1307,15 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 	drr = kmem_zalloc(sizeof (dmu_replay_record_t), KM_SLEEP);
 	drr->drr_type = DRR_BEGIN;
 	drr->drr_u.drr_begin = *drc->drc_drrb;
-	if (drc->drc_byteswap) {
-		fletcher_4_incremental_byteswap(drr,
-		    sizeof (dmu_replay_record_t), &drc->drc_cksum);
-	} else {
-		fletcher_4_incremental_native(drr,
-		    sizeof (dmu_replay_record_t), &drc->drc_cksum);
+	/* on-wire checksum can be disabled for krrp */
+	if (force_cksum) {
+		if (drc->drc_byteswap) {
+			fletcher_4_incremental_byteswap(drr,
+			    sizeof (dmu_replay_record_t), &drc->drc_cksum);
+		} else {
+			fletcher_4_incremental_native(drr,
+			    sizeof (dmu_replay_record_t), &drc->drc_cksum);
+		}
 	}
 	kmem_free(drr, sizeof (dmu_replay_record_t));
 
@@ -1246,6 +1345,7 @@ struct restorearg {
 	int bufsize; /* amount of memory allocated for buf */
 	zio_cksum_t cksum;
 	avl_tree_t *guid_to_ds_map;
+	dmu_krrp_task_t *krrp_task;
 };
 
 typedef struct guid_map_entry {
@@ -1295,27 +1395,43 @@ restore_read(struct restorearg *ra, int len, char *buf)
 	ASSERT0(len % 8);
 	ASSERT3U(len, <=, ra->bufsize);
 
-	while (done < len) {
-		ssize_t resid;
+	/*
+	 * if vp is NULL, then the send is from krrp and we can try to bypass
+	 * copying data to an intermediate buffer.
+	 */
+	if (ra->vp != NULL) {
+		while (done < len) {
+			ssize_t resid = 0;
 
-		ra->err = vn_rdwr(UIO_READ, ra->vp,
-		    buf + done, len - done,
-		    ra->voff, UIO_SYSSPACE, FAPPEND,
-		    RLIM64_INFINITY, CRED(), &resid);
-
-		if (resid == len - done)
-			ra->err = SET_ERROR(EINVAL);
-		ra->voff += len - done - resid;
-		done = len - resid;
+			ra->err = vn_rdwr(UIO_READ, ra->vp,
+			    buf + done, len - done,
+			    ra->voff, UIO_SYSSPACE, FAPPEND,
+			    RLIM64_INFINITY, CRED(), &resid);
+			if (resid == len - done)
+				ra->err = SET_ERROR(EINVAL);
+			ra->voff += len - done - resid;
+			done = len - resid;
+			if (ra->err != 0)
+				return (NULL);
+		}
+	} else {
+		ASSERT(ra->krrp_task != NULL);
+		ra->err = dmu_krrp_buffer_read(buf, len, ra->krrp_task);
 		if (ra->err != 0)
 			return (NULL);
+
+		done = len;
 	}
 
 	ASSERT3U(done, ==, len);
-	if (ra->byteswap)
-		fletcher_4_incremental_byteswap(buf, len, &ra->cksum);
-	else
-		fletcher_4_incremental_native(buf, len, &ra->cksum);
+	/* on-wire checksum can be disabled for krrp */
+	if (!ra->krrp_task ||
+	    ra->krrp_task->buffer_args.force_cksum) {
+		if (ra->byteswap)
+			fletcher_4_incremental_byteswap(buf, len, &ra->cksum);
+		else
+			fletcher_4_incremental_native(buf, len, &ra->cksum);
+	}
 	return (buf);
 }
 
@@ -1497,8 +1613,8 @@ restore_object(struct restorearg *ra, objset_t *os, struct drr_object *drro)
 		return (SET_ERROR(EINVAL));
 	}
 
-	dmu_object_set_checksum(os, drro->drr_object, drro->drr_checksumtype,
-	    tx);
+	dmu_object_set_checksum(os, drro->drr_object,
+	    drro->drr_checksumtype, tx);
 	dmu_object_set_compress(os, drro->drr_object, drro->drr_compress, tx);
 
 	if (data != NULL) {
@@ -1551,7 +1667,7 @@ restore_write(struct restorearg *ra, objset_t *os,
     struct drr_write *drrw)
 {
 	dmu_tx_t *tx;
-	void *data;
+	void *data = NULL;
 	int err;
 
 	if (drrw->drr_offset + drrw->drr_length < drrw->drr_offset ||
@@ -1585,11 +1701,13 @@ restore_write(struct restorearg *ra, objset_t *os,
 		dmu_tx_abort(tx);
 		return (err);
 	}
+
 	if (ra->byteswap) {
 		dmu_object_byteswap_t byteswap =
 		    DMU_OT_BYTESWAP(drrw->drr_type);
 		dmu_ot_byteswap[byteswap].ob_func(data, drrw->drr_length);
 	}
+
 	dmu_assign_arcbuf(bonus, drrw->drr_offset, abuf, tx);
 	dmu_tx_commit(tx);
 	dmu_buf_rele(bonus, FTAG);
@@ -1781,7 +1899,7 @@ dmu_recv_cleanup_ds(dmu_recv_cookie_t *drc)
  */
 int
 dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
-    int cleanup_fd, uint64_t *action_handlep)
+    int cleanup_fd, uint64_t *action_handlep, dmu_krrp_task_t *krrp_task)
 {
 	struct restorearg ra = { 0 };
 	dmu_replay_record_t *drr;
@@ -1793,8 +1911,17 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 	ra.cksum = drc->drc_cksum;
 	ra.vp = vp;
 	ra.voff = *voffp;
-	ra.bufsize = SPA_MAXBLOCKSIZE;
-	ra.buf = kmem_alloc(ra.bufsize, KM_SLEEP);
+
+	/* Use pre-allocated buffer in case of krrp */
+	if (krrp_task && krrp_task->stream_handler) {
+		ra.bufsize =
+		    krrp_task->stream_handler->custom_recv_buffer_size;
+		ra.buf = krrp_task->stream_handler->custom_recv_buffer;
+	} else {
+		ra.bufsize = SPA_MAXBLOCKSIZE;
+		ra.buf = kmem_alloc(ra.bufsize, KM_SLEEP);
+	}
+	ra.krrp_task = krrp_task;
 
 	/* these were verified in dmu_recv_begin */
 	ASSERT3U(DMU_GET_STREAM_HDRTYPE(drc->drc_drrb->drr_versioninfo), ==,
@@ -1851,7 +1978,7 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 	pcksum = ra.cksum;
 	while (ra.err == 0 &&
 	    NULL != (drr = restore_read(&ra, sizeof (*drr), NULL))) {
-		if (issig(JUSTLOOKING) && issig(FORREAL)) {
+		if (vp && issig(JUSTLOOKING) && issig(FORREAL)) {
 			ra.err = SET_ERROR(EINTR);
 			goto out;
 		}
@@ -1942,7 +2069,8 @@ out:
 		dmu_recv_cleanup_ds(drc);
 	}
 
-	kmem_free(ra.buf, ra.bufsize);
+	if (!krrp_task || !krrp_task->stream_handler)
+		kmem_free(ra.buf, ra.bufsize);
 	*voffp = ra.voff;
 	return (ra.err);
 }
@@ -2007,6 +2135,19 @@ dmu_recv_end_check(void *arg, dmu_tx_t *tx)
 	} else {
 		error = dsl_dataset_snapshot_check_impl(drc->drc_ds,
 		    drc->drc_tosnap, tx, B_TRUE, 1, drc->drc_cred);
+	}
+
+	if (dmu_tx_is_syncing(tx)) {
+		const char *token =
+		    drc->drc_krrp_task->buffer_args.to_ds;
+		const char *cookie = drc->drc_krrp_task->cookie;
+		dsl_pool_t *dp = tx->tx_pool;
+
+		if (*token != '\0') {
+			error = zap_update(dp->dp_meta_objset,
+			    DMU_POOL_DIRECTORY_OBJECT, token, 1,
+			    strlen(cookie) + 1, cookie, tx);
+		}
 	}
 	return (error);
 }

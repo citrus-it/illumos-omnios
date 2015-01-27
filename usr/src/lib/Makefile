@@ -111,6 +111,7 @@ SUBDIRS += \
 	libipmp		\
 	libiscsit	\
 	libkmf		\
+	libkrrp		\
 	libkstat	\
 	libkvm		\
 	liblm		\
@@ -422,6 +423,7 @@ HDRSUBDIRS=		\
 	libipmp		\
 	libipp		\
 	libiscsit	\
+	libkrrp		\
 	libkstat	\
 	libkvm		\
 	libmail		\
@@ -596,6 +598,7 @@ libipadm:	libnsl libinetutil libsocket libdlpi libnvpair libdhcpagent \
 		libdladm libsecdb libcmdutils
 libiscsit:	libc libnvpair libstmf libuuid libnsl
 libkmf:		libcryptoutil pkcs11
+libkrrp:	libnvpair libuuid libsysevent libumem
 libm:		libc
 libm1:		libc libm
 libmvec:	libc libm

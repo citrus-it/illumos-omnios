@@ -1,0 +1,46 @@
+#
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+#
+
+$mapfile_version 2
+
+SYMBOL_VERSION SUNWprivate_1.1 {
+    global:
+	is_krrp_supported;
+	libkrrp_init;
+	libkrrp_fini;
+	krrp_set_srv_config;
+	krrp_get_srv_config;
+	krrp_sess_create_sender;
+	krrp_sess_create_receiver;
+	krrp_sess_create_compound;
+	krrp_sess_destroy;
+	krrp_sess_create_conn;
+	krrp_sess_conn_throttle;
+	krrp_sess_create_pdu_engine;
+	krrp_sess_create_read_stream;
+	krrp_sess_create_write_stream;
+	krrp_sess_run;
+	krrp_sess_send_stop;
+	krrp_sess_get_list;
+	krrp_sess_list_free;
+	krrp_zfs_get_recv_cookies;
+	krrp_svc_enable;
+	krrp_svc_disable;
+	krrp_svc_state;
+	libkrrp_error;
+	libkrrp_error_description;
+	libkrrp_evc_subscribe;
+	libkrrp_evc_unsubscribe;
+	libkrrp_evc_error;
+	libkrrp_evc_error_description;
+	libkrrp_ev_dup;
+	libkrrp_ev_type;
+	libkrrp_ev_data;
+	libkrrp_ev_error;
+	libkrrp_ev_error_description;
+	libkrrp_ev_data_error_description;
+	libkrrp_ev_free;
+    local:
+	*;
+};

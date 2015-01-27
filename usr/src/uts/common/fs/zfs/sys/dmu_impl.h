@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _SYS_DMU_IMPL_H
@@ -34,6 +34,7 @@
 #include <sys/dnode.h>
 #include <sys/zfs_context.h>
 #include <sys/zfs_ioctl.h>
+#include <sys/kreplication_common.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -297,7 +298,22 @@ typedef struct dmu_sendarg {
 	uint64_t dsa_featureflags;
 	uint64_t dsa_last_data_object;
 	uint64_t dsa_last_data_offset;
+	dmu_krrp_task_t *dsa_krrp_task;
 } dmu_sendarg_t;
+
+void *dmu_krrp_stream_init();
+void dmu_krrp_stream_fini(void *handler);
+int dmu_krrp_buffer_write(void *buf, int len,
+    dmu_krrp_task_t *krrp_task);
+int dmu_krrp_buffer_read(void *buf, int len,
+    dmu_krrp_task_t *krrp_task);
+void* dmu_krrp_init_send_task(void *args);
+void* dmu_krrp_init_recv_task(void *args);
+int dmu_krrp_fini_task(void *krrp_task_void);
+int dmu_krrp_lend_send_buffer(void *krrp_task_void,
+    kreplication_buffer_t *buffer);
+int dmu_krrp_lend_recv_buffer(void *krrp_task_void,
+    kreplication_buffer_t *buffer);
 
 void dmu_object_zapify(objset_t *, uint64_t, dmu_object_type_t, dmu_tx_t *);
 void dmu_object_free_zapified(objset_t *, uint64_t, dmu_tx_t *);

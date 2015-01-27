@@ -1,0 +1,49 @@
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/network/krrp@$(PKGVERS)
+set name=pkg.description \
+    value="In-Kernel Remote Replication Protocol (KRRP) for super-fast CDP reliable service"
+set name=pkg.summary value="Remote Replication Protocol (KRRP)"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Networking
+set name=variant.arch value=$(ARCH)
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/include/sys
+dir path=usr/lib
+dir path=usr/lib/devfsadm group=sys
+dir path=usr/lib/devfsadm/linkmod group=sys
+dir path=usr/sbin
+driver name=krrp perms="* 0600 root sys"
+file path=kernel/drv/$(ARCH64)/krrp group=sys mode=0755
+$(i386_ONLY)file path=kernel/drv/krrp group=sys mode=0755
+file path=kernel/drv/krrp.conf group=sys mode=0644 \
+    original_name=SUNWkrrp:kernel/drv/krrp.conf preserve=renamenew
+file path=lib/$(ARCH64)/libkrrp.so.1
+file path=lib/$(ARCH64)/llib-lkrrp.ln
+file path=lib/libkrrp.so.1
+file path=lib/llib-lkrrp
+file path=lib/llib-lkrrp.ln
+file path=usr/include/libkrrp.h
+file path=usr/include/sys/kreplication_common.h
+file path=usr/include/sys/sysevent/krrp.h
+file path=usr/lib/devfsadm/linkmod/SUNW_krrp_link.so group=sys
+file path=usr/sbin/krrpadm mode=0555
+license lic_CDDL license=lic_CDDL
+link path=lib/$(ARCH64)/libkrrp.so target=libkrrp.so.1
+link path=lib/libkrrp.so target=libkrrp.so.1
+link path=usr/lib/$(ARCH64)/libkrrp.so \
+    target=../../../lib/$(ARCH64)/libkrrp.so.1
+link path=usr/lib/$(ARCH64)/libkrrp.so.1 \
+    target=../../../lib/$(ARCH64)/libkrrp.so.1
+link path=usr/lib/$(ARCH64)/llib-lkrrp.ln \
+    target=../../../lib/$(ARCH64)/llib-lkrrp.ln
+link path=usr/lib/libkrrp.so target=../../lib/libkrrp.so.1
+link path=usr/lib/libkrrp.so.1 target=../../lib/libkrrp.so.1
+link path=usr/lib/llib-lkrrp target=../../lib/llib-lkrrp
+link path=usr/lib/llib-lkrrp.ln target=../../lib/llib-lkrrp.ln

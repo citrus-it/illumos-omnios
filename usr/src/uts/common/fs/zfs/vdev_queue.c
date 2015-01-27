@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -283,6 +283,8 @@ vdev_queue_io_add(vdev_queue_t *vq, zio_t *zio)
 	spa->spa_queue_stats[zio->io_priority].spa_queued++;
 	if (spa->spa_iokstat != NULL)
 		kstat_waitq_enter(spa->spa_iokstat->ks_data);
+	if (vq->vq_vdev->vdev_iokstat != NULL)
+		kstat_waitq_enter(vq->vq_vdev->vdev_iokstat->ks_data);
 	mutex_exit(&spa->spa_iokstat_lock);
 }
 
@@ -299,6 +301,8 @@ vdev_queue_io_remove(vdev_queue_t *vq, zio_t *zio)
 	spa->spa_queue_stats[zio->io_priority].spa_queued--;
 	if (spa->spa_iokstat != NULL)
 		kstat_waitq_exit(spa->spa_iokstat->ks_data);
+	if (vq->vq_vdev->vdev_iokstat != NULL)
+		kstat_waitq_exit(vq->vq_vdev->vdev_iokstat->ks_data);
 	mutex_exit(&spa->spa_iokstat_lock);
 }
 
@@ -315,6 +319,8 @@ vdev_queue_pending_add(vdev_queue_t *vq, zio_t *zio)
 	spa->spa_queue_stats[zio->io_priority].spa_active++;
 	if (spa->spa_iokstat != NULL)
 		kstat_runq_enter(spa->spa_iokstat->ks_data);
+	if (vq->vq_vdev->vdev_iokstat != NULL)
+		kstat_runq_enter(vq->vq_vdev->vdev_iokstat->ks_data);
 	mutex_exit(&spa->spa_iokstat_lock);
 }
 
@@ -322,6 +328,7 @@ static void
 vdev_queue_pending_remove(vdev_queue_t *vq, zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
+
 	ASSERT(MUTEX_HELD(&vq->vq_lock));
 	ASSERT3U(zio->io_priority, <, ZIO_PRIORITY_NUM_QUEUEABLE);
 	vq->vq_class[zio->io_priority].vqc_active--;
@@ -334,6 +341,19 @@ vdev_queue_pending_remove(vdev_queue_t *vq, zio_t *zio)
 		kstat_io_t *ksio = spa->spa_iokstat->ks_data;
 
 		kstat_runq_exit(spa->spa_iokstat->ks_data);
+		if (zio->io_type == ZIO_TYPE_READ) {
+			ksio->reads++;
+			ksio->nread += zio->io_size;
+		} else if (zio->io_type == ZIO_TYPE_WRITE) {
+			ksio->writes++;
+			ksio->nwritten += zio->io_size;
+		}
+	}
+
+	if (vq->vq_vdev->vdev_iokstat != NULL) {
+		kstat_io_t *ksio = vq->vq_vdev->vdev_iokstat->ks_data;
+
+		kstat_runq_exit(ksio);
 		if (zio->io_type == ZIO_TYPE_READ) {
 			ksio->reads++;
 			ksio->nread += zio->io_size;
@@ -515,49 +535,6 @@ vdev_queue_class_to_issue(vdev_queue_t *vq)
 	/* No eligible queued i/os */
 	return (ZIO_PRIORITY_NUM_QUEUEABLE);
 }
-
-/*
- * Compute vdev utilization
- *
- * we use active queue add/remove events to accummulate vdev busy time
- * (when there are zios on the active queue)
- *
- * the expected usage pattern is as follows:
- * ...
- * vdev_busy_update(vd);
- * avl_add(pending_tree, zio);
- * ...
- * vdev_busy_update(vd);
- * avl_remove(pending_tree, zio);
- * ...
- */
-
-static void
-vdev_busy_update(vdev_t *vd)
-{
-	ulong_t active;
-	vdev_queue_t *vq = &vd->vdev_queue;
-	vdev_stat_t *vs = &vd->vdev_stat;
-	hrtime_t ts;
-
-	ASSERT(MUTEX_HELD(&vq->vq_lock));
-
-	active = avl_numnodes(&vq->vq_active_tree);
-
-	DTRACE_PROBE2(vdev_util_comp, uint64_t, vd->vdev_guid,
-	    ulong_t, active);
-
-	ts = gethrtime();
-	mutex_enter(&vd->vdev_stat_lock);
-	if (active) {
-		ASSERT(vs->vs_bzstart);
-		ASSERT(vs->vs_bzstart <= ts);
-		vs->vs_bztotal += ts - vs->vs_bzstart;
-	}
-	vs->vs_bzstart = ts;
-	mutex_exit(&vd->vdev_stat_lock);
-}
-
 
 /*
  * Compute the range spanned by two i/os, which is the endpoint of the last
@@ -760,9 +737,6 @@ again:
 		goto again;
 	}
 
-	/* update vdev utilization statistics */
-	vdev_busy_update(zio->io_vd);
-
 	vdev_queue_pending_add(vq, zio);
 	vq->vq_last_offset = zio->io_offset;
 
@@ -823,9 +797,6 @@ vdev_queue_io_done(zio_t *zio)
 		delay(SEC_TO_TICK(zio_handle_io_delay(zio)));
 
 	mutex_enter(&vq->vq_lock);
-
-	/* update vdev utilization statistics */
-	vdev_busy_update(zio->io_vd);
 
 	vdev_queue_pending_remove(vq, zio);
 

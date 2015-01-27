@@ -1,0 +1,1093 @@
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
+ * Stream module
+ */
+
+#include <sys/types.h>
+#include <sys/kmem.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/sunldi.h>
+#include <sys/time.h>
+#include <sys/sdt.h>
+#include <sys/sysmacros.h>
+#include <sys/modctl.h>
+#include <sys/class.h>
+#include <sys/cmn_err.h>
+
+#include "krrp_stream.h"
+
+#define	is_str_empty(str) (str[0] == '\0')
+
+#define	copy_str(dst_str, src_str, dst_str_max_sz) \
+	((strlcpy(dst_str, src_str, dst_str_max_sz) < dst_str_max_sz) ? 0 : -1)
+
+/* #define	KRRP_STREAM_DEBUG 1 */
+
+/* These extern functions are part of ZFS sources */
+extern int spa_wrc_mode(const char *name);
+extern uint64_t dsl_dataset_creation_txg(const char *name);
+extern int dmu_krrp_get_recv_cookie(const char *pool,
+    const char *token, char *cookie, size_t len);
+
+
+typedef void (krrp_stream_handler_t)(void *);
+
+static krrp_stream_t * krrp_stream_common_create(void);
+static void krrp_stream_task_done(krrp_stream_t *, krrp_stream_task_t *,
+    boolean_t);
+static void krrp_stream_callback(krrp_stream_t *, krrp_stream_cb_ev_t,
+    uintptr_t);
+
+static void krrp_stream_calc_avg_rpo(krrp_stream_t *, krrp_stream_task_t *,
+    boolean_t);
+static void krrp_stream_read(void *);
+static void krrp_stream_write(void *);
+
+static int krrp_stream_activate_autosnap(krrp_stream_t *stream,
+    krrp_error_t *error);
+static void krrp_stream_autosnap_restore_cb(void *void_stream,
+    const char *snap_name, uint64_t txg);
+
+static int krrp_stream_validate_run(krrp_stream_t *stream,
+    krrp_error_t *error);
+
+static uint64_t krrp_stream_get_snap_txg(krrp_stream_t *stream,
+    const char *short_snap_name);
+static int krrp_stream_check_wrc(krrp_stream_t *, krrp_error_t *);
+
+#if 0
+static void krrp_stream_debug(const char *, void *, void *, void *, void *);
+#endif
+
+static void krrp_stream_snap_create_error_cb(const char *, int,
+    uint64_t, void *);
+static boolean_t krrp_stream_read_snap_confirm_cb(const char *, boolean_t,
+    uint64_t, void *);
+static boolean_t krrp_stream_write_snap_notify_cb(const char *, boolean_t,
+    boolean_t, uint64_t, uint64_t, void *);
+static boolean_t krrp_stream_read_snap_notify_cb(const char *, boolean_t,
+    boolean_t, uint64_t, uint64_t, void *);
+
+int
+krrp_stream_read_create(krrp_stream_t **result_stream,
+    const char *dataset, const char *base_snap_name,
+    const char *incr_snap_name, const char *zcookies,
+    boolean_t include_all_snaps,
+    boolean_t recursive, boolean_t send_props,
+    boolean_t enable_cksum, boolean_t embedded, krrp_error_t *error)
+{
+	krrp_stream_t *stream;
+	int rc;
+
+	VERIFY(result_stream != NULL && *result_stream == NULL);
+	VERIFY(dataset != NULL);
+
+	stream = krrp_stream_common_create();
+
+	stream->mode = KRRP_STRMM_READ;
+	stream->recursive = recursive;
+
+	rc = copy_str(stream->dataset, dataset, sizeof (stream->dataset));
+	if (rc != 0 || is_str_empty(dataset)) {
+		krrp_error_set(error, KRRP_ERRNO_SRCDS, EINVAL);
+		goto err;
+	}
+
+	/* Source and Common snapshots must not be equal */
+	if (base_snap_name != NULL && incr_snap_name != NULL &&
+		strcmp(base_snap_name, incr_snap_name) == 0) {
+		krrp_error_set(error, KRRP_ERRNO_STREAM, EINVAL);
+		goto err;
+	}
+
+	/*
+	 * If base_snap_name is defined then the stream will be non_continuous,
+	 * that means: only one task will be processed
+	 */
+	if (base_snap_name != NULL) {
+		stream->non_continuous = B_TRUE;
+
+		rc = copy_str(stream->base_snap_name, base_snap_name,
+		    sizeof (stream->base_snap_name));
+		if (rc != 0 || is_str_empty(base_snap_name)) {
+			krrp_error_set(error, KRRP_ERRNO_SRCSNAP, EINVAL);
+			goto err;
+		}
+
+		if (zcookies != NULL) {
+			rc = copy_str(stream->zcookies, zcookies,
+			    sizeof (stream->zcookies));
+			if (rc != 0 || is_str_empty(zcookies)) {
+				krrp_error_set(error,
+				    KRRP_ERRNO_ZCOOKIES, EINVAL);
+				goto err;
+			}
+		}
+	}
+
+	if (incr_snap_name != NULL) {
+		rc = copy_str(stream->incr_snap_name, incr_snap_name,
+			sizeof (stream->incr_snap_name));
+		if (rc != 0 || is_str_empty(incr_snap_name)) {
+			krrp_error_set(error, KRRP_ERRNO_CMNSNAP, EINVAL);
+			goto err;
+		}
+	}
+
+	rc = krrp_stream_te_read_create(&stream->task_engine,
+	    stream->dataset, include_all_snaps, stream->recursive,
+	    send_props, enable_cksum, embedded, error);
+	if (rc != 0)
+		goto err;
+
+	*result_stream = stream;
+
+	return (0);
+
+err:
+	krrp_stream_destroy(stream);
+
+	return (-1);
+}
+
+int
+krrp_stream_write_create(krrp_stream_t **result_stream,
+    const char *dataset, const char *incr_snap_name,
+	const char *zcookies, boolean_t force_receive,
+    boolean_t enable_cksum, nvlist_t *ignore_props_list,
+    nvlist_t *replace_props_list, krrp_error_t *error)
+{
+	krrp_stream_t *stream;
+	int rc;
+
+	VERIFY(result_stream != NULL && *result_stream == NULL);
+	VERIFY(dataset != NULL);
+
+	stream = krrp_stream_common_create();
+
+	stream->mode = KRRP_STRMM_WRITE;
+
+	rc = copy_str(stream->dataset, dataset, sizeof (stream->dataset));
+	if (rc != 0 || is_str_empty(dataset)) {
+		krrp_error_set(error, KRRP_ERRNO_DSTDS, EINVAL);
+		goto err;
+	}
+
+	if (zcookies != NULL) {
+		rc = copy_str(stream->zcookies, zcookies,
+		    sizeof (stream->zcookies));
+		if (rc != 0 || is_str_empty(zcookies)) {
+			krrp_error_set(error, KRRP_ERRNO_ZCOOKIES, EINVAL);
+			goto err;
+		}
+	}
+
+	if (incr_snap_name != NULL) {
+		rc = copy_str(stream->incr_snap_name, incr_snap_name,
+		    sizeof (stream->incr_snap_name));
+		if (rc != 0 || is_str_empty(incr_snap_name)) {
+			krrp_error_set(error, KRRP_ERRNO_CMNSNAP, EINVAL);
+			goto err;
+		}
+	}
+
+	rc = krrp_stream_te_write_create(&stream->task_engine,
+		stream->dataset, force_receive, enable_cksum,
+	    ignore_props_list, replace_props_list, error);
+	if (rc != 0)
+		goto err;
+
+	*result_stream = stream;
+
+	return (0);
+
+err:
+	krrp_stream_destroy(stream);
+
+	return (-1);
+}
+
+int
+krrp_stream_fake_read_create(krrp_stream_t **result_stream,
+    uint64_t fake_data_sz, krrp_error_t *error)
+{
+	int rc = -1;
+	krrp_stream_t *stream;
+
+	VERIFY(result_stream != NULL && *result_stream == NULL);
+
+	if (fake_data_sz == 0) {
+		krrp_error_set(error, KRRP_ERRNO_FAKEDSZ, EINVAL);
+		goto out;
+	}
+
+	stream = krrp_stream_common_create();
+
+	stream->mode = KRRP_STRMM_READ;
+	stream->fake_mode = B_TRUE;
+	stream->non_continuous = B_TRUE;
+	stream->fake_data_sz = fake_data_sz;
+
+	/* Fake never fails */
+	VERIFY(krrp_stream_te_fake_read_create(&stream->task_engine,
+	    error) == 0);
+
+	*result_stream = stream;
+	rc = 0;
+
+out:
+	return (rc);
+}
+
+int
+krrp_stream_fake_write_create(krrp_stream_t **result_stream,
+    krrp_error_t *error)
+{
+	krrp_stream_t *stream;
+
+	VERIFY(result_stream != NULL && *result_stream == NULL);
+
+	stream = krrp_stream_common_create();
+
+	stream->mode = KRRP_STRMM_WRITE;
+	stream->fake_mode = B_TRUE;
+	stream->non_continuous = B_TRUE;
+
+	/* Fake never fails */
+	VERIFY(krrp_stream_te_fake_write_create(&stream->task_engine,
+	    error) == 0);
+
+	*result_stream = stream;
+
+	return (0);
+}
+
+static krrp_stream_t *
+krrp_stream_common_create(void)
+{
+	krrp_stream_t *stream;
+
+	stream = kmem_zalloc(sizeof (krrp_stream_t), KM_SLEEP);
+
+	mutex_init(&stream->mtx, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&stream->cv, NULL, CV_DEFAULT, NULL);
+
+	stream->state = KRRP_STRMS_CREATED;
+
+	return (stream);
+}
+
+void
+krrp_stream_destroy(krrp_stream_t *stream)
+{
+	krrp_stream_lock(stream);
+
+	if (stream->state == KRRP_STRMS_ACTIVE) {
+		stream->state = KRRP_STRMS_STOPPED;
+		krrp_stream_unlock(stream);
+		thread_join(stream->t_did);
+		krrp_stream_lock(stream);
+	}
+
+	if (stream->task_engine != NULL)
+		krrp_stream_te_destroy(stream->task_engine);
+
+	if (stream->autosnap != NULL)
+		krrp_autosnap_destroy(stream->autosnap);
+
+	krrp_stream_unlock(stream);
+
+	cv_destroy(&stream->cv);
+	mutex_destroy(&stream->mtx);
+
+	kmem_free(stream, sizeof (krrp_stream_t));
+}
+
+void
+krrp_stream_register_callback(krrp_stream_t *stream,
+    krrp_stream_cb_t *ev_cb, void *ev_cb_arg)
+{
+	VERIFY(ev_cb != NULL);
+
+	krrp_stream_lock(stream);
+	VERIFY(stream->state == KRRP_STRMS_CREATED);
+
+	stream->state = KRRP_STRMS_READY_TO_RUN;
+	stream->callback = ev_cb;
+	stream->callback_arg = ev_cb_arg;
+
+	krrp_stream_unlock(stream);
+}
+
+int
+krrp_stream_run(krrp_stream_t *stream, krrp_queue_t *write_data_queue,
+    krrp_pdu_engine_t *data_pdu_engine, krrp_error_t *error)
+{
+	int rc = -1;
+
+	VERIFY(data_pdu_engine != NULL);
+	VERIFY(data_pdu_engine->type == KRRP_PET_DATA);
+	VERIFY(write_data_queue != NULL);
+
+	krrp_stream_lock(stream);
+	VERIFY(stream->state == KRRP_STRMS_READY_TO_RUN);
+
+	stream->data_pdu_engine = data_pdu_engine;
+	stream->write_data_queue = write_data_queue;
+
+	if (!stream->fake_mode) {
+		if (krrp_stream_validate_run(stream, error) != 0)
+			goto out;
+
+		if (krrp_stream_activate_autosnap(stream, error) != 0)
+			goto out;
+	}
+
+	/* thread_create never fails */
+	switch (stream->mode) {
+	case KRRP_STRMM_READ:
+		if (stream->fake_mode)
+			krrp_stream_fake_read_task_init(stream->task_engine,
+			    stream->fake_data_sz);
+
+		if (stream->non_continuous)
+			stream->notify_when_done = B_TRUE;
+
+		(void) thread_create(NULL, 0, &krrp_stream_read,
+			(void *) stream, 0, &p0, TS_RUN, minclsyspri);
+		break;
+	case KRRP_STRMM_WRITE:
+		(void) thread_create(NULL, 0, &krrp_stream_write,
+			(void *) stream, 0, &p0, TS_RUN, minclsyspri);
+		break;
+	}
+
+	while (stream->t_did == 0)
+		krrp_stream_cv_wait(stream);
+
+	rc = 0;
+
+out:
+	krrp_stream_unlock(stream);
+	return (rc);
+}
+
+void
+krrp_stream_stop(krrp_stream_t *stream)
+{
+	krrp_stream_lock(stream);
+	VERIFY(stream->state == KRRP_STRMS_ACTIVE ||
+	    stream->state == KRRP_STRMS_IN_ERROR);
+
+	stream->state = KRRP_STRMS_STOPPED;
+
+	if (!stream->non_continuous)
+		krrp_autosnap_deactivate(stream->autosnap);
+
+	krrp_stream_unlock(stream);
+}
+
+int
+krrp_stream_send_stop(krrp_stream_t *stream)
+{
+	int rc = -1;
+
+	VERIFY(stream->mode == KRRP_STRMM_READ);
+
+	if (!stream->notify_when_done) {
+		if (!stream->non_continuous) {
+			krrp_autosnap_create_snapshot(stream->autosnap,
+			    KRRP_SYNC_OP);
+			krrp_autosnap_deactivate(stream->autosnap);
+		}
+
+		stream->notify_when_done = B_TRUE;
+		rc = 0;
+	}
+
+	return (rc);
+}
+
+static int
+krrp_stream_validate_run(krrp_stream_t *stream, krrp_error_t *error)
+{
+	int rc = -1;
+
+	if (dsl_dataset_creation_txg(stream->dataset) == UINT64_MAX) {
+		if (stream->mode == KRRP_STRMM_READ) {
+			krrp_error_set(error, KRRP_ERRNO_SRCDS, ENOENT);
+			goto out;
+		} else {
+			/*
+			 * The destination dataset may not exist
+			 * and this is ok, but:
+			 *
+			 * if destination dataset is a pool ('/' is not
+			 * contained in the name), then it must be here
+			 *
+			 * incr_snap_name is defined
+			 * so this replication is not first and in this case
+			 * the destination dataset must be here
+			 */
+			if (strchr(stream->dataset, '/') == NULL ||
+			    strlen(stream->incr_snap_name) != 0) {
+				krrp_error_set(error, KRRP_ERRNO_DSTDS, ENOENT);
+				goto out;
+			}
+		}
+	}
+
+	rc = krrp_stream_check_wrc(stream, error);
+
+out:
+	return (rc);
+}
+
+static int
+krrp_stream_activate_autosnap(krrp_stream_t *stream,
+    krrp_error_t *error)
+{
+	uint64_t incr_snap_txg = UINT64_MAX;
+	int rc = -1;
+
+	if (strlen(stream->incr_snap_name) != 0) {
+		incr_snap_txg = krrp_stream_get_snap_txg(stream,
+		    stream->incr_snap_name);
+		if (incr_snap_txg == UINT64_MAX) {
+			krrp_error_set(error, KRRP_ERRNO_CMNSNAP, ENOENT);
+			goto out;
+		}
+	}
+
+	switch (stream->mode) {
+	case KRRP_STRMM_READ:
+		if (!stream->non_continuous) {
+			rc = krrp_autosnap_rside_create(&stream->autosnap,
+			    stream->dataset, stream->recursive, incr_snap_txg,
+			    &krrp_stream_autosnap_restore_cb,
+			    &krrp_stream_read_snap_confirm_cb,
+				&krrp_stream_read_snap_notify_cb,
+			    &krrp_stream_snap_create_error_cb,
+			    (void *) stream, error);
+			if (rc != 0)
+				goto out;
+
+			/*
+			 * Autosnap does snapshots only in case of I/O
+			 * to the dataset, so if user has some data on
+			 * the dataset, but does not have I/O the available
+			 * data will not be replicated. To exclude this case
+			 * need to ask autosnap to create snapshot
+			 */
+			krrp_autosnap_create_snapshot(stream->autosnap,
+			    B_FALSE);
+		} else {
+			uint64_t base_snap_txg;
+			const char *zcookies;
+
+			VERIFY(stream->base_snap_name[0] != '\0');
+
+			base_snap_txg = krrp_stream_get_snap_txg(stream,
+				stream->base_snap_name);
+			if (base_snap_txg == UINT64_MAX) {
+				krrp_error_set(error,
+				    KRRP_ERRNO_SRCSNAP, ENOENT);
+				goto out;
+			}
+
+			zcookies = (stream->zcookies[0] != '\0') ?
+			    stream->zcookies : NULL;
+
+			krrp_stream_read_task_init(stream->task_engine,
+				base_snap_txg, stream->base_snap_name,
+				stream->incr_snap_name, zcookies);
+		}
+
+		break;
+	case KRRP_STRMM_WRITE:
+		rc = krrp_autosnap_wside_create(&stream->autosnap,
+			stream->dataset, incr_snap_txg,
+			&krrp_stream_write_snap_notify_cb,
+			(void *) stream, error);
+		if (rc != 0)
+			goto out;
+
+		break;
+	}
+
+	rc = 0;
+
+out:
+	return (rc);
+}
+
+static void
+krrp_stream_autosnap_restore_cb(void *void_stream,
+    const char *snap_name, uint64_t txg)
+{
+	krrp_stream_t *stream = (krrp_stream_t *) void_stream;
+
+	VERIFY(stream->mode == KRRP_STRMM_READ);
+
+	krrp_stream_read_task_init(stream->task_engine, txg, snap_name,
+	    stream->incr_snap_name, NULL);
+
+	(void) strlcpy(stream->incr_snap_name, snap_name,
+	    sizeof (stream->incr_snap_name));
+}
+
+/*
+ * This function does the following checks:
+ *
+ * - enabled WRC and non pool-to-pool replication: FAIL
+ * - enabled active-WRC and stream recv-mode: FAIL
+ * - enabled passive-WRC and stream send-mode: FAIL
+ * - other cases: OK
+ */
+static int
+krrp_stream_check_wrc(krrp_stream_t *stream, krrp_error_t *error)
+{
+	int wrc_mode;
+
+	wrc_mode = spa_wrc_mode(stream->dataset);
+	if (wrc_mode == WRC_MODE_OFF)
+		return (0);
+
+	/* WRC enabled so only pool to pool */
+	if (strchr(stream->dataset, '/') != NULL) {
+		krrp_error_set(error, KRRP_ERRNO_ZFSWRCBADUSE, 0);
+		return (-1);
+	}
+
+	if (wrc_mode == WRC_MODE_ACTIVE &&
+	    stream->mode == KRRP_STRMM_WRITE) {
+		krrp_error_set(error, KRRP_ERRNO_ZFSWRCBADMODE, 0);
+		cmn_err(CE_WARN, "Active-mode WRC cannot "
+		    "be used at receive side");
+		return (-1);
+	}
+
+	if (wrc_mode == WRC_MODE_PASSIVE &&
+	    stream->mode == KRRP_STRMM_READ) {
+		krrp_error_set(error, KRRP_ERRNO_ZFSWRCBADMODE, 0);
+		cmn_err(CE_WARN, "Passive-mode WRC cannot "
+		    "be used at send side");
+		return (-1);
+	}
+
+	return (0);
+}
+
+#if 0
+static void
+krrp_stream_debug(const char *msg, void *arg1, void *arg2,
+    void *arg3, void *arg4)
+{
+	cmn_err(CE_PANIC, "Debug");
+}
+#endif
+
+/*
+ * This function is called after a TXG confirmation
+ * has been received from the receiver
+ *
+ * There are two stages of receiving:
+ * - complete recv into krrp-buffers (complete == B_FALSE)
+ * - complete recv into ZFS (complete == B_TRUE)
+ */
+void
+krrp_stream_txg_confirmed(krrp_stream_t *stream, uint64_t txg,
+    boolean_t complete)
+{
+	krrp_stream_task_t *task;
+
+	if (complete) {
+		DTRACE_PROBE1(krrp_txg_ack2, uint64_t, txg);
+
+		/* autosnap is used only by CDP sender */
+		if (!stream->non_continuous)
+			krrp_autosnap_txg_rele(stream->autosnap,
+			    txg, AUTOSNAP_NO_SNAP);
+
+		stream->last_full_ack_txg = txg;
+
+		task = krrp_queue_get(stream->task_engine->tasks_done2);
+		krrp_stream_calc_avg_rpo(stream, task, B_TRUE);
+		krrp_stream_task_fini(task);
+
+		if (stream->notify_when_done) {
+			txg = atomic_cas_64(&stream->last_send_txg, txg, txg);
+			if (txg == stream->last_full_ack_txg)
+				krrp_stream_callback(stream,
+				    KRRP_STREAM_SEND_DONE, NULL);
+		}
+
+		return;
+	}
+
+	stream->last_ack_txg = txg;
+
+	/*
+	 * There is impossible infinity loop, because if we here,
+	 * then receiver has received the final PDU for the corresponding TXG,
+	 * so krrp_stream_task_done() for the TXG must be called
+	 */
+	while ((task = krrp_queue_get(stream->task_engine->tasks_done)) ==
+	    NULL);
+
+	krrp_stream_calc_avg_rpo(stream, task, B_FALSE);
+	krrp_queue_put(stream->task_engine->tasks_done2, task);
+}
+
+static void
+krrp_stream_calc_avg_rpo(krrp_stream_t *stream, krrp_stream_task_t *task,
+    boolean_t complete)
+{
+	size_t i, avg_cnt;
+	uint64_t sum;
+	krrp_txg_rpo_t *avg_rpo;
+
+	if (complete)
+		avg_rpo = &stream->avg_total_rpo;
+	else
+		avg_rpo = &stream->avg_rpo;
+
+	avg_rpo->buf[avg_rpo->cnt] = krrp_stream_task_calc_rpo(task);
+	avg_rpo->cnt++;
+	avg_rpo->cnt %= 10;
+
+	sum = 0;
+	avg_cnt = 10;
+	for (i = 0; i < 10; i++) {
+		sum += avg_rpo->buf[i];
+		if (avg_rpo->buf[i] == 0)
+			avg_cnt--;
+	}
+
+	/* Average value in ms */
+	avg_rpo->value = sum / avg_cnt / 1000 / 1000;
+}
+
+/* ARGSUSED */
+static void
+krrp_stream_snap_create_error_cb(const char *snap_name, int err,
+    uint64_t txg, void *void_stream)
+{
+	krrp_stream_t *stream;
+	krrp_error_t error;
+	boolean_t just_return = B_FALSE;
+
+	stream = (krrp_stream_t *) void_stream;
+
+	krrp_stream_lock(stream);
+
+	if (stream->state == KRRP_STRMS_ACTIVE)
+		stream->state = KRRP_STRMS_IN_ERROR;
+	else
+		just_return = B_TRUE;
+
+	krrp_stream_unlock(stream);
+
+	if (just_return)
+		return;
+
+	krrp_error_set(&error, KRRP_ERRNO_SNAPFAIL, err);
+	krrp_stream_callback(stream, KRRP_STREAM_ERROR,
+		(uintptr_t) &error);
+}
+
+/* ARGSUSED */
+static boolean_t
+krrp_stream_read_snap_confirm_cb(const char *snap_name, boolean_t recursive,
+    uint64_t txg, void *void_stream)
+{
+	krrp_stream_t *stream;
+	boolean_t result = B_FALSE;
+
+	stream = (krrp_stream_t *) void_stream;
+
+	if (krrp_autosnap_try_hold_to_confirm(stream->autosnap)) {
+		if (krrp_stream_task_num_of_tasks(stream->task_engine) > 1)
+			result = B_FALSE;
+		else
+			result = B_TRUE;
+
+		krrp_autosnap_unhold(stream->autosnap);
+	}
+
+	return (result);
+}
+
+/*
+ * Autosnap snap_created callback for the Receiver
+ */
+/* ARGSUSED */
+static boolean_t
+krrp_stream_write_snap_notify_cb(const char *snap_name, boolean_t recursive,
+    boolean_t autosnap, uint64_t txg, uint64_t unused, void *void_stream)
+{
+	krrp_stream_t *stream;
+
+	stream = (krrp_stream_t *) void_stream;
+
+	if (stream->cur_task->txg_start == UINT64_MAX) {
+		stream->cur_task->txg_start = txg;
+		stream->cur_task->txg_end = AUTOSNAP_NO_SNAP;
+	} else {
+		stream->cur_task->txg_end = txg;
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Autosnap snap_created callback for the Sender
+ */
+/* ARGSUSED */
+static boolean_t
+krrp_stream_read_snap_notify_cb(const char *snap_name, boolean_t recursive,
+    boolean_t autosnap, uint64_t txg, uint64_t unused, void *void_stream)
+{
+	krrp_stream_t *stream;
+	boolean_t result = B_FALSE;
+
+	stream = (krrp_stream_t *) void_stream;
+
+	if (krrp_autosnap_try_hold_to_confirm(stream->autosnap)) {
+		if (krrp_stream_task_num_of_tasks(stream->task_engine) <= 1) {
+			uint64_t cur_snap_txg;
+			char *cur_snap_name;
+
+			cur_snap_name = strchr(snap_name, '@');
+			ASSERT(cur_snap_name != NULL);
+			cur_snap_name++;
+			cur_snap_txg = txg;
+
+			krrp_stream_read_task_init(stream->task_engine,
+			    cur_snap_txg, cur_snap_name,
+			    stream->incr_snap_name, NULL);
+
+			(void) strlcpy(stream->incr_snap_name, cur_snap_name,
+				sizeof (stream->incr_snap_name));
+
+			result = B_TRUE;
+		}
+
+		krrp_autosnap_unhold(stream->autosnap);
+	}
+
+	return (result);
+}
+
+/*
+ * The handler for READ STREAM
+ *
+ * Stream tasks are created by Autosnaper and pushed to tasks-queue
+ */
+static void
+krrp_stream_read(void *arg)
+{
+	krrp_stream_t *stream = (krrp_stream_t *) arg;
+
+	krrp_stream_task_t *stream_task = NULL;
+	int rc;
+	krrp_pdu_data_t *pdu = NULL;
+
+	VERIFY(stream->data_pdu_engine != NULL);
+
+	krrp_stream_lock(stream);
+	stream->state = KRRP_STRMS_ACTIVE;
+	stream->t_did = curthread->t_did;
+	krrp_stream_cv_signal(stream);
+
+	while (stream->state == KRRP_STRMS_ACTIVE) {
+		krrp_stream_unlock(stream);
+
+		if (pdu == NULL) {
+			DTRACE_PROBE(krrp_pdu_data_alloc_start);
+
+			krrp_pdu_alloc(stream->data_pdu_engine,
+				(krrp_pdu_t **) &pdu, KRRP_PDU_WITH_HDR);
+
+			DTRACE_PROBE(krrp_pdu_data_alloc_stop);
+
+			if (pdu == NULL) {
+				krrp_stream_lock(stream);
+				continue;
+			}
+		}
+
+		if (stream_task == NULL) {
+			krrp_stream_task_engine_get_task(stream->task_engine,
+			    &stream_task);
+			if (stream_task == NULL) {
+				krrp_stream_lock(stream);
+				continue;
+			}
+
+			stream->cur_task = stream_task;
+			stream->cur_send_txg = stream_task->txg;
+			stream->cur_pdu = pdu;
+
+			stream_task->start(stream_task);
+
+			pdu->initial = B_TRUE;
+
+			DTRACE_PROBE1(krrp_stream_task_io_start, uint64_t,
+			    stream_task->txg);
+		}
+
+		rc = stream_task->process(stream_task, pdu);
+
+		if (rc != 0) {
+			krrp_pdu_rele((krrp_pdu_t *) pdu);
+			pdu = NULL;
+			stream->cur_pdu = NULL;
+
+			krrp_stream_lock(stream);
+			if (stream->state == KRRP_STRMS_ACTIVE) {
+				krrp_error_t error;
+
+				stream->state = KRRP_STRMS_IN_ERROR;
+				krrp_stream_unlock(stream);
+
+				krrp_error_set(&error, KRRP_ERRNO_READFAIL, rc);
+				krrp_stream_callback(stream, KRRP_STREAM_ERROR,
+					(uintptr_t) &error);
+
+				krrp_stream_lock(stream);
+			}
+
+			break;
+		}
+
+		if (stream_task->done) {
+			DTRACE_PROBE1(krrp_stream_task_io_stop, uint64_t,
+			    stream_task->txg);
+
+			krrp_stream_task_done(stream, stream_task, B_FALSE);
+			stream_task = NULL;
+			stream->cur_task = NULL;
+
+			stream->last_send_txg = stream->cur_send_txg;
+			stream->cur_send_txg = 0;
+		}
+
+		krrp_stream_callback(stream, KRRP_STREAM_DATA_PDU,
+		    (uintptr_t) pdu);
+
+		pdu = NULL;
+		stream->cur_pdu = NULL;
+		krrp_stream_lock(stream);
+	}
+
+	krrp_stream_unlock(stream);
+
+	if (pdu != NULL)
+		krrp_pdu_rele((krrp_pdu_t *) pdu);
+
+	if (stream_task != NULL)
+		krrp_stream_task_done(stream, stream_task, B_TRUE);
+}
+
+/*
+ * The handler for WRITE STREAM
+ *
+ * Stream tasks are created on intial PDU
+ */
+static void
+krrp_stream_write(void *arg)
+{
+	krrp_stream_t *stream = (krrp_stream_t *) arg;
+
+	krrp_pdu_data_t *pdu = NULL;
+	krrp_stream_task_t *stream_task = NULL;
+	const char *zcookies;
+	int rc;
+
+	VERIFY(stream->write_data_queue != NULL);
+
+#ifdef KRRP_STREAM_DEBUG
+	krrp_queue_init(&stream->debug_pdu_queue, sizeof (krrp_pdu_t),
+	    offsetof(krrp_pdu_t, node));
+#endif
+
+	zcookies = (stream->zcookies[0] != '\0') ? stream->zcookies : NULL;
+
+	krrp_stream_lock(stream);
+	stream->state = KRRP_STRMS_ACTIVE;
+	stream->t_did = curthread->t_did;
+	krrp_stream_cv_signal(stream);
+
+	while (stream->state == KRRP_STRMS_ACTIVE) {
+		krrp_stream_unlock(stream);
+
+		if (pdu == NULL) {
+			pdu = krrp_queue_get(stream->write_data_queue);
+			if (pdu == NULL) {
+				krrp_stream_lock(stream);
+				continue;
+			}
+		}
+
+		if (pdu->initial) {
+			/* Replace by ASSERT */
+			VERIFY(stream_task == NULL);
+
+			krrp_stream_write_task_init(stream->task_engine,
+			    pdu->txg, &stream_task, zcookies);
+
+			/*
+			 * Cookies are required only for
+			 * the first received task
+			 */
+			if (zcookies)
+				zcookies = NULL;
+
+			stream->cur_task = stream_task;
+			stream->cur_recv_txg = pdu->txg;
+
+			DTRACE_PROBE1(krrp_stream_task_io_start, uint64_t,
+			    stream_task->txg);
+		}
+
+		stream->cur_pdu = pdu;
+
+		rc = stream_task->process(stream_task, pdu);
+		if (rc != 0) {
+			krrp_stream_lock(stream);
+			if (stream->state == KRRP_STRMS_ACTIVE) {
+				krrp_error_t error;
+
+				stream->state = KRRP_STRMS_IN_ERROR;
+				krrp_stream_unlock(stream);
+
+				krrp_error_set(&error,
+				    KRRP_ERRNO_WRITEFAIL, rc);
+				krrp_stream_callback(stream, KRRP_STREAM_ERROR,
+					(uintptr_t) &error);
+				krrp_stream_lock(stream);
+			}
+
+			break;
+		}
+
+		if (stream_task->done) {
+			VERIFY(pdu->final == B_TRUE);
+
+			DTRACE_PROBE1(krrp_stream_task_io_stop, uint64_t,
+				stream_task->txg);
+
+			krrp_stream_task_done(stream, stream_task, B_FALSE);
+			stream_task = NULL;
+			stream->cur_task = NULL;
+			stream->cur_recv_txg = 0;
+		}
+
+#ifdef KRRP_STREAM_DEBUG
+		krrp_queue_put(stream->debug_pdu_queue, (void *) pdu);
+
+		if (krrp_queue_length(stream->debug_pdu_queue) > 1) {
+			pdu = krrp_queue_get(stream->debug_pdu_queue);
+			krrp_pdu_rele((krrp_pdu_t *) pdu);
+		}
+#else
+		krrp_pdu_rele((krrp_pdu_t *) pdu);
+#endif
+
+		pdu = NULL;
+		krrp_stream_lock(stream);
+	}
+
+	krrp_stream_unlock(stream);
+
+	if (pdu != NULL)
+		krrp_pdu_rele((krrp_pdu_t *) pdu);
+
+#ifdef KRRP_STREAM_DEBUG
+	/* Simple get, because this queue without locks */
+	while ((pdu = krrp_queue_get(stream->debug_pdu_queue)) != NULL)
+		krrp_pdu_rele((krrp_pdu_t *) pdu);
+
+	krrp_queue_fini(stream->debug_pdu_queue);
+#endif
+
+	if (stream_task != NULL)
+		krrp_stream_task_done(stream, stream_task, B_TRUE);
+}
+
+static void
+krrp_stream_task_done(krrp_stream_t *stream,
+    krrp_stream_task_t *task, boolean_t only_fini)
+{
+	task->shutdown(task);
+
+	if (only_fini) {
+		krrp_stream_task_fini(task);
+		return;
+	}
+
+	switch (stream->mode) {
+	case KRRP_STRMM_READ:
+		if (krrp_stream_task_num_of_tasks(stream->task_engine) == 0) {
+			if (stream->do_ctrl_snap) {
+				krrp_autosnap_create_snapshot(stream->autosnap,
+				    B_FALSE);
+				stream->do_ctrl_snap = B_FALSE;
+			}
+		} else
+			stream->do_ctrl_snap = B_TRUE;
+
+		krrp_queue_put(stream->task_engine->tasks_done, task);
+		break;
+	case KRRP_STRMM_WRITE:
+		krrp_autosnap_txg_rele(stream->autosnap,
+			task->txg_start, task->txg_end);
+
+		krrp_stream_callback(stream, KRRP_STREAM_TXG_RECV_DONE,
+		    (uintptr_t) task->txg);
+		krrp_stream_task_fini(task);
+		break;
+	}
+}
+
+static void
+krrp_stream_callback(krrp_stream_t *stream,
+    krrp_stream_cb_ev_t ev, uintptr_t ev_arg)
+{
+	stream->callback(ev, ev_arg, stream->callback_arg);
+}
+
+static uint64_t
+krrp_stream_get_snap_txg(krrp_stream_t *stream,
+    const char *short_snap_name)
+{
+	char full_ds_name[MAXNAMELEN];
+
+	(void) snprintf(full_ds_name, sizeof (full_ds_name), "%s@%s",
+		stream->dataset, short_snap_name);
+
+	return (dsl_dataset_creation_txg(full_ds_name));
+}
+
+int
+krrp_zfs_get_recv_cookies(const char *dataset, char *cookies_buf,
+    size_t cookies_buf_len, krrp_error_t *error)
+{
+	int rc = -1;
+
+	if (dsl_dataset_creation_txg(dataset) == UINT64_MAX) {
+		krrp_error_set(error, KRRP_ERRNO_DSTDS, ENOENT);
+	} else {
+		rc = dmu_krrp_get_recv_cookie(dataset, dataset,
+			cookies_buf, cookies_buf_len);
+		if (rc != 0)
+			krrp_error_set(error, KRRP_ERRNO_ZCOOKIES, rc);
+	}
+
+	return (rc);
+}

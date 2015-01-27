@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -29,8 +30,6 @@
 #include <sys/dsl_dir.h>
 #include <sys/dsl_synctask.h>
 #include <sys/metaslab.h>
-
-#define	DST_AVG_BLKSHIFT 14
 
 /* ARGSUSED */
 static int

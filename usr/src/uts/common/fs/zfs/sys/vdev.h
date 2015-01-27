@@ -160,6 +160,8 @@ typedef enum {
 
 extern int vdev_label_init(vdev_t *vd, uint64_t txg, vdev_labeltype_t reason);
 
+extern boolean_t vdev_is_special(vdev_t *vd);
+
 #ifdef	__cplusplus
 }
 #endif

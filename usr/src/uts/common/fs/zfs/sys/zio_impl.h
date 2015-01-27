@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _ZIO_IMPL_H
@@ -175,6 +176,13 @@ enum zio_stage {
 	ZIO_STAGE_READ_BP_INIT |		\
 	ZIO_STAGE_DDT_READ_START |		\
 	ZIO_STAGE_DDT_READ_DONE)
+
+#define	ZIO_MOVE_PIPELINE			\
+	(ZIO_INTERLOCK_STAGES |			\
+	ZIO_VDEV_IO_STAGES |			\
+	ZIO_STAGE_ISSUE_ASYNC |			\
+	ZIO_STAGE_WRITE_BP_INIT |		\
+	ZIO_STAGE_DVA_ALLOCATE)
 
 #define	ZIO_WRITE_COMMON_STAGES			\
 	(ZIO_INTERLOCK_STAGES |			\

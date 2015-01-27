@@ -23,8 +23,10 @@
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
  * Copyright (c) 2013 by Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
+#include <sys/autosnap.h>
 #include <sys/zfs_context.h>
 #include <sys/dsl_userhold.h>
 #include <sys/dsl_dataset.h>
@@ -40,6 +42,7 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/dsl_deleg.h>
 #include <sys/dmu_impl.h>
+#include <sys/wrcache.h>
 
 typedef struct dmu_snapshots_destroy_arg {
 	nvlist_t *dsda_snaps;
@@ -240,6 +243,8 @@ dsl_destroy_snapshot_sync_impl(dsl_dataset_t *ds, boolean_t defer, dmu_tx_t *tx)
 	int err;
 	int after_branch_point = FALSE;
 	dsl_pool_t *dp = ds->ds_dir->dd_pool;
+	spa_t *spa = dp->dp_spa;
+	wrc_data_t *wrc_data = spa_get_wrc_data(spa);
 	objset_t *mos = dp->dp_meta_objset;
 	dsl_dataset_t *ds_prev = NULL;
 	uint64_t obj;
@@ -247,6 +252,15 @@ dsl_destroy_snapshot_sync_impl(dsl_dataset_t *ds, boolean_t defer, dmu_tx_t *tx)
 	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
 	ASSERT3U(dsl_dataset_phys(ds)->ds_bp.blk_birth, <=, tx->tx_txg);
 	ASSERT(refcount_is_zero(&ds->ds_longholds));
+
+	/*
+	 * if an edge snapshot of wrc window is destroyed, the window must be
+	 * aborted
+	 */
+	mutex_enter(&wrc_data->wrc_lock);
+	if (dsl_dataset_phys(ds)->ds_creation_txg == wrc_data->wrc_finish_txg)
+		wrc_purge_window(spa, tx);
+	mutex_exit(&wrc_data->wrc_lock);
 
 	if (defer &&
 	    (ds->ds_userrefs > 0 ||
@@ -479,6 +493,15 @@ dsl_destroy_snapshot_sync(void *arg, dmu_tx_t *tx)
 	    pair != NULL;
 	    pair = nvlist_next_nvpair(dsda->dsda_successful_snaps, pair)) {
 		dsl_dataset_t *ds;
+		char *snapname;
+
+		snapname = strchr(nvpair_name(pair), '@');
+		ASSERT(snapname != NULL);
+		snapname++;
+
+		if (strncmp(snapname, AUTOSNAP_PREFIX,
+		    AUTOSNAP_PREFIX_LEN) == 0)
+			autosnap_exempt_snapshot(dp->dp_spa, nvpair_name(pair));
 
 		VERIFY0(dsl_dataset_hold(dp, nvpair_name(pair), FTAG, &ds));
 
@@ -912,6 +935,7 @@ dsl_destroy_head(const char *name)
 	if (error != 0)
 		return (error);
 	isenabled = spa_feature_is_enabled(spa, SPA_FEATURE_ASYNC_DESTROY);
+
 	spa_close(spa, FTAG);
 
 	ddha.ddha_name = name;
@@ -968,4 +992,185 @@ dsl_destroy_inconsistent(const char *dsname, void *arg)
 			(void) dsl_destroy_head(dsname);
 	}
 	return (0);
+}
+
+typedef struct {
+	const char *from_ds;
+	boolean_t defer;
+} dmu_destroy_atomically_arg_t;
+
+static int
+dsl_destroy_atomically_sync(void *arg, dmu_tx_t *tx)
+{
+	dmu_destroy_atomically_arg_t *ddaa = arg;
+	boolean_t defer = ddaa->defer;
+	dsl_pool_t *dp = dmu_tx_pool(tx);
+	zfs_ds_collector_entry_t *tail;
+	list_t namestack;
+	int err = 0;
+
+	/* do not perfrom checks in ioctl */
+	if (!dmu_tx_is_syncing(tx))
+		return (0);
+
+	ASSERT(dsl_pool_config_held(dp));
+
+	if (!spa_feature_is_enabled(dp->dp_spa, SPA_FEATURE_ASYNC_DESTROY))
+		return (SET_ERROR(ENOTSUP));
+
+	/* initialize the stack of datasets */
+	list_create(&namestack, sizeof (zfs_ds_collector_entry_t),
+	    offsetof(zfs_ds_collector_entry_t, node));
+	tail = dsl_dataset_collector_cache_alloc();
+
+	/* push the head */
+	tail->cookie = 0;
+	tail->cookie_is_snap = B_FALSE;
+	(void) strcpy(tail->name, ddaa->from_ds);
+	list_insert_tail(&namestack, tail);
+
+	/* the head is processed at the very end and after all is done */
+	while (!err && ((tail = list_tail(&namestack)) != NULL)) {
+		zfs_ds_collector_entry_t *el;
+		objset_t *os;
+		dsl_dataset_t *ds;
+		char *p;
+
+		/* init new entry */
+		el = dsl_dataset_collector_cache_alloc();
+		el->cookie = 0;
+		el->cookie_is_snap = B_FALSE;
+		(void) strcpy(el->name, tail->name);
+		p = el->name + strlen(el->name);
+
+		/* hold the current dataset t otraverse its children */
+		err = dsl_dataset_hold(dp, tail->name, FTAG, &ds);
+		if (err) {
+			dsl_dataset_collector_cache_free(el);
+			break;
+		}
+		err  = dmu_objset_from_ds(ds, &os);
+		if (err) {
+			dsl_dataset_rele(ds, FTAG);
+			dsl_dataset_collector_cache_free(el);
+			break;
+		}
+
+		if (dmu_objset_is_snapshot(os)) {
+			/* traverse clones for snapshots */
+			err = dmu_clone_list_next(os, MAXNAMELEN,
+			    el->name, NULL, &tail->cookie);
+		} else {
+			/* for filesystems traverse fs first, then snaps */
+			if (!tail->cookie_is_snap) {
+				*p++ = '/';
+				do {
+					*p = '\0';
+					err = dmu_dir_list_next(os,
+					    MAXNAMELEN - (p - el->name),
+					    p, NULL, &tail->cookie);
+				} while (err == 0 &&
+				    dataset_name_hidden(el->name));
+
+				/* no more fs, move to snapshots */
+				if (err == ENOENT) {
+					*(--p) = '\0';
+					tail->cookie_is_snap = 1;
+					tail->cookie = 0;
+					err = 0;
+				}
+			}
+
+			if (!err && tail->cookie_is_snap) {
+				*p++ = '@';
+				*p = '\0';
+				err = dmu_snapshot_list_next(os,
+				    MAXNAMELEN - (p - el->name),
+				    p, NULL, &tail->cookie, NULL);
+			}
+		}
+
+		if (err == 0) {
+			/* a children found, add it and continue */
+			list_insert_tail(&namestack, el);
+			dsl_dataset_rele(ds, FTAG);
+			continue;
+		}
+
+		dsl_dataset_collector_cache_free(el);
+
+		if (err != ENOENT) {
+			dsl_dataset_rele(ds, FTAG);
+			break;
+		}
+
+		/*
+		 * There are no more children of the dataset, pop it from stack
+		 * and destroy it
+		 */
+
+		err = 0;
+
+		list_remove(&namestack, tail);
+
+		if (dmu_objset_is_snapshot(os)) {
+			nvlist_t *nvl = fnvlist_alloc();
+			nvlist_t *errlist = fnvlist_alloc();
+			dmu_snapshots_destroy_arg_t dsda;
+
+			fnvlist_add_boolean(nvl, tail->name);
+			dsda.dsda_snaps = nvl;
+			dsda.dsda_successful_snaps = fnvlist_alloc();
+			dsda.dsda_defer = defer;
+			dsda.dsda_errlist = errlist;
+
+			err = dsl_destroy_snapshot_check(&dsda, tx);
+
+			if (!err)
+				dsl_destroy_snapshot_sync(&dsda, tx);
+
+			fnvlist_free(dsda.dsda_successful_snaps);
+			fnvlist_free(errlist);
+			fnvlist_free(nvl);
+		} else if (strchr(tail->name, '/') != NULL) {
+			dsl_destroy_head_arg_t ddha;
+
+			ddha.ddha_name = tail->name;
+			err = dsl_destroy_head_check(&ddha, tx);
+			if (!err)
+				dsl_destroy_head_sync(&ddha, tx);
+		}
+
+		dsl_dataset_rele(ds, FTAG);
+		dsl_dataset_collector_cache_free(tail);
+	}
+
+	if (err) {
+		while ((tail = list_remove_tail(&namestack)) != NULL)
+			dsl_dataset_collector_cache_free(tail);
+	}
+
+	ASSERT(list_head(&namestack) == NULL);
+
+	list_destroy(&namestack);
+
+	return (err);
+}
+
+/*ARGSUSED*/
+void
+dsl_destroy_atomically_sync_dummy(void *arg, dmu_tx_t *tx)
+{
+}
+
+int
+dsl_destroy_atomically(const char *name, boolean_t defer)
+{
+	dmu_destroy_atomically_arg_t ddaa;
+
+	ddaa.from_ds = name;
+	ddaa.defer = defer;
+
+	return (dsl_sync_task(name, dsl_destroy_atomically_sync,
+	    dsl_destroy_atomically_sync_dummy, &ddaa, 0, ZFS_SPACE_CHECK_NONE));
 }

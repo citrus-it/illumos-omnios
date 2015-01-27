@@ -69,6 +69,7 @@
 #include <sys/dsl_destroy.h>
 #include <sys/cos.h>
 #include <sys/special.h>
+#include <sys/wrcache.h>
 
 #ifdef	_KERNEL
 #include <sys/bootprops.h>
@@ -217,6 +218,8 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		    spa->spa_lowat, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_DEDUPMETA_DITTO, NULL,
 		    spa->spa_ddt_meta_copies, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_WRC_MODE, NULL,
+		    spa->spa_wrc_mode, src);
 
 		spa_prop_add_list(*nvp, ZPOOL_PROP_META_PLACEMENT, NULL,
 		    mp->spa_enable_meta_placement_selection, src);
@@ -226,6 +229,8 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		    NULL, mp->spa_general_meta_to_special, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_OTHER_META_TO_METADEV, NULL,
 		    mp->spa_other_meta_to_special, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_SMALL_DATA_TO_METADEV, NULL,
+		    mp->spa_small_data_to_special, src);
 
 		spa_prop_add_list(*nvp, ZPOOL_PROP_FRAGMENTATION, NULL,
 		    metaslab_class_fragmentation(mc), src);
@@ -507,6 +512,12 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				error = SET_ERROR(EINVAL);
 			break;
 
+		case ZPOOL_PROP_SMALL_DATA_TO_METADEV:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && intval > SPA_MAXBLOCKSIZE)
+				error = SET_ERROR(EINVAL);
+			break;
+
 		case ZPOOL_PROP_BOOTFS:
 			/*
 			 * If the pool version is less than SPA_VERSION_BOOTFS,
@@ -682,6 +693,19 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && (intval > SPA_DVAS_PER_BP))
 				error = SET_ERROR(EINVAL);
+			break;
+		case ZPOOL_PROP_WRC_MODE:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && (intval > WRC_MODE_PASSIVE)) {
+				error = SET_ERROR(EINVAL);
+			} else if (!spa_has_special(spa)) {
+				error = SET_ERROR(ENOTSUP);
+			} else if (spa->spa_wrc_mode != WRC_MODE_OFF &&
+			    intval == WRC_MODE_OFF) {
+				/* WRC can NOT be turned off */
+				error = SET_ERROR(EINVAL);
+			}
+
 			break;
 		}
 
@@ -1053,6 +1077,35 @@ spa_create_zio_taskqs(spa_t *spa)
 	}
 }
 
+static void
+spa_create_krrp_taskq(spa_t *spa)
+{
+	char name[MAXPATHLEN];
+	(void) strcpy(name, spa->spa_name);
+	(void) strcat(name, "_zfs_krrp");
+
+	spa->spa_krrp_taskq =
+	    taskq_create(name, 2, minclsyspri, 2, 4, TASKQ_DYNAMIC);
+}
+
+taskqid_t
+spa_dispatch_krrp_task(const char *dataset, task_func_t func, void *args)
+{
+	taskqid_t res = NULL;
+	spa_t *spa = NULL;
+
+	mutex_enter(&spa_namespace_lock);
+	spa = spa_lookup(dataset);
+	if (spa) {
+		res = taskq_dispatch(spa->spa_krrp_taskq, func, args, TQ_SLEEP);
+	} else {
+		cmn_err(CE_WARN, "KRRP: Can't find a pool for : %s", dataset);
+	}
+	mutex_exit(&spa_namespace_lock);
+
+	return (res);
+}
+
 #ifdef _KERNEL
 static void
 spa_thread(void *arg)
@@ -1100,6 +1153,7 @@ spa_thread(void *arg)
 	spa->spa_did = curthread->t_did;
 
 	spa_create_zio_taskqs(spa);
+	spa_create_krrp_taskq(spa);
 
 	mutex_enter(&spa->spa_proc_lock);
 	ASSERT(spa->spa_proc_state == SPA_PROC_CREATED);
@@ -1169,6 +1223,7 @@ spa_activate(spa_t *spa, int mode)
 	/* If we didn't create a process, we need to create our taskqs. */
 	if (spa->spa_proc == &p0) {
 		spa_create_zio_taskqs(spa);
+		spa_create_krrp_taskq(spa);
 	}
 
 	list_create(&spa->spa_config_dirty_list, sizeof (vdev_t),
@@ -1215,6 +1270,7 @@ spa_deactivate(spa_t *spa)
 		}
 	}
 
+	taskq_destroy(spa->spa_krrp_taskq);
 	metaslab_class_destroy(spa->spa_normal_class);
 	spa->spa_normal_class = NULL;
 
@@ -1317,6 +1373,11 @@ spa_unload(spa_t *spa)
 	int i;
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+
+	mutex_enter(&spa->spa_wrc.wrc_lock);
+	wrc_deactivate(spa);
+	mutex_exit(&spa->spa_wrc.wrc_lock);
+	autosnap_fini(spa);
 
 	/*
 	 * Stop async tasks.
@@ -2010,9 +2071,10 @@ spa_load_verify(spa_t *spa)
 	    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE);
 
 	if (spa_load_verify_metadata) {
-		error = traverse_pool(spa, spa->spa_verify_min_txg,
+		zbookmark_phys_t zb = { 0 };
+		error = traverse_pool(spa, spa->spa_verify_min_txg, UINT64_MAX,
 		    TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA,
-		    spa_load_verify_cb, rio);
+		    spa_load_verify_cb, rio, &zb);
 	}
 
 	(void) zio_wait(rio);
@@ -2703,6 +2765,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	mp = &spa->spa_meta_policy;
 
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
+	spa->spa_wrc_mode = zpool_prop_default_numeric(ZPOOL_PROP_WRC_MODE);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
 	spa->spa_dedup_lo_best_effort =
@@ -2718,6 +2781,8 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	    zpool_prop_default_numeric(ZPOOL_PROP_GENERAL_META_TO_METADEV);
 	mp->spa_other_meta_to_special =
 	    zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
+	mp->spa_small_data_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_SMALL_DATA_TO_METADEV);
 	spa_set_ddt_classes(spa,
 	    zpool_prop_default_numeric(ZPOOL_PROP_DDT_DESEGREGATION));
 
@@ -2738,6 +2803,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		    &spa->spa_dedup_ditto);
 		spa_prop_find(spa, ZPOOL_PROP_FORCETRIM, &spa->spa_force_trim);
 
+		spa_prop_find(spa, ZPOOL_PROP_WRC_MODE, &spa->spa_wrc_mode);
 		spa_prop_find(spa, ZPOOL_PROP_HIWATERMARK, &spa->spa_hiwat);
 		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
 		spa_prop_find(spa, ZPOOL_PROP_DEDUPMETA_DITTO,
@@ -2760,9 +2826,14 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		    &mp->spa_general_meta_to_special);
 		spa_prop_find(spa, ZPOOL_PROP_OTHER_META_TO_METADEV,
 		    &mp->spa_other_meta_to_special);
+		spa_prop_find(spa, ZPOOL_PROP_SMALL_DATA_TO_METADEV,
+		    &mp->spa_small_data_to_special);
 
 		spa->spa_autoreplace = (autoreplace != 0);
 	}
+
+	if (spa->spa_wrc_mode != WRC_MODE_OFF && state != SPA_LOAD_TRYIMPORT)
+		(void) wrc_start_thread(spa);
 
 	error = spa_dir_prop(spa, DMU_POOL_COS_PROPS,
 	    &spa->spa_cos_props_object);
@@ -2864,9 +2935,24 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	 * to start pushing transactions.
 	 */
 	if (state != SPA_LOAD_TRYIMPORT) {
-		if (error = spa_load_verify(spa))
+		autosnap_init(spa);
+		mutex_enter(&spa->spa_wrc.wrc_lock);
+		(void) wrc_activate(spa);
+		mutex_exit(&spa->spa_wrc.wrc_lock);
+
+		if (error = spa_load_verify(spa)) {
+
+			mutex_enter(&spa->spa_wrc.wrc_lock);
+			wrc_deactivate(spa);
+			mutex_exit(&spa->spa_wrc.wrc_lock);
+			autosnap_fini(spa);
+
 			return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA,
 			    error));
+		}
+
+		if (spa->spa_wrc_mode != WRC_MODE_OFF)
+			(void) wrc_start_thread(spa);
 	}
 
 	if (spa_writeable(spa) && (state == SPA_LOAD_RECOVER ||
@@ -3829,6 +3915,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 	spa->spa_failmode = zpool_prop_default_numeric(ZPOOL_PROP_FAILUREMODE);
 	spa->spa_autoexpand = zpool_prop_default_numeric(ZPOOL_PROP_AUTOEXPAND);
+	spa->spa_wrc_mode = zpool_prop_default_numeric(ZPOOL_PROP_WRC_MODE);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
 	spa->spa_ddt_meta_copies =
@@ -3849,6 +3936,8 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	    zpool_prop_default_numeric(ZPOOL_PROP_GENERAL_META_TO_METADEV);
 	mp->spa_other_meta_to_special =
 	    zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
+	mp->spa_small_data_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_SMALL_DATA_TO_METADEV);
 
 	spa_set_ddt_classes(spa, 0);
 
@@ -3885,6 +3974,14 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
 
 	mutex_exit(&spa_namespace_lock);
+	autosnap_init(spa);
+	mutex_enter(&spa->spa_wrc.wrc_lock);
+	(void) wrc_activate(spa);
+	mutex_exit(&spa->spa_wrc.wrc_lock);
+
+	if (spa->spa_wrc_mode != WRC_MODE_OFF)
+		(void) wrc_start_thread(spa);
+
 	return (0);
 }
 
@@ -4434,6 +4531,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
     boolean_t force, boolean_t hardforce, boolean_t saveconfig)
 {
 	spa_t *spa;
+	zfs_autosnap_t *autosnap;
 	boolean_t wrcthr_stopped = B_FALSE;
 
 	if (oldconfig)
@@ -4455,7 +4553,20 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	 */
 	spa_open_ref(spa, FTAG);
 	mutex_exit(&spa_namespace_lock);
-	wrcthr_stopped = stop_wrc_thread(spa); /* stop write cache thread */
+
+	autosnap = spa_get_autosnap(spa);
+	mutex_enter(&autosnap->autosnap_lock);
+
+	if (autosnap_has_children_zone(spa, spa_name(spa))) {
+		mutex_exit(&autosnap->autosnap_lock);
+		spa_close(spa, FTAG);
+		return (EBUSY);
+	}
+
+	mutex_exit(&autosnap->autosnap_lock);
+
+	wrcthr_stopped = wrc_stop_thread(spa); /* stop write cache thread */
+	autosnap_destroyer_thread_stop(spa);
 	spa_async_suspend(spa);
 	mutex_enter(&spa_namespace_lock);
 	spa_close(spa, FTAG);
@@ -4483,7 +4594,8 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 			spa_async_resume(spa);
 			mutex_exit(&spa_namespace_lock);
 			if (wrcthr_stopped)
-				start_wrc_thread(spa);
+				(void) wrc_start_thread(spa);
+			autosnap_destroyer_thread_start(spa);
 			return (SET_ERROR(EBUSY));
 		}
 
@@ -4498,7 +4610,8 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 			spa_async_resume(spa);
 			mutex_exit(&spa_namespace_lock);
 			if (wrcthr_stopped)
-				start_wrc_thread(spa);
+				(void) wrc_start_thread(spa);
+			autosnap_destroyer_thread_start(spa);
 			return (SET_ERROR(EXDEV));
 		}
 
@@ -6402,6 +6515,39 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 			case ZPOOL_PROP_HIWATERMARK:
 				spa->spa_hiwat = intval;
 				break;
+			case ZPOOL_PROP_WRC_MODE:
+				if (intval != WRC_MODE_OFF) {
+					boolean_t set = B_TRUE;
+					uint64_t old_mode = spa->spa_wrc_mode;
+					boolean_t reactivate =
+					    (old_mode != WRC_MODE_OFF);
+
+					/*
+					 * Set new val right away to let wrc
+					 * know the new state. Restore old
+					 * value in case of a failure
+					 */
+					spa->spa_wrc_mode = intval;
+
+					if (reactivate) {
+						wrc_reactivate(spa);
+					} else {
+						set = wrc_start_thread(spa);
+					}
+
+					/* rollback the zap-record */
+					if (!set) {
+						spa->spa_wrc_mode = old_mode;
+						VERIFY0(zap_update(mos,
+						    spa->spa_pool_props_object,
+						    propname, 8, 1, &old_mode,
+						    tx));
+						spa_history_log_internal(spa,
+						    "set", tx, "%s=%lld",
+						    nvpair_name(elem), intval);
+					}
+				}
+				break;
 			case ZPOOL_PROP_DEDUPMETA_DITTO:
 				spa->spa_ddt_meta_copies = intval;
 				break;
@@ -6417,6 +6563,9 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 				break;
 			case ZPOOL_PROP_OTHER_META_TO_METADEV:
 				mp->spa_other_meta_to_special = intval;
+				break;
+			case ZPOOL_PROP_SMALL_DATA_TO_METADEV:
+				mp->spa_small_data_to_special = intval;
 				break;
 			default:
 				break;
@@ -6567,6 +6716,15 @@ spa_sync(spa_t *spa, uint64_t txg)
 	/*
 	 * Iterate to convergence.
 	 */
+
+	autosnap_zone_t *apool;
+	for (apool = list_head(&dp->dp_spa->spa_autosnap.autosnap_zones);
+	    apool != NULL;
+	    apool = list_next(&dp->dp_spa->spa_autosnap.autosnap_zones,
+	    apool)) {
+		apool->created = B_FALSE;
+	}
+	dp->dp_spa->spa_autosnap.autosnap_global.created = B_FALSE;
 	do {
 		int pass = ++spa->spa_sync_pass;
 

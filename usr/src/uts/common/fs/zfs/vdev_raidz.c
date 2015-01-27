@@ -21,9 +21,9 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -32,6 +32,7 @@
 #include <sys/vdev_disk.h>
 #include <sys/vdev_file.h>
 #include <sys/vdev_raidz.h>
+#include <sys/wrcache.h>
 #include <sys/zio.h>
 #include <sys/zio_checksum.h>
 #include <sys/fs/zfs.h>
@@ -1917,6 +1918,7 @@ static void
 raidz_checksum_error(zio_t *zio, raidz_col_t *rc, void *bad_data)
 {
 	vdev_t *vd = zio->io_vd->vdev_child[rc->rc_devidx];
+	vdev_stat_t *vs = &vd->vdev_stat;
 
 	if (!(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
 		zio_bad_cksum_t zbc;
@@ -1932,6 +1934,11 @@ raidz_checksum_error(zio_t *zio, raidz_col_t *rc, void *bad_data)
 		zfs_ereport_post_checksum(zio->io_spa, vd, zio,
 		    rc->rc_offset, rc->rc_size, rc->rc_data, bad_data,
 		    &zbc);
+	}
+
+	if (vd->vdev_isspecial && (vs->vs_checksum_errors ||
+	    vs->vs_read_errors || vs->vs_write_errors)) {
+		wrc_enter_fault_state(vd->vdev_spa);
 	}
 }
 

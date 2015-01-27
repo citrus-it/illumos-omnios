@@ -1,0 +1,12 @@
+/*
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ */
+
+/*LINTLIBRARY*/
+/*PROTOLIB1*/
+
+#include <libkrrp.h>
+#include "../../../common/krrp/krrp.h"
+#include "../../../common/krrp/krrp_error.h"
+#include "../../../common/krrp/krrp_params.h"
+#include "../../../common/krrp/krrp_ioctl_common.h"

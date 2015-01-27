@@ -1,0 +1,342 @@
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
+ * PDU is high level structure (a container) that contains header, some ctrl
+ * information and list of dblks that contain payload.
+ * Over network are transfered header and dblks.
+ */
+
+#include "krrp_pdu.h"
+
+/* #define KRRP_PDU_DEBUG 1 */
+
+static struct {
+	taskq_t				*rele_taskq;
+	uint64_t			ref_cnt;
+	krrp_pdu_engine_t	*ctrl_pdu_engine;
+} krrp_global_pdu_engine_env = {NULL, 0, NULL};
+
+static void krrp_pdu_rele_task(void *void_pdu);
+static void krrp_pdu_engine_notify_cb(void *void_pdu_engine);
+
+int
+krrp_pdu_engine_global_init()
+{
+	int rc;
+	krrp_error_t error;
+
+	VERIFY(krrp_global_pdu_engine_env.ref_cnt == 0);
+	VERIFY(krrp_global_pdu_engine_env.ctrl_pdu_engine == NULL);
+	VERIFY(krrp_global_pdu_engine_env.rele_taskq == NULL);
+
+	krrp_global_pdu_engine_env.rele_taskq = taskq_create(
+	    "krrp_pdu_rele_taskq", 3, minclsyspri, 128,
+	    16384, TASKQ_PREPOPULATE);
+
+	/*
+	 * CTRL PDU Engine that will be used by all sessions:
+	 * preallocation: B_FALSE
+	 * max_memory: 100 MB (should be enough)
+	 * dblk_per_pdu: 1
+	 * dblk_head_sz: 0
+	 * dblk_data_sz: 2 KB
+	 * notify_free_cb: NULL
+	 * notify_free_cb_arg: NULL
+	 */
+	rc = krrp_pdu_engine_create(&krrp_global_pdu_engine_env.ctrl_pdu_engine,
+	    B_TRUE, B_FALSE, 100, 1, 0, 2 * 1024, &error);
+	if (rc != 0) {
+		taskq_destroy(krrp_global_pdu_engine_env.rele_taskq);
+		krrp_global_pdu_engine_env.rele_taskq = NULL;
+	}
+
+	return (rc);
+}
+
+void
+krrp_pdu_engine_global_fini()
+{
+	VERIFY(krrp_global_pdu_engine_env.ctrl_pdu_engine != NULL);
+	VERIFY(krrp_global_pdu_engine_env.ref_cnt == 1);
+
+	krrp_pdu_engine_destroy(krrp_global_pdu_engine_env.ctrl_pdu_engine);
+	krrp_global_pdu_engine_env.ctrl_pdu_engine = NULL;
+
+	taskq_destroy(krrp_global_pdu_engine_env.rele_taskq);
+	krrp_global_pdu_engine_env.rele_taskq = NULL;
+}
+
+void
+krrp_pdu_ctrl_alloc(krrp_pdu_ctrl_t **result_pdu, boolean_t with_header)
+{
+	krrp_pdu_alloc(krrp_global_pdu_engine_env.ctrl_pdu_engine,
+	    (krrp_pdu_t **) result_pdu, with_header);
+}
+
+int
+krrp_pdu_engine_create(krrp_pdu_engine_t **result_engine, boolean_t ctrl,
+    boolean_t prealloc, size_t max_memory, size_t dblks_per_pdu,
+    size_t dblk_head_sz, size_t dblk_data_sz, krrp_error_t *error)
+{
+	int rc;
+	krrp_pdu_engine_t *engine;
+	size_t total_dblk_sz, max_dblk_cnt;
+
+	VERIFY(result_engine != NULL && *result_engine == NULL);
+	VERIFY(max_memory != 0);
+	VERIFY(dblk_data_sz != 0);
+
+	engine = kmem_zalloc(sizeof (krrp_pdu_engine_t), KM_SLEEP);
+
+	engine->type = ctrl ? KRRP_PET_CTRL : KRRP_PET_DATA;
+
+	total_dblk_sz = dblk_head_sz + dblk_data_sz;
+	if (dblks_per_pdu == 0)
+		engine->dblks_per_pdu =
+		    (KRRP_PDU_DEFAULT_SIZE / total_dblk_sz) + 1;
+	else
+		engine->dblks_per_pdu = dblks_per_pdu;
+
+	engine->max_pdu_cnt = (max_memory * 1024 * 1024) /
+		total_dblk_sz / engine->dblks_per_pdu;
+
+	max_dblk_cnt = engine->max_pdu_cnt * engine->dblks_per_pdu;
+	rc = krrp_dblk_engine_create(&engine->dblk_engine, prealloc,
+	    max_dblk_cnt, dblk_head_sz, dblk_data_sz,
+	    engine->dblks_per_pdu, &krrp_pdu_engine_notify_cb, (void *) engine,
+	    error);
+	if (rc != 0) {
+		kmem_free(engine, sizeof (krrp_pdu_engine_t));
+		return (-1);
+	}
+
+	atomic_inc_64(&krrp_global_pdu_engine_env.ref_cnt);
+
+	mutex_init(&engine->mtx, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&engine->cv, NULL, CV_DEFAULT, NULL);
+
+	cmn_err(CE_NOTE, "PDU Engine config: dblk_head_sz:[%lu], "
+	    "dblk_data_sz:[%lu], max_mem:[%lu MB], "
+	    "dblks_per_pdu:[%lu], prealloc:[%s]",
+	    dblk_head_sz, dblk_data_sz, max_memory,
+	    engine->dblks_per_pdu, (prealloc ? "YES" : "NO"));
+
+	*result_engine = engine;
+	return (0);
+}
+
+void
+krrp_pdu_engine_destroy(krrp_pdu_engine_t *engine)
+{
+	krrp_dblk_engine_destroy(engine->dblk_engine);
+
+	mutex_enter(&engine->mtx);
+
+	/*
+	 * DBLK Engine has been destroyed
+	 * so all PDUs must be released
+	 */
+	VERIFY(engine->cur_pdu_cnt == 0);
+
+	cv_destroy(&engine->cv);
+
+	mutex_exit(&engine->mtx);
+	mutex_destroy(&engine->mtx);
+
+	atomic_dec_64(&krrp_global_pdu_engine_env.ref_cnt);
+
+	kmem_free(engine, sizeof (krrp_pdu_engine_t));
+}
+
+void
+krrp_pdu_engine_register_callback(krrp_pdu_engine_t *engine,
+    krrp_pdu_free_notify_cb_t *notify_cb, void *notify_cb_arg)
+{
+	VERIFY(notify_cb != NULL);
+	VERIFY(engine->notify_free.cb == NULL);
+
+	mutex_enter(&engine->mtx);
+
+	engine->notify_free.cb = notify_cb;
+	engine->notify_free.cb_arg = notify_cb_arg;
+	engine->notify_free.init_value = engine->max_pdu_cnt >> 3;
+	if (engine->notify_free.init_value == 0)
+		engine->notify_free.init_value = 1;
+
+	engine->notify_free.cnt = engine->notify_free.init_value;
+
+	mutex_exit(&engine->mtx);
+}
+
+void
+krrp_pdu_engine_force_notify(krrp_pdu_engine_t *engine, boolean_t initial)
+{
+	size_t value;
+
+	mutex_enter(&engine->mtx);
+
+	VERIFY(engine->notify_free.cb != NULL);
+
+	if (initial) {
+		value = engine->max_pdu_cnt;
+		goto out;
+	}
+
+	value = engine->notify_free.init_value - engine->notify_free.cnt;
+	if (value == 0 && engine->cur_pdu_cnt == 0)
+		value = engine->notify_free.init_value;
+
+	engine->notify_free.cnt = engine->notify_free.init_value;
+
+out:
+	if (value != 0)
+		engine->notify_free.cb(engine->notify_free.cb_arg, value);
+
+	mutex_exit(&engine->mtx);
+}
+
+void
+krrp_pdu_alloc(krrp_pdu_engine_t *pdu_engine, krrp_pdu_t **result_pdu,
+    boolean_t alloc_header)
+{
+	clock_t time_left = 0;
+	krrp_dblk_engine_t *dblk_engine;
+	krrp_pdu_t *pdu = NULL;
+
+	VERIFY(pdu_engine != NULL);
+	VERIFY(result_pdu != NULL && *result_pdu == NULL);
+
+#ifdef KRRP_PDU_DEBUG
+	cmn_err(CE_NOTE, "Init new PDU-[%s]",
+	    (pdu_engine->type == KRRP_PET_DATA ? "DATA" : "CTRL"));
+#endif
+
+	dblk_engine = pdu_engine->dblk_engine;
+
+	mutex_enter(&pdu_engine->mtx);
+	while ((pdu_engine->max_pdu_cnt - pdu_engine->cur_pdu_cnt) == 0) {
+		if (time_left == -1) {
+			mutex_exit(&pdu_engine->mtx);
+			return;
+		}
+
+		time_left = cv_reltimedwait(&pdu_engine->cv,
+		    &pdu_engine->mtx, MSEC_TO_TICK(500), TR_CLOCK_TICK);
+	}
+
+	pdu_engine->cur_pdu_cnt++;
+	mutex_exit(&pdu_engine->mtx);
+
+	switch (pdu_engine->type) {
+	case KRRP_PET_DATA:
+		pdu = kmem_zalloc(sizeof (krrp_pdu_data_t), KM_SLEEP);
+		pdu->type = KRRP_PT_DATA;
+		break;
+	case KRRP_PET_CTRL:
+		pdu = kmem_zalloc(sizeof (krrp_pdu_ctrl_t), KM_SLEEP);
+		pdu->type = KRRP_PT_CTRL;
+		break;
+	}
+
+	pdu->max_data_sz = pdu_engine->dblks_per_pdu *
+	    dblk_engine->dblk_data_sz;
+
+	if (alloc_header)
+		pdu->hdr = kmem_zalloc(sizeof (krrp_hdr_t), KM_SLEEP);
+
+	krrp_dblk_alloc(dblk_engine, &pdu->dblk,
+	    pdu_engine->dblks_per_pdu);
+
+	/*
+	 * Counter of free PDU is updated by events from dblk-engine,
+	 * so if we here, then dblk-engine must not return NULL
+	 */
+	VERIFY(pdu->dblk != NULL);
+
+	*result_pdu = pdu;
+}
+
+void
+krrp_pdu_rele(krrp_pdu_t *pdu)
+{
+	/*
+	 * Async rele make sense only if PDU has dblks,
+	 * because dblk_rele logic uses locks
+	 *
+	 * PDU has dblks at receiver side, because PDU initialized
+	 * by connection and released by stream
+	 *
+	 * At sender side PDU does not contain dblk, because PDU intialized
+	 * by stream and released by connection, but connection passes dblks
+	 * to TCP/IP stack, where dblks are processed and released.
+	 */
+	if (pdu->dblk == NULL) {
+		krrp_pdu_rele_task((void *) pdu);
+		return;
+	}
+
+	if (taskq_dispatch(krrp_global_pdu_engine_env.rele_taskq,
+	    krrp_pdu_rele_task, (void *) pdu, TQ_SLEEP) == NULL) {
+		cmn_err(CE_WARN, "Failed to dispatch new connection");
+		krrp_pdu_rele_task((void *) pdu);
+	}
+}
+
+static void
+krrp_pdu_rele_task(void *void_pdu)
+{
+	krrp_pdu_t *pdu = (krrp_pdu_t *) void_pdu;
+
+#ifdef KRRP_PDU_DEBUG
+	cmn_err(CE_NOTE, "RELE PDU: [%d]", pdu->type);
+#endif
+
+	if (pdu->dblk != NULL) {
+		krrp_dblk_rele(pdu->dblk);
+		pdu->dblk = NULL;
+	}
+
+	if (pdu->hdr != NULL) {
+		kmem_free(pdu->hdr, sizeof (krrp_hdr_t));
+		pdu->hdr = NULL;
+	}
+
+	switch (pdu->type) {
+	case KRRP_PT_DATA:
+		kmem_free(pdu, sizeof (krrp_pdu_data_t));
+		break;
+	case KRRP_PT_CTRL:
+		kmem_free(pdu, sizeof (krrp_pdu_ctrl_t));
+		break;
+	}
+}
+
+static void
+krrp_pdu_engine_notify_cb(void *void_pdu_engine)
+{
+	krrp_pdu_engine_t *engine = (krrp_pdu_engine_t *) void_pdu_engine;
+
+	mutex_enter(&engine->mtx);
+
+#ifdef KRRP_PDU_DEBUG
+	cmn_err(CE_NOTE, "Dblk rele notification [%d]", engine->type);
+#endif
+
+	ASSERT(engine->cur_pdu_cnt > 0);
+
+	engine->cur_pdu_cnt--;
+	if (engine->notify_free.cb != NULL) {
+		engine->notify_free.cnt--;
+		if (engine->notify_free.cnt == 0) {
+			engine->notify_free.cnt =
+			    engine->notify_free.init_value;
+			engine->notify_free.cb(engine->notify_free.cb_arg,
+			    engine->notify_free.cnt);
+		}
+	}
+
+	cv_broadcast(&engine->cv);
+	mutex_exit(&engine->mtx);
+}

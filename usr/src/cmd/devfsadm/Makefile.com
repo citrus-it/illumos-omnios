@@ -31,6 +31,7 @@ include ../../Makefile.cmd
 
 COMMON = ..
 UTSBASE = $(COMMON)/../../uts
+KRRPBASE = $(COMMON)/../../common
 
 DEVFSADM_MOD = devfsadm
 
@@ -70,6 +71,7 @@ LINK_OBJS_CMN =			\
 	md_link.o		\
 	dtrace_link.o		\
 	vscan_link.o		\
+	krrp_link.o		\
 	zfs_link.o		\
 	zut_link.o
 
@@ -89,7 +91,7 @@ DEVLINKTAB_SRC = $(COMMON)/$(DEVLINKTAB).sh
 COMPAT_LINKS = disks tapes ports audlinks devlinks drvconfig
 
 CPPFLAGS +=	-D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT \
-		-I$(COMMON) -I$(UTSBASE)/common -I$(MODLOADDIR)
+		-I$(COMMON) -I$(UTSBASE)/common -I$(MODLOADDIR) -I$(KRRPBASE)
 CFLAGS += $(CCVERBOSE) $(C_PICFLAGS)
 
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
