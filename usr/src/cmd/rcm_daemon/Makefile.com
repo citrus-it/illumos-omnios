@@ -24,6 +24,7 @@
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include ../../Makefile.cmd

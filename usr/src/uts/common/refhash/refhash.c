@@ -20,6 +20,8 @@
 #include <sys/list.h>
 #include <sys/ddi.h>
 
+#define	RHL_F_DEAD	0x01
+
 #ifdef lint
 extern refhash_link_t *obj_to_link(refhash_t *, void *);
 extern void *link_to_obj(refhash_t *, refhash_link_t *);
