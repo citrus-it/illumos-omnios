@@ -132,6 +132,7 @@ _MANFILES=	Intro.4				\
 		nsmbrc.4			\
 		nss.4				\
 		nsswitch.conf.4			\
+		overlay_files.4			\
 		packingrules.4			\
 		pam.conf.4			\
 		passwd.4			\

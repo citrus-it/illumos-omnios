@@ -447,6 +447,7 @@ COMMON_SUBDIRS=		\
 	utmpd		\
 	uuidgen		\
 	valtools	\
+	varpd		\
 	vgrind		\
 	vi		\
 	volcheck	\

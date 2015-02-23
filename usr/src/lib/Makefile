@@ -279,6 +279,7 @@ SUBDIRS +=				\
 	sun_fc		\
 	sun_sas		\
 	udapl		\
+	varpd		\
 	watchmalloc	\
 	$($(MACH)_SUBDIRS)
 
@@ -510,6 +511,7 @@ HDRSUBDIRS=				\
 	smbsrv		\
 	smhba		\
 	udapl		\
+	varpd		\
 	$($(MACH)_HDRSUBDIRS)
 
 i386_HDRSUBDIRS=	\
@@ -630,7 +632,7 @@ libdhcputil:	libgen libinetutil libdlpi
 libdiskmgt:	libdevid libdevinfo libadm libefi libkstat libsysevent
 $(INTEL_BLD)libdiskmgt: libfdisk
 libdladm:	libdevinfo libinetutil libscf librcm libexacct libkstat \
-		libpool
+		libpool varpd
 libdll:		libast
 libdlpi:	libinetutil libdladm
 libds:		libsysevent
@@ -745,6 +747,8 @@ storage:	libdevice libdevinfo libdevid
 sun_fc:		libdevinfo libsysevent
 sun_sas:	libdevinfo libsysevent libkstat libdevid
 udapl:		libdevinfo libdladm
+varpd:		libavl libidspace libumem libnsl libnvpair libmd5 librename \
+		libbunyan libcustr
 
 #
 # The reason this rule checks for the existence of the
