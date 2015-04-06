@@ -291,7 +291,7 @@ dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type, uint64_t object,
 				    (char *)ptr <
 				    (char *)abuf->b_data + blksz;
 				    ptr++)
-					*ptr = 0x2f5baddb10c;
+					*ptr = 0x2f5baddb10cULL;
 			} else {
 				return (EIO);
 			}
