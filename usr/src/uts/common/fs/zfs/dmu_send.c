@@ -263,16 +263,16 @@ dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type, uint64_t object,
 		int error = arc_io_bypass(dsp->dsa_os->os_spa, bp,
 		    dmu_krrp_arc_bypass, &bypass);
 
-		if (error == 0) {
+		if (!error) {
 			DTRACE_PROBE(krrp_send_arc_bypass);
 			return (0);
 		}
-
-		if (error != ENODATA)
-			return (EINTR);
-
-		DTRACE_PROBE(krrp_send_disk_read);
-		error = 0;
+		if (error == ENODATA) {
+			DTRACE_PROBE(krrp_send_disk_read);
+			error = 0;
+		}
+		if (error)
+			return (error);
 	}
 
 	if (!dsp->sendsize) {
@@ -908,6 +908,40 @@ dmu_send(const char *tosnap, const char *fromsnap,
 	return (err);
 }
 
+static int
+dmu_adjust_send_estimate_for_indirects(dsl_dataset_t *ds, uint64_t size,
+    uint64_t *sizep)
+{
+	int err;
+	/*
+	 * Assume that space (both on-disk and in-stream) is dominated by
+	 * data.  We will adjust for indirect blocks and the copies property,
+	 * but ignore per-object space used (eg, dnodes and DRR_OBJECT records).
+	 */
+
+	/*
+	 * Subtract out approximate space used by indirect blocks.
+	 * Assume most space is used by data blocks (non-indirect, non-dnode).
+	 * Assume all blocks are recordsize.  Assume ditto blocks and
+	 * internal fragmentation counter out compression.
+	 *
+	 * Therefore, space used by indirect blocks is sizeof(blkptr_t) per
+	 * block, which we observe in practice.
+	 */
+	uint64_t recordsize;
+	err = dsl_prop_get_int_ds(ds, "recordsize", &recordsize);
+	if (err != 0)
+		return (err);
+	size -= size / recordsize * sizeof (blkptr_t);
+
+	/* Add in the space for the record associated with each block. */
+	size += size / recordsize * sizeof (dmu_replay_record_t);
+
+	*sizep = size;
+
+	return (0);
+}
+
 int
 dmu_send_estimate(dsl_dataset_t *ds, dsl_dataset_t *fromds, uint64_t *sizep)
 {
@@ -939,33 +973,61 @@ dmu_send_estimate(dsl_dataset_t *ds, dsl_dataset_t *fromds, uint64_t *sizep)
 			return (err);
 	}
 
-	/*
-	 * Assume that space (both on-disk and in-stream) is dominated by
-	 * data.  We will adjust for indirect blocks and the copies property,
-	 * but ignore per-object space used (eg, dnodes and DRR_OBJECT records).
-	 */
+	err = dmu_adjust_send_estimate_for_indirects(ds, size, sizep);
+	return (err);
+}
 
-	/*
-	 * Subtract out approximate space used by indirect blocks.
-	 * Assume most space is used by data blocks (non-indirect, non-dnode).
-	 * Assume all blocks are recordsize.  Assume ditto blocks and
-	 * internal fragmentation counter out compression.
-	 *
-	 * Therefore, space used by indirect blocks is sizeof(blkptr_t) per
-	 * block, which we observe in practice.
-	 */
-	uint64_t recordsize;
-	err = dsl_prop_get_int_ds(ds, "recordsize", &recordsize);
-	if (err != 0)
-		return (err);
-	size -= size / recordsize * sizeof (blkptr_t);
-
-	/* Add in the space for the record associated with each block. */
-	size += size / recordsize * sizeof (dmu_replay_record_t);
-
-	*sizep = size;
-
+/*
+ * Simple callback used to traverse the blocks of a snapshot and sum their
+ * uncompressed size
+ */
+/* ARGSUSED */
+static int
+dmu_calculate_send_traversal(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
+    const zbookmark_phys_t *zb, const dnode_phys_t *dnp, void *arg)
+{
+	uint64_t *spaceptr = arg;
+	if (bp != NULL && !BP_IS_HOLE(bp)) {
+		*spaceptr += BP_GET_UCSIZE(bp);
+	}
 	return (0);
+}
+
+/*
+ * Given a desination snapshot and a TXG, calculate the approximate size of a
+ * send stream sent from that TXG. from_txg may be zero, indicating that the
+ * whole snapshot will be sent.
+ */
+int
+dmu_send_estimate_from_txg(dsl_dataset_t *ds, uint64_t from_txg,
+    uint64_t *sizep)
+{
+	dsl_pool_t *dp = ds->ds_dir->dd_pool;
+	int err;
+	uint64_t size = 0;
+
+	ASSERT(dsl_pool_config_held(dp));
+
+	/* tosnap must be a snapshot */
+	if (!dsl_dataset_is_snapshot(ds))
+		return (SET_ERROR(EINVAL));
+
+	/* verify that from_txg is before the provided snapshot was taken */
+	if (from_txg >= dsl_dataset_phys(ds)->ds_creation_txg) {
+		return (SET_ERROR(EXDEV));
+	}
+
+	/*
+	 * traverse the blocks of the snapshot with birth times after
+	 * from_txg, summing their uncompressed size
+	 */
+	err = traverse_dataset(ds, from_txg, TRAVERSE_POST,
+	    dmu_calculate_send_traversal, &size);
+	if (err)
+		return (err);
+
+	err = dmu_adjust_send_estimate_for_indirects(ds, size, sizep);
+	return (err);
 }
 
 typedef struct dmu_recv_begin_arg {
@@ -1135,22 +1197,6 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 	if (error == 0) {
 		/* target fs already exists; recv into temp clone */
 
-		if (spa_feature_is_active(dp->dp_spa, SPA_FEATURE_WRC)) {
-			objset_t *os = NULL;
-
-			error  = dmu_objset_from_ds(ds, &os);
-			if (error) {
-				dsl_dataset_rele(ds, FTAG);
-				return (error);
-			}
-
-			/* Recv is impossible into DS that uses WRC */
-			if (os->os_wrc_mode != ZFS_WRC_MODE_OFF) {
-				dsl_dataset_rele(ds, FTAG);
-				return (SET_ERROR(ENOTSUP));
-			}
-		}
-
 		/* Can't recv a clone into an existing fs */
 		if (flags & DRR_FLAG_CLONE) {
 			dsl_dataset_rele(ds, FTAG);
@@ -1176,22 +1222,6 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 		error = dsl_dataset_hold(dp, buf, FTAG, &ds);
 		if (error != 0)
 			return (error);
-
-		if (spa_feature_is_active(dp->dp_spa, SPA_FEATURE_WRC)) {
-			objset_t *os = NULL;
-
-			error  = dmu_objset_from_ds(ds, &os);
-			if (error) {
-				dsl_dataset_rele(ds, FTAG);
-				return (error);
-			}
-
-			/* Recv is impossible into DS that uses WRC */
-			if (os->os_wrc_mode != ZFS_WRC_MODE_OFF) {
-				dsl_dataset_rele(ds, FTAG);
-				return (SET_ERROR(ENOTSUP));
-			}
-		}
 
 		/*
 		 * Check filesystem and snapshot limits before receiving. We'll

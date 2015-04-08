@@ -5777,6 +5777,19 @@ zfs_ioc_vdev_set_props(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * Determine approximately how large a zfs send stream will be -- the number
+ * of bytes that will be written to the fd supplied to zfs_ioc_send_new().
+ *
+ * innvl: {
+ *     (optional) "from" -> full snap or bookmark name to send an incremental
+ *                          from
+ * }
+ *
+ * outnvl: {
+ *     "space" -> bytes of space (uint64)
+ * }
+ */
 static int
 zfs_ioc_vdev_get_props(zfs_cmd_t *zc)
 {
@@ -6010,7 +6023,7 @@ zfs_ioc_send_new(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
  * of bytes that will be written to the fd supplied to zfs_ioc_send_new().
  *
  * innvl: {
- *     (optional) "fromsnap" -> full snap name to send an incremental from
+ *     (optional) "from" -> full snap or bookmark name to send an incremental from
  * }
  *
  * outnvl: {
@@ -6021,7 +6034,6 @@ static int
 zfs_ioc_send_space(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 {
 	dsl_pool_t *dp;
-	dsl_dataset_t *fromsnap = NULL;
 	dsl_dataset_t *tosnap;
 	int error;
 	char *fromname;
@@ -6037,21 +6049,50 @@ zfs_ioc_send_space(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 		return (error);
 	}
 
-	error = nvlist_lookup_string(innvl, "fromsnap", &fromname);
+	error = nvlist_lookup_string(innvl, "from", &fromname);
 	if (error == 0) {
-		error = dsl_dataset_hold(dp, fromname, FTAG, &fromsnap);
-		if (error != 0) {
-			dsl_dataset_rele(tosnap, FTAG);
-			dsl_pool_rele(dp, FTAG);
-			return (error);
+		if (strchr(fromname, '@') != NULL) {
+			/*
+			 * If from is a snapshot, hold it and use the more
+			 * efficient dmu_send_estimate to estimate send space
+			 * size using deadlists.
+			 */
+			dsl_dataset_t *fromsnap;
+			error = dsl_dataset_hold(dp, fromname, FTAG, &fromsnap);
+			if (error != 0)
+				goto out;
+			error = dmu_send_estimate(tosnap, fromsnap, &space);
+			dsl_dataset_rele(fromsnap, FTAG);
+		} else if (strchr(fromname, '#') != NULL) {
+			/*
+			 * If from is a bookmark, fetch the creation TXG  of the
+			 * snapshot it was created from and use that to find
+			 * blocks that were born after it.
+			 */
+			zfs_bookmark_phys_t frombm;
+
+			error = dsl_bookmark_lookup(dp, fromname, tosnap,
+			    &frombm);
+			if (error != 0)
+				goto out;
+			error = dmu_send_estimate_from_txg(tosnap,
+			    frombm.zbm_creation_txg, &space);
+		} else {
+			/*
+			 * from is not propertly formatted as a snapshot or
+			 * bookmark
+			 */
+			error = SET_ERROR(EINVAL);
+			goto out;
 		}
+	} else {
+		// If estimating the size of a full send, use dmu_send_estimate
+		error = dmu_send_estimate(tosnap, NULL, &space);
 	}
 
-	error = dmu_send_estimate(tosnap, fromsnap, &space);
 	fnvlist_add_uint64(outnvl, "space", space);
 
-	if (fromsnap != NULL)
-		dsl_dataset_rele(fromsnap, FTAG);
+out:
 	dsl_dataset_rele(tosnap, FTAG);
 	dsl_pool_rele(dp, FTAG);
 	return (error);
@@ -6174,8 +6215,8 @@ dmu_objset_find_dp_cursor(dsl_pool_t *dp, uint64_t ddobj,
 
 			for (i = 0; i < cb->skip; i++) {
 				zap_cursor_advance(&zc);
-					if ((zap_cursor_retrieve(&zc,
-					    attr) != 0)) {
+				if ((zap_cursor_retrieve(&zc,
+				    attr) != 0)) {
 					error = ENOENT;
 					goto out;
 				}
@@ -6234,7 +6275,6 @@ out:
 static int
 zfs_ioc_list_from_cursor(const char *name, nvlist_t *innvl, nvlist_t *outnvl)
 {
-
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds;
 
@@ -6269,7 +6309,6 @@ zfs_ioc_list_from_cursor(const char *name, nvlist_t *innvl, nvlist_t *outnvl)
 
 	return (error);
 }
-
 
 static zfs_ioc_vec_t zfs_ioc_vec[ZFS_IOC_LAST - ZFS_IOC_FIRST];
 
