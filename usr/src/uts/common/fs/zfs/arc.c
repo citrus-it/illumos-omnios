@@ -5904,6 +5904,7 @@ arc_fini(void)
 	refcount_destroy(&arc_mfu->arcs_size);
 	refcount_destroy(&arc_mfu_ghost->arcs_size);
 	refcount_destroy(&arc_l2c_only->arcs_size);
+
 	for (arcs = ARC_BUFC_DATA; arcs < ARC_BUFC_NUMTYPES; ++arcs) {
 		multilist_destroy(&arc_mru->arcs_list[arcs]);
 		multilist_destroy(&arc_mru_ghost->arcs_list[arcs]);
@@ -7595,7 +7596,6 @@ l2arc_remove_vdev(vdev_t *vd)
 		 */
 		list_destroy(&remdev->l2ad_buflist);
 		mutex_destroy(&remdev->l2ad_mtx);
-		refcount_destroy(&remdev->l2ad_alloc);
 		kmem_free(remdev->l2ad_dev_hdr, remdev->l2ad_dev_hdr_asize);
 		kmem_free(remdev, sizeof (l2arc_dev_t));
 	}
