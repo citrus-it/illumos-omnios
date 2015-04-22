@@ -3963,6 +3963,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	txg_wait_synced(spa->spa_dsl_pool, txg);
 
 	spa_config_sync(spa, B_FALSE, B_TRUE);
+	spa_event_notify(spa, NULL, ESC_ZFS_POOL_CREATE);
 
 	spa_history_log_version(spa, "create");
 
@@ -4279,6 +4280,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 			spa_configfile_set(spa, props, B_FALSE);
 
 		spa_config_sync(spa, B_FALSE, B_TRUE);
+		spa_event_notify(spa, NULL, ESC_ZFS_POOL_IMPORT);
 
 		mutex_exit(&spa_namespace_lock);
 		return (0);
@@ -4417,6 +4419,8 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	if (!spa_writeable(spa))
 		spa_check_special_feature(spa);
 	spa_history_log_version(spa, "import");
+
+	spa_event_notify(spa, NULL, ESC_ZFS_POOL_IMPORT);
 
 	if (!spa_writeable(spa))
 		return (0);
@@ -4769,6 +4773,8 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 		spa->spa_l2cache.sav_sync = B_TRUE;
 	}
 
+	spa_event_notify(spa, vd, ESC_ZFS_VDEV_ADD);
+
 	/*
 	 * We have to be careful when adding new vdevs to an existing pool.
 	 * If other threads start allocating from these vdevs before we
@@ -5008,6 +5014,8 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 
 	if (spa->spa_bootfs)
 		spa_event_notify(spa, newvd, ESC_ZFS_BOOTFS_VDEV_ATTACH);
+
+	spa_event_notify(spa, newvd, ESC_ZFS_VDEV_ATTACH);
 
 	return (0);
 }
