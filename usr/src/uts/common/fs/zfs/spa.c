@@ -4303,6 +4303,9 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 		spa_event_notify(spa, NULL, ESC_ZFS_POOL_IMPORT);
 
 		mutex_exit(&spa_namespace_lock);
+
+		spa_event_notify(spa, NULL, ESC_ZFS_POOL_IMPORT);
+
 		return (0);
 	}
 
@@ -4834,6 +4837,7 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	dmu_tx_commit(tx);
 
 	wrc_activate(spa);
+	spa_event_notify(spa, vd, ESC_ZFS_VDEV_ADD);
 
 	return (0);
 }
