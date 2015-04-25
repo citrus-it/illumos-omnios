@@ -2137,7 +2137,7 @@ dmu_recv_end_check(void *arg, dmu_tx_t *tx)
 		    drc->drc_tosnap, tx, B_TRUE, 1, drc->drc_cred);
 	}
 
-	if (dmu_tx_is_syncing(tx)) {
+	if (dmu_tx_is_syncing(tx) && drc->drc_krrp_task != NULL) {
 		const char *token =
 		    drc->drc_krrp_task->buffer_args.to_ds;
 		const char *cookie = drc->drc_krrp_task->cookie;
