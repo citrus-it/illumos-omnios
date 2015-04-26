@@ -20,11 +20,11 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014 RackTop Systems.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/dmu_objset.h>
@@ -74,6 +74,20 @@ int zfs_max_recordsize = 1 * 1024 * 1024;
 #define	DS_REF_MAX	(1ULL << 62)
 
 extern inline dsl_dataset_phys_t *dsl_dataset_phys(dsl_dataset_t *ds);
+
+kmem_cache_t *zfs_ds_collector_cache = NULL;
+
+zfs_ds_collector_entry_t *
+dsl_dataset_collector_cache_alloc()
+{
+	return (kmem_cache_alloc(zfs_ds_collector_cache, KM_SLEEP));
+}
+
+void
+dsl_dataset_collector_cache_free(zfs_ds_collector_entry_t *entry)
+{
+	kmem_cache_free(zfs_ds_collector_cache, entry);
+}
 
 /*
  * Figure out how much of this delta should be propogated to the dsl_dir
@@ -142,6 +156,7 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, const blkptr_t *bp, dmu_tx_t *tx,
 	int used = bp_get_dsize_sync(tx->tx_pool->dp_spa, bp);
 	int compressed = BP_GET_PSIZE(bp);
 	int uncompressed = BP_GET_UCSIZE(bp);
+	wrc_data_t *wrc_data = spa_get_wrc_data(tx->tx_pool->dp_spa);
 
 	if (BP_IS_HOLE(bp))
 		return (0);
@@ -165,6 +180,23 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, const blkptr_t *bp, dmu_tx_t *tx,
 
 		dprintf_bp(bp, "freeing ds=%llu", ds->ds_object);
 		dsl_free(tx->tx_pool, tx->tx_txg, bp);
+
+		/* update amount of data which is changed in the window */
+		mutex_enter(&wrc_data->wrc_lock);
+		if (wrc_data->wrc_isvalid &&
+		    bp->blk_birth && wrc_data->wrc_finish_txg &&
+		    bp->blk_birth <= wrc_data->wrc_finish_txg &&
+		    bp->blk_birth >= wrc_data->wrc_start_txg &&
+		    !wrc_data->wrc_purge) {
+
+			wrc_data->wrc_altered_bytes += used;
+			if (wrc_data->wrc_altered_limit &&
+			    wrc_data->wrc_altered_bytes >
+			    wrc_data->wrc_altered_limit) {
+				wrc_purge_window(tx->tx_pool->dp_spa, tx);
+			}
+		}
+		mutex_exit(&wrc_data->wrc_lock);
 
 		mutex_enter(&ds->ds_lock);
 		ASSERT(dsl_dataset_phys(ds)->ds_unique_bytes >= used ||
@@ -1005,13 +1037,6 @@ dsl_dataset_snapshot_reserve_space(dsl_dataset_t *ds, dmu_tx_t *tx)
 	return (0);
 }
 
-typedef struct dsl_dataset_snapshot_arg {
-	nvlist_t *ddsa_snaps;
-	nvlist_t *ddsa_props;
-	nvlist_t *ddsa_errors;
-	cred_t *ddsa_cr;
-} dsl_dataset_snapshot_arg_t;
-
 int
 dsl_dataset_snapshot_check_impl(dsl_dataset_t *ds, const char *snapname,
     dmu_tx_t *tx, boolean_t recv, uint64_t cnt, cred_t *cr)
@@ -1071,7 +1096,7 @@ dsl_dataset_snapshot_check_impl(dsl_dataset_t *ds, const char *snapname,
 	return (0);
 }
 
-static int
+int
 dsl_dataset_snapshot_check(void *arg, dmu_tx_t *tx)
 {
 	dsl_dataset_snapshot_arg_t *ddsa = arg;
@@ -1222,6 +1247,8 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 	uint64_t dsobj, crtxg;
 	objset_t *mos = dp->dp_meta_objset;
 	objset_t *os;
+	boolean_t autosnap;
+	uint64_t unique_bytes = 0;
 
 	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
 
@@ -1321,6 +1348,7 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 	ASSERT3U(dsl_dataset_phys(ds)->ds_prev_snap_txg, <, tx->tx_txg);
 	dsl_dataset_phys(ds)->ds_prev_snap_obj = dsobj;
 	dsl_dataset_phys(ds)->ds_prev_snap_txg = crtxg;
+	unique_bytes = dsl_dataset_phys(ds)->ds_unique_bytes;
 	dsl_dataset_phys(ds)->ds_unique_bytes = 0;
 	if (spa_version(dp->dp_spa) >= SPA_VERSION_UNIQUE_ACCURATE)
 		dsl_dataset_phys(ds)->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;
@@ -1338,9 +1366,46 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 	dsl_dir_snap_cmtime_update(ds->ds_dir);
 
 	spa_history_log_internal_ds(ds->ds_prev, "snapshot", tx, "");
+
+	autosnap = strncmp(snapname, AUTOSNAP_PREFIX, AUTOSNAP_PREFIX_LEN) == 0;
+
+	/*
+	 * With an active WRC all autosnapshot are globalized
+	 * With no wrc and a dataset which is either a standalone or root of
+	 * recursion, just notify about creation
+	 * With no wrc and dataset not being a part of any zone, just reject it
+	 */
+	if (autosnap) {
+		autosnap_zone_t *zone = NULL;
+		autosnap_zone_t *rzone = NULL;
+		char fullname[MAXNAMELEN];
+
+		dsl_dataset_name(ds, fullname);
+		(void) strcat(fullname, "@");
+		(void) strcat(fullname, snapname);
+
+		mutex_enter(&dp->dp_spa->spa_autosnap.autosnap_lock);
+		zone = autosnap_find_zone(dp->dp_spa, fullname, B_FALSE);
+		rzone = autosnap_find_zone(dp->dp_spa, fullname, B_TRUE);
+
+		if (spa_wrc_active(dp->dp_spa) &&
+		    !strchr(fullname, '/')) {
+			autosnap_notify_created_globalized(fullname, tx->tx_txg,
+			    tx->tx_txg, spa_get_autosnap(dp->dp_spa));
+		} else if (!spa_wrc_present(dp->dp_spa) && zone) {
+			autosnap_notify_created(fullname, tx->tx_txg, zone);
+		} else if (!spa_wrc_present(dp->dp_spa) && !rzone) {
+			autosnap_reject_snap(fullname, tx->tx_txg,
+			    spa_get_autosnap(dp->dp_spa));
+		}
+		mutex_exit(&dp->dp_spa->spa_autosnap.autosnap_lock);
+	}
+
+	if (spa_wrc_present(dp->dp_spa))
+		wrc_add_bytes(dp->dp_spa, tx->tx_txg, unique_bytes);
 }
 
-static void
+void
 dsl_dataset_snapshot_sync(void *arg, dmu_tx_t *tx)
 {
 	dsl_dataset_snapshot_arg_t *ddsa = arg;
@@ -1354,6 +1419,7 @@ dsl_dataset_snapshot_sync(void *arg, dmu_tx_t *tx)
 		char dsname[MAXNAMELEN];
 
 		name = nvpair_name(pair);
+
 		atp = strchr(name, '@');
 		(void) strlcpy(dsname, name, atp - name + 1);
 		VERIFY0(dsl_dataset_hold(dp, dsname, FTAG, &ds));
@@ -1364,6 +1430,15 @@ dsl_dataset_snapshot_sync(void *arg, dmu_tx_t *tx)
 			    ZPROP_SRC_LOCAL, ddsa->ddsa_props, tx);
 		}
 		dsl_dataset_rele(ds, FTAG);
+	}
+
+	/*
+	 * in case of autosnap no one will take care about nvlist, so destroy
+	 * it here
+	 */
+	if (ddsa->ddsa_autosnap) {
+		nvlist_free(ddsa->ddsa_snaps);
+		kmem_free(ddsa, sizeof (dsl_dataset_snapshot_arg_t));
 	}
 }
 
@@ -1421,6 +1496,7 @@ dsl_dataset_snapshot(nvlist_t *snaps, nvlist_t *props, nvlist_t *errors)
 	ddsa.ddsa_props = props;
 	ddsa.ddsa_errors = errors;
 	ddsa.ddsa_cr = CRED();
+	ddsa.ddsa_autosnap = B_FALSE;
 
 	if (error == 0) {
 		error = dsl_sync_task(firstname, dsl_dataset_snapshot_check,
@@ -3337,10 +3413,164 @@ dsl_dataset_is_before(dsl_dataset_t *later, dsl_dataset_t *earlier,
 	return (ret);
 }
 
-
 void
 dsl_dataset_zapify(dsl_dataset_t *ds, dmu_tx_t *tx)
 {
 	objset_t *mos = ds->ds_dir->dd_pool->dp_meta_objset;
 	dmu_object_zapify(mos, ds->ds_object, DMU_OT_DSL_DATASET, tx);
+}
+
+boolean_t
+dataset_name_hidden(const char *name)
+{
+	if (strchr(name, '$') != NULL)
+		return (B_TRUE);
+	if (strchr(name, '%') != NULL)
+		return (B_TRUE);
+	if (!INGLOBALZONE(curproc) && !zone_dataset_visible(name, NULL))
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
+uint64_t
+dsl_dataset_creation_txg(const char *name)
+{
+	dsl_pool_t *dp;
+	dsl_dataset_t *ds;
+	int err;
+	uint64_t ret = UINT64_MAX;
+
+	err = dsl_pool_hold(name, FTAG, &dp);
+
+	if (err)
+		return (ret);
+
+	err = dsl_dataset_hold(dp, name, FTAG, &ds);
+
+	if (!err) {
+		ret = dsl_dataset_phys(ds)->ds_creation_txg;
+		dsl_dataset_rele(ds, FTAG);
+	}
+
+	dsl_pool_rele(dp, FTAG);
+
+	return (ret);
+}
+
+/*
+ * With recursive flag, collects all subdatasets (including given one)
+ * Without recursive flag - only given one
+ */
+int
+zfs_collect_ds(spa_t *spa, const char *from_ds, boolean_t recursive,
+    boolean_t hold, list_t *ds_to_send)
+{
+	dsl_pool_t *dp = spa_get_dsl(spa);
+	zfs_ds_collector_entry_t *tail;
+	zfs_ds_collector_entry_t *head = dsl_dataset_collector_cache_alloc();
+	list_t namestack;
+	int err = 0;
+
+	(void) strcpy(head->name, from_ds);
+	head->ds = NULL;
+	if (hold) {
+		err = dsl_dataset_hold(dp, from_ds, NULL, &head->ds);
+		if (err) {
+			dsl_dataset_collector_cache_free(head);
+			return (err);
+		}
+		dsl_dataset_long_hold(head->ds, NULL);
+	}
+	list_insert_tail(ds_to_send, head);
+
+	if (!recursive)
+		return (0);
+
+	list_create(&namestack, sizeof (zfs_ds_collector_entry_t),
+	    offsetof(zfs_ds_collector_entry_t, node));
+	tail = dsl_dataset_collector_cache_alloc();
+
+	tail->cookie = 0;
+	(void) strcpy(tail->name, from_ds);
+	list_insert_tail(&namestack, tail);
+
+	/*
+	 * Use a list as a stack to walk through all child datasets in the
+	 * depth-first order
+	 * We don't want a recursion because the kernel stack is very limited
+	 */
+	while (!err && ((tail = list_tail(&namestack)) != NULL)) {
+		zfs_ds_collector_entry_t *d_el =
+		    dsl_dataset_collector_cache_alloc();
+		zfs_ds_collector_entry_t *el =
+		    dsl_dataset_collector_cache_alloc();
+		objset_t *os;
+		dsl_dataset_t *pdss;
+		char *p;
+
+		d_el->ds = NULL;
+
+		el->cookie = 0;
+		(void) strcpy(el->name, tail->name);
+		(void) strcat(el->name, "/");
+
+		p = el->name + strlen(el->name);
+
+		err = dsl_dataset_hold(dp, tail->name, FTAG, &pdss);
+		if (err)
+			break;
+		err  = dmu_objset_from_ds(pdss, &os);
+		if (err) {
+			dsl_dataset_rele(pdss, FTAG);
+			dsl_dataset_collector_cache_free(d_el);
+			dsl_dataset_collector_cache_free(el);
+			dsl_dataset_collector_cache_free(tail);
+			break;
+		}
+		do {
+			*p = '\0';
+			err = dmu_dir_list_next(os, MAXPATHLEN - (p - el->name),
+			    p, NULL, &tail->cookie);
+		} while (err == 0 && dataset_name_hidden(el->name));
+		dsl_dataset_rele(pdss, FTAG);
+		if (!err) {
+			(void) strcpy(d_el->name, el->name);
+			if (hold) {
+				err = dsl_dataset_hold(dp, d_el->name,
+				    NULL, &d_el->ds);
+				if (err) {
+					dsl_dataset_collector_cache_free(d_el);
+					dsl_dataset_collector_cache_free(el);
+					dsl_dataset_collector_cache_free(tail);
+					break;
+				}
+				dsl_dataset_long_hold(d_el->ds, NULL);
+			}
+			list_insert_tail(&namestack, el);
+			list_insert_tail(ds_to_send, d_el);
+		} else {
+			(void) list_remove_tail(&namestack);
+			dsl_dataset_collector_cache_free(d_el);
+			dsl_dataset_collector_cache_free(el);
+			dsl_dataset_collector_cache_free(tail);
+			if (err == ENOENT)
+				err = 0;
+		}
+	}
+
+	while ((tail = list_tail(&namestack)) != NULL) {
+		(void) list_remove_tail(&namestack);
+		dsl_dataset_collector_cache_free(tail);
+	}
+
+	if (err) {
+		while ((tail = list_tail(ds_to_send)) != NULL) {
+			(void) list_remove_tail(ds_to_send);
+			dsl_dataset_collector_cache_free(tail);
+		}
+	}
+
+	list_destroy(&namestack);
+
+	return (err);
 }

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _SYS_METASLAB_H
@@ -55,15 +56,17 @@ void metaslab_sync_done(metaslab_t *, uint64_t);
 void metaslab_sync_reassess(metaslab_group_t *);
 uint64_t metaslab_block_maxsize(metaslab_t *);
 
-#define	METASLAB_HINTBP_FAVOR	0x0
-#define	METASLAB_HINTBP_AVOID	0x1
-#define	METASLAB_GANG_HEADER	0x2
-#define	METASLAB_GANG_CHILD	0x4
-#define	METASLAB_GANG_AVOID	0x8
+#define	METASLAB_HINTBP_FAVOR	0x00
+#define	METASLAB_HINTBP_AVOID	0x01
+#define	METASLAB_GANG_HEADER	0x02
+#define	METASLAB_GANG_CHILD	0x04
+#define	METASLAB_GANG_AVOID	0x08
+#define	METASLAB_USE_SECONDARY	0x10
 
 int metaslab_alloc(spa_t *, metaslab_class_t *, uint64_t,
     blkptr_t *, int, uint64_t, blkptr_t *, int);
 void metaslab_free(spa_t *, const blkptr_t *, uint64_t, boolean_t);
+void metaslab_free_dva(spa_t *, const dva_t *, uint64_t, boolean_t);
 int metaslab_claim(spa_t *, const blkptr_t *, uint64_t);
 void metaslab_check_free(spa_t *, const blkptr_t *);
 

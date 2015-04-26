@@ -954,6 +954,8 @@ $(ROOT)/usr/lib/libkmf.so.1:=		REALPATH=../../lib/libkmf.so.1
 $(ROOT)/usr/lib/libkmf.so:=		REALPATH=../../lib/libkmf.so.1
 $(ROOT)/usr/lib/libkmfberder.so.1:=	REALPATH=../../lib/libkmfberder.so.1
 $(ROOT)/usr/lib/libkmfberder.so:=	REALPATH=../../lib/libkmfberder.so.1
+$(ROOT)/usr/lib/libkrrp.so.1:=		REALPATH=../../lib/libkrrp.so.1
+$(ROOT)/usr/lib/libkrrp.so:=		REALPATH=../../lib/libkrrp.so.1
 $(ROOT)/usr/lib/libkstat.so.1:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/libkstat.so:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/liblddbg.so.4:=		REALPATH=../../lib/liblddbg.so.4
@@ -1079,6 +1081,8 @@ $(ROOT)/usr/lib/llib-linetutil.ln:=	REALPATH=../../lib/llib-linetutil.ln
 $(ROOT)/usr/lib/llib-linetutil:=	REALPATH=../../lib/llib-linetutil
 $(ROOT)/usr/lib/llib-lintl.ln:=		REALPATH=../../lib/llib-lintl.ln
 $(ROOT)/usr/lib/llib-lintl:=		REALPATH=../../lib/llib-lintl
+$(ROOT)/usr/lib/llib-lkrrp.ln:=		REALPATH=../../lib/llib-lkrrp.ln
+$(ROOT)/usr/lib/llib-lkrrp:=		REALPATH=../../lib/llib-lkrrp
 $(ROOT)/usr/lib/llib-lkstat.ln:=	REALPATH=../../lib/llib-lkstat.ln
 $(ROOT)/usr/lib/llib-lkstat:=		REALPATH=../../lib/llib-lkstat
 $(ROOT)/usr/lib/llib-lm:=		REALPATH=../../lib/llib-lm
@@ -1249,6 +1253,10 @@ $(ROOT)/usr/lib/$(MACH64)/libintl.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libintl.so.1
 $(ROOT)/usr/lib/$(MACH64)/libintl.so:= \
 	REALPATH=../../../lib/$(MACH64)/libintl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libkrrp.so:= \
+	REALPATH=../../../lib/$(MACH64)/libkrrp.so.1
+$(ROOT)/usr/lib/$(MACH64)/libkrrp.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libkrrp.so.1
 $(ROOT)/usr/lib/$(MACH64)/libkstat.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
 $(ROOT)/usr/lib/$(MACH64)/libkstat.so:= \
@@ -1447,6 +1455,8 @@ $(ROOT)/usr/lib/$(MACH64)/llib-linetutil.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-linetutil.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lintl.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lintl.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lkrrp.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lkrrp.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lkstat.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lkstat.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lm.ln:= \
@@ -1585,6 +1595,8 @@ SYM.USRLIB= \
 	/usr/lib/libinetutil.so.1 \
 	/usr/lib/libintl.so \
 	/usr/lib/libintl.so.1 \
+	/usr/lib/libkrrp.so \
+	/usr/lib/libkrrp.so.1 \
 	/usr/lib/libkstat.so \
 	/usr/lib/libkstat.so.1 \
 	/usr/lib/liblddbg.so.4 \
@@ -1708,6 +1720,8 @@ SYM.USRLIB= \
 	/usr/lib/llib-linetutil.ln \
 	/usr/lib/llib-lintl \
 	/usr/lib/llib-lintl.ln \
+	/usr/lib/llib-lkrrp \
+	/usr/lib/llib-lkrrp.ln \
 	/usr/lib/llib-lkstat \
 	/usr/lib/llib-lkstat.ln \
 	/usr/lib/llib-lm \
@@ -1838,6 +1852,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libinetutil.so.1 \
 	/usr/lib/$(MACH64)/libintl.so \
 	/usr/lib/$(MACH64)/libintl.so.1 \
+	/usr/lib/$(MACH64)/libkrrp.so \
+	/usr/lib/$(MACH64)/libkrrp.so.1 \
 	/usr/lib/$(MACH64)/libkstat.so \
 	/usr/lib/$(MACH64)/libkstat.so.1 \
 	/usr/lib/$(MACH64)/liblddbg.so.4 \
@@ -1935,6 +1951,7 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-lgen.ln \
 	/usr/lib/$(MACH64)/llib-linetutil.ln \
 	/usr/lib/$(MACH64)/llib-lintl.ln \
+	/usr/lib/$(MACH64)/llib-lkrrp.ln \
 	/usr/lib/$(MACH64)/llib-lkstat.ln \
 	/usr/lib/$(MACH64)/llib-lm.ln \
 	/usr/lib/$(MACH64)/llib-lmd5.ln \

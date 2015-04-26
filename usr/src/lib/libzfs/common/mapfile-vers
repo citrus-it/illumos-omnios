@@ -19,8 +19,8 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 # MAPFILE HEADER START
 #
@@ -229,6 +229,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_search_import;
 	zpool_set_prop;
 	zpool_stage_history;
+	zpool_standard_error;
 	zpool_state_to_name;
 	zpool_unmount_datasets;
 	zpool_upgrade;
@@ -251,6 +252,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zvol_volsize_to_reservation;
 
 # NZA ZFS Plus
+	zfs_destroy_atomically;
+	zfs_check_krrp;
 	vdev_name_to_prop;
 	vdev_prop_to_name;
 	vdev_prop_readonly;

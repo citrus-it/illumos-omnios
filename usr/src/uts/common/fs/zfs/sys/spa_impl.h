@@ -30,6 +30,7 @@
 
 #include <sys/spa.h>
 #include <sys/vdev.h>
+#include <sys/vdev_impl.h>
 #include <sys/metaslab.h>
 #include <sys/dmu.h>
 #include <sys/dsl_pool.h>
@@ -43,6 +44,7 @@
 #include <sys/wrcache.h>
 #include <sys/zfeature.h>
 #include <zfeature_common.h>
+#include <sys/autosnap.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -132,10 +134,7 @@ typedef enum spa_watermark {
 /* Tunables and default values for special/normal class selection */
 extern boolean_t spa_special_selection_enable;
 
-#define	SPA_SPECIAL_RATIO	1024
-#define	SPA_SPECIAL_RATIO_MIN	1
-#define	SPA_SPECIAL_RATIO_MAX	(1ULL<<43)
-#define	SPA_SPECIAL_ADJUSTMENT	2
+#define	SPA_SPECIAL_ADJUSTMENT	5
 #define	SPA_SPECIAL_UTILIZATION	70
 
 typedef enum {
@@ -152,10 +151,29 @@ typedef enum {
 	    ((sel) < SPA_SPECIAL_SELECTION_MAX))
 
 typedef struct spa_special_stat {
-	int special_ut;
-	int normal_ut;
-	hrtime_t normal_lt;
-	hrtime_t special_lt;
+	uint64_t special_ut;
+	uint64_t normal_ut;
+	uint64_t normal_lt;
+	uint64_t special_lt;
+
+	uint64_t ht_special_lt;
+	uint64_t ht_normal_lt;
+	uint64_t rt_special_lt;
+	uint64_t rt_normal_lt;
+	uint64_t ac_special_lt;
+	uint64_t ac_normal_lt;
+
+	vdev_io_stat_t normal_stat;
+	vdev_io_stat_t special_stat;
+
+	uint64_t ht_special_ut;
+	uint64_t ht_normal_ut;
+	uint64_t rt_special_ut;
+	uint64_t rt_normal_ut;
+	uint64_t ac_special_ut;
+	uint64_t ac_normal_ut;
+
+	uint64_t ac_divisor;
 } spa_special_stat_t;
 
 typedef struct spa_perfmon_data {
@@ -170,6 +188,7 @@ typedef struct spa_meta_placement {
 	uint64_t spa_ddt_to_special;
 	uint64_t spa_general_meta_to_special;
 	uint64_t spa_other_meta_to_special;
+	uint64_t spa_small_data_to_special;
 } spa_meta_placement_t;
 
 
@@ -354,8 +373,8 @@ struct spa {
 	boolean_t	spa_enable_specialclass;
 
 	/* wrcache thread. */
+	uint64_t	spa_wrc_mode;
 	wrc_data_t	spa_wrc;
-	wrc_route_t	spa_wrc_route;
 
 	/* cos list */
 	list_t		spa_cos_list;
@@ -409,6 +428,12 @@ struct spa {
 	uint64_t spa_dedup_best_effort;
 	uint64_t spa_dedup_lo_best_effort;
 	uint64_t spa_dedup_hi_best_effort;
+
+	taskq_t *spa_krrp_taskq;
+
+	zfs_autosnap_t spa_autosnap;
+
+	zbookmark_phys_t spa_lszb;
 };
 
 /* spa sysevent taskq */

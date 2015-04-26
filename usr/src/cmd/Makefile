@@ -467,6 +467,7 @@ COMMON_SUBDIRS=		\
 	zhack		\
 	zic		\
 	zinject		\
+	krrpadm	\
 	zlogin		\
 	zoneadm		\
 	zoneadmd	\
@@ -741,6 +742,7 @@ MSGSUBDIRS=		\
 	zdump		\
 	zfs		\
 	zic		\
+	krrpadm	\
 	zlogin		\
 	zoneadm		\
 	zoneadmd	\

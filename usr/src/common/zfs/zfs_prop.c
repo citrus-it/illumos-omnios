@@ -20,10 +20,10 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -228,10 +228,6 @@ zfs_prop_init(void)
 	static zprop_index_t specialclass_table[] = {
 		{ "zil",	SPA_SPECIALCLASS_ZIL },
 		{ "meta",	SPA_SPECIALCLASS_META },
-#if 0
-		/* temporarily disable wrcache */
-		{ "wrcache",	SPA_SPECIALCLASS_WRCACHE },
-#endif
 		{ NULL }
 	};
 

@@ -539,6 +539,23 @@ spa_deadman(void *arg)
 		vdev_deadman(spa->spa_root_vdev);
 }
 
+static int
+wrc_blocks_compare(const void *arg1, const void *arg2)
+{
+	wrc_block_t *b1 = (wrc_block_t *)arg1;
+	wrc_block_t *b2 = (wrc_block_t *)arg2;
+
+	uint64_t d11 = b1->dva[0].dva_word[0];
+	uint64_t d12 = b1->dva[0].dva_word[1];
+	uint64_t d21 = b2->dva[0].dva_word[0];
+	uint64_t d22 = b2->dva[0].dva_word[1];
+	int cmp1 = (d11 < d21) ? (-1) : (d11 == d21 ? 0 : 1);
+	int cmp2 = (d12 < d22) ? (-1) : (d12 == d22 ? 0 : 1);
+	int cmp = (cmp1 == 0) ? cmp2 : cmp1;
+
+	return (cmp);
+}
+
 /*
  * Create an uninitialized spa_t with the given name.  Requires
  * spa_namespace_lock.  The caller must ensure that the spa_t doesn't already
@@ -570,7 +587,6 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_cos_props_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_vdev_props_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_wrc.wrc_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_wrc_route.route_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_perfmon.perfmon_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
@@ -664,17 +680,18 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 
 	spa_cos_init(spa);
 
-	list_create(&spa->spa_wrc.wrc_blocks, sizeof (wrc_block_t),
+	avl_create(&spa->spa_wrc.wrc_blocks,
+	    wrc_blocks_compare, sizeof (wrc_block_t),
+	    offsetof(wrc_block_t, node));
+	avl_create(&spa->spa_wrc.wrc_moved_blocks,
+	    wrc_blocks_compare, sizeof (wrc_block_t),
 	    offsetof(wrc_block_t, node));
 	spa->spa_wrc.wrc_block_count = 0;
 	spa->spa_wrc.wrc_thread = NULL;
-	spa->spa_wrc_route.route_special = 0;
-	spa->spa_wrc_route.route_normal = 0;
-	spa->spa_wrc_route.route_perc = 0;
 
 	bzero(&(spa->spa_special_stat), sizeof (spa_special_stat_t));
 	spa->spa_special_stat_rotor = 0;
-	spa->spa_special_to_normal_ratio = SPA_SPECIAL_RATIO;
+	spa->spa_special_to_normal_ratio = 100;
 	spa->spa_dedup_percentage = 100;
 	spa->spa_dedup_rotor = 0;
 
@@ -725,7 +742,10 @@ spa_remove(spa_t *spa)
 	}
 
 	list_destroy(&spa->spa_config_list);
-	list_destroy(&spa->spa_wrc.wrc_blocks);
+	wrc_clean_plan_tree(spa);
+	wrc_clean_moved_tree(spa);
+	avl_destroy(&spa->spa_wrc.wrc_blocks);
+	avl_destroy(&spa->spa_wrc.wrc_moved_blocks);
 
 	spa_cos_fini(spa);
 
@@ -771,7 +791,6 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_cos_props_lock);
 	mutex_destroy(&spa->spa_vdev_props_lock);
 	mutex_destroy(&spa->spa_wrc.wrc_lock);
-	mutex_destroy(&spa->spa_wrc_route.route_lock);
 	mutex_destroy(&spa->spa_perfmon.perfmon_lock);
 
 	kmem_free(spa, sizeof (spa_t));
@@ -1829,6 +1848,16 @@ spa_evicting_os_wait(spa_t *spa)
 	dmu_buf_user_evict_wait();
 }
 
+uint64_t
+spa_class_alloc_percentage(metaslab_class_t *mc)
+{
+	uint64_t capacity = mc->mc_space;
+	uint64_t alloc = mc->mc_alloc;
+	uint64_t one_percent = capacity / 100;
+
+	return (alloc / one_percent);
+}
+
 int
 spa_max_replication(spa_t *spa)
 {
@@ -1880,9 +1909,16 @@ uint64_t
 bp_get_dsize_sync(spa_t *spa, const blkptr_t *bp)
 {
 	uint64_t dsize = 0;
+	boolean_t spec_case = B_FALSE;
 
-	for (int d = 0; d < BP_GET_NDVAS(bp); d++)
+	for (int d = 0; d < BP_GET_NDVAS(bp); d++) {
+		vdev_t *vd = vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[d]));
+		if (d == 0 && vdev_is_special(vd))
+			spec_case = B_TRUE;
+		if (d == 1 && spec_case && !vdev_is_special(vd))
+			break;
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
+	}
 
 	return (dsize);
 }
@@ -1891,11 +1927,18 @@ uint64_t
 bp_get_dsize(spa_t *spa, const blkptr_t *bp)
 {
 	uint64_t dsize = 0;
+	boolean_t spec_case = B_FALSE;
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
-	for (int d = 0; d < BP_GET_NDVAS(bp); d++)
+	for (int d = 0; d < BP_GET_NDVAS(bp); d++) {
+		vdev_t *vd = vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[d]));
+		if (d == 0 && vdev_is_special(vd))
+			spec_case = B_TRUE;
+		if (d == 1 && spec_case && !vdev_is_special(vd))
+			break;
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
+	}
 
 	spa_config_exit(spa, SCL_VDEV, FTAG);
 
@@ -2158,4 +2201,46 @@ spa_maxblocksize(spa_t *spa)
 		return (SPA_MAXBLOCKSIZE);
 	else
 		return (SPA_OLD_MAXBLOCKSIZE);
+}
+
+boolean_t
+spa_wrc_present(spa_t *spa)
+{
+	return (spa->spa_wrc_mode != WRC_MODE_OFF);
+}
+
+boolean_t
+spa_wrc_active(spa_t *spa)
+{
+	return (spa->spa_wrc_mode == WRC_MODE_ACTIVE);
+}
+
+int
+spa_wrc_mode(const char *name)
+{
+	int ret = 0;
+	spa_t *spa;
+
+	mutex_enter(&spa_namespace_lock);
+	spa = spa_lookup(name);
+	if (!spa) {
+		mutex_exit(&spa_namespace_lock);
+		return (-1);
+	}
+
+	ret = (int)spa->spa_wrc_mode;
+	mutex_exit(&spa_namespace_lock);
+	return (ret);
+}
+
+struct zfs_autosnap *
+spa_get_autosnap(spa_t *spa)
+{
+	return (&spa->spa_autosnap);
+}
+
+wrc_data_t *
+spa_get_wrc_data(spa_t *spa)
+{
+	return (&spa->spa_wrc);
 }

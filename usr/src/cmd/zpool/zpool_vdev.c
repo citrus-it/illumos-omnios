@@ -563,7 +563,6 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 	lastrep.zprl_type = NULL;
 	for (t = 0; t < toplevels; t++) {
 		uint64_t is_log = B_FALSE;
-		uint64_t is_special = B_FALSE;
 
 		nv = top[t];
 
@@ -573,11 +572,6 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 		 */
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_LOG, &is_log);
 		if (is_log)
-			continue;
-
-		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_SPECIAL,
-		    &is_special);
-		if (is_special)
 			continue;
 
 		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE,

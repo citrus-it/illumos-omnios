@@ -24,7 +24,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBZFS_H
@@ -215,6 +215,7 @@ extern const char *zpool_get_name(zpool_handle_t *);
 extern int zpool_get_state(zpool_handle_t *);
 extern char *zpool_state_to_name(vdev_state_t, vdev_aux_t);
 extern void zpool_free_handles(libzfs_handle_t *);
+extern int zpool_standard_error(libzfs_handle_t *, int, const char *);
 
 /*
  * Iterate over all active pools in the system.
@@ -582,6 +583,8 @@ int libzfs_dataset_cmp(const void *, const void *);
 extern int zfs_create(libzfs_handle_t *, const char *, zfs_type_t,
     nvlist_t *);
 extern int zfs_create_ancestors(libzfs_handle_t *, const char *);
+extern int zfs_check_krrp(libzfs_handle_t *, const char *);
+extern int zfs_destroy_atomically(zfs_handle_t *, boolean_t);
 extern int zfs_destroy(zfs_handle_t *, boolean_t);
 extern int zfs_destroy_snaps(zfs_handle_t *, char *, boolean_t);
 extern int zfs_destroy_snaps_nvl(libzfs_handle_t *, nvlist_t *, boolean_t);

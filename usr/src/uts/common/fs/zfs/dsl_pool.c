@@ -20,12 +20,13 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
+#include <sys/autosnap.h>
 #include <sys/dsl_pool.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_prop.h>
@@ -465,6 +466,89 @@ dsl_pool_dirty_delta(dsl_pool_t *dp, int64_t delta)
 		cv_signal(&dp->dp_spaceavail_cv);
 }
 
+/* Collect datasets with a given param and create a snapshoting synctask */
+#define	AUTOSNAP_COLLECTOR_BUSY_LIMIT (1000)
+int
+dsl_pool_collect_ds_for_autosnap(dsl_pool_t *dp, uint64_t txg,
+    const char *root_ds, const char *snap_name, boolean_t recursive,
+    dmu_tx_t *tx)
+{
+	spa_t *spa = dp->dp_spa;
+	dsl_dataset_t *ds;
+	list_t ds_to_send;
+	zfs_ds_collector_entry_t *el;
+	nvlist_t *nv_auto;
+	int err;
+	int busy_counter = 0;
+
+	err = nvlist_alloc(&nv_auto, NV_UNIQUE_NAME, KM_SLEEP);
+	if (err)
+		return (err);
+
+	list_create(&ds_to_send, sizeof (zfs_ds_collector_entry_t),
+	    offsetof(zfs_ds_collector_entry_t, node));
+
+	while ((err = zfs_collect_ds(spa, root_ds, recursive,
+	    B_FALSE, &ds_to_send)) == EBUSY &&
+	    busy_counter++ < AUTOSNAP_COLLECTOR_BUSY_LIMIT)
+		delay(NSEC_TO_TICK(100));
+
+	if (err) {
+		list_destroy(&ds_to_send);
+		nvlist_free(nv_auto);
+		return (err);
+	}
+
+	for (el = list_head(&ds_to_send);
+	    el != NULL;
+	    el = list_head(&ds_to_send)) {
+		boolean_t len_ok =
+		    (strlen(el->name) + strlen(snap_name) + 1) < MAXNAMELEN;
+		if (!err && !len_ok)
+			err = ENAMETOOLONG;
+		if (!err)
+			err = dsl_dataset_hold(dp, el->name, FTAG, &ds);
+		if (!err) {
+			err = dsl_dataset_snapshot_check_impl(ds,
+			    snap_name, tx, B_FALSE, 0, NULL);
+			dsl_dataset_rele(ds, FTAG);
+		}
+		if (!err) {
+			(void) strcat(el->name, "@");
+			(void) strcat(el->name, snap_name);
+
+			err = nvlist_add_boolean(nv_auto, el->name);
+		}
+
+		(void) list_remove_head(&ds_to_send);
+		dsl_dataset_collector_cache_free(el);
+	}
+	list_destroy(&ds_to_send);
+
+	if (!err) {
+		dsl_sync_task_t *dst =
+		    kmem_zalloc(sizeof (dsl_sync_task_t), KM_SLEEP);
+		dsl_dataset_snapshot_arg_t *ddsa =
+		    kmem_zalloc(sizeof (dsl_dataset_snapshot_arg_t), KM_SLEEP);
+		ddsa->ddsa_autosnap = B_TRUE;
+		ddsa->ddsa_snaps = nv_auto;
+		ddsa->ddsa_cr = CRED();
+		dst->dst_pool = dp;
+		dst->dst_txg = txg;
+		dst->dst_space = 3 << DST_AVG_BLKSHIFT;
+		dst->dst_checkfunc = dsl_dataset_snapshot_check;
+		dst->dst_syncfunc = dsl_dataset_snapshot_sync;
+		dst->dst_arg = ddsa;
+		dst->dst_error = 0;
+		dst->dst_nowaiter = B_TRUE;
+		(void) txg_list_add_tail(&dp->dp_sync_tasks, dst, dst->dst_txg);
+	} else {
+		nvlist_free(nv_auto);
+	}
+
+	return (err);
+}
+
 void
 dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 {
@@ -473,18 +557,125 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	dsl_dir_t *dd;
 	dsl_dataset_t *ds;
 	objset_t *mos = dp->dp_meta_objset;
+	spa_t *spa = dp->dp_spa;
 	list_t synced_datasets;
+	dsl_sync_task_t *iter;
+	boolean_t autosnap_skip_txg = B_FALSE;
+	boolean_t user_snap = B_FALSE;
+	boolean_t wrc_present = spa_wrc_present(spa);
+	autosnap_zone_t *gzone = &spa->spa_autosnap.autosnap_global;
+	char snap[MAXNAMELEN];
+
+	/* check if there are  ny sync ops in the txg */
+	if (txg_list_head(&dp->dp_sync_tasks, txg) != NULL)
+		autosnap_skip_txg = B_TRUE;
+
+	/* check if there are user snaps in the txg */
+	for (iter = txg_list_head(&dp->dp_sync_tasks, txg);
+	    iter != NULL;
+	    iter = txg_list_next(&dp->dp_sync_tasks, iter, txg)) {
+		if (iter->dst_syncfunc == dsl_dataset_snapshot_sync) {
+			user_snap = B_TRUE;
+			break;
+		}
+	}
+
 
 	list_create(&synced_datasets, sizeof (dsl_dataset_t),
 	    offsetof(dsl_dataset_t, ds_synced_link));
 
 	tx = dmu_tx_create_assigned(dp, txg);
 
+	(void) sprintf(snap, "%s_%llu", AUTOSNAP_PREFIX,
+	    (unsigned long long int) txg);
+
+	if (spa->spa_autosnap.initialized) {
+		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+		mutex_enter(&spa->spa_autosnap.autosnap_lock);
+
+		/* wrc allows pool-level recursive snaps only */
+		if (wrc_present &&
+		    spa->spa_sync_pass == 1 &&
+		    (txg_list_head(&dp->dp_dirty_datasets, txg) ||
+		    gzone->delayed)) {
+			if (autosnap_skip_txg) {
+				gzone->delayed = B_TRUE;
+			} else {
+				boolean_t confirm = autosnap_confirm_snap(
+				    spa_name(spa), txg, gzone);
+
+				if (confirm) {
+					int err =
+					    dsl_pool_collect_ds_for_autosnap(
+					    dp, txg, spa_name(spa),
+					    snap, B_TRUE, tx);
+					if (!err) {
+						gzone->created = B_TRUE;
+					} else {
+						autosnap_error_snap(
+						    spa_name(spa), err, txg,
+						    gzone);
+					}
+				}
+
+				gzone->delayed = B_FALSE;
+			}
+		}
+
+		/*
+		 * iterate through dirty datasets to delay
+		 * ones with usersnaps
+		 */
+		for (ds = txg_list_head(&dp->dp_dirty_datasets, txg);
+		    ds != NULL && spa->spa_sync_pass <= 1;
+		    ds = txg_list_next(&dp->dp_dirty_datasets, ds, txg)) {
+			char ds_name[MAXPATHLEN];
+			char ds_snap[MAXPATHLEN];
+			autosnap_zone_t *azone;
+
+			dsl_dataset_name(ds, ds_name);
+			(void) sprintf(ds_snap, "%s@%s", ds_name, snap);
+
+			azone = autosnap_find_zone(spa, ds_name, B_TRUE);
+
+			if (!azone)
+				continue;
+			if (gzone->created) {
+				azone->delayed = B_FALSE;
+				continue;
+			}
+			if (autosnap_skip_txg) {
+				azone->delayed = B_TRUE;
+				continue;
+			}
+			if (azone->created)
+				continue;
+
+			if (autosnap_confirm_snap(azone->dataset, txg, azone)) {
+				int err = dsl_pool_collect_ds_for_autosnap(dp,
+				    txg, azone->dataset, snap,
+				    !!(azone->flags & AUTOSNAP_RECURSIVE), tx);
+				if (!err) {
+					azone->created = B_TRUE;
+				} else {
+					autosnap_error_snap(spa_name(spa),
+					    err, txg, azone);
+				}
+			}
+			azone->delayed = B_FALSE;
+		}
+
+		mutex_exit(&spa->spa_autosnap.autosnap_lock);
+		rrw_exit(&dp->dp_config_rwlock, FTAG);
+	}
+
+
 	/*
 	 * Write out all dirty blocks of dirty datasets.
 	 */
 	zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
 	while ((ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) != NULL) {
+
 		/*
 		 * We must not sync any non-MOS datasets twice, because
 		 * we may have taken a snapshot of them.  However, we
@@ -494,7 +685,52 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 		list_insert_tail(&synced_datasets, ds);
 		dsl_dataset_sync(ds, zio, tx);
 	}
+
 	VERIFY0(zio_wait(zio));
+
+	if (spa->spa_autosnap.initialized) {
+		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
+		mutex_enter(&spa->spa_autosnap.autosnap_lock);
+	}
+
+	/* check if there are any delayed autosnap left and reset the flag */
+	if (spa->spa_autosnap.initialized && !gzone->created &&
+	    spa->spa_sync_pass == 1) {
+		autosnap_zone_t *azone;
+		zfs_autosnap_t *autosnap = &spa->spa_autosnap;
+
+		if (user_snap)
+			gzone->delayed = B_TRUE;
+
+		for (azone = list_head(&autosnap->autosnap_zones);
+		    azone != NULL;
+		    azone = list_next(&autosnap->autosnap_zones, azone)) {
+			if (user_snap) {
+				azone->delayed = B_TRUE;
+				continue;
+			} else if (autosnap_skip_txg || !azone->delayed) {
+				continue;
+			}
+
+			if (autosnap_confirm_snap(azone->dataset, txg, azone)) {
+				int err = dsl_pool_collect_ds_for_autosnap(dp,
+				    txg, azone->dataset, snap,
+				    !!(azone->flags & AUTOSNAP_RECURSIVE), tx);
+				if (!err) {
+					azone->created = B_TRUE;
+				} else {
+					autosnap_error_snap(spa_name(spa),
+					    err, txg, azone);
+				}
+			}
+			azone->delayed = B_FALSE;
+		}
+	}
+
+	if (spa->spa_autosnap.initialized) {
+		mutex_exit(&spa->spa_autosnap.autosnap_lock);
+		rrw_exit(&dp->dp_config_rwlock, FTAG);
+	}
 
 	/*
 	 * We have written all of the accounted dirty data, so our
@@ -521,6 +757,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	 * user accounting information (and we won't get confused
 	 * about which blocks are part of the snapshot).
 	 */
+
 	zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
 	while ((ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) != NULL) {
 		ASSERT(list_link_active(&ds->ds_synced_link));
@@ -577,6 +814,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	 * The MOS data dirtied by the sync_tasks will be synced on the next
 	 * pass.
 	 */
+
 	if (!txg_list_empty(&dp->dp_sync_tasks, txg)) {
 		dsl_sync_task_t *dst;
 		/*
@@ -586,6 +824,11 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 		ASSERT3U(spa_sync_pass(dp->dp_spa), ==, 1);
 		while ((dst = txg_list_remove(&dp->dp_sync_tasks, txg)) != NULL)
 			dsl_sync_task_sync(dst, tx);
+	}
+
+	if (spa_wrc_present(spa)) {
+		wrc_trigger_wrcthread(dp->dp_spa,
+		    ((dp->dp_sync_history[0] + dp->dp_sync_history[1]) / 2));
 	}
 
 	dmu_tx_commit(tx);
@@ -643,11 +886,10 @@ dsl_pool_need_dirty_delay(dsl_pool_t *dp)
 	    zfs_dirty_data_max * zfs_delay_min_dirty_percent / 100;
 	boolean_t rv;
 
-	mutex_enter(&dp->dp_lock);
 	if (dp->dp_dirty_total > zfs_dirty_data_sync)
 		txg_kick(dp);
 	rv = (dp->dp_dirty_total > delay_min_bytes);
-	mutex_exit(&dp->dp_lock);
+
 	return (rv);
 }
 

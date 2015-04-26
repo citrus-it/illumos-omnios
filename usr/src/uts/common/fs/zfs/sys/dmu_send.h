@@ -22,8 +22,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _DMU_SEND_H
@@ -31,6 +31,10 @@
 
 #include <sys/inttypes.h>
 #include <sys/spa.h>
+#include <sys/dmu_impl.h>
+#include <sys/dmu_krrp.h>
+#include <sys/dsl_dataset.h>
+#include <sys/dsl_bookmark.h>
 
 struct vnode;
 struct dsl_dataset;
@@ -62,12 +66,23 @@ typedef struct dmu_recv_cookie {
 	uint64_t drc_newsnapobj;
 	void *drc_owner;
 	cred_t *drc_cred;
+	dmu_krrp_task_t *drc_krrp_task;
 } dmu_recv_cookie_t;
 
+int dmu_recv_impl(int fd, char *tofs, char *tosnap, char *origin,
+    struct drr_begin *drrb, nvlist_t *props, nvlist_t *errors, uint64_t *errf,
+    int cfd, uint64_t *ahdl, uint64_t *sz, boolean_t force,
+    dmu_krrp_task_t *krrp_task);
+int dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *ds,
+    zfs_bookmark_phys_t *fromzb, boolean_t is_clone, boolean_t embedok,
+    boolean_t large_block_ok, int outfd, vnode_t *vp, offset_t *off,
+    dmu_krrp_task_t *krrp_task);
 int dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
-    boolean_t force, char *origin, dmu_recv_cookie_t *drc);
+    boolean_t force, boolean_t force_cksum, char *origin,
+    dmu_recv_cookie_t *drc);
 int dmu_recv_stream(dmu_recv_cookie_t *drc, struct vnode *vp, offset_t *voffp,
-    int cleanup_fd, uint64_t *action_handlep);
+    int cleanup_fd, uint64_t *action_handlep,
+    dmu_krrp_task_t *krrp_task);
 int dmu_recv_end(dmu_recv_cookie_t *drc, void *owner);
 boolean_t dmu_objset_is_receiving(objset_t *os);
 

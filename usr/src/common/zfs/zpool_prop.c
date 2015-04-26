@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zio.h>
@@ -79,6 +79,13 @@ zpool_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t wrcmode_table[] = {
+		{ "off", WRC_MODE_OFF },
+		{ "active", WRC_MODE_ACTIVE },
+		{ "passive", WRC_MODE_PASSIVE },
+		{ NULL }
+	};
+
 	/* string properties */
 	zprop_register_string(ZPOOL_PROP_ALTROOT, "altroot", NULL, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "<path>", "ALTROOT");
@@ -130,6 +137,9 @@ zpool_prop_init(void)
 	    "0-100", "DEDUP_HI_BEST_EFFORT");
 
 	/* default index (boolean) properties */
+	zprop_register_index(ZPOOL_PROP_WRC_MODE, "wrc_mode", WRC_MODE_OFF,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "off | active | passive",
+	    "WRC_MODE", wrcmode_table);
 	zprop_register_index(ZPOOL_PROP_DELEGATION, "delegation", 1,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "DELEGATION",
 	    boolean_table);
@@ -160,7 +170,7 @@ zpool_prop_init(void)
 	    ZFS_TYPE_POOL, "on | dual | off", "GENMETA_TO_MD",
 	    meta_placement_table);
 	zprop_register_index(ZPOOL_PROP_OTHER_META_TO_METADEV,
-	    "other_meta_to_metadev", META_PLACEMENT_OFF, PROP_DEFAULT,
+	    "other_meta_to_metadev", META_PLACEMENT_ON, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "on | dual | off", "OTHERMETA_TO_MD",
 	    meta_placement_table);
 
@@ -186,6 +196,10 @@ zpool_prop_init(void)
 	zprop_register_number(ZPOOL_PROP_HIWATERMARK, "high-watermark",
 	    80, PROP_DEFAULT, ZFS_TYPE_POOL,
 	    "<watermark 0-100%>", "HIWATERMARK");
+
+	zprop_register_number(ZPOOL_PROP_SMALL_DATA_TO_METADEV,
+	    "small_data_to_metadev", 0, PROP_DEFAULT, ZFS_TYPE_POOL,
+	    "Threshold to route to md", "SMALLDATA_TO_MD");
 
 	/* hidden properties */
 	zprop_register_hidden(ZPOOL_PROP_NAME, "name", PROP_TYPE_STRING,

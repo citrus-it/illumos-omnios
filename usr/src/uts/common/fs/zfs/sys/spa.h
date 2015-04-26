@@ -56,6 +56,8 @@ typedef struct ddt_entry ddt_entry_t;
 struct dsl_pool;
 struct dsl_dataset;
 
+struct zfs_autosnap;
+
 /*
  * General-purpose 32-bit and 64-bit bitfield encodings.
  */
@@ -468,7 +470,7 @@ _NOTE(CONSTCOND) } while (0)
 
 /* Determines whether BP points to data or metadata blocks */
 #define	BP_IS_METADATA(bp)	(BP_GET_LEVEL(bp) > 0 || \
-				dmu_ot[BP_GET_TYPE(bp)].ot_metadata)
+				DMU_OT_IS_METADATA(BP_GET_TYPE(bp)))
 
 #define	BP_ZERO(bp)				\
 {						\
@@ -796,6 +798,7 @@ extern metaslab_class_t *spa_special_class(spa_t *spa);
 extern void spa_evicting_os_register(spa_t *, objset_t *os);
 extern void spa_evicting_os_deregister(spa_t *, objset_t *os);
 extern void spa_evicting_os_wait(spa_t *spa);
+extern uint64_t spa_class_alloc_percentage(metaslab_class_t *mc);
 extern int spa_max_replication(spa_t *spa);
 extern int spa_prev_software_version(spa_t *spa);
 extern int spa_busy(void);
@@ -836,6 +839,10 @@ extern boolean_t spa_has_pending_synctask(spa_t *spa);
 extern boolean_t spa_has_special(spa_t *spa);
 extern int spa_maxblocksize(spa_t *spa);
 extern void zfs_blkptr_verify(spa_t *spa, const blkptr_t *bp);
+extern boolean_t spa_wrc_present(spa_t *spa);
+extern boolean_t spa_wrc_active(spa_t *spa);
+extern struct zfs_autosnap *spa_get_autosnap(spa_t *spa);
+extern void wrc_purge_window(spa_t *spa, dmu_tx_t *tx);
 
 extern int spa_mode(spa_t *spa);
 extern uint64_t strtonum(const char *str, char **nptr);
@@ -894,6 +901,17 @@ extern void spa_configfile_set(spa_t *, nvlist_t *, boolean_t);
 
 /* asynchronous event notification */
 extern void spa_event_notify(spa_t *spa, vdev_t *vdev, const char *name);
+
+/* krrp */
+extern taskqid_t spa_dispatch_krrp_task(const char *dataset,
+    task_func_t func, void *args);
+extern int spa_wrc_mode(const char *name);
+
+typedef enum spa_wrc_mode {
+	WRC_MODE_OFF,
+	WRC_MODE_ACTIVE,
+	WRC_MODE_PASSIVE
+} spa_wrc_mode_t;
 
 #ifdef ZFS_DEBUG
 #define	dprintf_bp(bp, fmt, ...) do {				\

@@ -23,8 +23,8 @@
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
- * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -56,9 +56,14 @@
  */
 krwlock_t os_lock;
 
+extern kmem_cache_t *zfs_ds_collector_cache;
+
 void
 dmu_objset_init(void)
 {
+	zfs_ds_collector_cache = kmem_cache_create("zfs_ds_collector_cache",
+	    sizeof (zfs_ds_collector_entry_t),
+	    8, NULL, NULL, NULL, NULL, NULL, 0);
 	rw_init(&os_lock, NULL, RW_DEFAULT, NULL);
 }
 
@@ -66,6 +71,7 @@ void
 dmu_objset_fini(void)
 {
 	rw_destroy(&os_lock);
+	kmem_cache_destroy(zfs_ds_collector_cache);
 }
 
 spa_t *
@@ -1542,6 +1548,50 @@ dmu_snapshot_realname(objset_t *os, char *name, char *real, int maxlen,
 	return (zap_lookup_norm(ds->ds_dir->dd_pool->dp_meta_objset,
 	    dsl_dataset_phys(ds)->ds_snapnames_zapobj, name, 8, 1, &ignored,
 	    MT_FIRST, real, maxlen, conflict));
+}
+
+int
+dmu_clone_list_next(objset_t *os, int len, char *name,
+    uint64_t *idp, uint64_t *offp)
+{
+	dsl_dataset_t *ds = os->os_dsl_dataset, *clone;
+	zap_cursor_t cursor;
+	zap_attribute_t attr;
+	char buf[MAXNAMELEN];
+
+	ASSERT(dsl_pool_config_held(dmu_objset_pool(os)));
+
+	if (dsl_dataset_phys(ds)->ds_next_clones_obj == 0)
+		return (SET_ERROR(ENOENT));
+
+	zap_cursor_init_serialized(&cursor,
+	    ds->ds_dir->dd_pool->dp_meta_objset,
+	    dsl_dataset_phys(ds)->ds_next_clones_obj, *offp);
+
+	if (zap_cursor_retrieve(&cursor, &attr) != 0) {
+		zap_cursor_fini(&cursor);
+		return (SET_ERROR(ENOENT));
+	}
+
+	VERIFY0(dsl_dataset_hold_obj(ds->ds_dir->dd_pool,
+	    attr.za_first_integer, FTAG, &clone));
+
+	dsl_dir_name(clone->ds_dir, buf);
+
+	dsl_dataset_rele(clone, FTAG);
+
+	if (strlen(buf) >= len)
+		return (SET_ERROR(ENAMETOOLONG));
+
+	(void) strcpy(name, buf);
+	if (idp)
+		*idp = attr.za_first_integer;
+
+	zap_cursor_advance(&cursor);
+	*offp = zap_cursor_serialize(&cursor);
+	zap_cursor_fini(&cursor);
+
+	return (0);
 }
 
 int

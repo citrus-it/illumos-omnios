@@ -26,7 +26,7 @@
  * Copyright (c) 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 Martin Matuska. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <ctype.h>
@@ -3205,6 +3205,64 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 	}
 
 	return (0);
+}
+
+int
+zfs_check_krrp(libzfs_handle_t *hdl, const char *name)
+{
+	zfs_cmd_t zc = { 0 };
+	int err;
+
+	(void) strncpy(zc.zc_name, name, ZFS_MAXNAMELEN);
+	zc.zc_name[ZFS_MAXNAMELEN - 1] = '\0';
+
+	(void) zfs_ioctl(hdl, ZFS_IOC_CHECK_KRRP, &zc);
+	err = errno;
+
+	free((void *)(uintptr_t)zc.zc_nvlist_dst);
+
+	return (err);
+}
+
+int
+zfs_destroy_atomically(zfs_handle_t *zhp, boolean_t defer)
+{
+	zfs_cmd_t zc = { 0 };
+
+	if (zhp->zfs_type == ZFS_TYPE_BOOKMARK) {
+		nvlist_t *nv = fnvlist_alloc();
+		fnvlist_add_boolean(nv, zhp->zfs_name);
+		int error = lzc_destroy_bookmarks(nv, NULL);
+		fnvlist_free(nv);
+		if (error != 0) {
+			return (zfs_standard_error_fmt(zhp->zfs_hdl, errno,
+			    dgettext(TEXT_DOMAIN, "cannot destroy '%s'"),
+			    zhp->zfs_name));
+		}
+		return (0);
+	}
+
+	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+
+	if (ZFS_IS_VOLUME(zhp)) {
+		zc.zc_objset_type = DMU_OST_ZVOL;
+	} else {
+		zc.zc_objset_type = DMU_OST_ZFS;
+	}
+
+	zc.zc_defer_destroy = defer;
+	zc.zc_guid = B_TRUE;
+	if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_DESTROY, &zc) != 0 &&
+	    errno != ENOENT) {
+		return (zfs_standard_error_fmt(zhp->zfs_hdl, errno,
+		    dgettext(TEXT_DOMAIN, "cannot destroy '%s'"),
+		    zhp->zfs_name));
+	}
+
+	remove_mountpoint(zhp);
+
+	return (0);
+
 }
 
 /*

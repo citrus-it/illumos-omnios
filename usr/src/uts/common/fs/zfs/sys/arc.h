@@ -34,6 +34,7 @@
 extern "C" {
 #endif
 
+#include <sys/kreplication_common.h>
 #include <sys/zio.h>
 #include <sys/dmu.h>
 #include <sys/spa.h>
@@ -170,6 +171,8 @@ boolean_t arc_buf_eviction_needed(arc_buf_t *buf);
 int arc_referenced(arc_buf_t *buf);
 #endif
 
+int arc_io_bypass(spa_t *spa, const blkptr_t *bp,
+    arc_bypass_io_func func, void *arg);
 int arc_read(zio_t *pio, spa_t *spa, const blkptr_t *bp,
     arc_done_func_t *done, void *private, zio_priority_t priority, int flags,
     arc_flags_t *arc_flags, const zbookmark_phys_t *zb);

@@ -25,7 +25,7 @@
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland.  All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <assert.h>
@@ -1194,6 +1194,20 @@ destroy_clones(destroy_cbdata_t *cb)
 }
 
 static int
+unmount_callback(zfs_handle_t *zhp, void *arg)
+{
+	destroy_cbdata_t *cb = arg;
+	int err = 0;
+
+	if (zfs_is_mounted(zhp, NULL))
+		err = zfs_unmount(zhp, NULL, cb->cb_force ? MS_FORCE : 0);
+
+	zfs_close(zhp);
+
+	return (err);
+}
+
+static int
 zfs_do_destroy(int argc, char **argv)
 {
 	destroy_cbdata_t cb = { 0 };
@@ -1361,6 +1375,58 @@ zfs_do_destroy(int argc, char **argv)
 			return (1);
 
 		cb.cb_target = zhp;
+
+		err = zfs_check_krrp(g_zfs, argv[0]);
+
+		/*
+		 * ENOTSUP means that autosnaper doesn't handle this dataset
+		 * and the basic detruction can be used.
+		 */
+		if (err != ENOTSUP) {
+			rv = 1;
+			if (!cb.cb_recurse || !cb.cb_doclones) {
+				(void) fprintf(stderr,
+				    gettext("cannot destroy '%s': "
+				    "dataset under autosnap can be destroyed "
+				    "with -R only\n"), zfs_get_name(zhp));
+			} else if (err == ECHILD) {
+				(void) fprintf(stderr,
+				    gettext("cannot destroy '%s': "
+				    "dataset has children under krrp"),
+				    zfs_get_name(zhp));
+			} else if (err == EBUSY) {
+				(void) fprintf(stderr,
+				    gettext("cannot destroy '%s': "
+				    "dataset is root of a krrp task"),
+				    zfs_get_name(zhp));
+			} else if (err && err != EUSERS) {
+				(void) fprintf(stderr,
+				    gettext("cannot destroy '%s': "
+				    "unexpected error : %d\n"),
+				    zfs_get_name(zhp), err);
+			} else {
+				/*
+				 * err == 0 || err == EUSERS means the ds can
+				 * be destroyed with atomical destroy
+				 */
+				err = zfs_iter_dependents(zhp, B_FALSE,
+				    unmount_callback, &cb);
+				if (!err) {
+					err = unmount_callback(
+					    zfs_handle_dup(zhp), &cb);
+				}
+				if (!err) {
+					err = zfs_destroy_atomically(
+					    zhp, B_TRUE);
+				}
+
+				if (!err)
+					rv = 0;
+			}
+			goto out;
+		}
+
+		err = 0;
 
 		/*
 		 * Perform an explicit check for pools before going any further.

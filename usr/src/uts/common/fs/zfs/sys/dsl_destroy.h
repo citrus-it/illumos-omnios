@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_DESTROY_H
@@ -37,6 +38,7 @@ struct dmu_tx;
 
 int dsl_destroy_snapshots_nvl(struct nvlist *, boolean_t,
     struct nvlist *);
+int dsl_destroy_atomically(const char *, boolean_t);
 int dsl_destroy_snapshot(const char *, boolean_t);
 int dsl_destroy_head(const char *);
 int dsl_destroy_head_check_impl(struct dsl_dataset *, int);

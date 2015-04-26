@@ -1,0 +1,613 @@
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+#include <sys/sdt.h>
+
+#include <krrp_params.h>
+
+#include "krrp_svc.h"
+#include "krrp_session.h"
+#include "krrp_ioctl.h"
+
+static boolean_t krrp_is_input_data_required(krrp_ioctl_cmd_t cmd);
+static int krrp_ioctl_sess_status(nvlist_t *params, nvlist_t *result,
+    krrp_error_t *error);
+static int krrp_ioctl_sess_create(nvlist_t *params, krrp_error_t *error);
+static int krrp_ioctl_sess_destroy(nvlist_t *params, krrp_error_t *error);
+static int krrp_ioctl_sess_run(nvlist_t *params, krrp_error_t *error);
+static int krrp_ioctl_sess_send_stop(nvlist_t *params, krrp_error_t *error);
+static int krrp_ioctl_sess_create_conn(nvlist_t *params, krrp_error_t *error);
+static int krrp_ioctl_sess_create_pdu_engine(nvlist_t *params,
+    krrp_error_t *error);
+
+static int krrp_ioctl_sess_create_stream(nvlist_t *params,
+    boolean_t read_stream, krrp_error_t *error);
+static int krrp_ioctl_sess_create_fake_stream(krrp_stream_t **result_stream,
+    boolean_t sender, nvlist_t *params, krrp_error_t *error);
+static int krrp_ioctl_sess_create_read_stream(krrp_stream_t **result_stream,
+    nvlist_t *params, krrp_error_t *error);
+static int krrp_ioctl_sess_create_write_stream(krrp_stream_t **result_stream,
+    nvlist_t *params, krrp_error_t *error);
+
+static int krrp_ioctl_sess_conn_throttle(nvlist_t *params, krrp_error_t *error);
+
+static int krrp_ioctl_zfs_get_recv_cookies(nvlist_t *params,
+    nvlist_t *result, krrp_error_t *error);
+
+static krrp_sess_t * krrp_ioctl_sess_action_common(nvlist_t *params,
+    krrp_error_t *error);
+
+int
+krrp_ioctl_validate_cmd(krrp_ioctl_cmd_t cmd)
+{
+	if (cmd <= KRRP_IOCTL_FIRST || cmd >= KRRP_IOCTL_LAST)
+		return (-1);
+
+	return (0);
+}
+
+int krrp_ioctl_process(krrp_ioctl_cmd_t cmd, nvlist_t *input,
+    nvlist_t *output, krrp_error_t *error)
+{
+	int rc = 0;
+
+	if (input == NULL && krrp_is_input_data_required(cmd)) {
+		krrp_error_set(error, KRRP_ERRNO_INVAL, ENODATA);
+		rc = -1;
+		goto out;
+	}
+
+	switch (cmd) {
+	case KRRP_IOCTL_SVC_ENABLE:
+		rc = krrp_svc_enable(error);
+		break;
+	case KRRP_IOCTL_SVC_DISABLE:
+		rc = krrp_svc_disable(error);
+		break;
+	case KRRP_IOCTL_SVC_STATE:
+		krrp_svc_state(output);
+		break;
+	case KRRP_IOCTL_SVC_SET_CONFIG:
+		rc = krrp_svc_config(input, NULL, error);
+		break;
+	case KRRP_IOCTL_SVC_GET_CONFIG:
+		rc = krrp_svc_config(input, output, error);
+		break;
+	case KRRP_IOCTL_SESS_LIST:
+		krrp_svc_list_sessions(output);
+		break;
+	case KRRP_IOCTL_SESS_STATUS:
+		rc = krrp_ioctl_sess_status(input, output, error);
+		break;
+	case KRRP_IOCTL_SESS_CREATE:
+		rc = krrp_ioctl_sess_create(input, error);
+		break;
+	case KRRP_IOCTL_SESS_DESTROY:
+		rc = krrp_ioctl_sess_destroy(input, error);
+		break;
+	case KRRP_IOCTL_SESS_RUN:
+		rc = krrp_ioctl_sess_run(input, error);
+		break;
+	case KRRP_IOCTL_SESS_SEND_STOP:
+		rc = krrp_ioctl_sess_send_stop(input, error);
+		break;
+	case KRRP_IOCTL_SESS_CREATE_CONN:
+		rc = krrp_ioctl_sess_create_conn(input, error);
+		break;
+	case KRRP_IOCTL_SESS_CREATE_PDU_ENGINE:
+		rc = krrp_ioctl_sess_create_pdu_engine(input, error);
+		break;
+	case KRRP_IOCTL_SESS_CREATE_READ_STREAM:
+		rc = krrp_ioctl_sess_create_stream(input, B_TRUE, error);
+		break;
+	case KRRP_IOCTL_SESS_CREATE_WRITE_STREAM:
+		rc = krrp_ioctl_sess_create_stream(input, B_FALSE, error);
+		break;
+	case KRRP_IOCTL_SESS_CONN_THROTTLE:
+		rc = krrp_ioctl_sess_conn_throttle(input, error);
+		break;
+	case KRRP_IOCTL_ZFS_GET_RECV_COOKIES:
+		rc = krrp_ioctl_zfs_get_recv_cookies(input, output, error);
+		break;
+	default:
+		cmn_err(CE_PANIC, "Unknown ioctl cmd [%d]", cmd);
+	}
+
+out:
+	return (rc);
+}
+
+static boolean_t
+krrp_is_input_data_required(krrp_ioctl_cmd_t cmd)
+{
+	boolean_t result;
+
+	/*
+	 * If an ioctl requires input data do not forget
+	 * to add it to this switch
+	 */
+	switch (cmd) {
+	case KRRP_IOCTL_SVC_SET_CONFIG:
+	case KRRP_IOCTL_SVC_GET_CONFIG:
+	case KRRP_IOCTL_SESS_STATUS:
+	case KRRP_IOCTL_SESS_CREATE:
+	case KRRP_IOCTL_SESS_DESTROY:
+	case KRRP_IOCTL_SESS_RUN:
+	case KRRP_IOCTL_SESS_SEND_STOP:
+	case KRRP_IOCTL_SESS_CREATE_CONN:
+	case KRRP_IOCTL_SESS_CREATE_PDU_ENGINE:
+	case KRRP_IOCTL_SESS_CREATE_READ_STREAM:
+	case KRRP_IOCTL_SESS_CREATE_WRITE_STREAM:
+	case KRRP_IOCTL_ZFS_GET_RECV_COOKIES:
+		result = B_TRUE;
+		break;
+	default:
+		result = B_FALSE;
+	}
+
+	return (result);
+}
+
+/* ARGSUSED */
+static int
+krrp_ioctl_sess_status(nvlist_t *params, nvlist_t *result,
+    krrp_error_t *error)
+{
+	return (0);
+}
+
+static int
+krrp_ioctl_sess_create(nvlist_t *params, krrp_error_t *error)
+{
+	int rc;
+	const char *sess_id = NULL, *sess_kstat_id = NULL,
+	    *auth_digest = NULL;
+	krrp_sess_t *sess = NULL;
+	boolean_t sender = B_FALSE;
+	boolean_t fake_mode = B_FALSE;
+	boolean_t compound = B_FALSE;
+
+	rc = krrp_param_get(KRRP_PARAM_SESS_ID, params,
+	    (void *) &sess_id);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_SESSID, ENOENT);
+		return (-1);
+	}
+
+	rc = krrp_param_get(KRRP_PARAM_SESS_KSTAT_ID, params,
+	    (void *) &sess_kstat_id);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_KSTATID, ENOENT);
+		return (-1);
+	}
+
+	(void) krrp_param_get(KRRP_PARAM_AUTH_DATA,
+		    params, (void *) &auth_digest);
+	(void) krrp_param_get(KRRP_PARAM_FAKE_MODE,
+	    params, (void *) &fake_mode);
+	(void) krrp_param_get(KRRP_PARAM_SESS_SENDER,
+	    params, (void *) &sender);
+	(void) krrp_param_get(KRRP_PARAM_SESS_COMPOUND,
+	    params, (void *) &compound);
+
+	if (krrp_sess_create(&sess, sess_id, sess_kstat_id,
+	    auth_digest, sender, fake_mode, compound, error) != 0)
+		return (-1);
+
+	if (krrp_svc_register_session(sess, error) != 0) {
+		krrp_sess_destroy(sess);
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+krrp_ioctl_sess_destroy(nvlist_t *params, krrp_error_t *error)
+{
+	krrp_sess_t *sess = NULL;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		return (-1);
+
+	if (krrp_svc_unregister_session(sess, error) != 0)
+		return (-1);
+
+	krrp_sess_destroy(sess);
+
+	return (0);
+}
+
+static int
+krrp_ioctl_sess_create_conn(nvlist_t *params, krrp_error_t *error)
+{
+	int rc, remote_port = 0, timeout = 10;
+	const char *remote_addr = NULL;
+	krrp_sess_t *sess = NULL;
+	krrp_conn_t *conn = NULL;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		return (-1);
+
+	rc = krrp_param_get(KRRP_PARAM_CONN_TIMEOUT,
+	    params, (void *) &timeout);
+	if (rc == 0 && (timeout < KRRP_MIN_CONN_TIMEOUT ||
+	    timeout > KRRP_MAX_CONN_TIMEOUT)) {
+		krrp_error_set(error, KRRP_ERRNO_CONNTIMEOUT, EINVAL);
+		return (-1);
+	}
+
+	rc = krrp_param_get(KRRP_PARAM_REMOTE_HOST,
+	    params, (void *) &remote_addr);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_ADDR, ENOENT);
+		return (-1);
+	}
+
+	/* Remote address will be valiated by inet_pton() */
+
+	rc = krrp_param_get(KRRP_PARAM_PORT,
+	    params, (void *) &remote_port);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_PORT, ENOENT);
+		return (-1);
+	}
+
+	if (remote_port < KRRP_MIN_PORT || remote_port > KRRP_MAX_PORT) {
+		krrp_error_set(error, KRRP_ERRNO_PORT, EINVAL);
+		return (-1);
+	}
+
+	rc = krrp_conn_create_from_scratch(&conn,
+	    remote_addr, remote_port, timeout, error);
+	if (rc != 0)
+		return (-1);
+
+	rc = krrp_sess_initiator_attach_conn(sess, conn, error);
+	if (rc != 0)
+		krrp_conn_destroy(conn);
+
+	return (rc);
+}
+
+static int
+krrp_ioctl_sess_create_pdu_engine(nvlist_t *params, krrp_error_t *error)
+{
+	int rc;
+	krrp_sess_t *sess = NULL;
+	krrp_pdu_engine_t *pdu_engine = NULL;
+	boolean_t use_prealloc = B_FALSE;
+	size_t dblk_data_sz = 0, dblk_head_sz = 0, max_memory = 0;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		return (-1);
+
+	rc = krrp_param_get(KRRP_PARAM_DBLK_DATA_SIZE, params,
+	    (void *) &dblk_data_sz);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_DBLKSZ, ENOENT);
+		return (-1);
+	}
+
+	/*
+	 * kmem-allocator works very slowly for mem-blocks >128 KB,
+	 * so the upper limit is 128 KB
+	 *
+	 * the lower limit is just an optimal value
+	 */
+	if (dblk_data_sz < KRRP_MIN_SESS_PDU_DBLK_DATA_SZ ||
+	    dblk_data_sz > KRRP_MAX_SESS_PDU_DBLK_DATA_SZ) {
+		krrp_error_set(error, KRRP_ERRNO_DBLKSZ, EINVAL);
+		return (-1);
+	}
+
+	dblk_head_sz = 120;
+
+	rc = krrp_param_get(KRRP_PARAM_MAX_MEMORY, params,
+	    (void *) &max_memory);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_MAXMEMSZ, ENOENT);
+		return (-1);
+	}
+
+	if (max_memory < KRRP_MIN_MAXMEM) {
+		krrp_error_set(error, KRRP_ERRNO_MAXMEMSZ, EINVAL);
+		return (-1);
+	}
+
+	(void) krrp_param_get(KRRP_PARAM_USE_PREALLOCATION, params,
+	    (void *) &use_prealloc);
+
+	rc = krrp_pdu_engine_create(&pdu_engine, B_FALSE,
+	    use_prealloc, max_memory, 0, dblk_head_sz,
+	    dblk_data_sz, error);
+	if (rc != 0)
+		return (-1);
+
+	rc = krrp_sess_attach_pdu_engine(sess, pdu_engine, error);
+	if (rc != 0)
+		krrp_pdu_engine_destroy(pdu_engine);
+
+	return (rc);
+}
+
+static int
+krrp_ioctl_sess_create_stream(nvlist_t *params, boolean_t read_stream,
+    krrp_error_t *error)
+{
+	int rc = -1;
+	krrp_sess_t *sess = NULL;
+	krrp_stream_t *stream = NULL;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		goto out;
+
+	switch (sess->type) {
+	case KRRP_SESS_SENDER:
+		if (!read_stream) {
+			krrp_error_set(error, KRRP_ERRNO_SESS, EINVAL);
+			goto out;
+		}
+
+		if (sess->fake_mode)
+			rc = krrp_ioctl_sess_create_fake_stream(&stream,
+			    B_TRUE, params, error);
+		else
+			rc = krrp_ioctl_sess_create_read_stream(&stream,
+			    params, error);
+
+		break;
+	case KRRP_SESS_RECEIVER:
+		if (read_stream) {
+			krrp_error_set(error, KRRP_ERRNO_SESS, EINVAL);
+			goto out;
+		}
+
+		if (sess->fake_mode)
+			rc = krrp_ioctl_sess_create_fake_stream(&stream,
+			    B_FALSE, params, error);
+		else
+			rc = krrp_ioctl_sess_create_write_stream(&stream,
+			    params, error);
+
+		break;
+	case KRRP_SESS_COMPOUND:
+		if (sess->fake_mode && read_stream) {
+			krrp_error_set(error, KRRP_ERRNO_SESS, EINVAL);
+			goto out;
+		}
+
+		if (read_stream)
+			rc = krrp_ioctl_sess_create_read_stream(&stream,
+				params, error);
+		else if (sess->fake_mode)
+			rc = krrp_ioctl_sess_create_fake_stream(&stream,
+				B_FALSE, params, error);
+		else
+			rc = krrp_ioctl_sess_create_write_stream(&stream,
+				params, error);
+
+		break;
+	}
+
+	if (rc != 0)
+		goto out;
+
+	if (read_stream)
+		rc = krrp_sess_attach_read_stream(sess, stream, error);
+	else
+		rc = krrp_sess_attach_write_stream(sess, stream, error);
+
+	if (rc != 0)
+		krrp_stream_destroy(stream);
+
+out:
+	return (rc);
+}
+
+static int
+krrp_ioctl_sess_create_fake_stream(krrp_stream_t **result_stream,
+    boolean_t sender, nvlist_t *params, krrp_error_t *error)
+{
+	if (sender) {
+		int rc;
+		uint64_t fake_data_ds = 0;
+
+		rc = krrp_param_get(KRRP_PARAM_FAKE_DATA_SIZE,
+		    params, (void *) &fake_data_ds);
+		if (rc != 0) {
+			krrp_error_set(error, KRRP_ERRNO_FAKEDSZ, ENOENT);
+			return (-1);
+		}
+
+		return (krrp_stream_fake_read_create(result_stream,
+		    fake_data_ds, error));
+	} else
+		return (krrp_stream_fake_write_create(result_stream, error));
+
+}
+
+static int
+krrp_ioctl_sess_create_read_stream(krrp_stream_t **result_stream,
+    nvlist_t *params, krrp_error_t *error)
+{
+	int rc;
+	const char *dataset = NULL, *base_snap_name = NULL,
+	    *common_snap_name = NULL, *zcookies = NULL;
+	boolean_t send_recursive = B_FALSE, send_props = B_FALSE,
+	    include_all_snaps = B_FALSE, enable_cksum = B_FALSE,
+	    embedded = B_FALSE;
+
+	rc = krrp_param_get(KRRP_PARAM_SRC_DATASET,
+	    params, (void *) &dataset);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_SRCDS, ENOENT);
+		return (-1);
+	}
+
+	(void) krrp_param_get(KRRP_PARAM_ZCOOKIES,
+	    params, (void *) &zcookies);
+
+	(void) krrp_param_get(KRRP_PARAM_COMMON_SNAPSHOT,
+	    params, (void *) &common_snap_name);
+	(void) krrp_param_get(KRRP_PARAM_SRC_SNAPSHOT,
+	    params, (void *) &base_snap_name);
+	(void) krrp_param_get(KRRP_PARAM_SEND_RECURSIVE,
+	    params, (void *) &send_recursive);
+	(void) krrp_param_get(KRRP_PARAM_SEND_PROPERTIES,
+	    params, (void *) &send_props);
+	(void) krrp_param_get(KRRP_PARAM_INCLUDE_ALL_SNAPSHOTS,
+	    params, (void *) &include_all_snaps);
+	(void) krrp_param_get(KRRP_PARAM_ENABLE_STREAM_CHKSUM,
+	    params, (void *) &enable_cksum);
+	(void) krrp_param_get(KRRP_PARAM_STREAM_EMBEDDED_BLOCKS,
+	    params, (void *) &embedded);
+
+	return (krrp_stream_read_create(result_stream, dataset,
+	    base_snap_name, common_snap_name, zcookies, include_all_snaps,
+	    send_recursive, send_props, enable_cksum, embedded,
+	    error));
+}
+
+static int
+krrp_ioctl_sess_create_write_stream(krrp_stream_t **result_stream,
+    nvlist_t *params, krrp_error_t *error)
+{
+	int rc;
+	const char *dataset = NULL, *common_snap_name = NULL,
+	    *zcookies = NULL;
+	boolean_t force_receive = B_FALSE, enable_cksum = B_FALSE;
+	nvlist_t *ignore_props_list = NULL, *replace_props_list = NULL;
+
+	rc = krrp_param_get(KRRP_PARAM_DST_DATASET,
+	    params, (void *) &dataset);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_DSTDS, ENOENT);
+		return (-1);
+	}
+
+	(void) krrp_param_get(KRRP_PARAM_ZCOOKIES,
+	    params, (void *) &zcookies);
+
+	(void) krrp_param_get(KRRP_PARAM_IGNORE_PROPS_LIST,
+	    params, (void *) &ignore_props_list);
+	(void) krrp_param_get(KRRP_PARAM_REPLACE_PROPS_LIST,
+	    params, (void *) &replace_props_list);
+
+	(void) krrp_param_get(KRRP_PARAM_COMMON_SNAPSHOT,
+	    params, (void *) &common_snap_name);
+	(void) krrp_param_get(KRRP_PARAM_FORCE_RECEIVE,
+	    params, (void *) &force_receive);
+	(void) krrp_param_get(KRRP_PARAM_ENABLE_STREAM_CHKSUM,
+	    params, (void *) &enable_cksum);
+
+	return (krrp_stream_write_create(result_stream, dataset,
+	    common_snap_name, zcookies, force_receive, enable_cksum,
+	    ignore_props_list, replace_props_list, error));
+}
+
+static int
+krrp_ioctl_sess_run(nvlist_t *params, krrp_error_t *error)
+{
+	krrp_sess_t *sess = NULL;
+	boolean_t only_once = B_FALSE;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		return (-1);
+
+	(void) krrp_param_get(KRRP_PARAM_ONLY_ONCE, params,
+	    (void *) &only_once);
+
+	return (krrp_sess_run(sess, only_once, error));
+}
+
+static int
+krrp_ioctl_sess_send_stop(nvlist_t *params, krrp_error_t *error)
+{
+	krrp_sess_t *sess = NULL;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		return (-1);
+
+	return (krrp_sess_send_stop(sess, error));
+}
+
+static int krrp_ioctl_sess_conn_throttle(nvlist_t *params,
+    krrp_error_t *error)
+{
+	int rc;
+	krrp_sess_t *sess = NULL;
+	size_t limit = 0;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		return (-1);
+
+	rc = krrp_param_get(KRRP_PARAM_THROTTLE,
+	    params, (void *) &limit);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_THROTTLE, ENOENT);
+		return (-1);
+	}
+
+	if (limit < KRRP_MIN_CONN_THROTTLE && limit != 0) {
+		krrp_error_set(error, KRRP_ERRNO_THROTTLE, EINVAL);
+		return (-1);
+	}
+
+	return (krrp_sess_throttle_conn(sess, limit, error));
+}
+
+static int krrp_ioctl_zfs_get_recv_cookies(nvlist_t *params,
+    nvlist_t *result, krrp_error_t *error)
+{
+	int rc;
+	const char *dataset = NULL;
+	char cookies[MAXNAMELEN];
+
+	rc = krrp_param_get(KRRP_PARAM_DST_DATASET, params,
+	    (void *) &dataset);
+	if (rc != 0 || dataset[0] == '\0') {
+		krrp_error_set(error, KRRP_ERRNO_DSTDS, EINVAL);
+		rc = -1;
+		goto out;
+	}
+
+	rc = krrp_zfs_get_recv_cookies(dataset, cookies,
+	    sizeof (cookies), error);
+	if (rc == 0) {
+		(void) krrp_param_put(KRRP_PARAM_ZCOOKIES, result,
+		    (void *) cookies);
+	}
+
+out:
+	return (rc);
+}
+
+static krrp_sess_t *
+krrp_ioctl_sess_action_common(nvlist_t *params, krrp_error_t *error)
+{
+	int rc;
+	krrp_sess_t *sess;
+	const char *sess_id = NULL;
+
+	rc = krrp_param_get(KRRP_PARAM_SESS_ID, params,
+	    (void *) &sess_id);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_SESSID, ENOENT);
+		return (NULL);
+	}
+
+	sess = krrp_svc_lookup_session(sess_id);
+	if (sess == NULL)
+		krrp_error_set(error, KRRP_ERRNO_SESS, ENOENT);
+
+	return (sess);
+}

@@ -52,6 +52,7 @@
 #include <sys/zfs_znode.h>
 #endif
 #include <sys/special.h>
+#include <sys/wrcache.h>
 
 /*
  * Enable/disable nopwrite feature.
@@ -2002,11 +2003,13 @@ dmu_init(void)
 	zfetch_init();
 	l2arc_init();
 	arc_init();
+	wrc_init();
 }
 
 void
 dmu_fini(void)
 {
+	wrc_fini();
 	arc_fini(); /* arc depends on l2arc, so arc must go first */
 	l2arc_fini();
 	zfetch_fini();

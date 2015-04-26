@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -36,7 +36,6 @@ typedef struct spa_specialclass spa_specialclass_t;
 typedef enum spa_specialclass_id {
 	SPA_SPECIALCLASS_ZIL,
 	SPA_SPECIALCLASS_META,
-	SPA_SPECIALCLASS_WRCACHE,
 	SPA_NUM_SPECIALCLASSES
 } spa_specialclass_id_t;
 
@@ -73,7 +72,7 @@ enum specialflagbit {
 #define	SPECIAL_WRCACHE_FLAGS	(SPECIAL_FLAG_DATAUSER | SPECIAL_FLAG_DATAMETA)
 #define	SPECIAL_WRCACHE_MASK	(SPECIAL_FLAG_DATAUSER | SPECIAL_FLAG_DATAMETA)
 
-metaslab_class_t *spa_select_class(spa_t *spa, zio_prop_t *io_prop);
+metaslab_class_t *spa_select_class(spa_t *spa, zio_t *zio);
 
 #ifdef	__cplusplus
 }

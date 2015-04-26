@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -23,6 +23,9 @@
 #include <sys/vdev_impl.h>
 #include <sys/spa_impl.h>
 #include <sys/zio.h>
+#ifdef _KERNEL
+#include <sys/instance.h>
+#endif
 
 #include <sys/sysevent/eventdefs.h>
 /*
@@ -85,7 +88,6 @@
 spa_specialclass_t specialclass_desc[SPA_NUM_SPECIALCLASSES] = {
 	{ SPA_SPECIALCLASS_ZIL,	0 },
 	{ SPA_SPECIALCLASS_META,	SPECIAL_META_FLAGS },
-	{ SPA_SPECIALCLASS_WRCACHE,	SPECIAL_WRCACHE_FLAGS }
 };
 
 void
@@ -97,8 +99,6 @@ spa_set_specialclass(spa_t *spa, objset_t *os,
 	ASSERT(specclassid < SPA_NUM_SPECIALCLASSES);
 
 	os->os_special_class = specialclass_desc[specclassid];
-	if (specclassid == SPA_SPECIALCLASS_WRCACHE)
-		(void) start_wrc_thread(spa);
 }
 
 static void
@@ -124,7 +124,7 @@ spa_write_data_to_special(spa_t *spa, objset_t *os)
 	return ((spa_has_special(spa)) &&
 	    (spa->spa_usesc) &&
 	    (spa->spa_watermark == SPA_WM_NONE) &&
-	    (os->os_special_class.sc_id == SPA_SPECIALCLASS_WRCACHE));
+	    (spa->spa_wrc_mode != WRC_MODE_OFF));
 }
 
 spa_specialclass_id_t
@@ -195,9 +195,7 @@ spa_check_watermarks(spa_t *spa)
 			spa_event_notify(spa, vd, ESC_ZFS_HIGH_WATERMARK);
 		}
 	} else {
-		boolean_t wrc_route_init = B_FALSE;
 		if (spa->spa_watermark != SPA_WM_LOW) {
-			wrc_route_init = B_TRUE;
 			if (spa->spa_watermark == SPA_WM_NONE)
 				spa_enable_special(spa, B_TRUE);
 			spa->spa_watermark = SPA_WM_LOW;
@@ -211,7 +209,6 @@ spa_check_watermarks(spa_t *spa)
 			 */
 			if (spa->spa_watermark == SPA_WM_HIGH)
 				spa_enable_special(spa, B_TRUE);
-			wrc_route_init = B_TRUE;
 			lspace = aspace - spa->spa_lwm_space;
 			if (spa->spa_wrc_wm_range) {
 				spa->spa_wrc_perc = (uint8_t)(lspace * 100 /
@@ -219,8 +216,6 @@ spa_check_watermarks(spa_t *spa)
 			} else {
 				spa->spa_wrc_perc = 50;
 			}
-
-			wrc_route_set(spa, wrc_route_init);
 		}
 	}
 
@@ -322,23 +317,6 @@ spa_meta_is_dual(spa_t *spa, uint64_t zpl_meta_to_special, dmu_object_type_t ot)
 }
 
 /*
- * Tunable: enable auto-adjustment of load based on performance metrics
- *
- * spa_enable_data_placement_selection - EXPERIMENTAL - enable distribution
- * of I/O load between special and normal classes
- * if true, enables distribution of I/O between special and normal
- * classes according to the spa->spa_special_to_normal_ratio
- * if false, the ratio is disregarded, special class is used when possible
- *
- * spa_enable_best_effort_dedup - enable auto-adjustment of the percentage
- * of data blocks to be de-duplicated
- * if true, enables changing the percentage of data blocks to be deduplicated
- * based on the utilization of the special vdevs
- * if false, all data blocks are deduplicated as usual
- */
-boolean_t spa_enable_data_placement_selection = B_FALSE;
-boolean_t spa_enable_best_effort_dedup = B_TRUE;
-/*
  * Tunable: special load balancing goal
  * selects among special and normal vdevs in order to optimize specific
  * system parameter, e.g. latency or throughput/utilization
@@ -348,10 +326,7 @@ boolean_t spa_enable_best_effort_dedup = B_TRUE;
  * are made normal, as there is no reason to differentiate
  */
 spa_special_selection_t spa_special_selection =
-    SPA_SPECIAL_SELECTION_LATENCY;
-/* Tunable: limits on the ratio of special to normal writes */
-uint64_t spa_special_ratio_max = SPA_SPECIAL_RATIO_MAX;
-uint64_t spa_special_ratio_min = SPA_SPECIAL_RATIO_MIN;
+    SPA_SPECIAL_SELECTION_THROUGHPUT;
 /* Tunable: factor used to adjust the ratio up/down */
 uint64_t spa_special_factor = SPA_SPECIAL_ADJUSTMENT;
 /*
@@ -369,7 +344,7 @@ static boolean_t
 spa_refine_data_placement(spa_t *spa)
 {
 	uint64_t val = atomic_inc_64_nv(&spa->spa_special_stat_rotor);
-	return (val % spa->spa_special_to_normal_ratio);
+	return ((val % 100) < spa->spa_special_to_normal_ratio);
 }
 
 static boolean_t
@@ -381,7 +356,8 @@ spa_meta_to_special(spa_t *spa, objset_t *os, dmu_object_type_t ot)
 		return (B_FALSE);
 	} else {
 		uint64_t specflags = spa_specialclass_flags(os);
-		boolean_t match = !!(SPECIAL_FLAG_DATAMETA & specflags);
+		boolean_t match = (!!(SPECIAL_FLAG_DATAMETA & specflags)) ||
+		    spa_wrc_present(spa);
 		return (match && spa_refine_meta_placement(spa,
 		    os->os_zpl_meta_to_special, ot));
 	}
@@ -433,7 +409,7 @@ dbuf_ddt_is_l2cacheable(dmu_buf_impl_t *db)
 		return (B_TRUE);
 
 	specflags = spa_specialclass_flags(db->db_objset);
-	match = !!(SPECIAL_FLAG_DATAMETA & specflags);
+	match = (!!(SPECIAL_FLAG_DATAMETA & specflags)) || spa_wrc_present(spa);
 
 	DB_DNODE_ENTER(db);
 	ot = DB_DNODE(db)->dn_type;
@@ -452,22 +428,35 @@ dbuf_ddt_is_l2cacheable(dmu_buf_impl_t *db)
  * additional information about the system's behavior
  */
 metaslab_class_t *
-spa_select_class(spa_t *spa, zio_prop_t *zp)
+spa_select_class(spa_t *spa, zio_t *zio)
 {
+	zio_prop_t *zp = &zio->io_prop;
 	spa_meta_placement_t *mp = &spa->spa_meta_policy;
-	if (zp->zp_usesc && spa_has_special(spa) && spa->spa_usesc) {
+	if (zp->zp_usesc && spa_has_special(spa)) {
 		boolean_t match = B_FALSE;
 		uint64_t specflags = zp->zp_specflags;
 
 		if (zp->zp_metadata) {
-			match = !!(SPECIAL_FLAG_DATAMETA & specflags);
+			match = (!!(SPECIAL_FLAG_DATAMETA & specflags)) ||
+			    spa_wrc_present(spa);
 			if (match && mp->spa_enable_meta_placement_selection)
 				match = spa_refine_meta_placement(spa,
 				    zp->zp_zpl_meta_to_special, zp->zp_type);
 		} else {
-			match = !!(SPECIAL_FLAG_DATAUSER & specflags);
-			if (match && spa_enable_data_placement_selection)
-				match = spa_refine_data_placement(spa);
+			match = (spa->spa_wrc_mode != WRC_MODE_OFF);
+			if (match) {
+				if (zio->io_priority == ZIO_PRIORITY_SYNC_WRITE) {
+					match = B_TRUE;
+				} else {
+					match = spa_refine_data_placement(spa);
+				}
+				DTRACE_PROBE1(wrc_data_placement, int, match);
+			}
+			if (!match) {
+				match =
+				    (BP_GET_PSIZE(zio->io_bp) <=
+				    mp->spa_small_data_to_special);
+			}
 		}
 
 		if (match)
@@ -476,6 +465,9 @@ spa_select_class(spa_t *spa, zio_prop_t *zp)
 
 	return (spa_normal_class(spa));
 }
+
+uint64_t spa_static_routing_percentage = 0;
+uint64_t spa_special_lt_limit = 15;
 
 static void
 spa_special_load_adjust(spa_t *spa)
@@ -486,6 +478,13 @@ spa_special_load_adjust(spa_t *spa)
 	 * then look at either latency or vdev utilization and adjust
 	 * load distribution accordingly
 	 */
+
+	if (spa_static_routing_percentage != 0) {
+		spa->spa_special_to_normal_ratio =
+		    spa_static_routing_percentage;
+		return;
+	}
+
 	ASSERT(SPA_SPECIAL_SELECTION_VALID(spa_special_selection));
 	switch (spa_special_selection) {
 	case SPA_SPECIAL_SELECTION_LATENCY:
@@ -493,74 +492,147 @@ spa_special_load_adjust(spa_t *spa)
 		 * bias selection toward class with smaller
 		 * average latency
 		 */
-		if (stat->normal_lt && stat->special_lt) {
-			if (stat->normal_lt > stat->special_lt)
-				spa->spa_special_to_normal_ratio *=
-				    spa_special_factor;
-			if (stat->normal_lt < stat->special_lt)
-				spa->spa_special_to_normal_ratio /=
-				    spa_special_factor;
+		if (stat->ht_normal_lt || stat->ht_special_lt) {
+			/*
+			 * Normalized delta between the current
+			 * class-averaged latencies
+			 */
+			uint64_t diff = 0;
+			uint64_t new_special_to_normal_ratio =
+			    spa->spa_special_to_normal_ratio;
+
+			if (stat->ht_normal_lt > stat->ht_special_lt) {
+				diff =
+				    (stat->ht_normal_lt - stat->ht_special_lt) *
+				    100 / stat->ht_normal_lt;
+				new_special_to_normal_ratio +=
+				    MIN(spa_special_factor,
+				    100 - spa->spa_special_to_normal_ratio);
+			} else if (stat->ht_normal_lt < stat->ht_special_lt) {
+				diff =
+				    (stat->ht_special_lt - stat->ht_normal_lt) *
+				    100 / stat->ht_special_lt;
+				new_special_to_normal_ratio -=
+				    MIN(spa_special_factor,
+				    spa->spa_special_to_normal_ratio);
+			}
+
+			if (diff > spa_special_lt_limit) {
+				spa->spa_special_to_normal_ratio =
+				    new_special_to_normal_ratio;
+			}
 		}
 		break;
 	case SPA_SPECIAL_SELECTION_THROUGHPUT:
-		if (stat->special_ut < spa_special_vdev_busy) {
+		if (stat->ht_special_ut < spa_special_vdev_busy) {
 			/*
 			 * keep using special class until
 			 * the threshold is reached
 			 */
-			spa->spa_special_to_normal_ratio *= spa_special_factor;
-		} else if (stat->normal_ut < spa_normal_vdev_busy) {
+			spa->spa_special_to_normal_ratio +=
+			    MIN(spa_special_factor,
+			    100 - spa->spa_special_to_normal_ratio);
+		} else if (stat->ht_normal_ut < spa_normal_vdev_busy) {
 			/*
 			 * move some of the work to the normal class,
 			 * unless it is already busy
 			 */
-			spa->spa_special_to_normal_ratio /= spa_special_factor;
+			spa->spa_special_to_normal_ratio -=
+			    MIN(spa_special_factor,
+			    spa->spa_special_to_normal_ratio);
 		}
 		break;
 	default:
 		break; /* do nothing */
 	}
-	/*
-	 * must stay within limits
-	 */
-	if (spa->spa_special_to_normal_ratio < spa_special_ratio_min)
-		spa->spa_special_to_normal_ratio = spa_special_ratio_min;
-	if (spa->spa_special_to_normal_ratio > spa_special_ratio_max)
-		spa->spa_special_to_normal_ratio = spa_special_ratio_max;
+#ifdef _KERNEL
+	DTRACE_PROBE5(spa_adjust_routing,
+	    uint64_t, stat->ht_special_ut,
+	    uint64_t, stat->ht_normal_ut,
+	    uint64_t, spa->spa_special_to_normal_ratio,
+	    uint64_t, stat->ht_special_lt,
+	    uint64_t, stat->ht_normal_lt);
+#endif
+	ASSERT(spa->spa_special_to_normal_ratio <= 100);
 }
 
+typedef uint64_t (*spa_load_cb)(vdev_t *);
+
 /* update vdev utilization stats */
-static int
+static uint64_t
 spa_vdev_busy(vdev_t *vd)
 {
 	vdev_stat_t *vs = &vd->vdev_stat;
-	hrtime_t ts = gethrtime();
+	char dev_path[MAXPATHLEN];
+	char *last_column, *last_slash;
 
-	ASSERT(MUTEX_HELD(&vd->vdev_stat_lock));
-	ASSERT(ts >= vs->vs_wcstart);
+#ifdef _KERNEL
+	/* strip slice tag */
+	(void) strcpy(dev_path, vd->vdev_physpath);
+	last_column = strrchr(dev_path, ':');
+	last_slash = strrchr(dev_path, '/');
+	if (last_column && (last_column > last_slash))
+		*last_column = '\0';
 
-	if (vs->vs_wcstart != 0) {
-		vs->vs_busy = 100 * vs->vs_bztotal/(ts - vs->vs_wcstart);
+	e_ddi_enter_instance();
+	in_node_t *node_inst = e_ddi_path_to_instance(dev_path);
+	if (node_inst) {
+		zoneid_t zoneid;
+		kstat_t *ks;
+		char inst_name[MAXNAMELEN];
+		in_drv_t *driver_inst = node_inst->in_drivers;
+
+		mutex_enter(&cpu_lock);
+		if (zone_pset_get(global_zone) != ZONE_PS_INVAL)
+			zoneid = GLOBAL_ZONEID;
+		else
+			zoneid = ALL_ZONES;
+		mutex_exit(&cpu_lock);
+
+		(void) sprintf(inst_name, "%s%d", driver_inst->ind_driver_name,
+		    driver_inst->ind_instance);
+		ks = kstat_hold_byname(driver_inst->ind_driver_name,
+		    driver_inst->ind_instance, inst_name, zoneid);
+
+		if (ks) {
+			kstat_io_t *kip = (kstat_io_t *)ks->ks_data;
+			uint64_t ts = kip->rlastupdate;
+			uint64_t rtime = kip->rtime;
+
+			kstat_rele(ks);
+
+			if (ts > vs->vs_wcstart) {
+				vs->vs_busy = 100 * (rtime - vs->vs_bztotal) /
+				    (ts - vs->vs_wcstart);
+			} else {
+				vs->vs_busy = 0;
+			}
+
+			vs->vs_bztotal = rtime;
+			vs->vs_wcstart = ts;
+		} else {
+			cmn_err(CE_WARN, "Can not find stat for %s", inst_name);
+		}
+	} else {
+		cmn_err(CE_WARN, "Can not find instance for %s", dev_path);
 	}
-	/* reset the busy accumulator and the wall clock start */
-	vs->vs_bztotal = 0;
-	vs->vs_wcstart = ts;
+	e_ddi_exit_instance();
+#endif
 
 	return (vs->vs_busy);
 }
 
 static void
-spa_vdev_walk_stats(vdev_t *pvd, hrtime_t *lt, int *ut, int *nvdev)
+spa_vdev_walk_stats(vdev_t *pvd, spa_load_cb func,
+    uint64_t *st, uint64_t *nvdev)
 {
 	int i;
 	if (pvd->vdev_children == 0) {
-		vdev_stat_t *pvd_stat = &pvd->vdev_stat;
 		/* single vdev (itself) */
 		ASSERT(pvd->vdev_ops->vdev_op_leaf);
 		DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, pvd);
 		mutex_enter(&pvd->vdev_stat_lock);
-		*lt += pvd_stat->vs_latency[ZIO_TYPE_WRITE];
-		*ut += spa_vdev_busy(pvd);
+		*st += func(pvd);
 		mutex_exit(&pvd->vdev_stat_lock);
 		*nvdev = *nvdev+1;
 	} else {
@@ -568,7 +640,6 @@ spa_vdev_walk_stats(vdev_t *pvd, hrtime_t *lt, int *ut, int *nvdev)
 		ASSERT(pvd->vdev_ops->vdev_op_leaf == B_FALSE);
 		for (i = 0; i < pvd->vdev_children; i++) {
 			vdev_t *vd = pvd->vdev_child[i];
-			vdev_stat_t *vd_stat = &vd->vdev_stat;
 			ASSERT(vd);
 
 			if (vd->vdev_islog || vd->vdev_ishole ||
@@ -577,12 +648,11 @@ spa_vdev_walk_stats(vdev_t *pvd, hrtime_t *lt, int *ut, int *nvdev)
 
 			if (vd->vdev_ops->vdev_op_leaf == B_FALSE) {
 				DTRACE_PROBE1(spa_vdev_walk_nl, vdev_t *, vd);
-				spa_vdev_walk_stats(vd, lt, ut, nvdev);
+				spa_vdev_walk_stats(vd, func, st, nvdev);
 			} else {
 				DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, vd);
 				mutex_enter(&vd->vdev_stat_lock);
-				*lt += vd_stat->vs_latency[ZIO_TYPE_WRITE];
-				*ut += spa_vdev_busy(vd);
+				*st += func(vd);
 				mutex_exit(&vd->vdev_stat_lock);
 				*nvdev = *nvdev+1;
 			}
@@ -590,10 +660,124 @@ spa_vdev_walk_stats(vdev_t *pvd, hrtime_t *lt, int *ut, int *nvdev)
 	}
 }
 
-static void
-spa_load_stats_update(spa_t *spa)
+uint64_t spa_rotor_load_adjusting = 1;
+uint64_t spa_historic_factor = 4;
+uint64_t spa_current_factor = 6;
+
+static uint64_t
+spa_vdev_process_lt_impl(vdev_io_stat_t *vd_stat, kstat_t *stat)
 {
-	int i, nnormal = 0, nspecial = 0;
+	uint64_t run_last_time, wait_last_time, read_op, write_op;
+	uint64_t run_len_time, wait_len_time, latency = 0;
+	kstat_io_t *data = stat->ks_data;
+
+	/* retrieve current values */
+	mutex_enter(stat->ks_lock);
+
+	run_last_time = data->rlastupdate;
+	wait_last_time = data->wlastupdate;
+	read_op = data->reads;
+	write_op = data->writes;
+	run_len_time = data->rlentime;
+	wait_len_time = data->wlentime;
+
+	mutex_exit(stat->ks_lock);
+
+	/* convert unscaled time to nanoseconds */
+#ifdef _KERNEL
+	scalehrtime((hrtime_t *)&run_last_time);
+	scalehrtime((hrtime_t *)&wait_last_time);
+	scalehrtime((hrtime_t *)&run_len_time);
+	scalehrtime((hrtime_t *)&wait_len_time);
+#endif
+
+	/* bypass calculation on first entry to initialize counters */
+	if (vd_stat->run_last_time) {
+		uint64_t run_time_delta, wait_time_delta;
+		uint64_t read_op_delta, write_op_delta, op_delta;
+		uint64_t run_len_delta, wait_len_delta;
+		uint64_t iops;
+		uint64_t wait_avg, run_avg;
+
+		/* calculate deltas for all statistics */
+		run_time_delta = run_last_time - vd_stat->run_last_time;
+		wait_time_delta = wait_last_time - vd_stat->wait_last_time;
+		read_op_delta = read_op - vd_stat->read_op;
+		write_op_delta = write_op - vd_stat->write_op;
+		run_len_delta = run_len_time - vd_stat->run_len_time;
+		wait_len_delta = wait_len_time - vd_stat->wait_len_time;
+		op_delta = read_op_delta + write_op_delta;
+
+		if (!run_time_delta || !wait_time_delta || !op_delta)
+			return (0);
+
+		/* calculate iops */
+		iops = NANOSEC * op_delta / run_time_delta;
+
+		if (!iops)
+			return (0);
+
+		wait_avg = (wait_len_delta * 1000 / wait_time_delta) / iops;
+		run_avg = (run_len_delta * 1000 / run_time_delta) / iops;
+		latency = wait_avg + run_avg;
+	}
+
+	vd_stat->run_last_time = run_last_time;
+	vd_stat->wait_last_time = wait_last_time;
+	vd_stat->read_op = read_op;
+	vd_stat->write_op = write_op;
+	vd_stat->run_len_time = run_len_time;
+	vd_stat->wait_len_time = wait_len_time;
+
+	return (latency);
+}
+
+static uint64_t
+spa_vdev_process_lt(vdev_t *vd)
+{
+	return (spa_vdev_process_lt_impl(&vd->vdev_iostat, vd->vdev_iokstat));
+}
+
+static void
+spa_class_collect_lt(spa_t *spa, uint64_t weight)
+{
+	uint64_t nspecial = 0, nnormal = 0;
+	vdev_t *rvd = spa->spa_root_vdev;
+	int i;
+
+	spa->spa_special_stat.normal_lt = 0;
+	spa->spa_special_stat.special_lt = 0;
+
+	for (i = 0; i < rvd->vdev_children; i++) {
+		vdev_t *vd = rvd->vdev_child[i];
+		ASSERT(vd);
+
+		if (vd->vdev_islog || vd->vdev_ishole ||
+		    vd->vdev_isspare || vd->vdev_isl2cache)
+			continue;
+		if (vd->vdev_isspecial) {
+			spa_vdev_walk_stats(vd, spa_vdev_process_lt,
+			    &spa->spa_special_stat.special_lt, &nspecial);
+		} else {
+			spa_vdev_walk_stats(vd, spa_vdev_process_lt,
+			    &spa->spa_special_stat.normal_lt, &nnormal);
+		}
+	}
+
+	spa->spa_special_stat.special_lt /= nspecial;
+	spa->spa_special_stat.normal_lt /= nnormal;
+
+	spa->spa_special_stat.ac_normal_lt +=
+	    weight * spa->spa_special_stat.normal_lt;
+	spa->spa_special_stat.ac_special_lt +=
+	    weight * spa->spa_special_stat.special_lt;
+}
+
+static void
+spa_class_collect_ut(spa_t *spa, uint64_t weight)
+{
+	uint64_t nnormal = 0, nspecial = 0;
+	int i;
 	vdev_t *rvd;
 	spa_special_stat_t spa_stat = {0};
 
@@ -614,27 +798,105 @@ spa_load_stats_update(spa_t *spa)
 		    vd->vdev_isspare || vd->vdev_isl2cache)
 			continue;
 		if (vd->vdev_isspecial) {
-			spa_vdev_walk_stats(vd, &spa_stat.special_lt,
+			spa_vdev_walk_stats(vd, spa_vdev_busy,
 			    &spa_stat.special_ut, &nspecial);
 		} else {
-			spa_vdev_walk_stats(vd, &spa_stat.normal_lt,
+			spa_vdev_walk_stats(vd, spa_vdev_busy,
 			    &spa_stat.normal_ut, &nnormal);
 		}
 	}
 
 	spa_config_exit(spa, SCL_VDEV, FTAG);
 
-	DTRACE_PROBE4(spa_vdev_stats, int, nnormal, int, nspecial,
-	    int, spa_stat.normal_ut, int, spa_stat.special_ut);
-
 	/* calculate averages */
-	if (nnormal) {
-		spa->spa_special_stat.normal_lt = spa_stat.normal_lt/nnormal;
+	if (nnormal)
 		spa->spa_special_stat.normal_ut = spa_stat.normal_ut/nnormal;
-	}
-	if (nspecial) {
-		spa->spa_special_stat.special_lt = spa_stat.special_lt/nspecial;
+	if (nspecial)
 		spa->spa_special_stat.special_ut = spa_stat.special_ut/nspecial;
+
+	spa->spa_special_stat.ac_normal_ut +=
+	    weight * spa->spa_special_stat.normal_ut;
+	spa->spa_special_stat.ac_special_ut +=
+	    weight * spa->spa_special_stat.special_ut;
+}
+
+static void
+spa_class_update_lt(spa_t *spa)
+{
+	spa->spa_special_stat.rt_special_lt =
+	    spa->spa_special_stat.ac_special_lt /
+	    spa->spa_special_stat.ac_divisor;
+	spa->spa_special_stat.rt_normal_lt =
+	    spa->spa_special_stat.ac_normal_lt /
+	    spa->spa_special_stat.ac_divisor;
+
+	spa->spa_special_stat.ht_special_lt =
+	    (spa->spa_special_stat.ht_special_lt * spa_historic_factor +
+	    spa->spa_special_stat.rt_special_lt * spa_current_factor) /
+	    (spa_historic_factor + spa_current_factor);
+
+	spa->spa_special_stat.ht_normal_lt =
+	    (spa->spa_special_stat.ht_normal_lt * spa_historic_factor +
+	    spa->spa_special_stat.rt_normal_lt * spa_current_factor) /
+	    (spa_historic_factor + spa_current_factor);
+}
+
+static void
+spa_class_update_ut(spa_t *spa)
+{
+	spa->spa_special_stat.rt_special_ut =
+	    spa->spa_special_stat.ac_special_ut /
+	    spa->spa_special_stat.ac_divisor;
+	spa->spa_special_stat.rt_normal_ut =
+	    spa->spa_special_stat.ac_normal_ut /
+	    spa->spa_special_stat.ac_divisor;
+
+	spa->spa_special_stat.ht_special_ut =
+	    (spa->spa_special_stat.ht_special_ut * spa_historic_factor +
+	    spa->spa_special_stat.rt_special_ut * spa_current_factor) /
+	    (spa_historic_factor + spa_current_factor);
+
+	spa->spa_special_stat.ht_normal_ut =
+	    (spa->spa_special_stat.ht_normal_ut * spa_historic_factor +
+	    spa->spa_special_stat.rt_normal_ut * spa_current_factor) /
+	    (spa_historic_factor + spa_current_factor);
+}
+
+static void
+spa_class_collect_data(spa_t *spa, uint64_t weight)
+{
+	spa_class_collect_lt(spa, weight);
+	spa_class_collect_ut(spa, weight);
+}
+
+static void
+spa_class_update_data(spa_t *spa)
+{
+	spa_class_update_lt(spa);
+	spa_class_update_ut(spa);
+}
+
+static void
+spa_load_stats_update(spa_t *spa, uint64_t rotor)
+{
+	uint64_t weight;
+
+	weight = rotor % spa_rotor_load_adjusting;
+	if (weight == 0)
+		weight = spa_rotor_load_adjusting;
+
+	spa_class_collect_data(spa, weight);
+
+	spa->spa_special_stat.ac_divisor += weight;
+
+	if (weight == spa_rotor_load_adjusting) {
+		spa_class_update_data(spa);
+
+		spa->spa_special_stat.ac_divisor = 0;
+		spa->spa_special_stat.ac_special_ut = 0;
+		spa->spa_special_stat.ac_normal_ut = 0;
+		spa->spa_special_stat.ac_special_lt = 0;
+		spa->spa_special_stat.ac_normal_lt = 0;
 	}
 }
 
@@ -668,6 +930,7 @@ spa_perfmon_thread(spa_t *spa)
 {
 	spa_perfmon_data_t *data = &spa->spa_perfmon;
 	boolean_t done = B_FALSE;
+	uint64_t rotor = 0;
 
 	ASSERT(data);
 
@@ -700,15 +963,16 @@ spa_perfmon_thread(spa_t *spa)
 		 * latency and utilization statistics
 		 */
 		DTRACE_PROBE1(spa_pm_work, spa_t *, spa);
-		spa_load_stats_update(spa);
+		spa_load_stats_update(spa, rotor);
 
 		/* we can adjust load and dedup at the same time */
-		if (spa_enable_data_placement_selection)
+		if (rotor % spa_rotor_load_adjusting == 0)
 			spa_special_load_adjust(spa);
 		if (spa->spa_dedup_best_effort)
 			spa_special_dedup_adjust(spa);
 
 		/* go to sleep until next tick */
+		++rotor;
 		DTRACE_PROBE1(spa_pm_sleep, spa_t *, spa);
 	}
 

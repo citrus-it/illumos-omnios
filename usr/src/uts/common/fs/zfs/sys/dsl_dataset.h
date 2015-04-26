@@ -23,8 +23,8 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_DSL_DATASET_H
@@ -98,6 +98,14 @@ struct dsl_pool;
 #define	DS_FLAG_CI_DATASET	(1ULL<<16)
 
 #define	DS_CREATE_FLAG_NODIRTY	(1ULL<<24)
+
+typedef struct dsl_dataset_snapshot_arg {
+	nvlist_t *ddsa_snaps;
+	nvlist_t *ddsa_props;
+	nvlist_t *ddsa_errors;
+	cred_t *ddsa_cr;
+	boolean_t ddsa_autosnap;
+} dsl_dataset_snapshot_arg_t;
 
 typedef struct dsl_dataset_phys {
 	uint64_t ds_dir_obj;		/* DMU_OT_DSL_DIR */
@@ -201,9 +209,6 @@ typedef struct dsl_dataset {
 
 	kmutex_t ds_sendstream_lock;
 	list_t ds_sendstreams;
-
-	/* writecache block header */
-	void	*ds_wrc_blkhdr;
 
 	/* Protected by ds_lock; keep at end of struct for better locality */
 	char ds_snapname[MAXNAMELEN];
@@ -322,8 +327,28 @@ void dsl_dataset_set_refreservation_sync_impl(dsl_dataset_t *ds,
 void dsl_dataset_zapify(dsl_dataset_t *ds, dmu_tx_t *tx);
 int dsl_dataset_rollback(const char *fsname, void *owner, nvlist_t *result);
 int dsl_destroy_inconsistent(const char *dsname, void *arg);
-int dsl_dataset_clean_special(dsl_dataset_t *ds, dmu_tx_t *tx, uint64_t curtxg,
-		hrtime_t scan_start);
+
+int dsl_dataset_snapshot_check(void *arg, dmu_tx_t *tx);
+void dsl_dataset_snapshot_sync(void *arg, dmu_tx_t *tx);
+
+typedef struct {
+	char name[MAXNAMELEN];
+	char sguid[64];
+	uint64_t guid;
+	uint64_t cookie;
+	boolean_t cookie_is_snap;
+	dsl_dataset_t *ds;
+	list_node_t node;
+} zfs_ds_collector_entry_t;
+
+uint64_t dsl_dataset_creation_txg(const char *name);
+int zfs_collect_ds(spa_t *spa, const char *from_ds, boolean_t recursive,
+    boolean_t hold, list_t *ds_to_send);
+
+boolean_t dataset_name_hidden(const char *name);
+
+zfs_ds_collector_entry_t *dsl_dataset_collector_cache_alloc();
+void dsl_dataset_collector_cache_free(zfs_ds_collector_entry_t *entry);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_ds(ds, fmt, ...) do { \

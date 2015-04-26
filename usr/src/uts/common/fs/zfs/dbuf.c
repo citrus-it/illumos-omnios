@@ -1513,7 +1513,9 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 void
 dmu_buf_will_dirty(dmu_buf_t *db_fake, dmu_tx_t *tx)
 {
-	dmu_buf_will_dirty_sc(db_fake, tx, B_TRUE);
+	dmu_buf_impl_t *db = (dmu_buf_impl_t *)db_fake;
+	spa_t *spa = db->db_objset->os_spa;
+	dmu_buf_will_dirty_sc(db_fake, tx, spa->spa_usesc);
 }
 
 void

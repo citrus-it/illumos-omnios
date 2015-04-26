@@ -21,9 +21,9 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2013, Joyent, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -331,6 +331,7 @@ CHKHDRS=			\
 	kmem_impl.h		\
 	kobj.h			\
 	kobj_impl.h		\
+	kreplication_common.h	\
 	ksocket.h		\
 	kstat.h			\
 	kstr.h			\
@@ -1003,7 +1004,8 @@ SYSEVENTHDRS=		\
 	ipmp.h		\
 	pwrctl.h	\
 	svm.h		\
-	vrrp.h
+	vrrp.h		\
+	krrp.h
 
 CONTRACTHDRS=		\
 	process.h	\

@@ -262,6 +262,7 @@ COMMON_SUBDIRS = \
 	cmd/rcm_daemon \
 	cmd/rctladm \
 	cmd/renice \
+	cmd/krrpadm \
 	cmd/rm \
 	cmd/rmdir \
 	cmd/rmformat \
