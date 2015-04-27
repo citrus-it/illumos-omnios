@@ -770,7 +770,7 @@ autosnap_exempt_snapshot(spa_t *spa, const char *name)
 
 	mutex_enter(&autosnap->autosnap_lock);
 
-	strcpy(search.name, name);
+	(void) strcpy(search.name, name);
 	search.txg = txg;
 
 	found = avl_find(&autosnap->snapshots, &search, NULL);

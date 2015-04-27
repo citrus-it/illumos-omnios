@@ -19,7 +19,7 @@ INCS += -I../../common/krrp
 CPPFLAGS += -D_REENTRANT
 CPPFLAGS += $(INCS)
 
-LDLIBS += -lumem -lnvpair -lsysevent -lkrrp -luuid
+LDLIBS += -lnvpair -lkrrp -luuid
 
 .KEEP_STATE:
 
