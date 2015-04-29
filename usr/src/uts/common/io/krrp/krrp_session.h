@@ -107,6 +107,7 @@ typedef struct krrp_sess_s {
 	boolean_t				running;
 	boolean_t				destroying;
 	boolean_t				shutdown;
+	boolean_t				on_hold;
 
 	size_t					ref_cnt;
 
@@ -173,6 +174,9 @@ int krrp_sess_compare_id(const void *opaque_sess1, const void *opaque_sess2);
 
 boolean_t krrp_sess_is_started(krrp_sess_t *sess);
 boolean_t krrp_sess_is_running(krrp_sess_t *sess);
+
+int krrp_sess_try_hold(krrp_sess_t *sess);
+void krrp_sess_rele(krrp_sess_t *sess);
 
 #ifdef __cplusplus
 }

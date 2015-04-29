@@ -237,14 +237,14 @@ krrp_ioctl_sess_create_conn(nvlist_t *params, krrp_error_t *error)
 	if (rc == 0 && (timeout < KRRP_MIN_CONN_TIMEOUT ||
 	    timeout > KRRP_MAX_CONN_TIMEOUT)) {
 		krrp_error_set(error, KRRP_ERRNO_CONNTIMEOUT, EINVAL);
-		return (-1);
+		goto out;
 	}
 
 	rc = krrp_param_get(KRRP_PARAM_REMOTE_HOST,
 	    params, (void *) &remote_addr);
 	if (rc != 0) {
 		krrp_error_set(error, KRRP_ERRNO_ADDR, ENOENT);
-		return (-1);
+		goto out;
 	}
 
 	/* Remote address will be valiated by inet_pton() */
@@ -253,23 +253,25 @@ krrp_ioctl_sess_create_conn(nvlist_t *params, krrp_error_t *error)
 	    params, (void *) &remote_port);
 	if (rc != 0) {
 		krrp_error_set(error, KRRP_ERRNO_PORT, ENOENT);
-		return (-1);
+		goto out;
 	}
 
 	if (remote_port < KRRP_MIN_PORT || remote_port > KRRP_MAX_PORT) {
 		krrp_error_set(error, KRRP_ERRNO_PORT, EINVAL);
-		return (-1);
+		goto out;
 	}
 
 	rc = krrp_conn_create_from_scratch(&conn,
 	    remote_addr, remote_port, timeout, error);
 	if (rc != 0)
-		return (-1);
+		goto out;
 
 	rc = krrp_sess_initiator_attach_conn(sess, conn, error);
 	if (rc != 0)
 		krrp_conn_destroy(conn);
 
+out:
+	krrp_sess_rele(sess);
 	return (rc);
 }
 
@@ -290,7 +292,7 @@ krrp_ioctl_sess_create_pdu_engine(nvlist_t *params, krrp_error_t *error)
 	    (void *) &dblk_data_sz);
 	if (rc != 0) {
 		krrp_error_set(error, KRRP_ERRNO_DBLKSZ, ENOENT);
-		return (-1);
+		goto out;
 	}
 
 	/*
@@ -302,7 +304,7 @@ krrp_ioctl_sess_create_pdu_engine(nvlist_t *params, krrp_error_t *error)
 	if (dblk_data_sz < KRRP_MIN_SESS_PDU_DBLK_DATA_SZ ||
 	    dblk_data_sz > KRRP_MAX_SESS_PDU_DBLK_DATA_SZ) {
 		krrp_error_set(error, KRRP_ERRNO_DBLKSZ, EINVAL);
-		return (-1);
+		goto out;
 	}
 
 	dblk_head_sz = 120;
@@ -311,12 +313,12 @@ krrp_ioctl_sess_create_pdu_engine(nvlist_t *params, krrp_error_t *error)
 	    (void *) &max_memory);
 	if (rc != 0) {
 		krrp_error_set(error, KRRP_ERRNO_MAXMEMSZ, ENOENT);
-		return (-1);
+		goto out;
 	}
 
 	if (max_memory < KRRP_MIN_MAXMEM) {
 		krrp_error_set(error, KRRP_ERRNO_MAXMEMSZ, EINVAL);
-		return (-1);
+		goto out;
 	}
 
 	(void) krrp_param_get(KRRP_PARAM_USE_PREALLOCATION, params,
@@ -326,12 +328,14 @@ krrp_ioctl_sess_create_pdu_engine(nvlist_t *params, krrp_error_t *error)
 	    use_prealloc, max_memory, 0, dblk_head_sz,
 	    dblk_data_sz, error);
 	if (rc != 0)
-		return (-1);
+		goto out;
 
 	rc = krrp_sess_attach_pdu_engine(sess, pdu_engine, error);
 	if (rc != 0)
 		krrp_pdu_engine_destroy(pdu_engine);
 
+out:
+	krrp_sess_rele(sess);
 	return (rc);
 }
 
@@ -407,6 +411,7 @@ krrp_ioctl_sess_create_stream(nvlist_t *params, boolean_t read_stream,
 		krrp_stream_destroy(stream);
 
 out:
+	krrp_sess_rele(sess);
 	return (rc);
 }
 
@@ -516,6 +521,7 @@ krrp_ioctl_sess_run(nvlist_t *params, krrp_error_t *error)
 {
 	krrp_sess_t *sess = NULL;
 	boolean_t only_once = B_FALSE;
+	int rc;
 
 	sess = krrp_ioctl_sess_action_common(params, error);
 	if (sess == NULL)
@@ -524,19 +530,26 @@ krrp_ioctl_sess_run(nvlist_t *params, krrp_error_t *error)
 	(void) krrp_param_get(KRRP_PARAM_ONLY_ONCE, params,
 	    (void *) &only_once);
 
-	return (krrp_sess_run(sess, only_once, error));
+	rc = krrp_sess_run(sess, only_once, error);
+
+	krrp_sess_rele(sess);
+	return (rc);
 }
 
 static int
 krrp_ioctl_sess_send_stop(nvlist_t *params, krrp_error_t *error)
 {
+	int rc;
 	krrp_sess_t *sess = NULL;
 
 	sess = krrp_ioctl_sess_action_common(params, error);
 	if (sess == NULL)
 		return (-1);
 
-	return (krrp_sess_send_stop(sess, error));
+	rc = krrp_sess_send_stop(sess, error);
+
+	krrp_sess_rele(sess);
+	return (rc);
 }
 
 static int krrp_ioctl_sess_conn_throttle(nvlist_t *params,
@@ -554,15 +567,19 @@ static int krrp_ioctl_sess_conn_throttle(nvlist_t *params,
 	    params, (void *) &limit);
 	if (rc != 0) {
 		krrp_error_set(error, KRRP_ERRNO_THROTTLE, ENOENT);
-		return (-1);
+		goto out;
 	}
 
 	if (limit < KRRP_MIN_CONN_THROTTLE && limit != 0) {
 		krrp_error_set(error, KRRP_ERRNO_THROTTLE, EINVAL);
-		return (-1);
+		goto out;
 	}
 
-	return (krrp_sess_throttle_conn(sess, limit, error));
+	rc = krrp_sess_throttle_conn(sess, limit, error);
+
+out:
+	krrp_sess_rele(sess);
+	return (rc);
 }
 
 static int krrp_ioctl_zfs_get_recv_cookies(nvlist_t *params,
@@ -595,19 +612,27 @@ static krrp_sess_t *
 krrp_ioctl_sess_action_common(nvlist_t *params, krrp_error_t *error)
 {
 	int rc;
-	krrp_sess_t *sess;
+	krrp_sess_t *sess = NULL;
 	const char *sess_id = NULL;
 
 	rc = krrp_param_get(KRRP_PARAM_SESS_ID, params,
 	    (void *) &sess_id);
 	if (rc != 0) {
 		krrp_error_set(error, KRRP_ERRNO_SESSID, ENOENT);
-		return (NULL);
+		goto out;
 	}
 
 	sess = krrp_svc_lookup_session(sess_id);
-	if (sess == NULL)
+	if (sess == NULL) {
 		krrp_error_set(error, KRRP_ERRNO_SESS, ENOENT);
+		goto out;
+	}
 
+	if (krrp_sess_try_hold(sess) != 0) {
+		krrp_error_set(error, KRRP_ERRNO_SESS, EBUSY);
+		sess = NULL;
+	}
+
+out:
 	return (sess);
 }

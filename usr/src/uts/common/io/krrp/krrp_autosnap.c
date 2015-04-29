@@ -39,6 +39,8 @@ static void krrp_autosnap_activate(krrp_autosnap_t *autosnap,
     boolean_t snap_creator, uint64_t incr_snap_txg,
     krrp_autosnap_restore_cb_t restore_cb, void *restore_cb_arg);
 static uint64_t krrp_get_txg_from_snap_nvp(nvpair_t *);
+static boolean_t krrp_autosnap_try_hold_with_check_state(
+    krrp_autosnap_t *autosnap, krrp_autosnap_state_t min_state);
 
 int krrp_autosnap_rside_create(krrp_autosnap_t **result_autosnap,
     const char *dataset, boolean_t recursive,
@@ -257,28 +259,33 @@ krrp_get_txg_from_snap_nvp(nvpair_t *snap)
 boolean_t
 krrp_autosnap_try_hold_to_confirm(krrp_autosnap_t *autosnap)
 {
-	boolean_t rc = B_FALSE;
-
-	krrp_autosnap_lock(autosnap);
-
-	if (autosnap->state == KRRP_AUTOSNAP_STATE_ACTIVE) {
-		autosnap->ref_cnt++;
-		rc = B_TRUE;
-	}
-
-	krrp_autosnap_unlock(autosnap);
-
-	return (rc);
+	return (krrp_autosnap_try_hold_with_check_state(autosnap,
+	    KRRP_AUTOSNAP_STATE_ACTIVE));
 }
 
 boolean_t
 krrp_autosnap_try_hold_to_snap_rele(krrp_autosnap_t *autosnap)
 {
+	return (krrp_autosnap_try_hold_with_check_state(autosnap,
+	    KRRP_AUTOSNAP_STATE_REGISTERED));
+}
+
+boolean_t
+krrp_autosnap_try_hold_to_snap_create(krrp_autosnap_t *autosnap)
+{
+	return (krrp_autosnap_try_hold_with_check_state(autosnap,
+	    KRRP_AUTOSNAP_STATE_REGISTERED));
+}
+
+static boolean_t
+krrp_autosnap_try_hold_with_check_state(krrp_autosnap_t *autosnap,
+    krrp_autosnap_state_t min_state)
+{
 	boolean_t rc = B_FALSE;
 
 	krrp_autosnap_lock(autosnap);
 
-	if (autosnap->state != KRRP_AUTOSNAP_STATE_UNREGISTERED) {
+	if (autosnap->state >= min_state) {
 		autosnap->ref_cnt++;
 		rc = B_TRUE;
 	}
@@ -298,10 +305,15 @@ krrp_autosnap_unhold(krrp_autosnap_t *autosnap)
 }
 
 void
-krrp_autosnap_create_snapshot(krrp_autosnap_t *autosnap, boolean_t sync)
+krrp_autosnap_create_snapshot(krrp_autosnap_t *autosnap)
 {
 	ASSERT(autosnap->zfs_ctx != NULL);
-	autosnap_force_snap(autosnap->zfs_ctx, sync);
+
+	if (krrp_autosnap_try_hold_to_snap_create(autosnap)) {
+		autosnap_force_snap(autosnap->zfs_ctx, B_FALSE);
+
+		krrp_autosnap_unhold(autosnap);
+	}
 }
 
 void

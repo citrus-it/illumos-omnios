@@ -339,13 +339,13 @@ krrp_sysevent_cb(libkrrp_event_t *ev, void *cookie)
 		libkrrp_ev_data_error_description(ev_type,
 		    &ev_data->sess_error.libkrrp_error, err_desc);
 		fprintf_msg("Session '%s' has interrupted by error:\n"
-		    "    %s", err_desc);
+		    "    %s\n", err_desc);
 		break;
 	case LIBKRRP_EV_TYPE_SERVER_ERROR:
 		libkrrp_ev_data_error_description(ev_type,
 		    &ev_data->sess_error.libkrrp_error, err_desc);
 		fprintf_msg("An error occured in kernel-server:\n"
-		    "    %s", err_desc);
+		    "    %s\n", err_desc);
 		break;
 	default:
 		fprintf_err("Unknow event type\n");
@@ -615,8 +615,8 @@ krrp_do_sess_action(int argc, char **argv, krrp_cmd_t *cmd)
 	}
 
 	if (rc != 0) {
-		exit(1);
 		krrp_print_libkrrp_error();
+		exit(1);
 	}
 
 	return (0);
@@ -649,11 +649,15 @@ krrp_do_sess_list(int argc, char **argv, krrp_cmd_t *cmd)
 
 	sess_list = sess_list_head;
 	while (sess_list != NULL) {
+		char sess_id_str[UUID_PRINTABLE_STRING_LENGTH];
+
+		uuid_unparse(sess_list->sess_id, sess_id_str);
+
 		fprintf_msg("Session: [%s]\n"
 			"    kstat ID: %s\n"
 			"    started: %s\n"
 			"    running: %s\n\n",
-		    sess_list->sess_id,
+			sess_id_str,
 		    sess_list->sess_kstat_id,
 			sess_list->sess_started ? "YES" : "NO",
 			sess_list->sess_running ? "YES" : "NO");

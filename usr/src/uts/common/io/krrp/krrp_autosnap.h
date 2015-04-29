@@ -24,9 +24,6 @@
 extern "C" {
 #endif
 
-#define	KRRP_SYNC_OP	B_TRUE
-#define	KRRP_ASYNC_OP	B_FALSE
-
 #define	krrp_autosnap_lock(a)			mutex_enter(&(a)->mtx)
 #define	krrp_autosnap_unlock(a)			mutex_exit(&(a)->mtx)
 #define	krrp_autosnap_cv_wait(a)		cv_wait(&(a)->cv, &(a)->mtx)
@@ -63,11 +60,12 @@ void krrp_autosnap_destroy(krrp_autosnap_t *autosnap);
 
 boolean_t krrp_autosnap_try_hold_to_confirm(krrp_autosnap_t *autosnap);
 boolean_t krrp_autosnap_try_hold_to_snap_rele(krrp_autosnap_t *autosnap);
+boolean_t krrp_autosnap_try_hold_to_snap_create(krrp_autosnap_t *autosnap);
 void krrp_autosnap_unhold(krrp_autosnap_t *autosnap);
 
 void krrp_autosnap_deactivate(krrp_autosnap_t *autosnap);
 
-void krrp_autosnap_create_snapshot(krrp_autosnap_t *autosnap, boolean_t sync);
+void krrp_autosnap_create_snapshot(krrp_autosnap_t *autosnap);
 
 void krrp_autosnap_txg_rele(krrp_autosnap_t *, uint64_t, uint64_t);
 void krrp_autosnap_txg_rele_one(krrp_autosnap_t *, uint64_t);

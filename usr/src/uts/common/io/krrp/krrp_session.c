@@ -206,7 +206,7 @@ krrp_sess_destroy(krrp_sess_t *sess)
 
 	mutex_enter(&sess->mtx);
 
-	if (!sess->shutdown) {
+	if (!sess->shutdown && sess->conn != NULL) {
 		sess->shutdown = B_TRUE;
 		krrp_sess_send_shutdown(sess);
 
@@ -488,9 +488,11 @@ krrp_sess_send_stop(krrp_sess_t *sess, krrp_error_t *error)
 	if (!krrp_sess_is_running(sess)) {
 		krrp_error_set(error, KRRP_ERRNO_SESS, ENOTACTIVE);
 	} else {
-		if (sess->type == KRRP_SESS_RECEIVER) {
+		if (sess->type == KRRP_SESS_RECEIVER)
 			krrp_error_set(error, KRRP_ERRNO_SESS, EINVAL);
-		} else if (krrp_stream_send_stop(sess->stream_read) != 0)
+		else if (sess->stream_read->non_continuous)
+			krrp_error_set(error, KRRP_ERRNO_STREAM, EINVAL);
+		else if (krrp_stream_send_stop(sess->stream_read) != 0)
 			krrp_error_set(error, KRRP_ERRNO_STREAM, EALREADY);
 		else
 			rc = 0;
@@ -1544,6 +1546,33 @@ krrp_sess_dec_ref_cnt(krrp_sess_t *sess)
 	ASSERT(sess->ref_cnt > 0);
 	sess->ref_cnt--;
 	cv_signal(&sess->cv);
+	mutex_exit(&sess->mtx);
+}
+
+int
+krrp_sess_try_hold(krrp_sess_t *sess)
+{
+	int rc = -1;
+
+	mutex_enter(&sess->mtx);
+	if (sess->on_hold)
+		goto out;
+
+	rc = 0;
+	sess->on_hold = B_TRUE;
+
+out:
+	mutex_exit(&sess->mtx);
+
+	return (rc);
+}
+
+void
+krrp_sess_rele(krrp_sess_t *sess)
+{
+	mutex_enter(&sess->mtx);
+	ASSERT(sess->on_hold);
+	sess->on_hold = B_FALSE;
 	mutex_exit(&sess->mtx);
 }
 

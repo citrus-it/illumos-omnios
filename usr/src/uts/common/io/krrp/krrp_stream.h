@@ -75,6 +75,7 @@ struct krrp_stream_s {
 	kmutex_t				mtx;
 	kcondvar_t				cv;
 
+	boolean_t				wait_for_snap;
 	boolean_t				notify_when_done;
 
 	boolean_t				non_continuous;

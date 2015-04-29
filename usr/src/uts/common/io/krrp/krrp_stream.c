@@ -396,14 +396,25 @@ krrp_stream_send_stop(krrp_stream_t *stream)
 {
 	int rc = -1;
 
-	VERIFY(stream->mode == KRRP_STRMM_READ);
+	ASSERT(stream->mode == KRRP_STRMM_READ);
+	ASSERT(!stream->non_continuous);
 
 	if (!stream->notify_when_done) {
-		if (!stream->non_continuous) {
-			krrp_autosnap_create_snapshot(stream->autosnap,
-			    KRRP_SYNC_OP);
-			krrp_autosnap_deactivate(stream->autosnap);
-		}
+		krrp_autosnap_create_snapshot(stream->autosnap);
+
+		/*
+		 * To deactivate autosnap-logic need to be sure
+		 * that an autosnap created
+		 *
+		 * Autosnap-service may delay creation of snapshot,
+		 * so here we may wait for some time (1-2 transactions)
+		 */
+		krrp_stream_lock(stream);
+		stream->wait_for_snap = B_TRUE;
+		krrp_stream_cv_wait(stream);
+		krrp_stream_unlock(stream);
+
+		krrp_autosnap_deactivate(stream->autosnap);
 
 		stream->notify_when_done = B_TRUE;
 		rc = 0;
@@ -483,8 +494,7 @@ krrp_stream_activate_autosnap(krrp_stream_t *stream,
 			 * data will not be replicated. To exclude this case
 			 * need to ask autosnap to create snapshot
 			 */
-			krrp_autosnap_create_snapshot(stream->autosnap,
-			    B_FALSE);
+			krrp_autosnap_create_snapshot(stream->autosnap);
 		} else {
 			uint64_t base_snap_txg;
 			const char *zcookies;
@@ -631,13 +641,8 @@ krrp_stream_txg_confirmed(krrp_stream_t *stream, uint64_t txg,
 
 	stream->last_ack_txg = txg;
 
-	/*
-	 * There is impossible infinity loop, because if we here,
-	 * then receiver has received the final PDU for the corresponding TXG,
-	 * so krrp_stream_task_done() for the TXG must be called
-	 */
-	while ((task = krrp_queue_get(stream->task_engine->tasks_done)) ==
-	    NULL);
+	task = krrp_queue_get(stream->task_engine->tasks_done);
+	ASSERT(task != NULL);
 
 	krrp_stream_calc_avg_rpo(stream, task, B_FALSE);
 	krrp_queue_put(stream->task_engine->tasks_done2, task);
@@ -690,6 +695,11 @@ krrp_stream_snap_create_error_cb(const char *snap_name, int err,
 	else
 		just_return = B_TRUE;
 
+	if (stream->wait_for_snap) {
+		stream->wait_for_snap = B_FALSE;
+		krrp_stream_cv_signal(stream);
+	}
+
 	krrp_stream_unlock(stream);
 
 	if (just_return)
@@ -711,10 +721,13 @@ krrp_stream_read_snap_confirm_cb(const char *snap_name, boolean_t recursive,
 	stream = (krrp_stream_t *) void_stream;
 
 	if (krrp_autosnap_try_hold_to_confirm(stream->autosnap)) {
-		if (krrp_stream_task_num_of_tasks(stream->task_engine) > 1)
-			result = B_FALSE;
-		else
+		size_t tasks;
+
+		tasks = krrp_stream_task_num_of_tasks(stream->task_engine);
+		if (tasks <= 1 || stream->wait_for_snap)
 			result = B_TRUE;
+		else
+			result = B_FALSE;
 
 		krrp_autosnap_unhold(stream->autosnap);
 	}
@@ -758,7 +771,10 @@ krrp_stream_read_snap_notify_cb(const char *snap_name, boolean_t recursive,
 	stream = (krrp_stream_t *) void_stream;
 
 	if (krrp_autosnap_try_hold_to_confirm(stream->autosnap)) {
-		if (krrp_stream_task_num_of_tasks(stream->task_engine) <= 1) {
+		size_t tasks;
+
+		tasks = krrp_stream_task_num_of_tasks(stream->task_engine);
+		if (tasks <= 1 || stream->wait_for_snap) {
 			uint64_t cur_snap_txg;
 			char *cur_snap_name;
 
@@ -775,6 +791,14 @@ krrp_stream_read_snap_notify_cb(const char *snap_name, boolean_t recursive,
 				sizeof (stream->incr_snap_name));
 
 			result = B_TRUE;
+
+			if (stream->wait_for_snap) {
+				stream->wait_for_snap = B_FALSE;
+
+				krrp_stream_lock(stream);
+				krrp_stream_cv_signal(stream);
+				krrp_stream_unlock(stream);
+			}
 		}
 
 		krrp_autosnap_unhold(stream->autosnap);
@@ -1035,8 +1059,7 @@ krrp_stream_task_done(krrp_stream_t *stream,
 	case KRRP_STRMM_READ:
 		if (krrp_stream_task_num_of_tasks(stream->task_engine) == 0) {
 			if (stream->do_ctrl_snap) {
-				krrp_autosnap_create_snapshot(stream->autosnap,
-				    B_FALSE);
+				krrp_autosnap_create_snapshot(stream->autosnap);
 				stream->do_ctrl_snap = B_FALSE;
 			}
 		} else
