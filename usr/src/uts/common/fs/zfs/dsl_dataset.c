@@ -362,7 +362,7 @@ dsl_dataset_snap_lookup(dsl_dataset_t *ds, const char *name, uint64_t *value)
 
 	err = zap_lookup_norm(mos, snapobj, name, 8, 1,
 	    value, mt, NULL, 0, NULL);
-	if (err == ENOTSUP && mt == MT_FIRST)
+	if (err == ENOTSUP && (mt & MT_FIRST))
 		err = zap_lookup(mos, snapobj, name, 8, 1, value);
 	return (err);
 }
@@ -384,7 +384,7 @@ dsl_dataset_snap_remove(dsl_dataset_t *ds, const char *name, dmu_tx_t *tx,
 		mt = MT_EXACT;
 
 	err = zap_remove_norm(mos, snapobj, name, mt, tx);
-	if (err == ENOTSUP && mt == MT_FIRST)
+	if (err == ENOTSUP && (mt & MT_FIRST))
 		err = zap_remove(mos, snapobj, name, tx);
 
 	if (err == 0 && adj_cnt)
