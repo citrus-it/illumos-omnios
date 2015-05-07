@@ -6068,6 +6068,219 @@ zfs_ioc_send_space(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 	return (error);
 }
 
+typedef struct dp_cursor_cb_arg {
+	nvlist_t *outnvl;
+	uint64_t offset;
+	uint32_t count;
+	uint32_t skip;
+	boolean_t verbose;
+	boolean_t snaps;
+} dp_cursor_cb_arg_t;
+
+/* ARGSUSED */
+int
+ds_cursor_cb(dsl_pool_t *dp, dsl_dataset_t *ds, void *arg)
+{
+	int error;
+	char dsname[MAXNAMELEN];
+	objset_t *osp;
+
+	dp_cursor_cb_arg_t *cb = (dp_cursor_cb_arg_t *)arg;
+
+	dsl_dataset_name(ds, dsname);
+	nvlist_t *nv = fnvlist_alloc();
+
+	fnvlist_add_uint64(nv, zfs_prop_to_name(ZFS_PROP_GUID),
+	    dsl_dataset_phys(ds)->ds_guid);
+
+	if (cb->verbose) {
+		uint64_t refd, avail, uobjs, aobjs;
+		dsl_dataset_space(ds, &refd, &avail, &uobjs, &aobjs);
+
+		fnvlist_add_uint64(nv, zfs_prop_to_name(ZFS_PROP_AVAILABLE),
+		    avail);
+		fnvlist_add_uint64(nv, zfs_prop_to_name(ZFS_PROP_REFERENCED),
+		    refd);
+		fnvlist_add_uint64(nv, zfs_prop_to_name(ZFS_PROP_USED),
+		    dsl_dir_phys(ds->ds_dir)->dd_used_bytes);
+	}
+
+	error = dmu_objset_from_ds(ds, &osp);
+
+	if (error == 0)
+		fnvlist_add_uint64(nv, zfs_prop_to_name(ZFS_PROP_TYPE),
+		    dmu_objset_type(osp));
+
+	fnvlist_add_nvlist(cb->outnvl, dsname, nv);
+	nvlist_free(nv);
+	return (error);
+}
+
+int
+dmu_objset_find_dp_cursor(dsl_pool_t *dp, uint64_t ddobj,
+    int func(dsl_pool_t *, dsl_dataset_t *, void *), void *arg)
+{
+	dsl_dir_t *dd;
+	dsl_dataset_t *ds;
+	zap_cursor_t zc;
+	zap_attribute_t *attr;
+	uint64_t thisobj;
+	int error, i;
+
+	dp_cursor_cb_arg_t *cb = (dp_cursor_cb_arg_t *)arg;
+
+	ASSERT(dsl_pool_config_held(dp));
+	error = dsl_dir_hold_obj(dp, ddobj, NULL, FTAG, &dd);
+	thisobj = dsl_dir_phys(dd)->dd_head_dataset_obj;
+
+	if (error != 0)
+		return (error);
+
+	attr = kmem_alloc(sizeof (zap_attribute_t), KM_SLEEP);
+
+	/* we are interrestd in filesytems and volumes */
+	if (!cb->snaps) {
+
+		/* init the cursor at given offset */
+		zap_cursor_init_serialized(&zc, dp->dp_meta_objset,
+		    dsl_dir_phys(dd)->dd_child_dir_zapobj, cb->offset);
+
+
+		for (i = 0; i < cb->skip; i++) {
+			zap_cursor_advance(&zc);
+			if ((zap_cursor_retrieve(&zc, attr) != 0)) {
+				error = ENOENT;
+				goto out;
+			}
+		}
+
+		for (i = 0; i < cb->count; i++) {
+			zap_cursor_advance(&zc);
+			if ((zap_cursor_retrieve(&zc, attr) != 0)) {
+				error = ENOENT;
+				goto out;
+			}
+
+			ASSERT3U(attr->za_integer_length, ==,
+			    sizeof (uint64_t));
+			ASSERT3U(attr->za_num_integers, ==, 1);
+			/* recursivly walk objects skipping $MOS and $ORIGIN */
+			error = dmu_objset_find_dp(dp, attr->za_first_integer,
+			    func, arg, 0);
+			if (error != 0)
+				break;
+		}
+	} else {
+
+		dsl_dataset_t *ds;
+
+		error = dsl_dataset_hold_obj(dp, thisobj, FTAG, &ds);
+
+		if (error == 0) {
+
+			dsl_dataset_rele(ds, FTAG);
+			zap_cursor_init_serialized(&zc, dp->dp_meta_objset,
+			    dsl_dataset_phys(ds)->ds_snapnames_zapobj,
+			    cb->offset);
+
+			for (i = 0; i < cb->skip; i++) {
+				zap_cursor_advance(&zc);
+					if ((zap_cursor_retrieve(&zc,
+					    attr) != 0)) {
+					error = ENOENT;
+					goto out;
+				}
+			}
+
+			for (i = 0; i < cb->count; i++) {
+				zap_cursor_advance(&zc);
+				if ((zap_cursor_retrieve(&zc, attr) != 0)) {
+					error = ENOENT;
+					goto out;
+
+				}
+
+				ASSERT3U(attr->za_integer_length, ==,
+				    sizeof (uint64_t));
+				ASSERT3U(attr->za_num_integers, ==, 1);
+
+				error = dsl_dataset_hold_obj(dp,
+				    attr->za_first_integer, FTAG, &ds);
+				if (error != 0)
+					break;
+				error = func(dp, ds, arg);
+				dsl_dataset_rele(ds, FTAG);
+				if (error != 0)
+					break;
+			}
+		}
+	}
+out:
+	cb->offset = zap_cursor_serialize(&zc);
+	zap_cursor_fini(&zc);
+	dsl_dir_rele(dd, FTAG);
+	kmem_free(attr, sizeof (zap_attribute_t));
+
+	/* return self as the last dataset */
+	if (error == ENOENT) {
+		if ((error = dsl_dataset_hold_obj(dp, thisobj, FTAG, &ds)) != 0)
+			return (error);
+		error = func(dp, ds, arg);
+		dsl_dataset_rele(ds, FTAG);
+		if (error)
+			return (error);
+		error = ENOENT;
+	}
+
+	return (error);
+}
+
+
+/*
+ * We want to list all dataset under the given name. Optionally, we advance the
+ * ZAP cursor "skip" times and retrieve "count" datasets. We return the offset
+ * so the user can start the next invocation where he left off.
+ */
+
+static int
+zfs_ioc_list_from_cursor(const char *name, nvlist_t *innvl, nvlist_t *outnvl)
+{
+
+	dsl_pool_t *dp;
+	dsl_dataset_t *ds;
+
+	int error;
+
+	dp_cursor_cb_arg_t cb_args;
+
+	if ((strchr(name, '@') != NULL))
+		return (EINVAL);
+
+	if ((error = dsl_pool_hold(name, FTAG, &dp)) != 0)
+		return (error);
+
+	if ((error = dsl_dataset_hold(dp, name, FTAG, &ds)) != 0) {
+		dsl_pool_rele(dp, FTAG);
+		return (error);
+	}
+
+	(void) nvlist_lookup_uint32(innvl, "count", &cb_args.count);
+	(void) nvlist_lookup_uint32(innvl, "skip", &cb_args.skip);
+	(void) nvlist_lookup_uint64(innvl, "offset", &cb_args.offset);
+	(void) nvlist_lookup_boolean_value(innvl, "verbose", &cb_args.verbose);
+	(void) nvlist_lookup_boolean_value(innvl, "snaps", &cb_args.snaps);
+
+	cb_args.outnvl = outnvl;
+	error = dmu_objset_find_dp_cursor(dp, ds->ds_dir->dd_object,
+	    &ds_cursor_cb, &cb_args);
+
+	fnvlist_add_uint64(outnvl, "offset", cb_args.offset);
+	dsl_dataset_rele(ds, FTAG);
+	dsl_pool_rele(dp, FTAG);
+
+	return (error);
+}
+
 
 static zfs_ioc_vec_t zfs_ioc_vec[ZFS_IOC_LAST - ZFS_IOC_FIRST];
 
@@ -6553,6 +6766,10 @@ zfs_ioc_check_krrp(const char *dataset, nvlist_t *innvl, nvlist_t *outnvl)
 static void
 zfs_ioctl_init(void)
 {
+	zfs_ioctl_register("bulk_list", ZFS_IOC_BULK_LIST,
+	    zfs_ioc_list_from_cursor, zfs_secpolicy_read,
+	    DATASET_NAME, POOL_CHECK_SUSPENDED, B_FALSE, B_FALSE);
+
 	zfs_ioctl_register("snapshot", ZFS_IOC_SNAPSHOT,
 	    zfs_ioc_snapshot, zfs_secpolicy_snapshot, POOL_NAME,
 	    POOL_CHECK_SUSPENDED | POOL_CHECK_READONLY, B_TRUE, B_TRUE);

@@ -888,3 +888,94 @@ lzc_destroy_bookmarks(nvlist_t *bmarks, nvlist_t **errlist)
 
 	return (error);
 }
+
+
+/**
+ * Enumerate datasets and optionally get a few dataset properties.
+ * In order to start dataset enumeration, an offset off '0' must be given
+ * as the cursor argument. To continue enumeration, the previously returned
+ * cursor position should be passed as an argument.
+ *
+ * If verbose flag is set, this function additionaly returns the following
+ * dataset properties:
+ * 		"available"
+ * 		"referenced"
+ * 		"used"
+ *
+ * The output list of dataset is unsorted but the order of datasets
+ * is preserved between calls.
+ *
+ * Return 0 on success, if more dataset are available on the current cursor.
+ * Return -1 on success, if no more datasets are available.
+ * Return a positive error code in a case of error.
+ *
+ * Example:
+ *  int err = 0;
+ *  uint64_t cursor = 0;
+ *  nvlist_t *bunch = NULL, *info;
+ *  nvpair_t *elem = NULL;
+ *  const char* fsname = ...;
+ *
+ *  while (err == 0) {
+ *      err = lzc_bulk_list(fsname, 100, 0, B_TRUE, B_FALSE,
+ *                          &cursor, &bunch);
+ *      if (err > 0) {
+ *          printf("error: %s: %s\n", strerror(err), fsname);
+ *          goto out;
+ *      }
+ *
+ *      while ((elem = nvlist_next_nvpair(bunch, elem)) != NULL) {
+ *            if (nvpair_type(elem) != DATA_TYPE_NVLIST)
+ *                continue;
+ *            info = fnvpair_value_nvlist(elem);
+ *            printf("% -40s : % 16llu / % 16llu / % 16llu\n",
+ *                        nvpair_name(elem),
+ *                        fnvlist_lookup_uint64(info, "used"),
+ *                        fnvlist_lookup_uint64(info, "available"),
+ *                        fnvlist_lookup_uint64(info, "referenced"));
+ *      }
+ *  	nvlist_free(bunch);
+ *  }
+ */
+
+int
+lzc_bulk_list(const char *fsname, uint32_t count, uint32_t skip,
+     boolean_t verbose, boolean_t snaps, uint64_t *cursor, nvlist_t **outnvl)
+{
+	int error;
+	nvlist_t *args;
+
+	if (fsname == NULL || cursor == NULL || outnvl == NULL)
+		return (EINVAL);
+
+	args = fnvlist_alloc();
+
+	fnvlist_add_uint64(args, "offset", *cursor);
+	fnvlist_add_uint32(args, "count", count);
+	fnvlist_add_uint32(args, "skip", skip);
+	fnvlist_add_boolean_value(args, "verbose", verbose);
+	fnvlist_add_boolean_value(args, "snaps", snaps);
+
+	error = lzc_ioctl(ZFS_IOC_BULK_LIST, fsname, args, outnvl);
+
+	nvlist_free(args);
+
+	if (nvlist_empty(*outnvl) && error != 0) {
+		/* we either have invalid fsame or its non existing */
+		return (error);
+	}
+
+	/*
+	 * In case an output list is returned and the "offset" item is present,
+	 * ENOENT return value indicates end-of-list.
+	 */
+	VERIFY0(nvlist_lookup_uint64(*outnvl, "offset", cursor));
+	fnvlist_remove(*outnvl, "offset");
+
+	if (error == ENOENT)
+		return (-1);
+
+	 /* Zero error code indicates "success and continue" */
+	VERIFY0(error);
+	return (error);
+}
