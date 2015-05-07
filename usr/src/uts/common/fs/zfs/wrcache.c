@@ -73,12 +73,6 @@ extern uint64_t krrp_debug;
  */
 int zfs_wrc_schedtmo = 0;
 
-/*
- * timeout (in seconds) that is used to schedule a job that moves
- * blocks from a special device to other deivices in a pool
- */
-int zfs_special_schedtmo = 0;
-
 uint64_t zfs_wrc_data_max = 48 << 20; /* Max data to migrate in a pass */
 
 uint64_t wrc_mv_cancel_threshold_initial = 20;
@@ -87,25 +81,20 @@ uint64_t wrc_mv_cancel_threshold_step = 0;
 uint64_t wrc_mv_cancel_threshold_cap = 50;
 
 static void wrc_move_block(void *arg);
+static int wrc_move_block_impl(wrc_block_t *block);
 static int wrc_collect_special_blocks(dsl_pool_t *dp);
 static void wrc_close_window(spa_t *spa);
 static void wrc_write_update_window(void *void_spa, dmu_tx_t *tx);
 static boolean_t dsl_pool_wrcio_limit(dsl_pool_t *dp, uint64_t txg);
 
-kmem_cache_t *wrc_blocks_cache = NULL;
-
 void
 wrc_init()
 {
-	wrc_blocks_cache = kmem_cache_create(
-	    "wrc_blocks", sizeof (wrc_block_t), 0x10,
-	    NULL, NULL, NULL, NULL, NULL, 0);
 }
 
 void
 wrc_fini()
 {
-	kmem_cache_destroy(wrc_blocks_cache);
 }
 
 #ifndef _KERNEL
@@ -199,9 +188,6 @@ spa_wrc_thread(spa_t *spa)
 	(void) strncat(name, spa->spa_name, MAXNAMELEN - strlen(name) - 1);
 	name[MAXNAMELEN - 1] = '\0';
 
-	wrc_data->wrc_zio_cache = kmem_cache_create(name, SPA_MAXBLOCKSIZE, 8,
-	    NULL, NULL, NULL, NULL, NULL, 0);
-
 	for (;;) {
 		uint64_t count = 0;
 		uint64_t written_sz = 0;
@@ -275,7 +261,7 @@ spa_wrc_thread(spa_t *spa)
 						break;
 					}
 					mutex_enter(&wrc_data->wrc_lock);
-					written_sz += block->size;
+					written_sz += WRCBP_GET_PSIZE(block);
 				} else {
 					wrc_free_block(block);
 				}
@@ -302,7 +288,6 @@ out:
 	taskq_wait(wrc_data->wrc_move_taskq);
 	wrc_clean_moved_tree(spa);
 	wrc_data->wrc_thread = NULL;
-	kmem_cache_destroy(wrc_data->wrc_zio_cache);
 
 	DTRACE_PROBE1(wrc_thread_done, char *, spa->spa_name);
 
@@ -340,13 +325,8 @@ wrc_move_block(void *arg)
 	spa_t *spa = wrc_data->wrc_spa;
 	dsl_pool_t *dp = spa->spa_dsl_pool;
 	int err = 0;
-	blkptr_t pseudo_bp = { 0 };
 	boolean_t stop_wrc_thr = B_FALSE;
 	boolean_t first_iter = B_TRUE;
-
-	if (!spa)
-		return;
-retry:
 
 	do {
 		if (!first_iter)
@@ -371,108 +351,12 @@ retry:
 	 */
 	stop_wrc_thr = dsl_pool_wrcio_limit(dp, dp->dp_tx.tx_open_txg);
 
-	spa_config_enter(spa, SCL_VDEV | SCL_STATE_ALL, FTAG, RW_READER);
-	vdev_t *vd1 = vdev_lookup_top(spa, DVA_GET_VDEV(&block->dva[0]));
-	vdev_t *vd2 = vdev_lookup_top(spa, DVA_GET_VDEV(&block->dva[1]));
-	/*
-	 * If vd is a simple leaf device than we need to add offset which
-	 * othervise is added in zio pipeline
-	 */
-	uint64_t bias1 = vd1->vdev_children == 0 ? VDEV_LABEL_START_SIZE : 0;
-	uint64_t bias2 = vd2->vdev_children == 0 ? VDEV_LABEL_START_SIZE : 0;
-
-	void *buf = kmem_cache_alloc(wrc_data->wrc_zio_cache, KM_SLEEP);
-	void *dbuf = kmem_cache_alloc(wrc_data->wrc_zio_cache, KM_SLEEP);
-	wrc_arc_bypass_t bypass = { 0 };
-
-	if (wrc_arc_enabled) {
-		if (block->compression != ZIO_COMPRESS_OFF) {
-			bypass.buf = dbuf;
-		} else {
-			bypass.buf = buf;
-		}
-
-		pseudo_bp.blk_dva[0] = block->dva[0];
-		pseudo_bp.blk_dva[1] = block->dva[1];
-		BP_SET_BIRTH(&pseudo_bp, block->btxg, block->btxg);
-
-		err = arc_io_bypass(spa, &pseudo_bp,
-		    wrc_arc_bypass_cb, &bypass);
-
-		if (!err && block->compression != ZIO_COMPRESS_OFF) {
-			size_t size = zio_compress_data(
-			    (enum zio_compress) block->compression,
-			    dbuf, buf, bypass.len);
-			size_t rounded =
-			    P2ROUNDUP(size, (size_t)SPA_MINBLOCKSIZE);
-			if (rounded != block->size) {
-				/* random error to get to slow path */
-				err = ERANGE;
-				cmn_err(CE_WARN, "WRC WARN: ARC COMPRESSION "
-				    "FAILED: %llu %llu %llu",
-				    (unsigned long long) size,
-				    (unsigned long long) block->size,
-				    (unsigned long long) block->compression);
-			} else if (rounded > size) {
-				bzero((char *)buf + size, rounded - size);
-			}
-		}
-	} else {
-		err = ENOTSUP;
-	}
-
-	/*
-	 * Any error means that arc read failed and block is being moved via
-	 * slow path
-	 */
-	if (err) {
-		zio_t *rio = zio_read_phys(NULL, vd1,
-		    DVA_GET_OFFSET(&block->dva[0]) + bias1,
-		    block->size, buf,
-		    ZIO_CHECKSUM_OFF, NULL, NULL, ZIO_PRIORITY_ASYNC_READ,
-		    ZIO_FLAG_DONT_CACHE, B_FALSE);
-		err = zio_wait(rio);
-		if (err) {
-			cmn_err(CE_WARN, "WRC: move task has failed to read:"
-			    " error [%d]", err);
-			goto out;
-		}
-		DTRACE_PROBE(wrc_move_from_disk);
-	} else {
-		DTRACE_PROBE(wrc_move_from_arc);
-	}
-
-	zio_t *wio = zio_write_phys(NULL, vd2,
-	    DVA_GET_OFFSET(&block->dva[1]) + bias2,
-	    block->size, buf,
-	    ZIO_CHECKSUM_OFF, NULL, NULL, ZIO_PRIORITY_ASYNC_WRITE,
-	    0, B_FALSE);
-	err = zio_wait(wio);
-	if (err) {
-		cmn_err(CE_WARN, "WRC: move task has failed to write: "
-		    "error [%d]", err);
-		goto out;
-	}
-
-#ifdef _KERNEL
-	DTRACE_PROBE5(wrc_move_block_data,
-	    uint64_t, DVA_GET_VDEV(&block->dva[0]),
-	    uint64_t, DVA_GET_OFFSET(&block->dva[0]),
-	    uint64_t, DVA_GET_VDEV(&block->dva[1]),
-	    uint64_t, DVA_GET_OFFSET(&block->dva[1]),
-	    uint64_t, block->size);
-#endif
-
-out:
-	kmem_cache_free(wrc_data->wrc_zio_cache, buf);
-	kmem_cache_free(wrc_data->wrc_zio_cache, dbuf);
-
-	spa_config_exit(spa, SCL_VDEV | SCL_STATE_ALL, FTAG);
-
+	err = wrc_move_block_impl(block);
 	if (!err) {
 		atomic_inc_64(&wrc_data->wrc_blocks_mv);
-		(void) atomic_cas_32((uint32_t *)&wrc_data->wrc_stop,
-		    B_FALSE, stop_wrc_thr);
+
+		if (stop_wrc_thr == B_TRUE)
+			wrc_data->wrc_stop = B_TRUE;
 	} else {
 		/* io error occured */
 		if (++wrc_data->wrc_fault_moves >= wrc_fault_limit) {
@@ -503,6 +387,139 @@ out:
 			}
 		}
 	}
+}
+
+static int
+wrc_move_block_impl(wrc_block_t *block)
+{
+	vdev_t *vd1, *vd2;
+	uint64_t bias1, bias2;
+	void *buf;
+	int err = 0;
+	wrc_data_t *wrc_data = block->data;
+	spa_t *spa = wrc_data->wrc_spa;
+
+	if (WRCBP_IS_DELETED(block))
+		return (0);
+
+	spa_config_enter(spa, SCL_VDEV | SCL_STATE_ALL, FTAG, RW_READER);
+	vd1 = vdev_lookup_top(spa, DVA_GET_VDEV(&block->dva[0]));
+	vd2 = vdev_lookup_top(spa, DVA_GET_VDEV(&block->dva[1]));
+
+	/*
+	 * If vd is a simple leaf device than we need to add offset which
+	 * othervise is added in zio pipeline
+	 */
+	bias1 = vd1->vdev_children == 0 ? VDEV_LABEL_START_SIZE : 0;
+	bias2 = vd2->vdev_children == 0 ? VDEV_LABEL_START_SIZE : 0;
+
+	buf = zio_data_buf_alloc(WRCBP_GET_PSIZE(block));
+
+	if (wrc_arc_enabled) {
+		blkptr_t pseudo_bp = { 0 };
+		wrc_arc_bypass_t bypass = { 0 };
+		void *dbuf = NULL;
+
+		if (WRCBP_GET_COMPRESS(block) != ZIO_COMPRESS_OFF) {
+			dbuf = zio_data_buf_alloc(WRCBP_GET_LSIZE(block));
+			bypass.buf = dbuf;
+		} else {
+			bypass.buf = buf;
+		}
+
+		pseudo_bp.blk_dva[0] = block->dva[0];
+		pseudo_bp.blk_dva[1] = block->dva[1];
+		BP_SET_BIRTH(&pseudo_bp, block->btxg, block->btxg);
+
+		mutex_enter(&block->lock);
+		if (WRCBP_IS_DELETED(block)) {
+			if (WRCBP_GET_COMPRESS(block) != ZIO_COMPRESS_OFF)
+				zio_data_buf_free(dbuf, WRCBP_GET_LSIZE(block));
+
+			goto out;
+		}
+
+		err = arc_io_bypass(spa, &pseudo_bp,
+		    wrc_arc_bypass_cb, &bypass);
+
+		if (!err && WRCBP_GET_COMPRESS(block) != ZIO_COMPRESS_OFF) {
+			size_t size = zio_compress_data(
+			    (enum zio_compress) WRCBP_GET_COMPRESS(block),
+			    dbuf, buf, bypass.len);
+			size_t rounded =
+			    P2ROUNDUP(size, (size_t)SPA_MINBLOCKSIZE);
+			if (rounded != WRCBP_GET_PSIZE(block)) {
+				/* random error to get to slow path */
+				err = ERANGE;
+				cmn_err(CE_WARN, "WRC WARN: ARC COMPRESSION "
+				    "FAILED: %u %u %u",
+				    (unsigned) size,
+				    (unsigned) WRCBP_GET_PSIZE(block),
+				    (unsigned) WRCBP_GET_COMPRESS(block));
+			} else if (rounded > size) {
+				bzero((char *)buf + size, rounded - size);
+			}
+		}
+
+		if (WRCBP_GET_COMPRESS(block) != ZIO_COMPRESS_OFF)
+			zio_data_buf_free(dbuf, WRCBP_GET_LSIZE(block));
+
+	} else {
+		err = ENOTSUP;
+		mutex_enter(&block->lock);
+		if (WRCBP_IS_DELETED(block))
+			goto out;
+	}
+
+	/*
+	 * Any error means that arc read failed and block is being moved via
+	 * slow path
+	 */
+	if (err) {
+		zio_t *rio = zio_read_phys(NULL, vd1,
+		    DVA_GET_OFFSET(&block->dva[0]) + bias1,
+		    WRCBP_GET_PSIZE(block), buf,
+		    ZIO_CHECKSUM_OFF, NULL, NULL, ZIO_PRIORITY_ASYNC_READ,
+		    ZIO_FLAG_DONT_CACHE, B_FALSE);
+		err = zio_wait(rio);
+		if (err) {
+			cmn_err(CE_WARN, "WRC: move task has failed to read:"
+			    " error [%d]", err);
+			goto out;
+		}
+		DTRACE_PROBE(wrc_move_from_disk);
+	} else {
+		DTRACE_PROBE(wrc_move_from_arc);
+	}
+
+	zio_t *wio = zio_write_phys(NULL, vd2,
+	    DVA_GET_OFFSET(&block->dva[1]) + bias2,
+	    WRCBP_GET_PSIZE(block), buf,
+	    ZIO_CHECKSUM_OFF, NULL, NULL, ZIO_PRIORITY_ASYNC_WRITE,
+	    0, B_FALSE);
+	err = zio_wait(wio);
+	if (err) {
+		cmn_err(CE_WARN, "WRC: move task has failed to write: "
+		    "error [%d]", err);
+		goto out;
+	}
+
+#ifdef _KERNEL
+	DTRACE_PROBE5(wrc_move_block_data,
+	    uint64_t, DVA_GET_VDEV(&block->dva[0]),
+	    uint64_t, DVA_GET_OFFSET(&block->dva[0]),
+	    uint64_t, DVA_GET_VDEV(&block->dva[1]),
+	    uint64_t, DVA_GET_OFFSET(&block->dva[1]),
+	    uint64_t, WRCBP_GET_PSIZE(block));
+#endif
+
+out:
+	mutex_exit(&block->lock);
+	zio_data_buf_free(buf, WRCBP_GET_PSIZE(block));
+
+	spa_config_exit(spa, SCL_VDEV | SCL_STATE_ALL, FTAG);
+
+	return (err);
 }
 
 /* WRC-WALK routines */
@@ -741,9 +758,10 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	block->dva[0] = bp->blk_dva[0];
 	block->dva[1] = bp->blk_dva[1];
 	block->btxg = BP_PHYSICAL_BIRTH(bp);
-	block->compression = BP_GET_COMPRESS(bp);
 
-	block->size = BP_GET_PSIZE(bp);
+	WRCBP_SET_COMPRESS(block, BP_GET_COMPRESS(bp));
+	WRCBP_SET_PSIZE(block, BP_GET_PSIZE(bp));
+	WRCBP_SET_LSIZE(block, BP_GET_LSIZE(bp));
 
 	/*
 	 * Add block to the tree of coolected blocks or drop it
@@ -752,7 +770,7 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	 */
 	if (avl_find(&wrc_data->wrc_blocks, block, &where) == NULL) {
 		avl_insert(&wrc_data->wrc_blocks, block, where);
-		cbd->bt_size += block->size;
+		cbd->bt_size += WRCBP_GET_PSIZE(block);
 		wrc_data->wrc_block_count++;
 		wrc_data->wrc_blocks_in++;
 	} else {
@@ -1033,9 +1051,6 @@ wrc_close_window_impl(spa_t *spa, avl_tree_t *tree)
 
 	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
 
-	VERIFY0(wrc_data->wrc_block_count);
-	VERIFY(avl_is_empty(&wrc_data->wrc_blocks));
-
 	wrc_data->wrc_delete = B_TRUE;
 
 	mutex_exit(&wrc_data->wrc_lock);
@@ -1070,7 +1085,11 @@ wrc_close_window_impl(spa_t *spa, avl_tree_t *tree)
 	 */
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 	while ((node = avl_destroy_nodes(tree, &cookie)) != NULL) {
-		metaslab_free_dva(spa, &node->dva[0], tx->tx_txg, B_FALSE);
+		if (!WRCBP_IS_DELETED(node)) {
+			metaslab_free_dva(spa, &node->dva[0],
+			    tx->tx_txg, B_FALSE);
+		}
+
 		wrc_free_block(node);
 	}
 	spa_config_exit(spa, SCL_VDEV, FTAG);
@@ -1110,6 +1129,7 @@ wrc_close_window(spa_t *spa)
 
 	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
 
+	ASSERT0(wrc_data->wrc_block_count);
 	ASSERT(avl_is_empty(&wrc_data->wrc_blocks));
 
 	VERIFY(wrc_data->wrc_finish_txg != 0);
@@ -1265,6 +1285,7 @@ wrc_free_restore(spa_t *spa)
 	mutex_enter(&wrc_data->wrc_lock);
 
 	wrc_close_window_impl(spa, &wrc_data->wrc_blocks);
+	wrc_data->wrc_block_count = 0;
 }
 
 /* Autosnap confirmation callback */

@@ -37,6 +37,43 @@ extern "C" {
 #define	WRCIO_PERC_MIN	(25)
 #define	WRCIO_PERC_MAX	(75)
 
+/* field 'blk_prop' of wrc_block_t
+ *
+ * 64              48               32              16              0
+ *	+-------+-------+-------+-------+-------+-------+-------+-------+
+ *  |      RESERVED    |D(1)|comp(7)|  PSIZE(16)    |     LSIZE(16) |
+ *	+-------+-------+-------+-------+-------+-------+-------+-------+
+ *
+ * Legend:
+ * D			deleted
+ * comp			compression function of payload
+ * PSIZE		size of payload after compression, in bytes
+ * LSIZE		logical size of payload, in bytes
+ *
+ * Deleted block is a block whos dva was freed,
+ * so this block must not be used by wrc_move_logic
+ * and after move has been finished need to free only block-structure
+ */
+#define	WRCBP_GET_LSIZE(bp)	\
+	BF64_GET_SB((bp)->blk_prop, 0, SPA_LSIZEBITS, SPA_MINBLOCKSHIFT, 1)
+#define	WRCBP_SET_LSIZE(bp, x)	do { \
+	BF64_SET_SB((bp)->blk_prop, \
+	    0, SPA_LSIZEBITS, SPA_MINBLOCKSHIFT, 1, x); \
+_NOTE(CONSTCOND) } while (0)
+
+#define	WRCBP_GET_PSIZE(bp)	\
+	BF64_GET_SB((bp)->blk_prop, 16, SPA_PSIZEBITS, SPA_MINBLOCKSHIFT, 1)
+#define	WRCBP_SET_PSIZE(bp, x)	do { \
+	BF64_SET_SB((bp)->blk_prop, \
+	    16, SPA_PSIZEBITS, SPA_MINBLOCKSHIFT, 1, x); \
+_NOTE(CONSTCOND) } while (0)
+
+#define	WRCBP_GET_COMPRESS(bp)		BF64_GET((bp)->blk_prop, 32, 7)
+#define	WRCBP_SET_COMPRESS(bp, x)	BF64_SET((bp)->blk_prop, 32, 7, x)
+
+#define	WRCBP_IS_DELETED(wrcbp)		BF64_GET((wrcbp)->blk_prop, 39, 1)
+#define	WRCBP_MARK_DELETED(wrcbp)	BF64_SET((wrcbp)->blk_prop, 39, 1, 1)
+
 /*
  * wrc_data structure contains all information associated with write cache and
  * is attached to spa structure.
@@ -72,8 +109,6 @@ typedef struct wrc_data {
 
 	spa_t		*wrc_spa;
 
-	kmem_cache_t	*wrc_zio_cache;		/* cache for move blocks */
-
 	uint64_t	wrc_fault_moves;	/* amount of fault moves */
 
 	boolean_t	wrc_purge;	/* should purge queued blocks */
@@ -102,18 +137,18 @@ typedef struct wrc_block {
 	/* associated wrc */
 	wrc_data_t	*data;
 
-	/* location information */
-	uint64_t	size;
+	/*
+	 * size, compression
+	 */
+	uint64_t	blk_prop;
 
 	/* birth txg for arc lookup */
 	uint64_t	btxg;
 
-	/* we need compression to be able move from arc */
-
-	uint64_t	compression;
-
 	/* dvas of blocks to move */
 	dva_t		dva[2];
+
+	kmutex_t	lock;
 
 	avl_node_t	node;
 } wrc_block_t;

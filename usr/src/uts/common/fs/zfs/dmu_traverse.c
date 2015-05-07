@@ -652,8 +652,8 @@ traverse_pool(spa_t *spa, uint64_t txg_start, uint64_t txg_finish, int flags,
 
 		if (doi.doi_bonus_type == DMU_OT_DSL_DATASET) {
 			dsl_dataset_t *ds;
-			dsl_dataset_t *nds;
-			objset_t *os, *nos;
+			objset_t *os;
+			boolean_t os_is_snapshot = B_FALSE;
 			uint64_t txg = txg_start;
 			uint64_t ctxg;
 			uint64_t max_txg = txg_finish;
@@ -669,6 +669,9 @@ traverse_pool(spa_t *spa, uint64_t txg_start, uint64_t txg_finish, int flags,
 
 			dsl_pool_config_enter(dp, FTAG);
 			err = dmu_objset_from_ds(ds, &os);
+			if (err == 0)
+				os_is_snapshot = dmu_objset_is_snapshot(os);
+
 			dsl_pool_config_exit(dp, FTAG);
 			if (err != 0) {
 				dsl_dataset_rele(ds, FTAG);
@@ -678,6 +681,10 @@ traverse_pool(spa_t *spa, uint64_t txg_start, uint64_t txg_finish, int flags,
 			}
 			ctxg = dsl_dataset_phys(ds)->ds_creation_txg;
 			if (max_txg != UINT64_MAX) {
+				dsl_dataset_t *nds;
+				objset_t *nos;
+				boolean_t nos_is_snapshot = B_FALSE;
+
 				dsl_pool_config_enter(dp, FTAG);
 				err = dsl_dataset_hold_obj(dp,
 				    dsl_dataset_phys(ds)->ds_next_snap_obj,
@@ -686,6 +693,10 @@ traverse_pool(spa_t *spa, uint64_t txg_start, uint64_t txg_finish, int flags,
 					err = dmu_objset_from_ds(nds, &nos);
 					if (err)
 						dsl_dataset_rele(nds, FTAG);
+					else {
+						nos_is_snapshot =
+						    dmu_objset_is_snapshot(nos);
+					}
 				}
 				dsl_pool_config_exit(dp, FTAG);
 				if (err == 0) {
@@ -693,7 +704,7 @@ traverse_pool(spa_t *spa, uint64_t txg_start, uint64_t txg_finish, int flags,
 					    dsl_dataset_phys(nds);
 					uint64_t ntxg =
 					    pnds->ds_creation_txg;
-					if (dmu_objset_is_snapshot(nos) &&
+					if (nos_is_snapshot &&
 					    ntxg < max_txg) {
 						dsl_dataset_rele(ds, FTAG);
 						dsl_dataset_rele(nds, FTAG);
@@ -704,8 +715,7 @@ traverse_pool(spa_t *spa, uint64_t txg_start, uint64_t txg_finish, int flags,
 			}
 
 			/* uplimited traverse walks over shapshots only */
-			if (max_txg != UINT64_MAX &&
-			    !dmu_objset_is_snapshot(os)) {
+			if (max_txg != UINT64_MAX && !os_is_snapshot) {
 				dsl_dataset_rele(ds, FTAG);
 				continue;
 			}
@@ -713,8 +723,7 @@ traverse_pool(spa_t *spa, uint64_t txg_start, uint64_t txg_finish, int flags,
 				dsl_dataset_rele(ds, FTAG);
 				continue;
 			}
-			if (dmu_objset_is_snapshot(os) &&
-			    ctxg <= txg_start) {
+			if (os_is_snapshot && ctxg <= txg_start) {
 				dsl_dataset_rele(ds, FTAG);
 				continue;
 			}

@@ -34,6 +34,7 @@
 #include <sys/zio.h>
 #include <sys/spa_impl.h>
 #include <sys/zfeature.h>
+#include <sys/wrcache.h>
 
 /*
  * Allow allocations to switch to gang blocks quickly. We do this to
@@ -2685,22 +2686,25 @@ metaslab_first_valid_dva(const blkptr_t *bp,
 		/* Only DVA[0] is required for search */
 		search.dva[0] = bp->blk_dva[0];
 
-		planned = avl_find(&wrc_data->wrc_moved_blocks,
+		moved = avl_find(&wrc_data->wrc_moved_blocks,
 		    &search, NULL);
-		if (planned && removal) {
-			avl_remove(
-			    &wrc_data->wrc_moved_blocks, planned);
+		if (moved != NULL && removal) {
+			/*
+			 * later WRC will do free for this block
+			 */
+			mutex_enter(&moved->lock);
+			WRCBP_MARK_DELETED(moved);
+			mutex_exit(&moved->lock);
+		}
+
+		planned = avl_find(&wrc_data->wrc_blocks,
+		    &search, NULL);
+		if (planned != NULL && removal) {
+			avl_remove(&wrc_data->wrc_blocks, planned);
 			wrc_free_block(planned);
 		}
 
-		moved = avl_find(&wrc_data->wrc_blocks,
-		    &search, NULL);
-		if (moved && removal) {
-			avl_remove(&wrc_data->wrc_blocks, moved);
-			wrc_free_block(moved);
-		}
-
-		if (!planned && !moved && wrc_data->wrc_delete)
+		if (planned == NULL && moved == NULL && wrc_data->wrc_delete)
 			start_dva = 1;
 	}
 
