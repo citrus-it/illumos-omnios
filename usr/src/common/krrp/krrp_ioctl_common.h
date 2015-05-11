@@ -56,7 +56,7 @@ typedef struct krrp_ioctl_data_s {
 	char		buf[1];
 } krrp_ioctl_data_t;
 
-const char * krrp_ioctl_cmd_to_str(krrp_ioctl_cmd_t cmd);
+const char *krrp_ioctl_cmd_to_str(krrp_ioctl_cmd_t cmd);
 
 #ifdef __cplusplus
 }

@@ -102,7 +102,7 @@ krrp_server_set_config(krrp_server_t *server, nvlist_t *params,
 		goto out;
 
 	(void) krrp_param_get(KRRP_PARAM_LISTENING_ADDRESS,
-	    params, (void *) &listening_addr);
+	    params, (void *)&listening_addr);
 
 	if (listening_addr != NULL && (listening_addr[0] == '\0' ||
 	    (strlen(listening_addr) >= sizeof (server->listening_addr)))) {
@@ -112,7 +112,7 @@ krrp_server_set_config(krrp_server_t *server, nvlist_t *params,
 	}
 
 	rc = krrp_param_get(KRRP_PARAM_PORT,
-	    params, (void *) &listening_port);
+	    params, &listening_port);
 	if (rc != 0) {
 		krrp_error_set(error, KRRP_ERRNO_PORT, ENOENT);
 		goto out;
@@ -194,11 +194,11 @@ krrp_server_get_config(krrp_server_t *server, nvlist_t *result,
 	}
 
 	(void) krrp_param_put(KRRP_PARAM_PORT, result,
-	    (void *) &server->listening_port);
+	    &server->listening_port);
 
 	if (server->listening_addr[0] != '\0')
 		(void) krrp_param_put(KRRP_PARAM_LISTENING_ADDRESS,
-		    result, (void *) server->listening_addr);
+		    result, server->listening_addr);
 
 	rc = 0;
 
@@ -215,7 +215,7 @@ krrp_server_enable(krrp_server_t *server)
 
 	/* thread_create never fails */
 	(void) thread_create(NULL, 0, &krrp_server_worker,
-	    (void *) server, 0, &p0, TS_RUN, minclsyspri);
+	    server, 0, &p0, TS_RUN, minclsyspri);
 
 	while (server->t_did == 0)
 		cv_wait(&server->cv, &server->mtx);
@@ -224,7 +224,7 @@ krrp_server_enable(krrp_server_t *server)
 static void
 krrp_server_worker(void *void_server)
 {
-	krrp_server_t *server = (krrp_server_t *) void_server;
+	krrp_server_t *server = void_server;
 	ksocket_t ks = NULL;
 
 	mutex_enter(&server->mtx);
@@ -271,7 +271,7 @@ krrp_server_accept(krrp_server_t *server, ksocket_t *result_ks)
 
 repeat:
 	rc = ksocket_accept(server->listening_ks, NULL, NULL,
-		result_ks, CRED());
+	    result_ks, CRED());
 	if (rc == ECONNABORTED || rc == EINTR)
 		goto repeat;
 
@@ -281,7 +281,7 @@ repeat:
 	 */
 	if (rc != 0 && rc != ENOTSOCK) {
 		cmn_err(CE_WARN, "Failed to accept new socket "
-			"[errno: %d]", rc);
+		    "[errno: %d]", rc);
 	}
 
 	return (rc);
@@ -312,8 +312,8 @@ krrp_server_create_socket(krrp_server_t *server)
 	servaddr.sin_port = htons(server->listening_port);
 
 	if (server->listening_addr[0] != '\0') {
-		if (inet_pton(AF_INET, (char *) server->listening_addr,
-			&servaddr.sin_addr) != 1) {
+		if (inet_pton(AF_INET, (char *)server->listening_addr,
+		    &servaddr.sin_addr) != 1) {
 			krrp_error_set(&server->error, KRRP_ERRNO_ADDR, EINVAL);
 			rc = -1;
 			goto fini;
@@ -321,7 +321,7 @@ krrp_server_create_socket(krrp_server_t *server)
 	} else
 		servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	rc = ksocket_bind(server->listening_ks, (struct sockaddr *) &servaddr,
+	rc = ksocket_bind(server->listening_ks, (struct sockaddr *)&servaddr,
 	    sizeof (servaddr), CRED());
 	if (rc != 0) {
 		krrp_error_set(&server->error, KRRP_ERRNO_BINDFAIL, rc);

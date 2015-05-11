@@ -66,8 +66,7 @@ dmu_krrp_stream_fini(void *handler)
 int
 dmu_krrp_arc_bypass(void *buf, int len, void *arg)
 {
-	dmu_krrp_arc_bypass_t *bypass =
-	    (dmu_krrp_arc_bypass_t *) arg;
+	dmu_krrp_arc_bypass_t *bypass = arg;
 	if (bypass->krrp_task->buffer_args.force_cksum)
 		fletcher_4_incremental_native(buf, len, bypass->zc);
 	DTRACE_PROBE(arc_bypass_send);
@@ -93,8 +92,8 @@ dmu_krrp_buffer_write(void *buf, int len,
 			size_t rem = len - count;
 			size_t size = MIN(rem, buf_rem);
 
-			(void) memcpy((char *) buffer->data + buffer->data_size,
-			    (char *) buf + count, size);
+			(void) memcpy((char *)buffer->data + buffer->data_size,
+			    (char *)buf + count, size);
 			count += size;
 			buffer->data_size += size;
 
@@ -128,8 +127,8 @@ dmu_krrp_buffer_read(void *buf, int len,
 			    krrp_task->buffer_bytes_read;
 			size_t size = MIN(rem, buf_rem);
 
-			(void) memcpy((char *) buf + done,
-			    (char *) buffer->data +
+			(void) memcpy((char *)buf + done,
+			    (char *)buffer->data +
 			    krrp_task->buffer_bytes_read, size);
 			krrp_task->buffer_bytes_read += size;
 			done += size;
@@ -275,8 +274,8 @@ zfs_send_collect_properties(list_t *ds_list, nvlist_t *nvp)
 static int
 zfs_snapshot_compare(const void *arg1, const void *arg2)
 {
-	const zfs_snap_avl_node_t * s1 = arg1;
-	const zfs_snap_avl_node_t * s2 = arg2;
+	const zfs_snap_avl_node_t *s1 = arg1;
+	const zfs_snap_avl_node_t *s2 = arg2;
 
 	if (s1->txg > s2->txg) {
 		return (+1);
@@ -555,7 +554,7 @@ zfs_send_one_ds(const char *inc_ds, const char *from_ds,
 		cmn_err(CE_NOTE, "KRRP SEND INC_BASE: %s -- DS: "
 		    "%s -- GUID: %llu", inc_ds,
 		    from_ds,
-		    (unsigned long long) dsl_dataset_phys(ds)->ds_guid);
+		    (unsigned long long)dsl_dataset_phys(ds)->ds_guid);
 	}
 
 	if (inc_ds) {
@@ -599,8 +598,7 @@ static void
 zfs_send_thread(void *krrp_task_void)
 {
 	dmu_replay_record_t drr = { 0 };
-	dmu_krrp_task_t *krrp_task =
-	    (dmu_krrp_task_t *) krrp_task_void;
+	dmu_krrp_task_t *krrp_task = krrp_task_void;
 	list_t ds_to_send;
 	zfs_ds_collector_entry_t *traverse_root, *prev_snap;
 	int err = 0;
@@ -838,17 +836,17 @@ zfs_recv_alter_props(nvlist_t *props, nvlist_t *exclude, nvlist_t *replace)
 			pair = NULL;
 			(void) nvlist_lookup_nvpair(props, prop, &pair);
 			if (pair)
-				VERIFY(0 == nvlist_remove_nvpair(props, pair));
+				fnvlist_remove_nvpair(props, pair);
 
 			pair = NULL;
 			(void) nvlist_lookup_nvpair(props, prop_recv, &pair);
 			if (pair)
-				VERIFY(0 == nvlist_remove_nvpair(props, pair));
+				fnvlist_remove_nvpair(props, pair);
 
 			pair = NULL;
 			(void) nvlist_lookup_nvpair(props, prop_inher, &pair);
 			if (pair)
-				VERIFY(0 == nvlist_remove_nvpair(props, pair));
+				fnvlist_remove_nvpair(props, pair);
 
 			strfree(prop_recv);
 			strfree(prop_inher);
@@ -871,17 +869,17 @@ zfs_recv_alter_props(nvlist_t *props, nvlist_t *exclude, nvlist_t *replace)
 			pair = NULL;
 			(void) nvlist_lookup_nvpair(props, prop, &pair);
 			if (pair)
-				VERIFY(0 == nvlist_remove_nvpair(props, pair));
+				fnvlist_remove_nvpair(props, pair);
 
 			pair = NULL;
 			(void) nvlist_lookup_nvpair(props, prop_recv, &pair);
 			if (pair)
-				VERIFY(0 == nvlist_remove_nvpair(props, pair));
+				fnvlist_remove_nvpair(props, pair);
 
 			pair = NULL;
 			(void) nvlist_lookup_nvpair(props, prop_inher, &pair);
 			if (pair)
-				VERIFY(0 == nvlist_remove_nvpair(props, pair));
+				fnvlist_remove_nvpair(props, pair);
 
 			strfree(prop_recv);
 			strfree(prop_inher);
@@ -1060,8 +1058,7 @@ zfs_recv_one_ds(char *ds, struct drr_begin *drrb, nvlist_t *props,
 static void
 zfs_recv_thread(void *krrp_task_void)
 {
-	dmu_krrp_task_t *krrp_task =
-	    (dmu_krrp_task_t *) krrp_task_void;
+	dmu_krrp_task_t *krrp_task = krrp_task_void;
 	dmu_replay_record_t drr = { 0 };
 	struct drr_begin *drrb = &drr.drr_u.drr_begin;
 	zio_cksum_t zcksum = { 0 };
@@ -1285,8 +1282,7 @@ dmu_krrp_init_send_recv(void (*func)(void *), kreplication_zfs_args_t *args)
 		return (NULL);
 	}
 
-	krrp_task->stream_handler =
-	    (dmu_krrp_stream_t *)args->stream_handler;
+	krrp_task->stream_handler = args->stream_handler;
 	krrp_task->buffer_args = *args;
 	cv_init(&krrp_task->buffer_state_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&krrp_task->buffer_destroy_cv, NULL, CV_DEFAULT, NULL);
@@ -1296,11 +1292,11 @@ dmu_krrp_init_send_recv(void (*func)(void *), kreplication_zfs_args_t *args)
 	if (args->force_thread) {
 		krrp_task->buffer_user_thread =
 		    thread_create(NULL, 32 << 10, func,
-		    (void*) krrp_task, 0, &p0, TS_RUN, minclsyspri);
+		    krrp_task, 0, &p0, TS_RUN, minclsyspri);
 	} else {
 		krrp_task->buffer_user_task = spa_dispatch_krrp_task(
 		    *args->to_ds ? args->to_ds : args->from_ds,
-		    func, (void*)krrp_task);
+		    func, krrp_task);
 	}
 
 	if (krrp_task->buffer_user_thread == NULL &&
@@ -1319,7 +1315,7 @@ dmu_krrp_init_send_recv(void (*func)(void *), kreplication_zfs_args_t *args)
 void *
 dmu_krrp_init_send_task(void *args)
 {
-	kreplication_zfs_args_t *zfs_args = (kreplication_zfs_args_t *)args;
+	kreplication_zfs_args_t *zfs_args = args;
 	ASSERT(zfs_args != NULL);
 	*zfs_args->to_ds = '\0';
 	return (dmu_krrp_init_send_recv(zfs_send_thread, zfs_args));
@@ -1328,7 +1324,7 @@ dmu_krrp_init_send_task(void *args)
 void *
 dmu_krrp_init_recv_task(void *args)
 {
-	kreplication_zfs_args_t *zfs_args = (kreplication_zfs_args_t *)args;
+	kreplication_zfs_args_t *zfs_args = args;
 	ASSERT(zfs_args != NULL);
 	*zfs_args->from_ds = '\0';
 	return (dmu_krrp_init_send_recv(zfs_recv_thread, zfs_args));
@@ -1337,8 +1333,7 @@ dmu_krrp_init_recv_task(void *args)
 static void
 dmu_set_send_recv_error(void *krrp_task_void, int err)
 {
-	dmu_krrp_task_t *krrp_task =
-	    (dmu_krrp_task_t *) krrp_task_void;
+	dmu_krrp_task_t *krrp_task = krrp_task_void;
 
 	ASSERT(krrp_task != NULL);
 
@@ -1356,8 +1351,7 @@ dmu_set_send_recv_error(void *krrp_task_void, int err)
 int
 dmu_krrp_fini_task(void *krrp_task_void)
 {
-	dmu_krrp_task_t *krrp_task =
-	    (dmu_krrp_task_t *) krrp_task_void;
+	dmu_krrp_task_t *krrp_task = krrp_task_void;
 	int error;
 
 	ASSERT(krrp_task != NULL);
@@ -1387,8 +1381,7 @@ dmu_krrp_fini_task(void *krrp_task_void)
 static int
 dmu_krrp_get_buffer(void *krrp_task_void)
 {
-	dmu_krrp_task_t *krrp_task =
-	    (dmu_krrp_task_t *) krrp_task_void;
+	dmu_krrp_task_t *krrp_task = krrp_task_void;
 
 	ASSERT(krrp_task != NULL);
 
@@ -1414,8 +1407,7 @@ dmu_krrp_get_buffer(void *krrp_task_void)
 static int
 dmu_krrp_put_buffer(void *krrp_task_void)
 {
-	dmu_krrp_task_t *krrp_task =
-	    (dmu_krrp_task_t *) krrp_task_void;
+	dmu_krrp_task_t *krrp_task = krrp_task_void;
 
 	ASSERT(krrp_task != NULL);
 
@@ -1438,8 +1430,7 @@ static int
 dmu_krrp_lend_buffer(void *krrp_task_void,
     kreplication_buffer_t *buffer, boolean_t recv)
 {
-	dmu_krrp_task_t *krrp_task =
-	    (dmu_krrp_task_t *) krrp_task_void;
+	dmu_krrp_task_t *krrp_task = krrp_task_void;
 	boolean_t full;
 
 	ASSERT(krrp_task != NULL);

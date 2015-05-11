@@ -31,7 +31,7 @@ krrp_ioctl_perform(libkrrp_handle_t *hdl, krrp_ioctl_cmd_t cmd,
 	krrp_ioctl_data_t *ioctl_data = NULL;
 	nvlist_t *result_nvl = NULL;
 
-	VERIFY(hdl);
+	VERIFY(hdl != NULL);
 
 	hdl->libkrrp_last_cmd = cmd;
 	rc = krrp_ioctl_data_from_nvl(hdl, &ioctl_data, in_params, 2 * 1024);
@@ -47,8 +47,8 @@ krrp_ioctl_perform(libkrrp_handle_t *hdl, krrp_ioctl_cmd_t cmd,
 		goto fini;
 
 	if (ioctl_data->out_flags & KRRP_IOCTL_FLAG_ERROR) {
-		VERIFY(libkrrp_error_from_nvl(result_nvl,
-		    &hdl->libkrrp_error) == 0);
+		VERIFY0(libkrrp_error_from_nvl(result_nvl,
+		    &hdl->libkrrp_error));
 		rc = -1;
 		fnvlist_free(result_nvl);
 	} else if (ioctl_data->out_flags & KRRP_IOCTL_FLAG_RESULT) {
@@ -67,7 +67,7 @@ krrp_ioctl_call(libkrrp_handle_t *hdl, krrp_ioctl_cmd_t cmd,
 {
 	int rc;
 
-	rc = ioctl(hdl->libkrrp_fd, cmd, (void *) ioctl_data);
+	rc = ioctl(hdl->libkrrp_fd, cmd, ioctl_data);
 
 	if (rc != 0) {
 		switch (errno) {
@@ -144,9 +144,9 @@ krrp_ioctl_data_from_nvl(libkrrp_handle_t *hdl,
 		return (-1);
 
 	if (params != NULL) {
-		char *buf = ioctl_data->buf;
-		VERIFY3U(nvlist_pack(params, (char **) &buf,
-			&packed_size, NV_ENCODE_NATIVE, 0), ==, 0);
+		/*LINTED: E_BAD_PTR_CAST_ALIGN*/
+		VERIFY0(nvlist_pack(params, (char **)&ioctl_data->buf,
+		    &packed_size, NV_ENCODE_NATIVE, 0));
 		ioctl_data->data_size = packed_size;
 	}
 
@@ -169,8 +169,8 @@ krrp_ioctl_data_to_nvl(libkrrp_handle_t *hdl, krrp_ioctl_data_t *ioctl_data,
 	VERIFY(*result_nvl == NULL && result_nvl != NULL);
 	VERIFY(ioctl_data->data_size != 0);
 
-	rc = nvlist_unpack((char *) ioctl_data->buf,
-		ioctl_data->data_size, &nvl, 0);
+	rc = nvlist_unpack(ioctl_data->buf,
+	    ioctl_data->data_size, &nvl, 0);
 
 	if (rc == ENOMEM) {
 		libkrrp_error_set(&hdl->libkrrp_error,

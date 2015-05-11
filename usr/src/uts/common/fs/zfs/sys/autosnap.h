@@ -1,8 +1,8 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
-#ifndef _SYS_AUTOSNAP_H_
-#define	_SYS_AUTOSNAP_H_
+#ifndef _SYS_AUTOSNAP_H
+#define	_SYS_AUTOSNAP_H
 
 #include <sys/dsl_dataset.h>
 #include <sys/spa.h>
@@ -151,4 +151,4 @@ extern void autosnap_fini(spa_t *spa);
 }
 #endif
 
-#endif
+#endif /* _SYS_AUTOSNAP_H */

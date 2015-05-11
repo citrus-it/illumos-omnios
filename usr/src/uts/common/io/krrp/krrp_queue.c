@@ -98,7 +98,7 @@ krrp_queue_get(krrp_queue_t *queue)
 		}
 
 		time_left = cv_reltimedwait(&queue->cv, &queue->mtx,
-			MSEC_TO_TICK(10), TR_CLOCK_TICK);
+		    MSEC_TO_TICK(10), TR_CLOCK_TICK);
 	}
 
 	queue->cnt--;

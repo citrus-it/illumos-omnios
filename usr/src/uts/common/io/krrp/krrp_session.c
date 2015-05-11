@@ -211,7 +211,7 @@ krrp_sess_destroy(krrp_sess_t *sess)
 		krrp_sess_send_shutdown(sess);
 
 		(void) cv_reltimedwait(&sess->cv, &sess->mtx,
-			SEC_TO_TICK(2), TR_CLOCK_TICK);
+		    SEC_TO_TICK(2), TR_CLOCK_TICK);
 	}
 
 	sess->destroying = B_TRUE;
@@ -328,17 +328,17 @@ krrp_sess_run(krrp_sess_t *sess, boolean_t only_once, krrp_error_t *error)
 		    sess->stream_read : sess->stream_write;
 
 		rc = krrp_stream_run(stream, sess->data_write_queue,
-			sess->data_pdu_engine, error);
+		    sess->data_pdu_engine, error);
 		if (rc != 0)
 			goto out;
 
 		if (sess->type == KRRP_SESS_SENDER)
 			krrp_conn_run(sess->conn, sess->ctrl_tx_queue,
-				sess->data_pdu_engine,
-				&krrp_sess_get_data_pdu_to_tx, (void *) sess);
+			    sess->data_pdu_engine,
+			    &krrp_sess_get_data_pdu_to_tx, sess);
 		else
 			krrp_conn_run(sess->conn, sess->ctrl_tx_queue,
-				sess->data_pdu_engine, NULL, NULL);
+			    sess->data_pdu_engine, NULL, NULL);
 
 		krrp_sess_start_ping(sess);
 	}
@@ -450,7 +450,7 @@ static void
 krrp_sess_ping_cb(void *void_sess)
 {
 	krrp_pdu_ctrl_t *pdu = NULL;
-	krrp_sess_t *sess = (krrp_sess_t *) void_sess;
+	krrp_sess_t *sess = void_sess;
 
 	if (sess->ping_wait_for_response) {
 		krrp_error_t error;
@@ -468,7 +468,7 @@ krrp_sess_ping_cb(void *void_sess)
 	}
 
 	pdu->hdr->opcode = KRRP_OPCODE_PING;
-	krrp_queue_put(sess->ctrl_tx_queue, (krrp_pdu_t *) pdu);
+	krrp_queue_put(sess->ctrl_tx_queue, pdu);
 	sess->ping_wait_for_response = B_TRUE;
 
 out:
@@ -525,7 +525,7 @@ krrp_sess_attach_pdu_engine(krrp_sess_t *sess,
 	 */
 	if (sess->type == KRRP_SESS_RECEIVER)
 		krrp_pdu_engine_register_callback(pdu_engine,
-			&krrp_sess_pdu_engine_cb, (void *) sess);
+		    &krrp_sess_pdu_engine_cb, sess);
 
 	rc = 0;
 out:
@@ -553,10 +553,10 @@ krrp_sess_attach_read_stream(krrp_sess_t *sess,
 
 	if (sess->type == KRRP_SESS_COMPOUND)
 		krrp_stream_register_callback(stream,
-			&krrp_sess_ll_stream_cb, (void *) sess);
+		    &krrp_sess_ll_stream_cb, sess);
 	else
 		krrp_stream_register_callback(stream,
-			&krrp_sess_lr_stream_cb, (void *) sess);
+		    &krrp_sess_lr_stream_cb, sess);
 
 	rc = 0;
 
@@ -586,10 +586,10 @@ krrp_sess_attach_write_stream(krrp_sess_t *sess,
 
 	if (sess->type == KRRP_SESS_COMPOUND)
 		krrp_stream_register_callback(stream,
-			&krrp_sess_ll_stream_cb, (void *) sess);
+		    &krrp_sess_ll_stream_cb, sess);
 	else
 		krrp_stream_register_callback(stream,
-			&krrp_sess_lr_stream_cb, (void *) sess);
+		    &krrp_sess_lr_stream_cb, sess);
 
 	rc = 0;
 
@@ -613,7 +613,7 @@ krrp_sess_target_attach_conn(krrp_sess_t *sess, krrp_conn_t *conn,
 
 	if (fake_mode && sess->type == KRRP_SESS_RECEIVER && !sess->fake_mode) {
 		cmn_err(CE_WARN, "It is impossible to use real receiver "
-			"together with fake sender");
+		    "together with fake sender");
 		krrp_error_set(error, KRRP_ERRNO_PROTO, EFAULT);
 		goto err;
 	}
@@ -622,7 +622,7 @@ krrp_sess_target_attach_conn(krrp_sess_t *sess, krrp_conn_t *conn,
 		const char *auth_data = NULL;
 
 		rc = krrp_param_get(KRRP_PARAM_AUTH_DATA,
-		    params, (void *) &auth_data);
+		    params, (void *)&auth_data);
 		if (rc != 0) {
 			krrp_error_set(error, KRRP_ERRNO_AUTH, ENOENT);
 			goto err;
@@ -635,12 +635,12 @@ krrp_sess_target_attach_conn(krrp_sess_t *sess, krrp_conn_t *conn,
 	}
 
 	rc = krrp_conn_send_ctrl_data(conn,
-		KRRP_OPCODE_ATTACH_SESS, NULL, error);
+	    KRRP_OPCODE_ATTACH_SESS, NULL, error);
 	if (rc != 0)
 		goto err;
 
 	krrp_conn_register_callback(sess->conn,
-	    &krrp_sess_conn_cb, (void *) sess);
+	    &krrp_sess_conn_cb, sess);
 
 	return (0);
 
@@ -664,18 +664,19 @@ krrp_sess_initiator_attach_conn(krrp_sess_t *sess, krrp_conn_t *conn,
 
 	params = fnvlist_alloc();
 
-	if (sess->auth_digest[0] != '\0')
+	if (sess->auth_digest[0] != '\0') {
 		(void) krrp_param_put(KRRP_PARAM_AUTH_DATA,
-		    params, (void *) sess->auth_digest);
+		    params, sess->auth_digest);
+	}
 
 	if (sess->type == KRRP_SESS_SENDER && sess->fake_mode)
 		(void) krrp_param_put(KRRP_PARAM_FAKE_MODE, params, NULL);
 
 	(void) krrp_param_put(KRRP_PARAM_SESS_ID,
-		params, (void *) sess->id);
+	    params, sess->id);
 
 	rc = krrp_conn_send_ctrl_data(conn,
-		KRRP_OPCODE_ATTACH_SESS, params, error);
+	    KRRP_OPCODE_ATTACH_SESS, params, error);
 	fnvlist_free(params);
 	if (rc != 0)
 		goto err;
@@ -692,13 +693,13 @@ krrp_sess_initiator_attach_conn(krrp_sess_t *sess, krrp_conn_t *conn,
 		rc = -1;
 	}
 
-	krrp_pdu_rele((krrp_pdu_t *) pdu);
+	krrp_pdu_rele((krrp_pdu_t *)pdu);
 
 	if (rc != 0)
 		goto err;
 
 	krrp_conn_register_callback(sess->conn,
-	    &krrp_sess_conn_cb, (void *) sess);
+	    &krrp_sess_conn_cb, sess);
 
 	return (0);
 
@@ -741,10 +742,10 @@ int
 krrp_sess_compare_id(const void *opaque_sess1, const void *opaque_sess2)
 {
 	size_t i;
-	krrp_sess_t *sess1, *sess2;
+	const krrp_sess_t *sess1, *sess2;
 
-	sess1 = (krrp_sess_t *) opaque_sess1;
-	sess2 = (krrp_sess_t *) opaque_sess2;
+	sess1 = opaque_sess1;
+	sess2 = opaque_sess2;
 
 	for (i = 0; i < UUID_PRINTABLE_STRING_LENGTH - 1; i++) {
 		if (sess1->id[i] > sess2->id[i])
@@ -825,12 +826,12 @@ krrp_sess_kstat_init(krrp_sess_t *sess)
 		return;
 	}
 
-	sess->kstat.ctx->ks_private = (void *) sess;
+	sess->kstat.ctx->ks_private = sess;
 
 	switch (sess->type) {
 	case KRRP_SESS_SENDER:
 		sess->kstat.ctx->ks_data =
-		    (void *) &sess->kstat.data.sender;
+		    &sess->kstat.data.sender;
 		sess->kstat.ctx->ks_data_size =
 		    sizeof (sess->kstat.data.sender);
 		sess->kstat.ctx->ks_ndata =
@@ -841,7 +842,7 @@ krrp_sess_kstat_init(krrp_sess_t *sess)
 		break;
 	case KRRP_SESS_RECEIVER:
 		sess->kstat.ctx->ks_data =
-		    (void *) &sess->kstat.data.receiver;
+		    &sess->kstat.data.receiver;
 		sess->kstat.ctx->ks_data_size =
 		    sizeof (sess->kstat.data.receiver);
 		sess->kstat.ctx->ks_ndata =
@@ -852,7 +853,7 @@ krrp_sess_kstat_init(krrp_sess_t *sess)
 		break;
 	case KRRP_SESS_COMPOUND:
 		sess->kstat.ctx->ks_data =
-		    (void *) &sess->kstat.data.compound;
+		    &sess->kstat.data.compound;
 		sess->kstat.ctx->ks_data_size =
 		    sizeof (sess->kstat.data.compound);
 		sess->kstat.ctx->ks_ndata =
@@ -871,7 +872,7 @@ static int
 krrp_sess_kstat_update(kstat_t *ks, int rw)
 {
 	int rc = EACCES;
-	krrp_sess_t *sess = (krrp_sess_t *) ks->ks_private;
+	krrp_sess_t *sess = ks->ks_private;
 
 	if (rw == KSTAT_WRITE)
 		goto out;
@@ -994,11 +995,11 @@ static void
 krrp_sess_lr_stream_cb(krrp_stream_cb_ev_t ev, uintptr_t ev_arg,
     void *void_sess)
 {
-	krrp_sess_t *sess = (krrp_sess_t *) void_sess;
+	krrp_sess_t *sess = void_sess;
 
 	if (krrp_sess_inc_ref_cnt(sess) != 0) {
 		if (ev == KRRP_STREAM_DATA_PDU)
-			krrp_pdu_rele((krrp_pdu_t *) ev_arg);
+			krrp_pdu_rele((krrp_pdu_t *)ev_arg);
 
 		return;
 	}
@@ -1006,16 +1007,16 @@ krrp_sess_lr_stream_cb(krrp_stream_cb_ev_t ev, uintptr_t ev_arg,
 	switch (ev) {
 	case KRRP_STREAM_DATA_PDU:
 		krrp_sess_lr_data_pdu_from_stream(sess,
-		    (krrp_pdu_data_t *) ev_arg);
+		    (krrp_pdu_data_t *)ev_arg);
 		break;
 	case KRRP_STREAM_TXG_RECV_DONE:
-		krrp_sess_lr_txg_recv_done(sess, (uint64_t) ev_arg);
+		krrp_sess_lr_txg_recv_done(sess, (uint64_t)ev_arg);
 		break;
 	case KRRP_STREAM_SEND_DONE:
 		krrp_sess_lr_send_done(sess);
 		break;
 	case KRRP_STREAM_ERROR:
-		krrp_sess_stream_error(sess, (krrp_error_t *) ev_arg);
+		krrp_sess_stream_error(sess, (krrp_error_t *)ev_arg);
 		break;
 	default:
 		break;
@@ -1028,11 +1029,11 @@ static void
 krrp_sess_ll_stream_cb(krrp_stream_cb_ev_t ev, uintptr_t ev_arg,
     void *void_sess)
 {
-	krrp_sess_t *sess = (krrp_sess_t *) void_sess;
+	krrp_sess_t *sess = void_sess;
 
 	if (krrp_sess_inc_ref_cnt(sess) != 0) {
 		if (ev == KRRP_STREAM_DATA_PDU)
-			krrp_pdu_rele((krrp_pdu_t *) ev_arg);
+			krrp_pdu_rele((krrp_pdu_t *)ev_arg);
 
 		return;
 	}
@@ -1040,16 +1041,16 @@ krrp_sess_ll_stream_cb(krrp_stream_cb_ev_t ev, uintptr_t ev_arg,
 	switch (ev) {
 	case KRRP_STREAM_DATA_PDU:
 		krrp_sess_ll_data_pdu_from_stream(sess,
-		    (krrp_pdu_data_t *) ev_arg);
+		    (krrp_pdu_data_t *)ev_arg);
 		break;
 	case KRRP_STREAM_TXG_RECV_DONE:
-		krrp_sess_ll_txg_recv_done(sess, (uint64_t) ev_arg);
+		krrp_sess_ll_txg_recv_done(sess, (uint64_t)ev_arg);
 		break;
 	case KRRP_STREAM_SEND_DONE:
 		krrp_sess_ll_send_done(sess);
 		break;
 	case KRRP_STREAM_ERROR:
-		krrp_sess_stream_error(sess, (krrp_error_t *) ev_arg);
+		krrp_sess_stream_error(sess, (krrp_error_t *)ev_arg);
 		break;
 	default:
 		break;
@@ -1101,7 +1102,7 @@ krrp_sess_txg_recv_done(krrp_sess_t *sess, uint64_t txg, boolean_t complete)
 
 	*((uint64_t *)(pdu->hdr->data)) = htonll(txg);
 
-	krrp_queue_put(sess->ctrl_tx_queue, (krrp_pdu_t *) pdu);
+	krrp_queue_put(sess->ctrl_tx_queue, pdu);
 }
 
 static void
@@ -1113,7 +1114,7 @@ krrp_sess_post_send_done_uevent(krrp_sess_t *sess)
 	sess->running = B_FALSE;
 	mutex_exit(&sess->mtx);
 
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, attrs, (void *) sess->id);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, attrs, sess->id);
 	krrp_svc_post_uevent(ESC_KRRP_SESS_SEND_DONE, attrs);
 	fnvlist_free(attrs);
 }
@@ -1125,7 +1126,7 @@ krrp_sess_post_error_uevent(krrp_sess_t *sess, krrp_error_t *error)
 
 	krrp_error_to_nvl(error, &attrs);
 
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, attrs, (void *) sess->id);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, attrs, sess->id);
 	krrp_svc_post_uevent(ESC_KRRP_SESS_ERROR, attrs);
 
 	fnvlist_free(attrs);
@@ -1135,7 +1136,7 @@ static void
 krrp_sess_pdu_engine_cb(void *void_sess, size_t released_pdus)
 {
 	krrp_pdu_ctrl_t *pdu = NULL;
-	krrp_sess_t *sess = (krrp_sess_t *) void_sess;
+	krrp_sess_t *sess = void_sess;
 	uint64_t max_pdu_seq_num;
 
 	ASSERT(sess->type == KRRP_SESS_RECEIVER);
@@ -1157,7 +1158,7 @@ krrp_sess_pdu_engine_cb(void *void_sess, size_t released_pdus)
 	    released_pdus);
 	*((uint64_t *)(pdu->hdr->data)) = htonll(max_pdu_seq_num);
 
-	krrp_queue_put(sess->ctrl_tx_queue, (krrp_pdu_t *) pdu);
+	krrp_queue_put(sess->ctrl_tx_queue, pdu);
 
 out:
 	krrp_sess_dec_ref_cnt(sess);
@@ -1167,12 +1168,12 @@ static void
 krrp_sess_conn_cb(void *void_conn, krrp_conn_cb_ev_t ev, uintptr_t ev_arg,
     void *void_sess)
 {
-	krrp_sess_t *sess = (krrp_sess_t *) void_sess;
-	krrp_conn_t *conn = (krrp_conn_t *) void_conn;
+	krrp_sess_t *sess = void_sess;
+	krrp_conn_t *conn = void_conn;
 
 	if (krrp_sess_inc_ref_cnt(sess) != 0) {
 		if (ev == KRRP_CONN_DATA_PDU || ev == KRRP_CONN_CTRL_PDU)
-			krrp_pdu_rele((krrp_pdu_t *) ev_arg);
+			krrp_pdu_rele((krrp_pdu_t *)ev_arg);
 
 		return;
 	}
@@ -1189,15 +1190,15 @@ krrp_sess_conn_cb(void *void_conn, krrp_conn_cb_ev_t ev, uintptr_t ev_arg,
 		}
 
 		krrp_sess_data_pdu_from_network(sess,
-		    (krrp_pdu_data_t *) ev_arg);
+		    (krrp_pdu_data_t *)ev_arg);
 		break;
 	case KRRP_CONN_CTRL_PDU:
 		krrp_sess_ctrl_pdu_from_network(sess,
-		    (krrp_pdu_ctrl_t *) ev_arg);
+		    (krrp_pdu_ctrl_t *)ev_arg);
 		break;
 	case KRRP_CONN_ERROR:
 		krrp_sess_conn_error(sess, conn,
-		    (krrp_error_t *) ev_arg);
+		    (krrp_error_t *)ev_arg);
 		break;
 	default:
 		cmn_err(CE_PANIC, "Unknown conn cb-event");
@@ -1220,8 +1221,8 @@ krrp_sess_conn_error(krrp_sess_t *sess, krrp_conn_t *conn,
 
 	if (error_case) {
 		cmn_err(CE_WARN, "An connection error has occured: %s (%d)",
-			krrp_error_errno_to_str(error->krrp_errno),
-			error->unix_errno);
+		    krrp_error_errno_to_str(error->krrp_errno),
+		    error->unix_errno);
 
 		krrp_sess_error(sess, error);
 	}
@@ -1282,7 +1283,7 @@ krrp_sess_ctrl_pdu_from_network(krrp_sess_t *sess, krrp_pdu_ctrl_t *pdu)
 		break;
 	}
 
-	krrp_pdu_rele((krrp_pdu_t *) pdu);
+	krrp_pdu_rele((krrp_pdu_t *)pdu);
 }
 
 static void
@@ -1298,7 +1299,7 @@ krrp_sess_ping_request(krrp_sess_t *sess)
 
 	pdu->hdr->opcode = KRRP_OPCODE_PONG;
 
-	krrp_queue_put(sess->ctrl_tx_queue, (krrp_pdu_t *) pdu);
+	krrp_queue_put(sess->ctrl_tx_queue, pdu);
 }
 
 static uint64_t
@@ -1380,8 +1381,8 @@ krrp_sess_fl_ctrl_validate(krrp_sess_t *sess, krrp_hdr_data_t *hdr)
 	if (!fl_ctrl->disabled) {
 		if (hdr->pdu_seq_num > fl_ctrl->max_pdu_seq_num) {
 			cmn_err(CE_WARN, "Detected violation of "
-				"flow control rules: [%" PRIu64 "] > "
-				"[%" PRIu64 "]", hdr->pdu_seq_num,
+			    "flow control rules: [%" PRIu64 "] > "
+			    "[%" PRIu64 "]", hdr->pdu_seq_num,
 			    fl_ctrl->max_pdu_seq_num);
 			goto out;
 		}
@@ -1409,14 +1410,14 @@ krrp_sess_data_pdu_from_network(krrp_sess_t *sess, krrp_pdu_data_t *pdu)
 		pdu->initial = B_TRUE;
 
 		DTRACE_PROBE1(krrp_network_recv_txg_start,
-			uint64_t, pdu->txg);
+		    uint64_t, pdu->txg);
 	}
 
 	if (hdr->flags & KRRP_HDR_FLAG_FINI_PDU) {
 		pdu->final = B_TRUE;
 
 		DTRACE_PROBE1(krrp_network_recv_txg_stop,
-			uint64_t, pdu->txg);
+		    uint64_t, pdu->txg);
 
 		krrp_sess_txg_recv_done(sess, pdu->txg, B_FALSE);
 	}
@@ -1428,11 +1429,11 @@ krrp_sess_data_pdu_from_network(krrp_sess_t *sess, krrp_pdu_data_t *pdu)
 		if (hdr->flags & KRRP_HDR_FLAG_FINI_PDU)
 			krrp_sess_txg_recv_done(sess, pdu->txg, B_TRUE);
 
-		krrp_pdu_rele((krrp_pdu_t *) pdu);
+		krrp_pdu_rele((krrp_pdu_t *)pdu);
 		return;
 	}
 
-	krrp_queue_put(sess->data_write_queue, (krrp_pdu_t *) pdu);
+	krrp_queue_put(sess->data_write_queue, pdu);
 }
 
 /*
@@ -1450,7 +1451,7 @@ krrp_sess_get_data_pdu_to_tx(void *void_sess, krrp_pdu_t **result_pdu)
 	boolean_t win_open;
 	boolean_t queue_is_empty;
 
-	sess = (krrp_sess_t *) void_sess;
+	sess = (krrp_sess_t *)void_sess;
 	fl_ctrl = &sess->fl_ctrl;
 
 	mutex_enter(&fl_ctrl->mtx);
@@ -1462,12 +1463,12 @@ repeat:
 
 		win_open = B_TRUE;
 		mutex_exit(&fl_ctrl->mtx);
-		pdu = (krrp_pdu_t *) krrp_queue_get(sess->data_tx_queue);
+		pdu = krrp_queue_get(sess->data_tx_queue);
 		mutex_enter(&fl_ctrl->mtx);
 		if (pdu != NULL) {
 			krrp_hdr_data_t *hdr;
 
-			hdr = (krrp_hdr_data_t *) krrp_pdu_hdr(pdu);
+			hdr = (krrp_hdr_data_t *)krrp_pdu_hdr(pdu);
 			fl_ctrl->cur_pdu_seq_num++;
 			hdr->pdu_seq_num = fl_ctrl->cur_pdu_seq_num;
 			*result_pdu = pdu;
@@ -1484,7 +1485,7 @@ repeat:
 			queue_is_empty = B_FALSE;
 
 		time_left = cv_reltimedwait(&fl_ctrl->cv, &fl_ctrl->mtx,
-			MSEC_TO_TICK(100), TR_CLOCK_TICK);
+		    MSEC_TO_TICK(100), TR_CLOCK_TICK);
 	}
 
 	if (time_left > 0)
@@ -1493,7 +1494,7 @@ repeat:
 	mutex_exit(&fl_ctrl->mtx);
 
 	DTRACE_PROBE2(krrp_data_path_state, boolean_t, win_open,
-		boolean_t, queue_is_empty);
+	    boolean_t, queue_is_empty);
 }
 
 static void
@@ -1593,7 +1594,7 @@ krrp_sess_lr_data_pdu_from_stream(krrp_sess_t *sess, krrp_pdu_data_t *pdu)
 	if (pdu->final)
 		hdr->flags |= KRRP_HDR_FLAG_FINI_PDU;
 
-	krrp_queue_put(sess->data_tx_queue, (krrp_pdu_t *) pdu);
+	krrp_queue_put(sess->data_tx_queue, pdu);
 }
 
 static void
@@ -1602,7 +1603,7 @@ krrp_sess_ll_data_pdu_from_stream(krrp_sess_t *sess, krrp_pdu_data_t *pdu)
 	if (pdu->final)
 		krrp_stream_txg_confirmed(sess->stream_read, pdu->txg, B_FALSE);
 
-	krrp_queue_put(sess->data_write_queue, (krrp_pdu_t *) pdu);
+	krrp_queue_put(sess->data_write_queue, pdu);
 }
 
 static void
@@ -1633,7 +1634,7 @@ krrp_sess_lr_send_done(krrp_sess_t *sess)
 
 	pdu->hdr->opcode = KRRP_OPCODE_SEND_DONE;
 
-	krrp_queue_put(sess->ctrl_tx_queue, (krrp_pdu_t *) pdu);
+	krrp_queue_put(sess->ctrl_tx_queue, pdu);
 
 out:
 	/* Notify the userspace that send has been done */
@@ -1661,5 +1662,5 @@ krrp_sess_send_shutdown(krrp_sess_t *sess)
 
 	pdu->hdr->opcode = KRRP_OPCODE_SHUTDOWN;
 
-	krrp_queue_put(sess->ctrl_tx_queue, (krrp_pdu_t *) pdu);
+	krrp_queue_put(sess->ctrl_tx_queue, pdu);
 }

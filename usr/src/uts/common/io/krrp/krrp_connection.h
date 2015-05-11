@@ -39,7 +39,7 @@ typedef enum {
 typedef void (krrp_conn_cb_t)(void *void_conn,
     krrp_conn_cb_ev_t ev, uintptr_t ev_arg, void *cb_arg);
 
-typedef void (krrp_get_data_pdu_cb_t) (void *cb_arg, krrp_pdu_t **result_pdu);
+typedef void (krrp_get_data_pdu_cb_t)(void *cb_arg, krrp_pdu_t **result_pdu);
 
 typedef enum {
 	KRRP_CS_CONNECTED,
@@ -61,10 +61,10 @@ typedef struct krrp_throttle_s {
 struct krrp_conn_s {
 	krrp_conn_state_t		state;
 
-	kt_did_t				tx_t_did;
+	kthread_t				*tx_thread;
 	boolean_t				tx_running;
 
-	kt_did_t				rx_t_did;
+	kthread_t				*rx_thread;
 	boolean_t				rx_running;
 
 	krrp_queue_t			*ctrl_tx_queue;

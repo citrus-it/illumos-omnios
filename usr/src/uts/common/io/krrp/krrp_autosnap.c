@@ -171,7 +171,7 @@ krrp_autosnap_activate(krrp_autosnap_t *autosnap, boolean_t snap_creator,
 			DTRACE_PROBE1(rele_old_snap, uint64_t, snap_txg);
 
 			autosnap_release_snapshots_by_txg(autosnap->zfs_ctx,
-				snap_txg, AUTOSNAP_NO_SNAP);
+			    snap_txg, AUTOSNAP_NO_SNAP);
 		}
 
 		if (incr_snap_txg == UINT64_MAX || snap_txg > incr_snap_txg) {
@@ -189,7 +189,7 @@ krrp_autosnap_activate(krrp_autosnap_t *autosnap, boolean_t snap_creator,
 
 					autosnap_release_snapshots_by_txg(
 					    autosnap->zfs_ctx,
-						target_snap_txg,
+					    target_snap_txg,
 					    AUTOSNAP_NO_SNAP);
 				}
 
@@ -209,7 +209,7 @@ krrp_autosnap_activate(krrp_autosnap_t *autosnap, boolean_t snap_creator,
 		 * is not required without incr_snap_txg
 		 */
 		autosnap_release_snapshots_by_txg(autosnap->zfs_ctx,
-			target_snap_txg, AUTOSNAP_NO_SNAP);
+		    target_snap_txg, AUTOSNAP_NO_SNAP);
 		goto out;
 	}
 
@@ -250,7 +250,7 @@ krrp_get_txg_from_snap_nvp(nvpair_t *snap)
 	uint_t nelem = 0;
 
 	VERIFY3U(nvpair_value_uint64_array(snap,
-		&snap_info, &nelem), ==, 0);
+	    &snap_info, &nelem), ==, 0);
 	VERIFY(nelem != 0);
 
 	return (snap_info[0]);
@@ -325,7 +325,7 @@ krrp_autosnap_txg_rele(krrp_autosnap_t *autosnap,
 	txg_item = kmem_zalloc(sizeof (krrp_txg_t), KM_SLEEP);
 	txg_item->txg_start = txg_start;
 	txg_item->txg_end = txg_end;
-	krrp_queue_put(autosnap->txg_to_rele, (void *) txg_item);
+	krrp_queue_put(autosnap->txg_to_rele, txg_item);
 
 	if (!krrp_autosnap_try_hold_to_snap_rele(autosnap))
 		return;
@@ -334,7 +334,7 @@ krrp_autosnap_txg_rele(krrp_autosnap_t *autosnap,
 		txg_item = krrp_queue_get(autosnap->txg_to_rele);
 
 		autosnap_release_snapshots_by_txg(autosnap->zfs_ctx,
-			txg_item->txg_start, txg_item->txg_end);
+		    txg_item->txg_start, txg_item->txg_end);
 
 		kmem_free(txg_item, sizeof (krrp_txg_t));
 	}

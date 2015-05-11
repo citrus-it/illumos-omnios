@@ -48,7 +48,7 @@ typedef struct krrp_svc_s {
 	evchan_t			*ev_chan;
 } krrp_svc_t;
 
-krrp_svc_t * krrp_svc_get_instance(void);
+krrp_svc_t *krrp_svc_get_instance(void);
 
 boolean_t krrp_svc_is_enabled(void);
 
@@ -69,7 +69,7 @@ int krrp_svc_unregister_session(krrp_sess_t *sess, krrp_error_t *error);
 
 void krrp_svc_post_uevent(const char *, nvlist_t *attr_list);
 
-krrp_sess_t * krrp_svc_lookup_session(const char *sess_id);
+krrp_sess_t *krrp_svc_lookup_session(const char *sess_id);
 void krrp_svc_list_sessions(nvlist_t *out_nvl);
 
 int krrp_svc_ref_cnt_try_hold();

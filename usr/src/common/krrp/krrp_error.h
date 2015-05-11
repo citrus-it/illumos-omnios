@@ -110,7 +110,7 @@ void krrp_error_to_nvl(krrp_error_t *, nvlist_t **);
 
 #endif /* _KERNEL */
 
-const char * krrp_error_errno_to_str(krrp_errno_t krrp_errno);
+const char *krrp_error_errno_to_str(krrp_errno_t krrp_errno);
 
 #ifdef __cplusplus
 }

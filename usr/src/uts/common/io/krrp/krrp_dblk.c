@@ -112,13 +112,13 @@ krrp_dblk_engine_configure(krrp_dblk_engine_t *engine, boolean_t prealloc,
 		char kmem_cache_name[KSTAT_STRLEN];
 
 		(void) snprintf(kmem_cache_name, KSTAT_STRLEN,
-		    "krrp_dec_%p", (void *) engine);
+		    "krrp_dec_%p", (void *)engine);
 
 		engine->type = KRRP_DET_KMEM_CACHE;
 		engine->alloc_func = &krrp_dblk_alloc_by_kmem_cache_alloc;
 		engine->dblk_cache = kmem_cache_create(kmem_cache_name,
 		    total_dblk_sz, 8, &krrp_dblk_constructor, NULL, NULL,
-		    (void *) engine, NULL, KM_SLEEP);
+		    engine, NULL, KM_SLEEP);
 	}
 
 	return (rc);
@@ -265,8 +265,7 @@ krrp_dblk_alloc_by_kmem_cache_alloc(krrp_dblk_engine_t *engine,
 
 	while (cnt < number) {
 		engine->cur_dblk_cnt++;
-		dblk_next = (krrp_dblk_t *) kmem_cache_alloc(
-		    engine->dblk_cache, KM_SLEEP);
+		dblk_next = kmem_cache_alloc(engine->dblk_cache, KM_SLEEP);
 
 		mutex_exit(&engine->mtx);
 
@@ -290,8 +289,7 @@ krrp_dblk_alloc_by_kmem_cache_alloc(krrp_dblk_engine_t *engine,
 static int
 krrp_dblk_constructor(void *void_dblk, void *void_dblk_engine, int km_flags)
 {
-	krrp_dblk_constructor_int((krrp_dblk_t *) void_dblk,
-	    (krrp_dblk_engine_t *) void_dblk_engine);
+	krrp_dblk_constructor_int(void_dblk, void_dblk_engine);
 
 	return (0);
 }
@@ -302,12 +300,12 @@ krrp_dblk_constructor_int(krrp_dblk_t *dblk, krrp_dblk_engine_t *dblk_engine)
 	dblk->engine = dblk_engine;
 
 	dblk->free_rtns.free_func = &krrp_dblk_free_cb;
-	dblk->free_rtns.free_arg = (caddr_t) dblk;
+	dblk->free_rtns.free_arg = (caddr_t)dblk;
 
 	dblk->max_data_sz = dblk_engine->dblk_data_sz;
 	dblk->cur_data_sz = 0;
-	dblk->head = (((caddr_t) dblk) + sizeof (krrp_dblk_t));
-	dblk->data = ((caddr_t) dblk->head + dblk_engine->dblk_head_sz);
+	dblk->head = (((caddr_t)dblk) + sizeof (krrp_dblk_t));
+	dblk->data = ((caddr_t)dblk->head + dblk_engine->dblk_head_sz);
 
 	dblk->total_sz = dblk_engine->dblk_head_sz + dblk_engine->dblk_data_sz;
 	dblk->next = NULL;
@@ -316,7 +314,7 @@ krrp_dblk_constructor_int(krrp_dblk_t *dblk, krrp_dblk_engine_t *dblk_engine)
 static void
 krrp_dblk_free_cb(caddr_t void_dblk)
 {
-	krrp_dblk_t *dblk = (krrp_dblk_t *) void_dblk;
+	krrp_dblk_t *dblk = (krrp_dblk_t *)void_dblk;
 	krrp_dblk_engine_t *dblk_engine = dblk->engine;
 	krrp_dblk_list_t *free_dblks;
 

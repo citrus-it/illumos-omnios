@@ -24,12 +24,12 @@ krrp_set_srv_config(libkrrp_handle_t *hdl, const char *address,
 
 	if ((address != NULL) && (strlen(address))) {
 		(void) krrp_param_put(KRRP_PARAM_LISTENING_ADDRESS, params,
-		    (void *) address);
+		    (void *)address);
 	}
 
-	(void) krrp_param_put(KRRP_PARAM_CFG_TYPE, params, (void *) &cfg_type);
+	(void) krrp_param_put(KRRP_PARAM_CFG_TYPE, params, (void *)&cfg_type);
 	(void) krrp_param_put(KRRP_PARAM_PORT, params,
-	    (void *) &port);
+	    (void *)&port);
 
 	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SVC_SET_CONFIG, params, NULL);
 
@@ -50,7 +50,7 @@ krrp_get_srv_config(libkrrp_handle_t *hdl, libkrrp_srv_config_t *cfg)
 
 	params = fnvlist_alloc();
 
-	(void) krrp_param_put(KRRP_PARAM_CFG_TYPE, params, (void *) &cfg_type);
+	(void) krrp_param_put(KRRP_PARAM_CFG_TYPE, params, (void *)&cfg_type);
 
 	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SVC_GET_CONFIG, params,
 	    &result);
@@ -61,10 +61,10 @@ krrp_get_srv_config(libkrrp_handle_t *hdl, libkrrp_srv_config_t *cfg)
 	}
 
 	VERIFY3U(krrp_param_get(KRRP_PARAM_PORT, result,
-	    (void *) &cfg->port), ==, 0);
+	    (void *)&cfg->port), ==, 0);
 
 	rc = krrp_param_get(KRRP_PARAM_LISTENING_ADDRESS, result,
-	    (void *) &address);
+	    (void *)&address);
 
 	VERIFY(rc == 0 || rc == ENOENT);
 
@@ -114,17 +114,17 @@ krrp_svc_state(libkrrp_handle_t *hdl, libkrrp_svc_state_t *state)
 		return (-1);
 
 	VERIFY3U(krrp_param_get(KRRP_PARAM_SVC_ENABLED, result_nvl,
-	    (void *) &state->enabled), ==, 0);
+	    (void *)&state->enabled), ==, 0);
 
 	VERIFY3U(krrp_param_get(KRRP_PARAM_SRV_RUNNING, result_nvl,
-	    (void *) &state->running), ==, 0);
+	    (void *)&state->running), ==, 0);
 
 	fnvlist_free(result_nvl);
 	return (rc);
 }
 
 int
-krrp_sess_get_list(libkrrp_handle_t * hdl, libkrrp_sess_list_t **res_sess_list)
+krrp_sess_get_list(libkrrp_handle_t *hdl, libkrrp_sess_list_t **res_sess_list)
 {
 	int rc;
 	nvlist_t *result = NULL;
@@ -149,12 +149,12 @@ krrp_sess_get_list(libkrrp_handle_t * hdl, libkrrp_sess_list_t **res_sess_list)
 	}
 
 	VERIFY3U(krrp_param_get(KRRP_PARAM_SESSIONS, result,
-	    (void *) &sessions), ==, 0);
+	    (void *)&sessions), ==, 0);
 
 	for (i = 0; i < sessions.nelem; i++) {
 		session = sessions.array[i];
 		VERIFY3U(krrp_param_get(KRRP_PARAM_SESS_ID, session,
-		    (void *) &sess_id_str), ==, 0);
+		    (void *)&sess_id_str), ==, 0);
 
 		entry = umem_zalloc(sizeof (libkrrp_sess_list_t), UMEM_DEFAULT);
 
@@ -173,10 +173,10 @@ krrp_sess_get_list(libkrrp_handle_t * hdl, libkrrp_sess_list_t **res_sess_list)
 		}
 
 		VERIFY3U(krrp_param_get(KRRP_PARAM_SESS_KSTAT_ID, session,
-		    (void *) &sess_kstat_id), ==, 0);
+		    (void *)&sess_kstat_id), ==, 0);
 
 		entry->sess_kstat_id = umem_alloc(KRRP_KSTAT_ID_STRING_LENGTH,
-			UMEM_DEFAULT);
+		    UMEM_DEFAULT);
 
 		if (entry->sess_kstat_id == NULL) {
 			libkrrp_error_set(&hdl->libkrrp_error,
@@ -189,10 +189,10 @@ krrp_sess_get_list(libkrrp_handle_t * hdl, libkrrp_sess_list_t **res_sess_list)
 		    KRRP_KSTAT_ID_STRING_LENGTH);
 
 		VERIFY3U(krrp_param_get(KRRP_PARAM_SESS_STARTED, session,
-		    (void *) &entry->sess_started), ==, 0);
+		    (void *)&entry->sess_started), ==, 0);
 
 		VERIFY3U(krrp_param_get(KRRP_PARAM_SESS_RUNNING, session,
-		    (void *) &entry->sess_running), ==, 0);
+		    (void *)&entry->sess_running), ==, 0);
 
 		if (prev == NULL)
 			sess_list = entry;

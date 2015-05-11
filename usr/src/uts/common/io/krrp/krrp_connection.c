@@ -13,11 +13,11 @@
 /* #define KRRP_CONN_DEBUG 1 */
 
 /* Interval in us */
-#define	KRRP_THROTTLE_INTERVAL_US 10 * MILLISEC
+#define	KRRP_THROTTLE_INTERVAL_US (10 * MILLISEC)
 
 #define	krrp_conn_callback(conn, ev, ev_arg) \
-	(conn)->callback((void *) conn, ev, \
-	(uintptr_t) ev_arg, (conn)->callback_arg)
+	(conn)->callback(conn, ev, \
+	(uintptr_t)ev_arg, (conn)->callback_arg)
 
 typedef struct {
 	kmutex_t	mtx;
@@ -131,11 +131,11 @@ krrp_conn_destroy(krrp_conn_t *conn)
 	if (conn->ks != NULL)
 		(void) ksocket_close(conn->ks, CRED());
 
-	if (conn->tx_t_did != 0)
-		thread_join(conn->tx_t_did);
+	if (conn->tx_thread != NULL)
+		thread_join(conn->tx_thread->t_did);
 
-	if (conn->rx_t_did)
-		thread_join(conn->rx_t_did);
+	if (conn->rx_thread != NULL)
+		thread_join(conn->rx_thread->t_did);
 
 	mutex_enter(&conn->mtx);
 	conn->state = KRRP_CS_DISCONNECTED;
@@ -191,12 +191,12 @@ krrp_conn_run(krrp_conn_t *conn, krrp_queue_t *ctrl_tx_queue,
 	krrp_conn_throttle_enable(&conn->throttle);
 
 	/* thread_create never fails */
-	(void) thread_create(NULL, 0, &krrp_conn_tx_handler,
-		(void *) conn, 0, &p0, TS_RUN, minclsyspri);
+	conn->tx_thread = thread_create(NULL, 0, &krrp_conn_tx_handler,
+	    conn, 0, &p0, TS_RUN, minclsyspri);
 
 	/* thread_create never fails */
-	(void) thread_create(NULL, 0, &krrp_conn_rx_handler,
-	    (void *) conn, 0, &p0, TS_RUN, minclsyspri);
+	conn->rx_thread = thread_create(NULL, 0, &krrp_conn_rx_handler,
+	    conn, 0, &p0, TS_RUN, minclsyspri);
 
 	mutex_exit(&conn->mtx);
 }
@@ -221,7 +221,7 @@ krrp_conn_send_ctrl_data(krrp_conn_t *conn, krrp_opcode_t opcode,
 
 	krrp_pdu_ctrl_alloc(&pdu, KRRP_PDU_WITH_HDR);
 	if (pdu != NULL) {
-		pdu->hdr->opcode = (uint16_t) opcode;
+		pdu->hdr->opcode = (uint16_t)opcode;
 
 		if (nvl != NULL) {
 			size_t packed_size = 0;
@@ -231,7 +231,7 @@ krrp_conn_send_ctrl_data(krrp_conn_t *conn, krrp_opcode_t opcode,
 			 * hardcoded encode-type == NV_ENCODE_NATIVE
 			 */
 			VERIFY3U(nvlist_size(nvl, &packed_size,
-				NV_ENCODE_XDR), ==, 0);
+			    NV_ENCODE_XDR), ==, 0);
 
 			VERIFY3U(packed_size, <, pdu->dblk->max_data_sz);
 
@@ -240,15 +240,15 @@ krrp_conn_send_ctrl_data(krrp_conn_t *conn, krrp_opcode_t opcode,
 			 * because cannot work with preallocated buffers,
 			 * so just reimplement it here
 			 */
-			VERIFY3U(nvlist_pack(nvl, (char **) &pdu->dblk->data,
+			VERIFY3U(nvlist_pack(nvl, (char **)&pdu->dblk->data,
 			    &packed_size, NV_ENCODE_XDR, KM_SLEEP), ==, 0);
 
 			pdu->dblk->cur_data_sz = packed_size;
-			pdu->hdr->payload_sz = (uint32_t) packed_size;
+			pdu->hdr->payload_sz = (uint32_t)packed_size;
 		}
 
 		rc = krrp_conn_tx_ctrl_pdu(conn, pdu, error);
-		krrp_pdu_rele((krrp_pdu_t *) pdu);
+		krrp_pdu_rele((krrp_pdu_t *)pdu);
 	} else
 		krrp_error_set(error, KRRP_ERRNO_NOMEM, 0);
 
@@ -270,10 +270,10 @@ krrp_conn_rx_ctrl_pdu(krrp_conn_t *conn, krrp_pdu_ctrl_t **result_pdu,
 		return (-1);
 	}
 
-	if (krrp_conn_rx_header(conn, (krrp_hdr_t **) &pdu->hdr, error) != 0)
+	if (krrp_conn_rx_header(conn, (krrp_hdr_t **)&pdu->hdr, error) != 0)
 		goto err;
 
-	if (krrp_conn_rx_pdu(conn, (krrp_pdu_t *) pdu, error) != 0)
+	if (krrp_conn_rx_pdu(conn, (krrp_pdu_t *)pdu, error) != 0)
 		goto err;
 
 	*result_pdu = pdu;
@@ -281,7 +281,7 @@ krrp_conn_rx_ctrl_pdu(krrp_conn_t *conn, krrp_pdu_ctrl_t **result_pdu,
 	return (0);
 
 err:
-	krrp_pdu_rele((krrp_pdu_t *) pdu);
+	krrp_pdu_rele((krrp_pdu_t *)pdu);
 	return (-1);
 }
 
@@ -294,7 +294,7 @@ krrp_conn_tx_ctrl_pdu(krrp_conn_t *conn, krrp_pdu_ctrl_t *pdu,
 	VERIFY(conn != NULL);
 	VERIFY(pdu != NULL);
 
-	rc = krrp_conn_tx(conn->ks, (void *) pdu->hdr,
+	rc = krrp_conn_tx(conn->ks, pdu->hdr,
 	    sizeof (krrp_hdr_t), error);
 	if (rc != 0)
 		return (rc);
@@ -341,10 +341,10 @@ krrp_conn_throttle_enable(krrp_throttle_t *throttle)
 {
 	mutex_enter(&throttle->mtx);
 
-	if (throttle->limit != 0)
+	if (throttle->limit != 0) {
 		throttle->timer = timeout(&krrp_conn_throttle_cb,
-			(void *) throttle,
-		    drv_usectohz(KRRP_THROTTLE_INTERVAL_US));
+		    throttle, drv_usectohz(KRRP_THROTTLE_INTERVAL_US));
+	}
 
 	mutex_exit(&throttle->mtx);
 }
@@ -368,7 +368,7 @@ krrp_conn_throttle_disable(krrp_throttle_t *throttle)
 static void
 krrp_conn_throttle_cb(void *void_throttle)
 {
-	krrp_throttle_t *throttle = (krrp_throttle_t *) void_throttle;
+	krrp_throttle_t *throttle = void_throttle;
 
 	mutex_enter(&throttle->mtx);
 	if (throttle->limit == 0)
@@ -376,10 +376,10 @@ krrp_conn_throttle_cb(void *void_throttle)
 	else
 		throttle->remains = throttle->limit;
 
-	if (throttle->timer != NULL)
+	if (throttle->timer != NULL) {
 		throttle->timer = timeout(&krrp_conn_throttle_cb,
-			(void *) throttle,
-		    drv_usectohz(KRRP_THROTTLE_INTERVAL_US));
+		    throttle, drv_usectohz(KRRP_THROTTLE_INTERVAL_US));
+	}
 
 	cv_signal(&throttle->cv);
 	mutex_exit(&throttle->mtx);
@@ -446,7 +446,7 @@ krrp_conn_connect(krrp_conn_t *conn, const char *host,
 	(void) memset(&servaddr, 0, sizeof (servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(port);
-	if (inet_pton(AF_INET, (char *) host, &servaddr.sin_addr) != 1) {
+	if (inet_pton(AF_INET, (char *)host, &servaddr.sin_addr) != 1) {
 		krrp_error_set(error, KRRP_ERRNO_ADDR, EINVAL);
 		return (-1);
 	}
@@ -459,7 +459,7 @@ krrp_conn_connect(krrp_conn_t *conn, const char *host,
 	}
 
 	rc = krrp_conn_connect_with_timeout(conn->ks,
-	    (struct sockaddr *) &servaddr,
+	    (struct sockaddr *)&servaddr,
 	    timeout, error);
 	if (rc != 0) {
 		(void) ksocket_close(conn->ks, CRED());
@@ -478,7 +478,7 @@ krrp_conn_connect_with_timeout(ksocket_t ks, struct sockaddr *servaddr,
 	krrp_conn_connect_timeout_t ct;
 
 	nonblocking = 1;
-	rc = ksocket_ioctl(ks, FIONBIO, (intptr_t) &nonblocking,
+	rc = ksocket_ioctl(ks, FIONBIO, (intptr_t)&nonblocking,
 	    &rval, CRED());
 	if (rc != 0) {
 		krrp_error_set(error, KRRP_ERRNO_SETSOCKOPTFAIL, rc);
@@ -516,7 +516,7 @@ krrp_conn_connect_with_timeout(ksocket_t ks, struct sockaddr *servaddr,
 	mutex_enter(&ct.mtx);
 	if (!ct.cb_done)
 		(void) cv_reltimedwait_sig(&ct.cv, &ct.mtx,
-			SEC_TO_TICK(timeout), TR_CLOCK_TICK);
+		    SEC_TO_TICK(timeout), TR_CLOCK_TICK);
 
 	rc = ct.cb_done ? ct.rc : ETIMEDOUT;
 
@@ -556,7 +556,7 @@ krrp_conn_connect_cb(ksocket_t ks,
 	if (ev == KSOCKET_EV_CONNECTED)
 		ct->rc = 0;
 	else
-		ct->rc = info == 0 ? ECONNRESET : (int) info;
+		ct->rc = info == 0 ? ECONNRESET : (int)info;
 
 	cv_signal(&ct->cv);
 	mutex_exit(&ct->mtx);
@@ -601,7 +601,7 @@ krrp_conn_post_configure(krrp_conn_t *conn, krrp_error_t *error)
 		tl.tv_usec = 0;
 
 		rc = ksocket_setsockopt(conn->ks, SOL_SOCKET, SO_RCVTIMEO,
-			&tl, sizeof (struct timeval), CRED());
+		    &tl, sizeof (struct timeval), CRED());
 	} else {
 		struct timeval32 tl;
 
@@ -609,7 +609,7 @@ krrp_conn_post_configure(krrp_conn_t *conn, krrp_error_t *error)
 		tl.tv_usec = 0;
 
 		rc = ksocket_setsockopt(conn->ks, SOL_SOCKET, SO_RCVTIMEO,
-			&tl, sizeof (struct timeval32), CRED());
+		    &tl, sizeof (struct timeval32), CRED());
 	}
 
 	if (rc != 0)
@@ -618,8 +618,8 @@ krrp_conn_post_configure(krrp_conn_t *conn, krrp_error_t *error)
 
 	so = (struct sonode *)(conn->ks);
 
-	conn->mblk_wroff = (size_t) so->so_proto_props.sopp_wroff;
-	conn->mblk_tail_len = (size_t) so->so_proto_props.sopp_tail;
+	conn->mblk_wroff = (size_t)so->so_proto_props.sopp_wroff;
+	conn->mblk_tail_len = (size_t)so->so_proto_props.sopp_tail;
 
 	conn->max_blk_sz = so->so_proto_props.sopp_maxpsz;
 
@@ -649,7 +649,7 @@ err:
 static void
 krrp_conn_tx_handler(void *void_conn)
 {
-	krrp_conn_t *conn = (krrp_conn_t *) void_conn;
+	krrp_conn_t *conn = void_conn;
 	krrp_pdu_t *pdu;
 	krrp_error_t error;
 	int rc = 0;
@@ -657,7 +657,6 @@ krrp_conn_tx_handler(void *void_conn)
 	krrp_error_init(&error);
 
 	mutex_enter(&conn->mtx);
-	conn->tx_t_did = curthread->t_did;
 	ksocket_hold(conn->ks);
 
 	while (conn->tx_running) {
@@ -677,7 +676,7 @@ krrp_conn_tx_handler(void *void_conn)
 					continue;
 				}
 
-				conn->cur_txg = ((krrp_pdu_data_t *) pdu)->txg;
+				conn->cur_txg = ((krrp_pdu_data_t *)pdu)->txg;
 			}
 		} else {
 			pdu = krrp_queue_get(conn->ctrl_tx_queue);
@@ -718,7 +717,7 @@ krrp_conn_tx_pdu(krrp_conn_t *conn, krrp_pdu_t *pdu, krrp_error_t *error)
 	    pdu->hdr->payload_sz, pdu->cur_data_sz);
 #endif
 
-	rc = krrp_conn_tx(conn->ks, (void *) pdu->hdr,
+	rc = krrp_conn_tx(conn->ks, pdu->hdr,
 	    sizeof (krrp_hdr_t), error);
 	if (rc != 0)
 		return (rc);
@@ -745,7 +744,7 @@ krrp_conn_tx(ksocket_t ks, void *buff, size_t buff_sz, krrp_error_t *error)
 
 	remains = buff_sz;
 	while (remains > 0) {
-		rc = ksocket_send(ks, (void *) (((uintptr_t) buff) + offset),
+		rc = ksocket_send(ks, (void *)(((uintptr_t)buff) + offset),
 		    remains, 0, &sent, CRED());
 		if (rc != 0) {
 			krrp_error_set(error, KRRP_ERRNO_SENDFAIL, rc);
@@ -850,7 +849,7 @@ krrp_conn_dblk_to_mblk(krrp_dblk_t *dblk, mblk_t **result_mp,
 static void
 krrp_conn_rx_handler(void *void_conn)
 {
-	krrp_conn_t *conn = (krrp_conn_t *) void_conn;
+	krrp_conn_t *conn = void_conn;
 
 	int rc;
 	krrp_pdu_t *pdu = NULL;
@@ -860,7 +859,6 @@ krrp_conn_rx_handler(void *void_conn)
 	krrp_error_init(&error);
 
 	mutex_enter(&conn->mtx);
-	conn->rx_t_did = curthread->t_did;
 	ksocket_hold(conn->ks);
 
 	while (conn->rx_running) {
@@ -875,17 +873,18 @@ krrp_conn_rx_handler(void *void_conn)
 		}
 
 #ifdef KRRP_CONN_DEBUG
-		cmn_err(CE_NOTE, "HDR: opcode:[%u]; flags:[%u]; payload_sz:[%u]",
+		cmn_err(CE_NOTE, "HDR: opcode:[%u]; flags:[%u]; "
+		    "payload_sz:[%u]",
 		    hdr->opcode, hdr->flags, hdr->payload_sz);
 #endif
 
 		if (hdr->opcode & KRRP_CTRL_OPCODE_MASK)
-			krrp_pdu_ctrl_alloc((krrp_pdu_ctrl_t **) &pdu,
+			krrp_pdu_ctrl_alloc((krrp_pdu_ctrl_t **)&pdu,
 			    KRRP_PDU_WITHOUT_HDR);
 		else if (conn->data_pdu_engine != NULL) {
 			krrp_pdu_alloc(conn->data_pdu_engine, &pdu,
 			    KRRP_PDU_WITHOUT_HDR);
-			conn->cur_txg = ((krrp_hdr_data_t *) hdr)->txg;
+			conn->cur_txg = ((krrp_hdr_data_t *)hdr)->txg;
 		} else {
 			/*
 			 * This thread is not used at initial stage,
@@ -939,7 +938,7 @@ krrp_conn_rx_header(krrp_conn_t *conn, krrp_hdr_t **result_hdr,
 	int rc;
 
 	hdr = kmem_zalloc(sizeof (krrp_hdr_t), KM_SLEEP);
-	rc = krrp_conn_rx(conn->ks, (void *) hdr, sizeof (krrp_hdr_t), error);
+	rc = krrp_conn_rx(conn->ks, hdr, sizeof (krrp_hdr_t), error);
 	if (rc == 0) {
 		conn->bytes_rx += sizeof (krrp_hdr_t);
 		*result_hdr = hdr;

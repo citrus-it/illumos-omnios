@@ -15,7 +15,7 @@ extern "C" {
 
 #define	LIBKRRP_ERRDESCR_EXPAND(m_libkrrp_errno, m_unix_errno, m_descr, ...) \
 	    libkrrp_error_cmp(libkrrp_errno, LIBKRRP_ERRNO_##m_libkrrp_errno, \
-	    unix_errno, m_unix_errno, flags, (char *) descr, \
+	    unix_errno, m_unix_errno, flags, (char *)descr, \
 	    m_descr, ##__VA_ARGS__) ||
 
 #define	SET_ERROR_DESCR(X) (void) (X(LIBKRRP_ERRDESCR_EXPAND) B_FALSE)
@@ -309,4 +309,4 @@ const char *krrp_unix_errno_to_str(int);
 }
 #endif
 
-#endif	/* _LIBKRRP_IMPL_H */
+#endif	/* _LIBKRRP_ERROR_H */

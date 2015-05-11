@@ -38,7 +38,7 @@ typedef enum {
 } krrp_opcode_t;
 #undef KRRP_OPCODE_EXPAND
 
-const char * krrp_protocol_opcode_str(krrp_opcode_t);
+const char *krrp_protocol_opcode_str(krrp_opcode_t);
 
 #ifdef __cplusplus
 }

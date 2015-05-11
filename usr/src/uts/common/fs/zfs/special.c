@@ -445,7 +445,8 @@ spa_select_class(spa_t *spa, zio_t *zio)
 		} else {
 			match = (spa->spa_wrc_mode != WRC_MODE_OFF);
 			if (match) {
-				if (zio->io_priority == ZIO_PRIORITY_SYNC_WRITE) {
+				if (zio->io_priority ==
+				    ZIO_PRIORITY_SYNC_WRITE) {
 					match = B_TRUE;
 				} else {
 					match = spa_refine_data_placement(spa);

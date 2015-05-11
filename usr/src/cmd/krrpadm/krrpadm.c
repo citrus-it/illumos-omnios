@@ -654,13 +654,13 @@ krrp_do_sess_list(int argc, char **argv, krrp_cmd_t *cmd)
 		uuid_unparse(sess_list->sess_id, sess_id_str);
 
 		fprintf_msg("Session: [%s]\n"
-			"    kstat ID: %s\n"
-			"    started: %s\n"
-			"    running: %s\n\n",
-			sess_id_str,
+		    "    kstat ID: %s\n"
+		    "    started: %s\n"
+		    "    running: %s\n\n",
+		    sess_id_str,
 		    sess_list->sess_kstat_id,
-			sess_list->sess_started ? "YES" : "NO",
-			sess_list->sess_running ? "YES" : "NO");
+		    sess_list->sess_started ? "YES" : "NO",
+		    sess_list->sess_running ? "YES" : "NO");
 
 		sess_list = sess_list->sl_next;
 	}
@@ -934,7 +934,7 @@ krrp_do_sess_create_write_stream(int argc, char **argv, krrp_cmd_t *cmd)
 		case 'i':
 			if (nvlist_exists(ignore_props_list, optarg)) {
 				(void) fprintf(stderr, "The property '%s' "
-					"already defined\n", optarg);
+				    "already defined\n", optarg);
 				exit(1);
 			}
 

@@ -20,7 +20,7 @@
 #include "krrp_params.h"
 #include "krrp_svc.h"
 
-static krrp_sess_t * krrp_svc_lookup_session_no_lock(const char *sess_id);
+static krrp_sess_t *krrp_svc_lookup_session_no_lock(const char *sess_id);
 static void krrp_svc_unregister_all_sessions(void);
 static void krrp_svc_unregister_session_common(krrp_sess_t *s);
 static void krrp_svc_on_new_ks_cb(ksocket_t new_ks);
@@ -277,7 +277,7 @@ krrp_svc_register_session(krrp_sess_t *sess, krrp_error_t *error)
 		return (-1);
 	}
 
-	avl_add(&krrp_svc.sessions, (void *) sess);
+	avl_add(&krrp_svc.sessions, sess);
 
 	cmn_err(CE_NOTE, "A new session has been registered (id:[%s])",
 	    sess->id);
@@ -351,7 +351,7 @@ krrp_svc_unregister_all_sessions()
 static void
 krrp_svc_unregister_session_common(krrp_sess_t *s)
 {
-	avl_remove(&krrp_svc.sessions, (void *) s);
+	avl_remove(&krrp_svc.sessions, s);
 	cmn_err(CE_NOTE, "A session has been unregistered (id:[%s])", s->id);
 }
 
@@ -383,13 +383,13 @@ krrp_svc_list_sessions(nvlist_t *out_nvl)
 		nvls_cur->sess_nvl = fnvlist_alloc();
 
 		VERIFY3U(krrp_param_put(KRRP_PARAM_SESS_ID,
-		    nvls_cur->sess_nvl, (void *) sess->id), ==, 0);
+		    nvls_cur->sess_nvl, (void *)sess->id), ==, 0);
 		VERIFY3U(krrp_param_put(KRRP_PARAM_SESS_KSTAT_ID,
-		    nvls_cur->sess_nvl, (void *) sess->kstat.id), ==, 0);
+		    nvls_cur->sess_nvl, (void *)sess->kstat.id), ==, 0);
 		VERIFY3U(krrp_param_put(KRRP_PARAM_SESS_STARTED,
-		    nvls_cur->sess_nvl, (void *) &sess_started), ==, 0);
+		    nvls_cur->sess_nvl, (void *)&sess_started), ==, 0);
 		VERIFY3U(krrp_param_put(KRRP_PARAM_SESS_RUNNING,
-		    nvls_cur->sess_nvl, (void *) &sess_running), ==, 0);
+		    nvls_cur->sess_nvl, (void *)&sess_running), ==, 0);
 
 		sess = AVL_NEXT(&krrp_svc.sessions, sess);
 		nvl_cnt++;
@@ -403,7 +403,7 @@ krrp_svc_list_sessions(nvlist_t *out_nvl)
 	if (nvl_cnt != 0) {
 		param_array.array =
 		    kmem_zalloc(sizeof (nvlist_t *) * nvl_cnt, KM_SLEEP);
-		param_array.nelem = (uint_t) nvl_cnt;
+		param_array.nelem = (uint_t)nvl_cnt;
 
 		for (i = 0; i < nvl_cnt; i++) {
 			nvls_cur = nvls_head;
@@ -415,7 +415,7 @@ krrp_svc_list_sessions(nvlist_t *out_nvl)
 		}
 
 		VERIFY3U(krrp_param_put(KRRP_PARAM_SESSIONS,
-		    out_nvl, (void *) &param_array), ==, 0);
+		    out_nvl, (void *)&param_array), ==, 0);
 
 		/*
 		 * Need to free the nvls that have
@@ -449,8 +449,8 @@ krrp_svc_lookup_session_no_lock(const char *sess_id)
 	if (krrp_sess_set_id(&srch_sess, sess_id, &error) != 0)
 		return (NULL);
 
-	s = (krrp_sess_t *) avl_find(&krrp_svc.sessions,
-		(const void *) &srch_sess, NULL);
+	s = avl_find(&krrp_svc.sessions,
+	    (const void *)&srch_sess, NULL);
 
 	return (s);
 }
@@ -506,7 +506,7 @@ krrp_svc_new_conn_handler(void *void_conn)
 {
 	int rc = -1;
 	nvlist_t *params = NULL;
-	krrp_conn_t *conn = (krrp_conn_t *) void_conn;
+	krrp_conn_t *conn = void_conn;
 	krrp_sess_t *sess;
 	const char *sess_id = NULL;
 	krrp_pdu_ctrl_t *pdu = NULL;
@@ -528,7 +528,7 @@ krrp_svc_new_conn_handler(void *void_conn)
 		goto send_error;
 	}
 
-	rc = nvlist_unpack((char *) pdu->dblk->data,
+	rc = nvlist_unpack((char *)pdu->dblk->data,
 	    pdu->cur_data_sz, &params, KM_SLEEP);
 	if (rc != 0) {
 		krrp_error_set(&error, KRRP_ERRNO_PROTO, EBADMSG);
@@ -559,7 +559,7 @@ send_error:
 
 out:
 	if (pdu != NULL)
-		krrp_pdu_rele((krrp_pdu_t *) pdu);
+		krrp_pdu_rele((krrp_pdu_t *)pdu);
 
 	if (rc != 0) {
 		if (error.krrp_errno != 0) {

@@ -241,9 +241,9 @@ krrp_ioctl(dev_t dev, int cmd, intptr_t argp, int flags, cred_t *cr, int *rvalp)
 				char *buf;
 
 				buf = ioctl_data->buf;
-				VERIFY3U(nvlist_pack(out_nvl, (char **) &buf,
+				VERIFY3U(nvlist_pack(out_nvl, (char **)&buf,
 				    &size, NV_ENCODE_NATIVE, KM_SLEEP), ==, 0);
-				ioctl_data->data_size = (uint64_t) size;
+				ioctl_data->data_size = (uint64_t)size;
 				ioctl_data->out_flags |= KRRP_IOCTL_FLAG_RESULT;
 			}
 		}
@@ -274,10 +274,10 @@ krrp_ioctl(dev_t dev, int cmd, intptr_t argp, int flags, cred_t *cr, int *rvalp)
 			char *buf;
 
 			buf = ioctl_data->buf;
-			VERIFY3U(nvlist_pack(error_nvl, (char **) &buf,
-				&size, NV_ENCODE_NATIVE, KM_SLEEP), ==, 0);
+			VERIFY3U(nvlist_pack(error_nvl, (char **)&buf,
+			    &size, NV_ENCODE_NATIVE, KM_SLEEP), ==, 0);
 			rc = 0;
-			ioctl_data->data_size = (uint64_t) size;
+			ioctl_data->data_size = (uint64_t)size;
 			ioctl_data->out_flags |= KRRP_IOCTL_FLAG_ERROR;
 		}
 

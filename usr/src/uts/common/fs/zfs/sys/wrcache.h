@@ -37,7 +37,8 @@ extern "C" {
 #define	WRCIO_PERC_MIN	(25)
 #define	WRCIO_PERC_MAX	(75)
 
-/* field 'blk_prop' of wrc_block_t
+/*
+ * field 'blk_prop' of wrc_block_t
  *
  * 64              48               32              16              0
  *	+-------+-------+-------+-------+-------+-------+-------+-------+

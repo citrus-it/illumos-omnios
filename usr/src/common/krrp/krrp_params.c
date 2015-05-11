@@ -77,7 +77,7 @@ krrp_param_get(krrp_param_t p, nvlist_t *nvl, void *result)
 		rc = nvlist_lookup_nvlist(nvl, name, result);
 		break;
 	case DATA_TYPE_NVLIST_ARRAY:
-		param = (krrp_param_array_t *) result;
+		param = result;
 		rc = nvlist_lookup_nvlist_array(nvl, name,
 		    &param->array, &param->nelem);
 		break;
@@ -107,24 +107,24 @@ krrp_param_put(krrp_param_t p, nvlist_t *nvl, void *value)
 
 	switch (param_dtype) {
 	case DATA_TYPE_BOOLEAN:
-		if (value != NULL)
+		if (value != NULL) {
 			fnvlist_add_boolean_value(nvl, name,
-			    *((boolean_t *) value));
-		else
+			    *((boolean_t *)value));
+		} else
 			fnvlist_add_boolean_value(nvl, name, B_TRUE);
 
 		break;
 	case DATA_TYPE_UINT16:
-		fnvlist_add_uint16(nvl, name, *((uint16_t *) value));
+		fnvlist_add_uint16(nvl, name, *((uint16_t *)value));
 		break;
 	case DATA_TYPE_UINT32:
-		fnvlist_add_uint32(nvl, name, *((uint32_t *) value));
+		fnvlist_add_uint32(nvl, name, *((uint32_t *)value));
 		break;
 	case DATA_TYPE_INT32:
-		fnvlist_add_int32(nvl, name, *((int32_t *) value));
+		fnvlist_add_int32(nvl, name, *((int32_t *)value));
 		break;
 	case DATA_TYPE_UINT64:
-		fnvlist_add_uint64(nvl, name, *((uint64_t *) value));
+		fnvlist_add_uint64(nvl, name, *((uint64_t *)value));
 		break;
 	case DATA_TYPE_STRING:
 		krrp_verify(value != NULL);
@@ -134,7 +134,7 @@ krrp_param_put(krrp_param_t p, nvlist_t *nvl, void *value)
 		fnvlist_add_nvlist(nvl, name, value);
 		break;
 	case DATA_TYPE_NVLIST_ARRAY:
-		param = (krrp_param_array_t *) value;
+		param = value;
 		fnvlist_add_nvlist_array(nvl, name,
 		    param->array, param->nelem);
 		break;

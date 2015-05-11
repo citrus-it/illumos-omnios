@@ -137,7 +137,7 @@ typedef struct krrp_sess_s {
 	timeout_id_t			ping_timer;
 	boolean_t				ping_wait_for_response;
 
-	char					auth_digest[KRRP_AUTH_DIGEST_MAX_LEN];
+	char auth_digest[KRRP_AUTH_DIGEST_MAX_LEN];
 
 	krrp_error_t			error;
 } krrp_sess_t;

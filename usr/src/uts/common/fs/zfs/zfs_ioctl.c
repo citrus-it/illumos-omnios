@@ -4506,7 +4506,7 @@ int
 dmu_recv_impl(int fd, char *tofs, char *tosnap, char *origin,
     struct drr_begin *drrb, nvlist_t *props, nvlist_t *errors, uint64_t *errf,
     int cfd, uint64_t *ahdl, uint64_t *sz, boolean_t force,
-    dmu_krrp_task_t * krrp_task)
+    dmu_krrp_task_t *krrp_task)
 {
 	file_t *fp = getf(fd);
 	dmu_recv_cookie_t drc;

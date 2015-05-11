@@ -25,14 +25,14 @@ krrp_sess_create_common(libkrrp_handle_t *hdl, uuid_t sess_id,
 
 	uuid_unparse(sess_id, sess_id_str);
 
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, (void *) sess_id_str);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
 
 	(void) krrp_param_put(KRRP_PARAM_SESS_KSTAT_ID, params,
-	    (void *) sess_kstat_id);
+	    (void *)sess_kstat_id);
 
 	if (auth_digest != NULL) {
 		(void) krrp_param_put(KRRP_PARAM_AUTH_DATA, params,
-		    (void *) auth_digest);
+		    (void *)auth_digest);
 	}
 
 	if (fake_mode)
@@ -108,7 +108,7 @@ krrp_sess_destroy(libkrrp_handle_t *hdl, uuid_t sess_id)
 
 	uuid_unparse(sess_id, sess_id_str);
 	params = fnvlist_alloc();
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, (void *) sess_id_str);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
 
 	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SESS_DESTROY, params, NULL);
 
@@ -132,13 +132,13 @@ krrp_sess_create_conn(libkrrp_handle_t *hdl, uuid_t sess_id,
 	uuid_unparse(sess_id, sess_id_str);
 	params = fnvlist_alloc();
 
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, (void *) sess_id_str);
-	(void) krrp_param_put(KRRP_PARAM_REMOTE_HOST, params, (void *) address);
-	(void) krrp_param_put(KRRP_PARAM_PORT, params, (void *) &port);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
+	(void) krrp_param_put(KRRP_PARAM_REMOTE_HOST, params, (void *)address);
+	(void) krrp_param_put(KRRP_PARAM_PORT, params, (void *)&port);
 
 	if (conn_timeout != 0) {
 		(void) krrp_param_put(KRRP_PARAM_CONN_TIMEOUT, params,
-		    (void *) &conn_timeout);
+		    (void *)&conn_timeout);
 	}
 
 	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SESS_CREATE_CONN, params, NULL);
@@ -161,8 +161,8 @@ krrp_sess_conn_throttle(libkrrp_handle_t *hdl, uuid_t sess_id,
 
 	uuid_unparse(sess_id, sess_id_str);
 	params = fnvlist_alloc();
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, (void *) sess_id_str);
-	(void) krrp_param_put(KRRP_PARAM_THROTTLE, params, (void *) &limit);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
+	(void) krrp_param_put(KRRP_PARAM_THROTTLE, params, (void *)&limit);
 
 	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SESS_CONN_THROTTLE, params,
 	    NULL);
@@ -185,15 +185,15 @@ krrp_sess_create_pdu_engine(libkrrp_handle_t *hdl, uuid_t sess_id,
 
 	uuid_unparse(sess_id, sess_id_str);
 	params = fnvlist_alloc();
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, (void *) sess_id_str);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
 	(void) krrp_param_put(KRRP_PARAM_MAX_MEMORY, params,
-	    (void *) &memory_limit);
+	    (void *)&memory_limit);
 	(void) krrp_param_put(KRRP_PARAM_DBLK_DATA_SIZE, params,
-	    (void *) &dblk_sz);
+	    (void *)&dblk_sz);
 
 	if (use_preallocation) {
-		(void) krrp_param_put(KRRP_PARAM_USE_PREALLOCATION, params,
-		    NULL);
+		(void) krrp_param_put(KRRP_PARAM_USE_PREALLOCATION,
+		    params, NULL);
 	}
 
 	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SESS_CREATE_PDU_ENGINE, params,
@@ -216,26 +216,26 @@ krrp_sess_create_stream_common(libkrrp_handle_t *hdl, nvlist_t *params,
 
 	uuid_unparse(sess_id, sess_id_str);
 
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, (void *) sess_id_str);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
 
 	if (common_snap != NULL) {
-		(void) krrp_param_put(KRRP_PARAM_COMMON_SNAPSHOT, params,
-		    (void *) common_snap);
+		(void) krrp_param_put(KRRP_PARAM_COMMON_SNAPSHOT,
+		    params, (void *)common_snap);
 	}
 
 	if (zcookies != NULL) {
-		(void) krrp_param_put(KRRP_PARAM_ZCOOKIES, params,
-		    (void *) zcookies);
+		(void) krrp_param_put(KRRP_PARAM_ZCOOKIES,
+		    params, (void *)zcookies);
 	}
 
 	if (krrp_sess_stream_flags & KRRP_STREAM_ZFS_EMBEDDED) {
-		(void) krrp_param_put(KRRP_PARAM_STREAM_EMBEDDED_BLOCKS, params,
-		    NULL);
+		(void) krrp_param_put(KRRP_PARAM_STREAM_EMBEDDED_BLOCKS,
+		    params, NULL);
 	}
 
 	if (krrp_sess_stream_flags & KRRP_STREAM_ZFS_CHKSUM) {
-		(void) krrp_param_put(KRRP_PARAM_ENABLE_STREAM_CHKSUM, params,
-		    NULL);
+		(void) krrp_param_put(KRRP_PARAM_ENABLE_STREAM_CHKSUM,
+		    params, NULL);
 	}
 }
 
@@ -254,7 +254,7 @@ krrp_sess_create_write_stream(libkrrp_handle_t *hdl, uuid_t sess_id,
 	    krrp_sess_stream_flags, zcookies);
 
 	(void) krrp_param_put(KRRP_PARAM_DST_DATASET, params,
-	    (void *) dataset);
+	    (void *)dataset);
 
 	if (krrp_sess_stream_flags & KRRP_STREAM_FORCE_RECEIVE)
 		(void) krrp_param_put(KRRP_PARAM_FORCE_RECEIVE, params, NULL);
@@ -291,26 +291,23 @@ krrp_sess_create_read_stream(libkrrp_handle_t *hdl, uuid_t sess_id,
 	krrp_sess_create_stream_common(hdl, params, sess_id, common_snap,
 	    krrp_sess_stream_flags, zcookies);
 
-	(void) krrp_param_put(KRRP_PARAM_SRC_DATASET, params,
-	    (void *) dataset);
+	(void) krrp_param_put(KRRP_PARAM_SRC_DATASET, params, (void *)dataset);
 
 	if (fake_data_sz != 0) {
 		(void) krrp_param_put(KRRP_PARAM_FAKE_DATA_SIZE, params,
-		    (void *) &fake_data_sz);
+		    &fake_data_sz);
 	}
 
 	if (src_snap != NULL) {
 		(void) krrp_param_put(KRRP_PARAM_SRC_SNAPSHOT, params,
-		    (void *) src_snap);
+		    (void *)src_snap);
 	}
 
 	if (krrp_sess_stream_flags & KRRP_STREAM_SEND_RECURSIVE)
 		(void) krrp_param_put(KRRP_PARAM_SEND_RECURSIVE, params, NULL);
 
-	if (krrp_sess_stream_flags & KRRP_STREAM_SEND_PROPERTIES) {
-		(void) krrp_param_put(KRRP_PARAM_SEND_PROPERTIES,
-		    params, NULL);
-	}
+	if (krrp_sess_stream_flags & KRRP_STREAM_SEND_PROPERTIES)
+		(void) krrp_param_put(KRRP_PARAM_SEND_PROPERTIES, params, NULL);
 
 	if (krrp_sess_stream_flags & KRRP_STREAM_INCLUDE_ALL_SNAPS) {
 		(void) krrp_param_put(KRRP_PARAM_INCLUDE_ALL_SNAPSHOTS,
@@ -339,7 +336,7 @@ krrp_sess_run(libkrrp_handle_t *hdl, uuid_t sess_id, boolean_t once)
 	uuid_unparse(sess_id, sess_id_str);
 	params = fnvlist_alloc();
 
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, (void *) sess_id_str);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
 
 	if (once)
 		(void) krrp_param_put(KRRP_PARAM_ONLY_ONCE, params, NULL);
@@ -363,7 +360,7 @@ krrp_sess_send_stop(libkrrp_handle_t *hdl, uuid_t sess_id)
 
 	uuid_unparse(sess_id, sess_id_str);
 	params = fnvlist_alloc();
-	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, (void *) sess_id_str);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
 
 	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SESS_SEND_STOP, params, NULL);
 
@@ -387,7 +384,7 @@ krrp_zfs_get_recv_cookies(libkrrp_handle_t *hdl, const char *dataset,
 	libkrrp_reset(hdl);
 
 	params = fnvlist_alloc();
-	(void) krrp_param_put(KRRP_PARAM_DST_DATASET, params, (void *) dataset);
+	(void) krrp_param_put(KRRP_PARAM_DST_DATASET, params, (void *)dataset);
 
 	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_ZFS_GET_RECV_COOKIES, params,
 	    &result_nvl);
@@ -400,11 +397,11 @@ krrp_zfs_get_recv_cookies(libkrrp_handle_t *hdl, const char *dataset,
 	if (result_nvl == NULL)
 		return (rc);
 
-	VERIFY3U(krrp_param_get(KRRP_PARAM_ZCOOKIES, result_nvl,
-	    (void *) &zcookies), ==, 0);
+	VERIFY0(krrp_param_get(KRRP_PARAM_ZCOOKIES, result_nvl,
+	    &zcookies));
 
-	if ((zcookies != NULL) && (strlcpy(res_zcookies, zcookies,
-	    res_zcookies_sz) >= res_zcookies_sz)) {
+	if (strlcpy(res_zcookies, zcookies,
+	    res_zcookies_sz) >= res_zcookies_sz) {
 		rc = EOVERFLOW;
 		libkrrp_error_set(&hdl->libkrrp_error, LIBKRRP_ERRNO_ZCOOKIES,
 		    rc, 0);

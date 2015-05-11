@@ -150,7 +150,7 @@ autosnap_get_owned_snapshots(void *opaque)
 {
 	nvlist_t *dup;
 	autosnap_snapshot_t *snap;
-	autosnap_handler_t *hdl = (autosnap_handler_t *) opaque;
+	autosnap_handler_t *hdl = opaque;
 	zfs_autosnap_t *autosnap = hdl->zone->autosnap;
 
 	if (!(hdl->flags & AUTOSNAP_OWNER))
@@ -273,7 +273,7 @@ void
 autosnap_release_snapshots_by_txg_no_lock_impl(void *opaque, uint64_t from_txg,
     uint64_t to_txg, boolean_t destroy)
 {
-	autosnap_handler_t *hdl = (autosnap_handler_t *)opaque;
+	autosnap_handler_t *hdl = opaque;
 	autosnap_zone_t *zone = hdl->zone;
 	zfs_autosnap_t *autosnap = zone->autosnap;
 	avl_index_t where;
@@ -391,7 +391,7 @@ void
 autosnap_release_snapshots_by_txg(void *opaque,
     uint64_t from_txg, uint64_t to_txg)
 {
-	autosnap_handler_t *hdl = (autosnap_handler_t *) opaque;
+	autosnap_handler_t *hdl = opaque;
 	autosnap_zone_t *zone = hdl->zone;
 	mutex_enter(&zone->autosnap->autosnap_lock);
 	autosnap_release_snapshots_by_txg_no_lock(opaque, from_txg, to_txg);
@@ -401,8 +401,8 @@ autosnap_release_snapshots_by_txg(void *opaque,
 static int
 snapshot_txg_compare(const void *arg1, const void *arg2)
 {
-	autosnap_snapshot_t *snap1 = (autosnap_snapshot_t *) arg1;
-	autosnap_snapshot_t *snap2 = (autosnap_snapshot_t *) arg2;
+	const autosnap_snapshot_t *snap1 = arg1;
+	const autosnap_snapshot_t *snap2 = arg2;
 
 	if (snap1->txg < snap2->txg) {
 		return (-1);
@@ -580,7 +580,7 @@ void
 autosnap_unregister_handler(void *opaque)
 {
 	spa_t *spa;
-	autosnap_handler_t *hdl = (autosnap_handler_t *) opaque;
+	autosnap_handler_t *hdl = opaque;
 	autosnap_zone_t *zone = hdl->zone;
 	zfs_autosnap_t *autosnap = NULL;
 	boolean_t namespace_alteration = B_TRUE;
@@ -872,7 +872,7 @@ autosnap_force_snap(void *opaque, boolean_t sync)
 	if (!opaque)
 		return;
 
-	hdl = (autosnap_handler_t *)opaque;
+	hdl = opaque;
 	zone = hdl->zone;
 
 	autosnap_force_snap_by_name(zone->dataset, sync);
@@ -1259,7 +1259,7 @@ autosnap_destroyer_thread_start(spa_t *spa)
 	zfs_autosnap_t *autosnap = spa_get_autosnap(spa);
 
 	autosnap->destroyer = thread_create(NULL, 32 << 10,
-	    autosnap_destroyer_thread, (void*) spa, 0, &p0,
+	    autosnap_destroyer_thread, spa, 0, &p0,
 	    TS_RUN, minclsyspri);
 }
 
@@ -1344,11 +1344,11 @@ autosnap_fini(spa_t *spa)
 
 	while ((zone = list_head(&autosnap->autosnap_zones)) != NULL) {
 		while ((hdl = list_head(&zone->listeners)) != NULL)
-			autosnap_unregister_handler((void*)hdl);
+			autosnap_unregister_handler(hdl);
 	}
 
 	while ((hdl = list_head(&autosnap->autosnap_global.listeners)) != NULL)
-		autosnap_unregister_handler((void*)hdl);
+		autosnap_unregister_handler(hdl);
 
 	while ((snap =
 	    avl_destroy_nodes(&autosnap->snapshots, &cookie)) != NULL)

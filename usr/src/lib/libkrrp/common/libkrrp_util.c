@@ -12,7 +12,8 @@
 #include "libkrrp.h"
 
 boolean_t
-is_krrp_supported(void) {
+is_krrp_supported(void)
+{
 	return (access(KRRP_DEVICE, 0) == 0);
 }
 
@@ -41,7 +42,8 @@ libkrrp_fini(libkrrp_handle_t *hdl)
 }
 
 void
-libkrrp_reset(libkrrp_handle_t *hdl) {
+libkrrp_reset(libkrrp_handle_t *hdl)
+{
 	hdl->libkrrp_error.libkrrp_errno = LIBKRRP_ERRNO_OK;
 	hdl->libkrrp_error_descr[0] = '\0';
 	hdl->libkrrp_error.flags = 0;

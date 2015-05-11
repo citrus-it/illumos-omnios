@@ -35,7 +35,7 @@ static int krrp_ioctl_sess_conn_throttle(nvlist_t *params, krrp_error_t *error);
 static int krrp_ioctl_zfs_get_recv_cookies(nvlist_t *params,
     nvlist_t *result, krrp_error_t *error);
 
-static krrp_sess_t * krrp_ioctl_sess_action_common(nvlist_t *params,
+static krrp_sess_t *krrp_ioctl_sess_action_common(nvlist_t *params,
     krrp_error_t *error);
 
 int
@@ -183,13 +183,13 @@ krrp_ioctl_sess_create(nvlist_t *params, krrp_error_t *error)
 	}
 
 	(void) krrp_param_get(KRRP_PARAM_AUTH_DATA,
-		    params, (void *) &auth_digest);
+	    params, (void *)&auth_digest);
 	(void) krrp_param_get(KRRP_PARAM_FAKE_MODE,
-	    params, (void *) &fake_mode);
+	    params, (void *)&fake_mode);
 	(void) krrp_param_get(KRRP_PARAM_SESS_SENDER,
-	    params, (void *) &sender);
+	    params, (void *)&sender);
 	(void) krrp_param_get(KRRP_PARAM_SESS_COMPOUND,
-	    params, (void *) &compound);
+	    params, (void *)&compound);
 
 	if (krrp_sess_create(&sess, sess_id, sess_kstat_id,
 	    auth_digest, sender, fake_mode, compound, error) != 0)
@@ -388,13 +388,13 @@ krrp_ioctl_sess_create_stream(nvlist_t *params, boolean_t read_stream,
 
 		if (read_stream)
 			rc = krrp_ioctl_sess_create_read_stream(&stream,
-				params, error);
+			    params, error);
 		else if (sess->fake_mode)
 			rc = krrp_ioctl_sess_create_fake_stream(&stream,
-				B_FALSE, params, error);
+			    B_FALSE, params, error);
 		else
 			rc = krrp_ioctl_sess_create_write_stream(&stream,
-				params, error);
+			    params, error);
 
 		break;
 	}

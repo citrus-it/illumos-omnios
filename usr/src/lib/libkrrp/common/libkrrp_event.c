@@ -88,38 +88,38 @@ libkrrp_sess_id_parse(libkrrp_event_t *ev, krrp_sess_id_str_t sess_id_str,
 }
 
 static void
-libkrrp_ev_unpack_sess_send_done(libkrrp_event_t *ev, nvlist_t *attr) {
-	krrp_sess_id_str_t *sess_id_str;
+libkrrp_ev_unpack_sess_send_done(libkrrp_event_t *ev, nvlist_t *attr)
+{
+	krrp_sess_id_str_t sess_id_str;
 
 	ASSERT(ev != NULL);
 	ASSERT(attr != NULL);
 
-	if (krrp_param_get(KRRP_PARAM_SESS_ID, attr,
-	    (void *) &sess_id_str) != 0) {
+	if (krrp_param_get(KRRP_PARAM_SESS_ID, attr, &sess_id_str) != 0) {
 		libkrrp_error_set(&ev->libkrrp_error, LIBKRRP_ERRNO_SESSID,
 		    ENOENT, 0);
 		return;
 	}
 
-	(void) libkrrp_sess_id_parse(ev, (char *) sess_id_str,
+	(void) libkrrp_sess_id_parse(ev, sess_id_str,
 	    ev->ev_data.sess_send_done.sess_id);
 }
 
 static void
-libkrrp_ev_unpack_sess_error(libkrrp_event_t *ev, nvlist_t *attr) {
-	krrp_sess_id_str_t *sess_id_str;
+libkrrp_ev_unpack_sess_error(libkrrp_event_t *ev, nvlist_t *attr)
+{
+	krrp_sess_id_str_t sess_id_str;
 
 	ASSERT(ev != NULL);
 	ASSERT(attr != NULL);
 
-	if (krrp_param_get(KRRP_PARAM_SESS_ID, attr,
-	    (void *) &sess_id_str) != 0) {
+	if (krrp_param_get(KRRP_PARAM_SESS_ID, attr, &sess_id_str) != 0) {
 		libkrrp_error_set(&ev->libkrrp_error, LIBKRRP_ERRNO_SESSID,
 		    ENOENT, 0);
 		return;
 	}
 
-	if (libkrrp_sess_id_parse(ev, (char *) sess_id_str,
+	if (libkrrp_sess_id_parse(ev, sess_id_str,
 	    ev->ev_data.sess_error.sess_id) != 0)
 		return;
 
@@ -131,7 +131,8 @@ libkrrp_ev_unpack_sess_error(libkrrp_event_t *ev, nvlist_t *attr) {
 }
 
 static void
-libkrrp_ev_unpack_server_error(libkrrp_event_t *ev, nvlist_t *attr) {
+libkrrp_ev_unpack_server_error(libkrrp_event_t *ev, nvlist_t *attr)
+{
 	ASSERT(ev != NULL);
 	ASSERT(attr != NULL);
 
@@ -142,8 +143,9 @@ libkrrp_ev_unpack_server_error(libkrrp_event_t *ev, nvlist_t *attr) {
 }
 
 static int
-libkrrp_evc_callback(sysevent_t *ev, void *cookie) {
-	libkrrp_evc_handle_t *hdl = (libkrrp_evc_handle_t *) cookie;
+libkrrp_evc_callback(sysevent_t *ev, void *cookie)
+{
+	libkrrp_evc_handle_t *hdl = cookie;
 	libkrrp_event_t libkrrp_ev;
 	nvlist_t *attr = NULL;
 	int rc;
@@ -191,12 +193,13 @@ callback:
 }
 
 void
-libkrrp_evc_unsubscribe(libkrrp_evc_handle_t *hdl) {
+libkrrp_evc_unsubscribe(libkrrp_evc_handle_t *hdl)
+{
 	VERIFY(hdl != NULL);
 
-	if (hdl->evchan) {
+	if (hdl->evchan)
 		(void) sysevent_evc_unbind(hdl->evchan);
-	}
+
 	umem_free(hdl, sizeof (libkrrp_evc_handle_t));
 }
 
@@ -226,9 +229,9 @@ libkrrp_evc_subscribe(libkrrp_evc_handle_t **res_hdl,
 	hdl->callback = callback;
 	hdl->cookie = cookie;
 
-	(void) sprintf(sid, "libkrrp%d", (int) getpid());
+	(void) sprintf(sid, "libkrrp%d", (int)getpid());
 	rc = sysevent_evc_subscribe(hdl->evchan, sid, EC_KRRP,
-	    libkrrp_evc_callback, (void *) hdl, 0);
+	    libkrrp_evc_callback, hdl, 0);
 
 	if (rc != 0) {
 		libkrrp_error_set(&hdl->libkrrp_error,

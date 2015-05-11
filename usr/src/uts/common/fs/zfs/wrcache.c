@@ -304,7 +304,7 @@ typedef struct {
 int
 wrc_arc_bypass_cb(void *buf, int len, void *arg)
 {
-	wrc_arc_bypass_t *bypass = (wrc_arc_bypass_t *)arg;
+	wrc_arc_bypass_t *bypass = arg;
 
 	bypass->len = len;
 
@@ -320,7 +320,7 @@ uint64_t wrc_arc_enabled = 1;
 void
 wrc_move_block(void *arg)
 {
-	wrc_block_t *block = (wrc_block_t *)arg;
+	wrc_block_t *block = arg;
 	wrc_data_t *wrc_data = block->data;
 	spa_t *spa = wrc_data->wrc_spa;
 	dsl_pool_t *dp = spa->spa_dsl_pool;
@@ -444,7 +444,7 @@ wrc_move_block_impl(wrc_block_t *block)
 
 		if (!err && WRCBP_GET_COMPRESS(block) != ZIO_COMPRESS_OFF) {
 			size_t size = zio_compress_data(
-			    (enum zio_compress) WRCBP_GET_COMPRESS(block),
+			    (enum zio_compress)WRCBP_GET_COMPRESS(block),
 			    dbuf, buf, bypass.len);
 			size_t rounded =
 			    P2ROUNDUP(size, (size_t)SPA_MINBLOCKSIZE);
@@ -453,9 +453,9 @@ wrc_move_block_impl(wrc_block_t *block)
 				err = ERANGE;
 				cmn_err(CE_WARN, "WRC WARN: ARC COMPRESSION "
 				    "FAILED: %u %u %u",
-				    (unsigned) size,
-				    (unsigned) WRCBP_GET_PSIZE(block),
-				    (unsigned) WRCBP_GET_COMPRESS(block));
+				    (unsigned)size,
+				    (unsigned)WRCBP_GET_PSIZE(block),
+				    (unsigned)WRCBP_GET_COMPRESS(block));
 			} else if (rounded > size) {
 				bzero((char *)buf + size, rounded - size);
 			}
@@ -820,8 +820,8 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 	if (wrc_data->wrc_walk && wrc_data->wrc_finish_txg) {
 		if (krrp_debug) {
 			cmn_err(CE_NOTE, "WRC: new window (%llu; %llu)",
-			    (unsigned long long) wrc_data->wrc_start_txg,
-			    (unsigned long long) wrc_data->wrc_finish_txg);
+			    (unsigned long long)wrc_data->wrc_start_txg,
+			    (unsigned long long)wrc_data->wrc_finish_txg);
 		}
 		err = traverse_pool(spa, wrc_data->wrc_start_txg - 1,
 		    wrc_data->wrc_finish_txg + 1,
@@ -1001,7 +1001,7 @@ static void
 wrc_set_state_delete(void *void_spa, dmu_tx_t *tx)
 {
 	uint64_t upd = 1;
-	spa_t *spa = (spa_t *) void_spa;
+	spa_t *spa = void_spa;
 
 	(void) zap_update(spa->spa_dsl_pool->dp_meta_objset,
 	    DMU_POOL_DIRECTORY_OBJECT,
@@ -1012,7 +1012,7 @@ static void
 wrc_clean_state_delete(void *void_spa, dmu_tx_t *tx)
 {
 	uint64_t upd = 0;
-	spa_t *spa = (spa_t *) void_spa;
+	spa_t *spa = void_spa;
 
 	(void) zap_update(spa->spa_dsl_pool->dp_meta_objset,
 	    DMU_POOL_DIRECTORY_OBJECT,
@@ -1022,7 +1022,7 @@ wrc_clean_state_delete(void *void_spa, dmu_tx_t *tx)
 static void
 wrc_write_update_window(void *void_spa, dmu_tx_t *tx)
 {
-	spa_t *spa = (spa_t *) void_spa;
+	spa_t *spa = void_spa;
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 
 	(void) zap_update(spa->spa_dsl_pool->dp_meta_objset,
@@ -1137,9 +1137,9 @@ wrc_close_window(spa_t *spa)
 	if (krrp_debug) {
 		cmn_err(CE_NOTE, "WRC: window (%llu; %llu) has been completed\n"
 		    "WRC: %llu blocks moved",
-		    (unsigned long long) wrc_data->wrc_start_txg,
-		    (unsigned long long) wrc_data->wrc_finish_txg,
-		    (unsigned long long) wrc_data->wrc_blocks_mv);
+		    (unsigned long long)wrc_data->wrc_start_txg,
+		    (unsigned long long)wrc_data->wrc_finish_txg,
+		    (unsigned long long)wrc_data->wrc_blocks_mv);
 		VERIFY(wrc_data->wrc_blocks_mv == wrc_data->wrc_blocks_in);
 		VERIFY(wrc_data->wrc_blocks_mv == wrc_data->wrc_blocks_out);
 	}
@@ -1293,7 +1293,7 @@ wrc_free_restore(spa_t *spa)
 static boolean_t
 wrc_confirm_cv(const char *name, boolean_t recursive, uint64_t txg, void *arg)
 {
-	spa_t *spa = (spa_t *)arg;
+	spa_t *spa = arg;
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 	return (wrc_data->wrc_finish_txg == 0);
 }
@@ -1327,7 +1327,7 @@ static boolean_t
 wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
     uint64_t txg, uint64_t etxg, void *arg)
 {
-	spa_t *spa = (spa_t *)arg;
+	spa_t *spa = arg;
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 
 	if (wrc_data->wrc_finish_txg != 0 ||
@@ -1360,7 +1360,7 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 static void
 wrc_err_cb(const char *name, int err, uint64_t txg, void *arg)
 {
-	spa_t *spa = (spa_t *)arg;
+	spa_t *spa = arg;
 
 	cmn_err(CE_WARN, "Autosnap can not create a snapshot for writecache at "
 	    "txg %llu [%d] of pool '%s'\n", (unsigned long long)txg, err, name);

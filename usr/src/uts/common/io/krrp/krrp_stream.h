@@ -63,7 +63,7 @@ typedef struct krrp_txg_rpo_t {
 } krrp_txg_rpo_t;
 
 struct krrp_stream_s {
-	kt_did_t				t_did;
+	kthread_t				*work_thread;
 
 	krrp_stream_cb_t		*callback;
 	void					*callback_arg;

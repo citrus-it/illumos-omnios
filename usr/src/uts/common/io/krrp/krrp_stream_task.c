@@ -110,13 +110,15 @@ krrp_stream_te_write_create(krrp_stream_te_t **result_te,
 	 * Need to dup the nvls because they are part of another nvl,
 	 * that will be destroyed
 	 */
-	if (ignore_props_list != NULL)
+	if (ignore_props_list != NULL) {
 		task_engine->ignore_props_list =
 		    fnvlist_dup(ignore_props_list);
+	}
 
-	if (replace_props_list != NULL)
+	if (replace_props_list != NULL) {
 		task_engine->replace_props_list =
 		    fnvlist_dup(replace_props_list);
+	}
 
 	return (0);
 }
@@ -204,20 +206,20 @@ krrp_stream_te_common_create(krrp_stream_te_t **result_te,
 	    offsetof(krrp_stream_task_t, node));
 
 	(void) snprintf(kmem_cache_name, KSTAT_STRLEN,
-		"krrp_stc_%p", (void *) task_engine);
+	    "krrp_stc_%p", (void *)task_engine);
 
 	task_engine->tasks_cache = kmem_cache_create(kmem_cache_name,
 	    sizeof (krrp_stream_task_t), 0, &krrp_stream_task_constructor,
-	    &krrp_stream_task_destructor, NULL, (void *) task_engine,
+	    &krrp_stream_task_destructor, NULL, (void *)task_engine,
 	    NULL, KM_SLEEP);
 
 	if (read_mode) {
 		task_engine->mode = KRRP_STEM_READ;
 		krrp_queue_init(&task_engine->tasks_done,
-			sizeof (krrp_stream_task_t),
+		    sizeof (krrp_stream_task_t),
 		    offsetof(krrp_stream_task_t, node));
 		krrp_queue_init(&task_engine->tasks_done2,
-			sizeof (krrp_stream_task_t),
+		    sizeof (krrp_stream_task_t),
 		    offsetof(krrp_stream_task_t, node));
 	} else
 		task_engine->mode = KRRP_STEM_WRITE;
@@ -263,7 +265,7 @@ krrp_stream_read_task_init(krrp_stream_te_t *task_engine, uint64_t txg,
 
 	task->init_hrtime = gethrtime();
 
-	krrp_queue_put(task_engine->tasks, (void *) task);
+	krrp_queue_put(task_engine->tasks, task);
 }
 
 void
@@ -281,7 +283,7 @@ krrp_stream_fake_read_task_init(krrp_stream_te_t *task_engine,
 	task->fake_data_sz = fake_data_sz;
 	task->init_hrtime = gethrtime();
 
-	krrp_queue_put(task_engine->tasks, (void *) task);
+	krrp_queue_put(task_engine->tasks, task);
 }
 
 void
@@ -343,8 +345,8 @@ static int
 krrp_stream_task_constructor(void *opaque_task,
     void *opaque_task_engine, int km_flags)
 {
-	krrp_stream_task_t *task = (krrp_stream_task_t *) opaque_task;
-	krrp_stream_te_t *task_engine = (krrp_stream_te_t *) opaque_task_engine;
+	krrp_stream_task_t *task = opaque_task;
+	krrp_stream_te_t *task_engine = opaque_task_engine;
 
 	bzero(&task->zargs, sizeof (kreplication_zfs_args_t));
 
@@ -367,7 +369,7 @@ krrp_stream_task_constructor(void *opaque_task,
 		} else {
 			(void) strlcpy(task->zargs.from_ds,
 			    task_engine->dataset,
-				sizeof (task->zargs.from_ds));
+			    sizeof (task->zargs.from_ds));
 
 			task->process = &krrp_stream_task_read_handler;
 			task->start = &krrp_stream_task_read_start;
@@ -381,7 +383,7 @@ krrp_stream_task_constructor(void *opaque_task,
 			task->shutdown = &krrp_stream_task_fake_common_action;
 		} else {
 			(void) strlcpy(task->zargs.to_ds, task_engine->dataset,
-				sizeof (task->zargs.to_ds));
+			    sizeof (task->zargs.to_ds));
 
 			task->process = &krrp_stream_task_write_handler;
 			task->shutdown = &krrp_stream_task_common_stop;
@@ -411,8 +413,8 @@ static void
 krrp_stream_task_destructor(void *opaque_task,
     void *opaque_task_engine)
 {
-	krrp_stream_task_t *task = (krrp_stream_task_t *) opaque_task;
-	krrp_stream_te_t *task_engine = (krrp_stream_te_t *) opaque_task_engine;
+	krrp_stream_task_t *task = opaque_task;
+	krrp_stream_te_t *task_engine = opaque_task_engine;
 
 	if (task_engine->fake_mode) {
 		cv_destroy(&task->cv);
@@ -439,7 +441,7 @@ krrp_stream_task_write_handler(krrp_stream_task_t *task, krrp_pdu_data_t *pdu)
 	int rc = 0;
 	kreplication_buffer_t *kr_buf = NULL;
 
-	kr_buf = (kreplication_buffer_t *) pdu->dblk;
+	kr_buf = (kreplication_buffer_t *)pdu->dblk;
 
 	ASSERT(task->zfs_ctx != NULL);
 
@@ -507,8 +509,8 @@ krrp_stream_task_fake_rate_limit(krrp_stream_task_t *task,
 	}
 
 	diff = gethrtime() - start_time;
-	delay = ((hrtime_t) data_sz * NANOSEC) /
-	    ((hrtime_t) krrp_stream_fake_rate_limit_mb * 1024 * 1024);
+	delay = ((hrtime_t)data_sz * NANOSEC) /
+	    ((hrtime_t)krrp_stream_fake_rate_limit_mb * 1024 * 1024);
 	if (diff > delay) {
 		DTRACE_PROBE2(rate_limit_delay2, uint64_t, diff,
 		    uint64_t, delay);
@@ -534,7 +536,7 @@ krrp_stream_task_read_handler(krrp_stream_task_t *task, krrp_pdu_data_t *pdu)
 	int rc = 0;
 	kreplication_buffer_t *kr_buf = NULL;
 
-	kr_buf = (kreplication_buffer_t *) pdu->dblk;
+	kr_buf = (kreplication_buffer_t *)pdu->dblk;
 
 	ASSERT(task->zfs_ctx != NULL);
 

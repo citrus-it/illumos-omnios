@@ -223,16 +223,13 @@ libkrrp_error_from_nvl(nvlist_t *nvl, libkrrp_error_t *error)
 
 	ASSERT(error != NULL);
 
-	if (krrp_param_get(KRRP_PARAM_ERROR_CODE, nvl,
-	    (void *) &krrp_errno) != 0)
+	if (krrp_param_get(KRRP_PARAM_ERROR_CODE, nvl, &krrp_errno) != 0)
 		return (-1);
 
-	if (krrp_param_get(KRRP_PARAM_ERROR_EXCODE, nvl,
-	    (void *) &unix_errno) != 0)
+	if (krrp_param_get(KRRP_PARAM_ERROR_EXCODE, nvl, &unix_errno) != 0)
 		return (-1);
 
-	if (krrp_param_get(KRRP_PARAM_ERROR_FLAGS, nvl,
-	    (void *) &flags) != 0)
+	if (krrp_param_get(KRRP_PARAM_ERROR_FLAGS, nvl, &flags) != 0)
 		return (-1);
 
 	libkrrp_error_set(error, krrp_errno_to_libkrrp_errno(krrp_errno),

@@ -72,7 +72,7 @@ void
 krrp_pdu_ctrl_alloc(krrp_pdu_ctrl_t **result_pdu, boolean_t with_header)
 {
 	krrp_pdu_alloc(krrp_global_pdu_engine_env.ctrl_pdu_engine,
-	    (krrp_pdu_t **) result_pdu, with_header);
+	    (krrp_pdu_t **)result_pdu, with_header);
 }
 
 int
@@ -100,12 +100,12 @@ krrp_pdu_engine_create(krrp_pdu_engine_t **result_engine, boolean_t ctrl,
 		engine->dblks_per_pdu = dblks_per_pdu;
 
 	engine->max_pdu_cnt = (max_memory * 1024 * 1024) /
-		total_dblk_sz / engine->dblks_per_pdu;
+	    total_dblk_sz / engine->dblks_per_pdu;
 
 	max_dblk_cnt = engine->max_pdu_cnt * engine->dblks_per_pdu;
 	rc = krrp_dblk_engine_create(&engine->dblk_engine, prealloc,
 	    max_dblk_cnt, dblk_head_sz, dblk_data_sz,
-	    engine->dblks_per_pdu, &krrp_pdu_engine_notify_cb, (void *) engine,
+	    engine->dblks_per_pdu, &krrp_pdu_engine_notify_cb, engine,
 	    error);
 	if (rc != 0) {
 		kmem_free(engine, sizeof (krrp_pdu_engine_t));
@@ -273,21 +273,21 @@ krrp_pdu_rele(krrp_pdu_t *pdu)
 	 * to TCP/IP stack, where dblks are processed and released.
 	 */
 	if (pdu->dblk == NULL) {
-		krrp_pdu_rele_task((void *) pdu);
+		krrp_pdu_rele_task(pdu);
 		return;
 	}
 
 	if (taskq_dispatch(krrp_global_pdu_engine_env.rele_taskq,
-	    krrp_pdu_rele_task, (void *) pdu, TQ_SLEEP) == NULL) {
+	    krrp_pdu_rele_task, pdu, TQ_SLEEP) == NULL) {
 		cmn_err(CE_WARN, "Failed to dispatch new connection");
-		krrp_pdu_rele_task((void *) pdu);
+		krrp_pdu_rele_task(pdu);
 	}
 }
 
 static void
 krrp_pdu_rele_task(void *void_pdu)
 {
-	krrp_pdu_t *pdu = (krrp_pdu_t *) void_pdu;
+	krrp_pdu_t *pdu = void_pdu;
 
 #ifdef KRRP_PDU_DEBUG
 	cmn_err(CE_NOTE, "RELE PDU: [%d]", pdu->type);
@@ -316,7 +316,7 @@ krrp_pdu_rele_task(void *void_pdu)
 static void
 krrp_pdu_engine_notify_cb(void *void_pdu_engine)
 {
-	krrp_pdu_engine_t *engine = (krrp_pdu_engine_t *) void_pdu_engine;
+	krrp_pdu_engine_t *engine = void_pdu_engine;
 
 	mutex_enter(&engine->mtx);
 

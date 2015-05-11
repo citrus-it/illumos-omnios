@@ -1,8 +1,8 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
-#ifndef	DMU_KRRP_H
-#define	DMU_KRRP_H
+#ifndef	_DMU_KRRP_H
+#define	_DMU_KRRP_H
 
 #ifdef	__cplusplus
 extern "C" {
@@ -28,4 +28,4 @@ typedef struct {
 }
 #endif
 
-#endif
+#endif /* _DMU_KRRP_H */
