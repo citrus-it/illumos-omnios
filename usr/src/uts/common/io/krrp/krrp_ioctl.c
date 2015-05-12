@@ -149,11 +149,19 @@ krrp_is_input_data_required(krrp_ioctl_cmd_t cmd)
 	return (result);
 }
 
-/* ARGSUSED */
 static int
 krrp_ioctl_sess_status(nvlist_t *params, nvlist_t *result,
     krrp_error_t *error)
 {
+	krrp_sess_t *sess = NULL;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		return (-1);
+
+	krrp_sess_get_status(sess, result);
+
+	krrp_sess_rele(sess);
 	return (0);
 }
 

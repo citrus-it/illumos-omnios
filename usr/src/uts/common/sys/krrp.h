@@ -7,8 +7,6 @@
 
 #include <sys/types.h>
 
-#include "krrp_ioctl_common.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

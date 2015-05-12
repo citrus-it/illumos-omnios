@@ -10,7 +10,7 @@
 #include <limits.h>
 #include <sys/mkdev.h>
 
-#include <krrp/krrp.h>
+#include <sys/krrp.h>
 
 /* krrp name info */
 

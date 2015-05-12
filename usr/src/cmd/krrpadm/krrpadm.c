@@ -23,7 +23,7 @@
 
 #include <assert.h>
 
-#include <krrp.h>
+#include <sys/krrp.h>
 #include <libkrrp.h>
 
 
@@ -40,6 +40,8 @@
 	    krrp_usage_sess, SESS_RUN) \
 	X(sess-send-stop, krrp_do_sess_action, \
 	    krrp_usage_sess, SESS_SEND_STOP) \
+	X(sess-status, krrp_do_sess_status, \
+	    krrp_usage_sess, SESS_STATUS) \
 	X(sess-create-conn, krrp_do_sess_create_conn, \
 	    krrp_usage_sess, SESS_CREATE_CONN) \
 	X(sess-create-read-stream, krrp_do_sess_create_read_stream, \
@@ -90,7 +92,7 @@ static krrp_usage_func krrp_usage_ksvc, krrp_usage_sess, krrp_usage_event,
 static krrp_handler_func krrp_do_ksvc_action, krrp_do_ksvc_configure,
     krrp_do_sess_list, krrp_do_sess_action, krrp_do_sess_create_conn,
     krrp_do_sess_create_read_stream, krrp_do_sess_create_write_stream,
-    krrp_do_sess_create_pdu_engine, krrp_do_read_event,
+    krrp_do_sess_create_pdu_engine, krrp_do_sess_status, krrp_do_read_event,
     krrp_do_get_recv_cookies, krrp_do_svc_get_state, krrp_do_sess_create;
 
 static int krrp_parse_and_check_sess_id(char *sess_id_str,
@@ -232,6 +234,10 @@ krrp_usage_sess(int rc, krrp_cmd_t *cmd, boolean_t use_return)
 		fprintf_msg("Usage: %s sess-destroy "
 		    "<-s sess_id>\n", tool_name);
 		break;
+	case KRRP_CMD_SESS_STATUS:
+		fprintf_msg("Usage: %s sess-status "
+		    "<-s sess_id>\n", tool_name);
+		break;
 	case KRRP_CMD_SESS_RUN:
 		fprintf_msg("Usage: %s sess-run "
 		    "<-s sess_id>\n", tool_name);
@@ -339,7 +345,7 @@ krrp_sysevent_cb(libkrrp_event_t *ev, void *cookie)
 		libkrrp_ev_data_error_description(ev_type,
 		    &ev_data->sess_error.libkrrp_error, err_desc);
 		fprintf_msg("Session '%s' has interrupted by error:\n"
-		    "    %s\n", err_desc);
+		    "    %s\n", sess_id_str, err_desc);
 		break;
 	case LIBKRRP_EV_TYPE_SERVER_ERROR:
 		libkrrp_ev_data_error_description(ev_type,
@@ -515,7 +521,6 @@ krrp_do_sess_action(int argc, char **argv, krrp_cmd_t *cmd)
 	boolean_t run_once = B_FALSE;
 	const char *opts = "hs:";
 
-
 	uuid_clear(sess_id);
 
 	switch (cmd->item) {
@@ -623,6 +628,75 @@ krrp_do_sess_action(int argc, char **argv, krrp_cmd_t *cmd)
 }
 
 static int
+krrp_do_sess_status(int argc, char **argv, krrp_cmd_t *cmd)
+{
+	int c, rc = 0;
+	uuid_t sess_id;
+	libkrrp_sess_status_t sess_status;
+	libkrrp_error_descr_t err_desc;
+	char *sess_id_str = NULL;
+
+	assert(cmd->item == KRRP_CMD_SESS_STATUS);
+
+	uuid_clear(sess_id);
+
+	while ((c = getopt(argc, argv, "hs:")) != -1) {
+		switch (c) {
+		case 's':
+			if (krrp_parse_and_check_sess_id(optarg, sess_id) != 0)
+				exit(1);
+
+			sess_id_str = optarg;
+			break;
+		case '?':
+			krrp_print_err_unknown_param(argv[optind - 1]);
+			cmd->usage_func(1, cmd, B_FALSE);
+			break;
+		case 'h':
+			cmd->usage_func(0, cmd, B_FALSE);
+			break;
+		}
+	}
+
+	if (uuid_is_null(sess_id) == 1) {
+		krrp_print_err_no_sess_id();
+		cmd->usage_func(1, cmd, B_FALSE);
+	}
+
+	rc = krrp_sess_status(libkrrp_hdl, sess_id, &sess_status);
+	if (rc != 0) {
+		fprintf_err("Failed to get session status\n");
+		krrp_print_libkrrp_error();
+		exit(1);
+	}
+
+	fprintf_msg("Session: [%s]\n"
+	    "    kstat ID: %s\n"
+	    "    type: %s\n"
+	    "    started: %s\n"
+	    "    running: %s\n",
+	    sess_id_str,
+	    sess_status.sess_kstat_id,
+	    sess_status.sess_type == LIBKRRP_SESS_TYPE_SENDER ? "sender" :
+	    sess_status.sess_type == LIBKRRP_SESS_TYPE_RECEIVER ? "receiver" :
+	    "compound",
+	    sess_status.sess_started ? "YES" : "NO",
+	    sess_status.sess_running ? "YES" : "NO",
+	    err_desc);
+
+	if (sess_status.libkrrp_error.libkrrp_errno != LIBKRRP_ERRNO_OK) {
+		libkrrp_sess_error_description(&sess_status.libkrrp_error,
+		    err_desc);
+
+		fprintf_msg("    error: %s\n", err_desc);
+	}
+
+	fprintf_msg("\n");
+
+	return (0);
+}
+
+static int
 krrp_do_sess_list(int argc, char **argv, krrp_cmd_t *cmd)
 {
 	int c, rc = 0;
@@ -640,7 +714,7 @@ krrp_do_sess_list(int argc, char **argv, krrp_cmd_t *cmd)
 		}
 	}
 
-	rc = krrp_sess_get_list(libkrrp_hdl, &sess_list_head);
+	rc = krrp_sess_list(libkrrp_hdl, &sess_list_head);
 	if (rc != 0) {
 		fprintf_err("Failed to get list of sessions\n");
 		krrp_print_libkrrp_error();
@@ -665,6 +739,7 @@ krrp_do_sess_list(int argc, char **argv, krrp_cmd_t *cmd)
 		sess_list = sess_list->sl_next;
 	}
 
+	krrp_sess_list_free(sess_list_head);
 	return (0);
 }
 

@@ -13,6 +13,11 @@
 extern "C" {
 #endif
 
+typedef enum {
+	LIBKRRP_SESS_ERROR,
+	LIBKRRP_SRV_ERROR
+} libkrrp_error_type_t;
+
 #define	LIBKRRP_ERRDESCR_EXPAND(m_libkrrp_errno, m_unix_errno, m_descr, ...) \
 	    libkrrp_error_cmp(libkrrp_errno, LIBKRRP_ERRNO_##m_libkrrp_errno, \
 	    unix_errno, m_unix_errno, flags, (char *)descr, \
@@ -304,7 +309,8 @@ void libkrrp_error_set(libkrrp_error_t *, libkrrp_errno_t, int, uint32_t);
 boolean_t libkrrp_error_cmp(libkrrp_errno_t, libkrrp_errno_t, int, int, int,
     char *, char *, ...);
 const char *krrp_unix_errno_to_str(int);
-
+void libkrrp_common_error_description(libkrrp_error_type_t,
+    libkrrp_error_t *, libkrrp_error_descr_t);
 #ifdef	__cplusplus
 }
 #endif

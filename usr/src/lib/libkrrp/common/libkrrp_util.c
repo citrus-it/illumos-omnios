@@ -7,7 +7,7 @@
 #include <fcntl.h>
 
 #include "krrp_error.h"
-#include "krrp.h"
+#include <sys/krrp.h>
 #include "libkrrp_impl.h"
 #include "libkrrp.h"
 

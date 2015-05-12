@@ -35,14 +35,16 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	krrp_sess_create_write_stream;
 	krrp_sess_run;
 	krrp_sess_send_stop;
-	krrp_sess_get_list;
+	krrp_sess_list;
 	krrp_sess_list_free;
+	krrp_sess_status;
 	krrp_zfs_get_recv_cookies;
 	krrp_svc_enable;
 	krrp_svc_disable;
 	krrp_svc_state;
 	libkrrp_error;
 	libkrrp_error_description;
+	libkrrp_sess_error_description;
 	libkrrp_evc_subscribe;
 	libkrrp_evc_unsubscribe;
 	libkrrp_evc_error;

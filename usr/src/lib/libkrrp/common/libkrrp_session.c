@@ -6,7 +6,7 @@
 #include <sys/debug.h>
 #include <string.h>
 
-#include "krrp.h"
+#include <sys/krrp.h>
 #include "libkrrp.h"
 #include "libkrrp_impl.h"
 
@@ -368,45 +368,74 @@ krrp_sess_send_stop(libkrrp_handle_t *hdl, uuid_t sess_id)
 	return (rc);
 }
 
-int
-krrp_zfs_get_recv_cookies(libkrrp_handle_t *hdl, const char *dataset,
-    char *res_zcookies, size_t res_zcookies_sz)
+int krrp_sess_status(libkrrp_handle_t *hdl, uuid_t sess_id,
+    libkrrp_sess_status_t *sess_status)
 {
-	int rc;
-	nvlist_t *result_nvl = NULL;
+	nvlist_t *result = NULL;
 	nvlist_t *params = NULL;
-	const char *zcookies = NULL;
+	char *res_sess_id_str;
+	char *res_sess_kstat_id;
+
+	krrp_sess_id_str_t sess_id_str;
+	int rc = 0;
 
 	VERIFY(hdl != NULL);
 
-	res_zcookies[0] = '\0';
-
 	libkrrp_reset(hdl);
 
+	uuid_unparse(sess_id, sess_id_str);
 	params = fnvlist_alloc();
-	(void) krrp_param_put(KRRP_PARAM_DST_DATASET, params, (void *)dataset);
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
 
-	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_ZFS_GET_RECV_COOKIES, params,
-	    &result_nvl);
+	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SESS_STATUS, params, &result);
 
-	fnvlist_free(params);
-
-	if (rc != 0)
-		return (rc);
-
-	if (result_nvl == NULL)
-		return (rc);
-
-	VERIFY0(krrp_param_get(KRRP_PARAM_ZCOOKIES, result_nvl,
-	    &zcookies));
-
-	if (strlcpy(res_zcookies, zcookies,
-	    res_zcookies_sz) >= res_zcookies_sz) {
-		rc = EOVERFLOW;
-		libkrrp_error_set(&hdl->libkrrp_error, LIBKRRP_ERRNO_ZCOOKIES,
-		    rc, 0);
+	if (rc != 0) {
+		rc = -1;
+		goto fini;
 	}
 
-	fnvlist_free(result_nvl);
+	VERIFY0(krrp_param_get(KRRP_PARAM_SESS_ID, result,
+	    &res_sess_id_str));
+
+	if (uuid_parse(res_sess_id_str, sess_status->sess_id) != 0) {
+		libkrrp_error_set(&hdl->libkrrp_error,
+		    LIBKRRP_ERRNO_SESSID, EINVAL, 0);
+		rc = -1;
+		goto fini;
+	}
+
+	VERIFY0(krrp_param_get(KRRP_PARAM_SESS_STARTED, result,
+	    &sess_status->sess_started));
+
+	VERIFY0(krrp_param_get(KRRP_PARAM_SESS_RUNNING, result,
+	    &sess_status->sess_running));
+
+	if (krrp_param_exists(KRRP_PARAM_SESS_SENDER, result))
+		sess_status->sess_type = LIBKRRP_SESS_TYPE_SENDER;
+	else if (krrp_param_exists(KRRP_PARAM_SESS_COMPOUND, result))
+		sess_status->sess_type = LIBKRRP_SESS_TYPE_COMPOUND;
+	else
+		sess_status->sess_type = LIBKRRP_SESS_TYPE_RECEIVER;
+
+	VERIFY0(krrp_param_get(KRRP_PARAM_SESS_KSTAT_ID, result,
+	    &res_sess_kstat_id));
+
+	(void) strlcpy(sess_status->sess_kstat_id, res_sess_kstat_id,
+	    KRRP_KSTAT_ID_STRING_LENGTH);
+
+	if (krrp_param_exists(KRRP_PARAM_ERROR_CODE, result)) {
+		rc = libkrrp_error_from_nvl(result,
+		    &sess_status->libkrrp_error);
+		ASSERT0(rc);
+	} else {
+		sess_status->libkrrp_error.libkrrp_errno = 0;
+	}
+
+fini:
+	fnvlist_free(params);
+
+	if (result != NULL)
+		fnvlist_free(result);
+
 	return (rc);
 }

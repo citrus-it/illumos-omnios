@@ -9,7 +9,7 @@
 #include <umem.h>
 #include <inttypes.h>
 
-#include "krrp.h"
+#include <sys/krrp.h>
 #include "libkrrp.h"
 #include "libkrrp_impl.h"
 
@@ -144,8 +144,8 @@ krrp_ioctl_data_from_nvl(libkrrp_handle_t *hdl,
 		return (-1);
 
 	if (params != NULL) {
-		/*LINTED: E_BAD_PTR_CAST_ALIGN*/
-		VERIFY0(nvlist_pack(params, (char **)&ioctl_data->buf,
+		char *buf = ioctl_data->buf;
+		VERIFY0(nvlist_pack(params, &buf,
 		    &packed_size, NV_ENCODE_NATIVE, 0));
 		ioctl_data->data_size = packed_size;
 	}

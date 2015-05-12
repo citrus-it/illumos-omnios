@@ -31,6 +31,7 @@ file path=lib/llib-lkrrp
 file path=lib/llib-lkrrp.ln
 file path=usr/include/libkrrp.h
 file path=usr/include/sys/kreplication_common.h
+file path=usr/include/sys/krrp.h
 file path=usr/include/sys/sysevent/krrp.h
 file path=usr/lib/devfsadm/linkmod/SUNW_krrp_link.so group=sys
 file path=usr/sbin/krrpadm mode=0555

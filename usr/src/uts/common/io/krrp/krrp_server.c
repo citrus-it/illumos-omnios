@@ -13,9 +13,8 @@
 #include <sys/class.h>
 #include <sys/sdt.h>
 
-#include <krrp.h>
 #include <krrp_params.h>
-#include <krrp.h>
+#include <sys/krrp.h>
 
 #include "krrp_server.h"
 

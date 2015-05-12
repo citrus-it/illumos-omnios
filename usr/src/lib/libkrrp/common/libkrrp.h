@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/nvpair.h>
 #include <uuid/uuid.h>
+#include <sys/krrp.h>
 #include <netdb.h>
 #include <errno.h>
 
@@ -114,6 +115,12 @@ typedef enum {
 } libkrrp_errno_t;
 #undef	LIBKRRP_ERRNO_EXPAND
 
+typedef enum {
+	LIBKRRP_SESS_TYPE_SENDER,
+	LIBKRRP_SESS_TYPE_RECEIVER,
+	LIBKRRP_SESS_TYPE_COMPOUND
+} libkrrp_sess_type_t;
+
 typedef struct libkrrp_error_s {
 	libkrrp_errno_t libkrrp_errno;
 	int unix_errno;
@@ -156,6 +163,15 @@ typedef union {
 	libkrrp_error_t server_error;
 } libkrrp_ev_data_t;
 
+typedef struct libkrrp_sess_status_s {
+	uuid_t sess_id;
+	libkrrp_sess_type_t sess_type;
+	boolean_t sess_running;
+	boolean_t sess_started;
+	char sess_kstat_id[KRRP_KSTAT_ID_STRING_LENGTH];
+	libkrrp_error_t libkrrp_error;
+} libkrrp_sess_status_t;
+
 boolean_t is_krrp_supported(void);
 
 libkrrp_handle_t *libkrrp_init(void);
@@ -189,8 +205,11 @@ int krrp_sess_create_write_stream(libkrrp_handle_t *, uuid_t, const char *,
 int krrp_sess_run(libkrrp_handle_t *, uuid_t, boolean_t);
 int krrp_sess_send_stop(libkrrp_handle_t *, uuid_t);
 
-int krrp_sess_get_list(libkrrp_handle_t *, libkrrp_sess_list_t **);
+int krrp_sess_list(libkrrp_handle_t *, libkrrp_sess_list_t **);
 void krrp_sess_list_free(libkrrp_sess_list_t *);
+
+int krrp_sess_status(libkrrp_handle_t *, uuid_t, libkrrp_sess_status_t *);
+void libkrrp_sess_error_description(libkrrp_error_t *, libkrrp_error_descr_t);
 
 int krrp_zfs_get_recv_cookies(libkrrp_handle_t *, const char *, char *, size_t);
 

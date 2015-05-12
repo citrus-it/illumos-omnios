@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "krrp.h"
+#include <sys/krrp.h>
 #include "krrp_error.h"
 #include "libkrrp.h"
 #include "libkrrp_impl.h"
@@ -190,6 +190,28 @@ static size_t unix_errnos_sz = sizeof (unix_errnos) / sizeof (unix_errnos[0]);
 #define	KRRP_ERRDESCR_SESS_STATUS_MAP(X)
 #define	KRRP_ERRDESCR_SESS_LIST_MAP(X)
 
+#define	LIBKRRP_ERRDESCR_SESS_ERROR_MAP(X) \
+	X(OK, 0, LIBKRRP_EMSG_OK) \
+	X(PINGTIMEOUT, 0, LIBKRRP_EMSG_SESSPINGTIMEOUT) \
+	X(WRITEFAIL, 0, LIBKRRP_EMSG_WRITEFAIL, \
+	    krrp_unix_errno_to_str(unix_errno)) \
+	X(READFAIL, 0, LIBKRRP_EMSG_READFAIL, \
+	    krrp_unix_errno_to_str(unix_errno)) \
+	X(SENDFAIL, 0, LIBKRRP_EMSG_SENDFAIL, strerror(unix_errno)) \
+	X(SENDMBLKFAIL, 0, LIBKRRP_EMSG_SENDMBLKFAIL, strerror(unix_errno)) \
+	X(RECVFAIL, 0, LIBKRRP_EMSG_RECVFAIL, strerror(unix_errno)) \
+	X(UNEXPEND, 0, LIBKRRP_EMSG_UNEXPEND) \
+	X(BIGPAYLOAD, 0, LIBKRRP_EMSG_BIGPAYLOAD) \
+	X(UNEXPCLOSE, 0, LIBKRRP_EMSG_UNEXPCLOSE) \
+	X(SNAPFAIL, 0, LIBKRRP_EMSG_SNAPFAIL, \
+	    krrp_unix_errno_to_str(unix_errno)) \
+
+#define	LIBKRRP_ERRDESCR_SERVER_ERROR_MAP(X) \
+	X(CREATEFAIL, 0, LIBKRRP_EMSG_CREATEFAIL) \
+	X(BINDFAIL, 0, LIBKRRP_EMSG_BINDFAIL) \
+	X(LISTENFAIL, 0, LIBKRRP_EMSG_LISTENFAIL) \
+	X(ADDR, EINVAL, LIBKRRP_EMSG_ADDR_INVAL) \
+
 
 static libkrrp_errno_t
 krrp_errno_to_libkrrp_errno(krrp_errno_t krrp_errno)
@@ -331,4 +353,47 @@ const char
 	}
 
 	return ("UNIX_ERRNO_UNKNOWN");
+}
+
+void
+libkrrp_common_error_description(libkrrp_error_type_t error_type,
+    libkrrp_error_t *error, libkrrp_error_descr_t descr)
+{
+	/* LINTED: E_FUNC_SET_NOT_USED */
+	libkrrp_errno_t libkrrp_errno;
+	/* LINTED: E_FUNC_SET_NOT_USED */
+	int unix_errno;
+	/* LINTED: E_FUNC_SET_NOT_USED */
+	int flags;
+
+	VERIFY(error != NULL);
+
+	descr[0] = '\0';
+	libkrrp_errno = error->libkrrp_errno;
+	unix_errno = error->unix_errno;
+	flags = error->flags;
+
+	switch (error_type) {
+	case LIBKRRP_SRV_ERROR:
+		SET_ERROR_DESCR(LIBKRRP_ERRDESCR_SERVER_ERROR_MAP);
+		break;
+	case LIBKRRP_SESS_ERROR:
+		SET_ERROR_DESCR(LIBKRRP_ERRDESCR_SESS_ERROR_MAP);
+		break;
+	default:
+		break;
+	}
+
+	if (descr[0] == '\0') {
+		(void) snprintf(descr,
+		    sizeof (libkrrp_error_descr_t) - 1,
+		    dgettext(TEXT_DOMAIN, LIBKRRP_EMSG_UNKNOWN));
+	}
+}
+
+void
+libkrrp_sess_error_description(libkrrp_error_t *error,
+    libkrrp_error_descr_t descr)
+{
+	libkrrp_common_error_description(LIBKRRP_SESS_ERROR, error, descr);
 }

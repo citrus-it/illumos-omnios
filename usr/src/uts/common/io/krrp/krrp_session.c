@@ -367,6 +367,41 @@ out:
 	return (rc);
 }
 
+void
+krrp_sess_get_status(krrp_sess_t *sess, nvlist_t *result)
+{
+	boolean_t true_value = B_TRUE;
+
+	mutex_enter(&sess->mtx);
+
+	switch (sess->type) {
+	case KRRP_SESS_SENDER:
+		VERIFY0(krrp_param_put(KRRP_PARAM_SESS_SENDER,
+		    result, &true_value));
+		break;
+	case KRRP_SESS_RECEIVER:
+		break;
+	case KRRP_SESS_COMPOUND:
+		VERIFY0(krrp_param_put(KRRP_PARAM_SESS_COMPOUND,
+		    result, &true_value));
+		break;
+	}
+
+	VERIFY0(krrp_param_put(KRRP_PARAM_SESS_ID,
+	    result, sess->id));
+	VERIFY0(krrp_param_put(KRRP_PARAM_SESS_KSTAT_ID,
+	    result, sess->kstat.id));
+	VERIFY0(krrp_param_put(KRRP_PARAM_SESS_STARTED,
+	    result, &sess->started));
+	VERIFY0(krrp_param_put(KRRP_PARAM_SESS_RUNNING,
+	    result, &sess->running));
+
+	if (sess->error.krrp_errno != 0)
+		krrp_error_to_nvl(&sess->error, &result);
+
+	mutex_exit(&sess->mtx);
+}
+
 /*
  * 'Started' means 'sess_run' IOCTL was successfully processed
  */

@@ -21,7 +21,7 @@
 #include <sys/cmn_err.h>
 
 #include <krrp_error.h>
-#include <krrp.h>
+#include <sys/krrp.h>
 
 #include "krrp_svc.h"
 #include "krrp_ioctl.h"

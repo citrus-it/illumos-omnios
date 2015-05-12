@@ -9,7 +9,7 @@
 #include <sys/avl.h>
 #include <sys/uuid.h>
 
-#include <krrp.h>
+#include <sys/krrp.h>
 #include <krrp_error.h>
 
 #include "krrp_stream.h"
@@ -160,6 +160,8 @@ int krrp_sess_initiator_attach_conn(krrp_sess_t *sess, krrp_conn_t *conn,
     krrp_error_t *error);
 int krrp_sess_target_attach_conn(krrp_sess_t *sess, krrp_conn_t *conn,
     nvlist_t *params, krrp_error_t *error);
+
+void krrp_sess_get_status(krrp_sess_t *sess, nvlist_t *result);
 
 int krrp_sess_run(krrp_sess_t *sess, boolean_t only_once,
     krrp_error_t *error);

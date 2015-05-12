@@ -332,6 +332,7 @@ CHKHDRS=			\
 	kobj.h			\
 	kobj_impl.h		\
 	kreplication_common.h	\
+	krrp.h			\
 	ksocket.h		\
 	kstat.h			\
 	kstr.h			\

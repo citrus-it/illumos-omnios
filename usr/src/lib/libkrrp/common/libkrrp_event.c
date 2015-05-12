@@ -8,9 +8,9 @@
 #include <string.h>
 #include <sys/debug.h>
 #include <stdarg.h>
-#include <sys/sysevent/krrp.h>
 
-#include "krrp.h"
+#include <sys/sysevent/krrp.h>
+#include <sys/krrp.h>
 #include "libkrrp.h"
 #include "libkrrp_impl.h"
 #include "libkrrp_error.h"
@@ -34,27 +34,6 @@ static struct {
 
 static size_t krrp_escs_sz = sizeof (krrp_escs) / sizeof (krrp_escs[0]);
 
-#define	LIBKRRP_ERRDESCR_EV_SESS_ERROR_MAP(X) \
-	X(PINGTIMEOUT, 0, LIBKRRP_EMSG_SESSPINGTIMEOUT) \
-	X(WRITEFAIL, 0, LIBKRRP_EMSG_WRITEFAIL, \
-	    krrp_unix_errno_to_str(unix_errno)) \
-	X(READFAIL, 0, LIBKRRP_EMSG_READFAIL, \
-	    krrp_unix_errno_to_str(unix_errno)) \
-	X(SENDFAIL, 0, LIBKRRP_EMSG_SENDFAIL, strerror(unix_errno)) \
-	X(SENDMBLKFAIL, 0, LIBKRRP_EMSG_SENDMBLKFAIL, strerror(unix_errno)) \
-	X(RECVFAIL, 0, LIBKRRP_EMSG_RECVFAIL, strerror(unix_errno)) \
-	X(UNEXPEND, 0, LIBKRRP_EMSG_UNEXPEND) \
-	X(BIGPAYLOAD, 0, LIBKRRP_EMSG_BIGPAYLOAD) \
-	X(UNEXPCLOSE, 0, LIBKRRP_EMSG_UNEXPCLOSE) \
-	X(SNAPFAIL, 0, LIBKRRP_EMSG_SNAPFAIL, \
-	    krrp_unix_errno_to_str(unix_errno)) \
-
-#define	LIBKRRP_ERRDESCR_EV_SERVER_ERROR_MAP(X) \
-	X(CREATEFAIL, 0, LIBKRRP_EMSG_CREATEFAIL) \
-	X(BINDFAIL, 0, LIBKRRP_EMSG_BINDFAIL) \
-	X(LISTENFAIL, 0, LIBKRRP_EMSG_LISTENFAIL) \
-	X(ADDR, EINVAL, LIBKRRP_EMSG_ADDR_INVAL) \
-
 static libkrrp_ev_type_t
 subclass_to_libkrrp_ev_type(const char *subclass)
 {
@@ -71,7 +50,7 @@ subclass_to_libkrrp_ev_type(const char *subclass)
 }
 
 static int
-libkrrp_sess_id_parse(libkrrp_event_t *ev, krrp_sess_id_str_t sess_id_str,
+libkrrp_sess_id_parse(libkrrp_event_t *ev, char *sess_id_str,
     uuid_t sess_id)
 {
 	ASSERT(sess_id != NULL);
@@ -90,7 +69,7 @@ libkrrp_sess_id_parse(libkrrp_event_t *ev, krrp_sess_id_str_t sess_id_str,
 static void
 libkrrp_ev_unpack_sess_send_done(libkrrp_event_t *ev, nvlist_t *attr)
 {
-	krrp_sess_id_str_t sess_id_str;
+	char *sess_id_str = NULL;
 
 	ASSERT(ev != NULL);
 	ASSERT(attr != NULL);
@@ -108,7 +87,7 @@ libkrrp_ev_unpack_sess_send_done(libkrrp_event_t *ev, nvlist_t *attr)
 static void
 libkrrp_ev_unpack_sess_error(libkrrp_event_t *ev, nvlist_t *attr)
 {
-	krrp_sess_id_str_t sess_id_str;
+	char *sess_id_str = NULL;
 
 	ASSERT(ev != NULL);
 	ASSERT(attr != NULL);
@@ -331,36 +310,17 @@ void
 libkrrp_ev_data_error_description(libkrrp_ev_type_t ev_type,
     libkrrp_error_t *error, libkrrp_error_descr_t descr)
 {
-
-	/* LINTED: E_FUNC_SET_NOT_USED */
-	libkrrp_errno_t libkrrp_errno;
-	/* LINTED: E_FUNC_SET_NOT_USED */
-	int unix_errno;
-	/* LINTED: E_FUNC_SET_NOT_USED */
-	int flags;
-
-	VERIFY(error != NULL);
-
-	descr[0] = '\0';
-	libkrrp_errno = error->libkrrp_errno;
-	unix_errno = error->unix_errno;
-	flags = error->flags;
-
 	switch (ev_type) {
 	case LIBKRRP_EV_TYPE_SERVER_ERROR:
-		SET_ERROR_DESCR(LIBKRRP_ERRDESCR_EV_SERVER_ERROR_MAP);
+		libkrrp_common_error_description(LIBKRRP_SRV_ERROR, error,
+		    descr);
 		break;
 	case LIBKRRP_EV_TYPE_SESS_ERROR:
-		SET_ERROR_DESCR(LIBKRRP_ERRDESCR_EV_SESS_ERROR_MAP);
+		libkrrp_common_error_description(LIBKRRP_SESS_ERROR, error,
+		    descr);
 		break;
 	default:
 		break;
-	}
-
-	if (descr[0] == '\0') {
-		(void) snprintf(descr,
-		    sizeof (libkrrp_error_descr_t) - 1,
-		    dgettext(TEXT_DOMAIN, LIBKRRP_EMSG_UNKNOWN));
 	}
 }
 
