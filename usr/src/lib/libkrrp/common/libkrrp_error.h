@@ -42,6 +42,7 @@ typedef enum {
 #define	LIBKRRP_EMSG_SESS_ALREADY "Session already exists"
 #define	LIBKRRP_EMSG_SESS_NOENT "Session does not exist"
 #define	LIBKRRP_EMSG_HOST_NOENT "Remote host is not specified"
+#define	LIBKRRP_EMSG_SESS_BUSY "Session is busy"
 #define	LIBKRRP_EMSG_HOST_INVAL "Invalid remote host"
 #define	LIBKRRP_EMSG_ADDR_INVAL "Invalid listening address"
 #define	LIBKRRP_EMSG_PORT_NOENT "Remote port not specified"
