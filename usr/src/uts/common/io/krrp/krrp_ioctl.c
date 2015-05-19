@@ -349,7 +349,7 @@ krrp_ioctl_sess_create_stream(nvlist_t *params, boolean_t read_stream,
 
 	sess = krrp_ioctl_sess_action_common(params, error);
 	if (sess == NULL)
-		goto out;
+		return (-1);
 
 	switch (sess->type) {
 	case KRRP_SESS_SENDER:
