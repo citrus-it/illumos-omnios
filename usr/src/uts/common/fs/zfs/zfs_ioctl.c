@@ -22,11 +22,11 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright 2011 Martin Matuska
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -6065,7 +6065,7 @@ zfs_ioc_send_space(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 			dsl_dataset_rele(fromsnap, FTAG);
 		} else if (strchr(fromname, '#') != NULL) {
 			/*
-			 * If from is a bookmark, fetch the creation TXG  of the
+			 * If from is a bookmark, fetch the creation TXG of the
 			 * snapshot it was created from and use that to find
 			 * blocks that were born after it.
 			 */
@@ -6079,7 +6079,7 @@ zfs_ioc_send_space(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 			    frombm.zbm_creation_txg, &space);
 		} else {
 			/*
-			 * from is not propertly formatted as a snapshot or
+			 * from is not properly formatted as a snapshot or
 			 * bookmark
 			 */
 			error = SET_ERROR(EINVAL);
