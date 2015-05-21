@@ -61,10 +61,7 @@ typedef struct krrp_throttle_s {
 struct krrp_conn_s {
 	krrp_conn_state_t		state;
 
-	kthread_t				*tx_thread;
 	boolean_t				tx_running;
-
-	kthread_t				*rx_thread;
 	boolean_t				rx_running;
 
 	krrp_queue_t			*ctrl_tx_queue;

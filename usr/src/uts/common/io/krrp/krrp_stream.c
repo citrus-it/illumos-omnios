@@ -286,10 +286,11 @@ krrp_stream_destroy(krrp_stream_t *stream)
 {
 	krrp_stream_lock(stream);
 
-	if (stream->state == KRRP_STRMS_ACTIVE) {
-		stream->state = KRRP_STRMS_STOPPED;
+	stream->state = KRRP_STRMS_STOPPED;
+	if (stream->work_thread != NULL) {
+		kt_did_t t_did = stream->work_thread->t_did;
 		krrp_stream_unlock(stream);
-		thread_join(stream->work_thread->t_did);
+		thread_join(t_did);
 		krrp_stream_lock(stream);
 	}
 
@@ -908,13 +909,16 @@ krrp_stream_read(void *arg)
 		krrp_stream_lock(stream);
 	}
 
-	krrp_stream_unlock(stream);
+	stream->work_thread = NULL;
 
 	if (pdu != NULL)
 		krrp_pdu_rele((krrp_pdu_t *)pdu);
 
 	if (stream_task != NULL)
 		krrp_stream_task_done(stream, stream_task, B_TRUE);
+
+	krrp_stream_unlock(stream);
+	thread_exit();
 }
 
 /*
@@ -1025,7 +1029,7 @@ krrp_stream_write(void *arg)
 		krrp_stream_lock(stream);
 	}
 
-	krrp_stream_unlock(stream);
+	stream->work_thread = NULL;
 
 	if (pdu != NULL)
 		krrp_pdu_rele((krrp_pdu_t *)pdu);
@@ -1040,6 +1044,9 @@ krrp_stream_write(void *arg)
 
 	if (stream_task != NULL)
 		krrp_stream_task_done(stream, stream_task, B_TRUE);
+
+	krrp_stream_unlock(stream);
+	thread_exit();
 }
 
 static void

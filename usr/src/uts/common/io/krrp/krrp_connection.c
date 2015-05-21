@@ -128,14 +128,14 @@ krrp_conn_destroy(krrp_conn_t *conn)
 
 	krrp_conn_throttle_disable(&conn->throttle);
 
+	/*
+	 * We do not join TX and RX thread, because:
+	 *  - conn->ks is held by TX and RX threads on start
+	 *  - TX and RX threads do ksocket_rele() before exit thread
+	 *  - ksocket_close() is blocked while the given ksocket is held
+	 */
 	if (conn->ks != NULL)
 		(void) ksocket_close(conn->ks, CRED());
-
-	if (conn->tx_thread != NULL)
-		thread_join(conn->tx_thread->t_did);
-
-	if (conn->rx_thread != NULL)
-		thread_join(conn->rx_thread->t_did);
 
 	mutex_enter(&conn->mtx);
 	conn->state = KRRP_CS_DISCONNECTED;
@@ -191,11 +191,11 @@ krrp_conn_run(krrp_conn_t *conn, krrp_queue_t *ctrl_tx_queue,
 	krrp_conn_throttle_enable(&conn->throttle);
 
 	/* thread_create never fails */
-	conn->tx_thread = thread_create(NULL, 0, &krrp_conn_tx_handler,
+	(void) thread_create(NULL, 0, &krrp_conn_tx_handler,
 	    conn, 0, &p0, TS_RUN, minclsyspri);
 
 	/* thread_create never fails */
-	conn->rx_thread = thread_create(NULL, 0, &krrp_conn_rx_handler,
+	(void) thread_create(NULL, 0, &krrp_conn_rx_handler,
 	    conn, 0, &p0, TS_RUN, minclsyspri);
 
 	mutex_exit(&conn->mtx);
@@ -698,12 +698,19 @@ krrp_conn_tx_handler(void *void_conn)
 	if (conn->state == KRRP_CS_DISCONNECTING)
 		(void) memset(&error, 0, sizeof (error));
 
+	if (error.krrp_errno != 0) {
+		conn->state = KRRP_CS_DISCONNECTING;
+		conn->rx_running = B_FALSE;
+	}
+
 	mutex_exit(&conn->mtx);
 
 	ksocket_rele(conn->ks);
 
 	if (error.krrp_errno != 0)
 		krrp_conn_callback(conn, KRRP_CONN_ERROR, &error);
+
+	thread_exit();
 }
 
 static int
@@ -916,6 +923,11 @@ krrp_conn_rx_handler(void *void_conn)
 	if (conn->state == KRRP_CS_DISCONNECTING)
 		(void) memset(&error, 0, sizeof (error));
 
+	if (error.krrp_errno != 0) {
+		conn->state = KRRP_CS_DISCONNECTING;
+		conn->tx_running = B_FALSE;
+	}
+
 	mutex_exit(&conn->mtx);
 
 	if (hdr != NULL)
@@ -928,6 +940,8 @@ krrp_conn_rx_handler(void *void_conn)
 		krrp_conn_callback(conn, KRRP_CONN_ERROR, &error);
 
 	ksocket_rele(conn->ks);
+
+	thread_exit();
 }
 
 static int
