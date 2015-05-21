@@ -278,7 +278,7 @@ out:
 static int
 krrp_ioctl_sess_create_pdu_engine(nvlist_t *params, krrp_error_t *error)
 {
-	int rc;
+	int rc = -1;
 	krrp_sess_t *sess = NULL;
 	krrp_pdu_engine_t *pdu_engine = NULL;
 	boolean_t use_prealloc = B_FALSE;
@@ -287,6 +287,23 @@ krrp_ioctl_sess_create_pdu_engine(nvlist_t *params, krrp_error_t *error)
 	sess = krrp_ioctl_sess_action_common(params, error);
 	if (sess == NULL)
 		return (-1);
+
+	/*
+	 * dblk at sender side (since the sender uses ksocket_sendmblk)
+	 * must have some space before data space, because the space is used
+	 * by TCP/IP stack. The size of the space is equal to mblk_wroff,
+	 * that is extracted from sonode_t.
+	 * So to create pdu_engine in this case we need to be sure that
+	 * a connection already established.
+	 */
+	if (sess->type == KRRP_SESS_SENDER) {
+		if (sess->conn == NULL) {
+			krrp_error_set(error, KRRP_ERRNO_CONN, ENOENT);
+			goto out;
+		}
+
+		dblk_head_sz = sess->conn->mblk_wroff;
+	}
 
 	rc = krrp_param_get(KRRP_PARAM_DBLK_DATA_SIZE, params,
 	    (void *) &dblk_data_sz);
@@ -306,8 +323,6 @@ krrp_ioctl_sess_create_pdu_engine(nvlist_t *params, krrp_error_t *error)
 		krrp_error_set(error, KRRP_ERRNO_DBLKSZ, EINVAL);
 		goto out;
 	}
-
-	dblk_head_sz = 120;
 
 	rc = krrp_param_get(KRRP_PARAM_MAX_MEMORY, params,
 	    (void *) &max_memory);
