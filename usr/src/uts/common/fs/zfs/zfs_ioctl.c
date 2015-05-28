@@ -6727,12 +6727,20 @@ zfs_ioc_check_krrp(const char *dataset, nvlist_t *innvl, nvlist_t *outnvl)
 	spa_t *spa;
 	int err = 0;
 
-	err = dsl_pool_hold(dataset, FTAG, &dp);
+	/*
+	 * Here we use different way to open spa for the given pool,
+	 * because the pool maybe faulted
+	 */
 
-	if (err)
-		return (err);
+	mutex_enter(&spa_namespace_lock);
+	if ((spa = spa_lookup(dataset)) == NULL) {
+		mutex_exit(&spa_namespace_lock);
+		/* From KRRP side everything nice */
+		return (0);
+	}
 
-	spa = dp->dp_spa;
+	spa_open_ref(spa, FTAG);
+	mutex_exit(&spa_namespace_lock);
 
 	autosnap = spa_get_autosnap(spa);
 
@@ -6758,9 +6766,12 @@ zfs_ioc_check_krrp(const char *dataset, nvlist_t *innvl, nvlist_t *outnvl)
 	}
 
 	mutex_exit(&autosnap->autosnap_lock);
-	dsl_pool_rele(dp, FTAG);
 
-	return (err);
+	mutex_enter(&spa_namespace_lock);
+	spa_close(spa, FTAG);
+	mutex_exit(&spa_namespace_lock);
+
+	return (err != 0 ? SET_ERROR(err) : 0);
 }
 
 static void
