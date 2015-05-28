@@ -2555,7 +2555,7 @@ function is_te_enabled
 #
 function is_mp
 {
-	(($(psrinfo | wc -l) > 1))
+	(($($PSRINFO | $WC -l) > 1))
 }
 
 # Run the given command as the user provided.
