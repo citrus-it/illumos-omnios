@@ -4802,7 +4802,14 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
 	mutex_exit(&spa_namespace_lock);
 
-	tx = dmu_tx_create_assigned(spa_get_dsl(spa), txg);
+	/*
+	 * "spa_last_synced_txg(spa) + 1" is used because:
+	 *   - spa_vdev_exit() calls txg_wait_synced() for "txg"
+	 *   - spa_config_update() calls txg_wait_synced() for
+	 *     "spa_last_synced_txg(spa) + 1"
+	 */
+	tx = dmu_tx_create_assigned(spa_get_dsl(spa),
+	    spa_last_synced_txg(spa) + 1);
 	spa_special_feature_activate(spa, tx);
 	dmu_tx_commit(tx);
 
