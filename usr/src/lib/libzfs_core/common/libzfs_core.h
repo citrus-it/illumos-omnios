@@ -74,7 +74,7 @@ int lzc_objset_stats(const char *, dmu_objset_type_t *, nvlist_t **,
 boolean_t lzc_exists(const char *);
 boolean_t lzc_has_snaps(const char *);
 int lzc_rollback(const char *, char *, int);
-int lzc_bulk_list(const char * , uint32_t, uint32_t, boolean_t, boolean_t,
+int lzc_bulk_list(const char *, uint32_t, uint32_t, boolean_t, boolean_t,
     uint64_t *, nvlist_t **);
 
 #ifdef	__cplusplus
