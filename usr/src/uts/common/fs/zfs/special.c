@@ -756,6 +756,16 @@ spa_class_collect_lt(spa_t *spa, uint64_t weight)
 		if (vd->vdev_islog || vd->vdev_ishole ||
 		    vd->vdev_isspare || vd->vdev_isl2cache)
 			continue;
+
+		/*
+		 * If vdev_physpath is not defined, this vdev
+		 * is not a real-device so it is impossible
+		 * to collect stats for this vdev, because
+		 * stats available only for real-devices.
+		 */
+		if (vd->vdev_physpath == NULL)
+			continue;
+
 		if (vd->vdev_isspecial) {
 			spa_vdev_walk_stats(vd, spa_vdev_process_lt,
 			    &spa->spa_special_stat.special_lt, &nspecial);
@@ -798,6 +808,16 @@ spa_class_collect_ut(spa_t *spa, uint64_t weight)
 		if (vd->vdev_islog || vd->vdev_ishole ||
 		    vd->vdev_isspare || vd->vdev_isl2cache)
 			continue;
+
+		/*
+		 * If vdev_physpath is not defined, this vdev
+		 * is not a real-device so it is impossible
+		 * to collect stats for this vdev, because
+		 * stats available only for real-devices.
+		 */
+		if (vd->vdev_physpath == NULL)
+			continue;
+
 		if (vd->vdev_isspecial) {
 			spa_vdev_walk_stats(vd, spa_vdev_busy,
 			    &spa_stat.special_ut, &nspecial);
