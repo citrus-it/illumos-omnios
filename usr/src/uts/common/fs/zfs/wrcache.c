@@ -80,6 +80,8 @@ uint64_t wrc_mv_cancel_threshold_initial = 20;
 uint64_t wrc_mv_cancel_threshold_step = 0;
 uint64_t wrc_mv_cancel_threshold_cap = 50;
 
+static wrc_block_t *wrc_create_block(wrc_data_t *wrc_data,
+    const blkptr_t *bp);
 static void wrc_move_block(void *arg);
 static int wrc_move_block_impl(wrc_block_t *block);
 static int wrc_collect_special_blocks(dsl_pool_t *dp);
@@ -106,9 +108,46 @@ drv_usectohz(uint64_t time)
 }
 #endif
 
+static wrc_block_t *
+wrc_create_block(wrc_data_t *wrc_data, const blkptr_t *bp)
+{
+	wrc_block_t *block;
+
+	block = kmem_alloc(sizeof (*block), KM_NOSLEEP);
+	if (block == NULL)
+		return (NULL);
+
+	/*
+	 * Fill information describing data we need to move
+	 */
+#ifdef _KERNEL
+	DTRACE_PROBE5(wrc_plan_block_data,
+	    uint64_t, DVA_GET_VDEV(&bp->blk_dva[0]),
+	    uint64_t, DVA_GET_OFFSET(&bp->blk_dva[0]),
+	    uint64_t, DVA_GET_VDEV(&bp->blk_dva[1]),
+	    uint64_t, DVA_GET_OFFSET(&bp->blk_dva[1]),
+	    uint64_t, BP_GET_PSIZE(bp));
+#endif
+
+	mutex_init(&block->lock, NULL, MUTEX_DEFAULT, NULL);
+	block->data = wrc_data;
+	block->blk_prop = 0;
+
+	block->dva[0] = bp->blk_dva[0];
+	block->dva[1] = bp->blk_dva[1];
+	block->btxg = BP_PHYSICAL_BIRTH(bp);
+
+	WRCBP_SET_COMPRESS(block, BP_GET_COMPRESS(bp));
+	WRCBP_SET_PSIZE(block, BP_GET_PSIZE(bp));
+	WRCBP_SET_LSIZE(block, BP_GET_LSIZE(bp));
+
+	return (block);
+}
+
 void
 wrc_free_block(wrc_block_t *block)
 {
+	mutex_destroy(&block->lock);
 	kmem_free(block, sizeof (*block));
 }
 
@@ -736,32 +775,11 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		return (ERESTART);
 	}
 
-	block = kmem_alloc(sizeof (*block), KM_NOSLEEP);
+	block = wrc_create_block(wrc_data, bp);
 	if (block == NULL) {
 		mutex_exit(&wrc_data->wrc_lock);
 		return (ERESTART);
 	}
-
-	/*
-	 * Fill information describing data we need to move
-	 */
-#ifdef _KERNEL
-	DTRACE_PROBE5(wrc_plan_block_data,
-	    uint64_t, DVA_GET_VDEV(&bp->blk_dva[0]),
-	    uint64_t, DVA_GET_OFFSET(&bp->blk_dva[0]),
-	    uint64_t, DVA_GET_VDEV(&bp->blk_dva[1]),
-	    uint64_t, DVA_GET_OFFSET(&bp->blk_dva[1]),
-	    uint64_t, BP_GET_PSIZE(bp));
-#endif
-	block->data = cbd->wrc_data;
-
-	block->dva[0] = bp->blk_dva[0];
-	block->dva[1] = bp->blk_dva[1];
-	block->btxg = BP_PHYSICAL_BIRTH(bp);
-
-	WRCBP_SET_COMPRESS(block, BP_GET_COMPRESS(bp));
-	WRCBP_SET_PSIZE(block, BP_GET_PSIZE(bp));
-	WRCBP_SET_LSIZE(block, BP_GET_LSIZE(bp));
 
 	/*
 	 * Add block to the tree of coolected blocks or drop it
