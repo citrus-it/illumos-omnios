@@ -32,11 +32,11 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/inttypes.h>
 #include <sys/list.h>
 #include <sys/avl.h>
 #include <arpa/inet.h>
-#include <net/if.h>
-#include <inet/tcp.h>
+#include <net/if.h>	/* LIFNAMSIZ */
 #include <netdb.h>
 #include <stdlib.h>
 #include <libscf.h>
@@ -667,6 +667,9 @@ typedef struct smb_gsid {
 	smb_sid_t *gs_sid;
 	uint16_t gs_type;
 } smb_gsid_t;
+
+struct sqlite_vm;
+struct sqlite;
 
 typedef struct smb_giter {
 	struct sqlite_vm	*sgi_vm;
