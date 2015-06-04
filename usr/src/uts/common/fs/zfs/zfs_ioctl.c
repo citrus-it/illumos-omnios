@@ -6720,7 +6720,6 @@ zfs_ioc_pool_get_props_nvl(const char *poolname, nvlist_t *innvl,
 static int
 zfs_ioc_check_krrp(const char *dataset, nvlist_t *innvl, nvlist_t *outnvl)
 {
-	dsl_pool_t *dp;
 	autosnap_zone_t *rzone, *zone, *gzone;
 	boolean_t children_zone, gzone_active;
 	zfs_autosnap_t *autosnap;
