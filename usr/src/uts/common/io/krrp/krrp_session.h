@@ -140,6 +140,7 @@ typedef struct krrp_sess_s {
 	char auth_digest[KRRP_AUTH_DIGEST_MAX_LEN];
 
 	krrp_error_t			error;
+	nvlist_t				*private_data;
 } krrp_sess_t;
 
 int krrp_sess_create(krrp_sess_t **result_sess, const char *id,

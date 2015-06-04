@@ -39,6 +39,8 @@ extern "C" {
 	X(SESS_SEND_STOP) \
 	X(SESS_CONN_THROTTLE) \
 	X(ZFS_GET_RECV_COOKIES) \
+	X(SESS_SET_PRIVATE_DATA) \
+	X(SESS_GET_PRIVATE_DATA) \
 
 #define	KRRP_IOCTL_EXPAND(enum_name) KRRP_IOCTL_##enum_name,
 typedef enum {

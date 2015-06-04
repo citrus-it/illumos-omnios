@@ -248,6 +248,9 @@ krrp_sess_destroy(krrp_sess_t *sess)
 	if (sess->data_pdu_engine != NULL)
 		krrp_pdu_engine_destroy(sess->data_pdu_engine);
 
+	if (sess->private_data != NULL)
+		fnvlist_free(sess->private_data);
+
 	cv_destroy(&sess->fl_ctrl.cv);
 	mutex_destroy(&sess->fl_ctrl.mtx);
 

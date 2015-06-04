@@ -189,6 +189,11 @@ int krrp_sess_create_compound(libkrrp_handle_t *, uuid_t, const char *,
 
 int krrp_sess_destroy(libkrrp_handle_t *, uuid_t);
 
+int krrp_sess_set_private_data(libkrrp_handle_t *hdl, uuid_t sess_id,
+    nvlist_t *private_data);
+int krrp_sess_get_private_data(libkrrp_handle_t *hdl, uuid_t sess_id,
+    nvlist_t **private_data);
+
 int krrp_sess_create_conn(libkrrp_handle_t *, uuid_t, const char *,
     const uint16_t, const uint32_t);
 int krrp_sess_conn_throttle(libkrrp_handle_t *, uuid_t, const uint32_t);

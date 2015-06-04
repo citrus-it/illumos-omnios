@@ -11,6 +11,12 @@
 #include "krrp_ioctl.h"
 
 static boolean_t krrp_is_input_data_required(krrp_ioctl_cmd_t cmd);
+
+static int krrp_ioctl_sess_set_private_data(nvlist_t *params,
+	krrp_error_t *error);
+static int krrp_ioctl_sess_get_private_data(nvlist_t *params,
+    nvlist_t *result, krrp_error_t *error);
+
 static int krrp_ioctl_sess_status(nvlist_t *params, nvlist_t *result,
     krrp_error_t *error);
 static int krrp_ioctl_sess_create(nvlist_t *params, krrp_error_t *error);
@@ -74,6 +80,12 @@ int krrp_ioctl_process(krrp_ioctl_cmd_t cmd, nvlist_t *input,
 	case KRRP_IOCTL_SVC_GET_CONFIG:
 		rc = krrp_svc_config(input, output, error);
 		break;
+	case KRRP_IOCTL_SESS_SET_PRIVATE_DATA:
+		rc = krrp_ioctl_sess_set_private_data(input, error);
+		break;
+	case KRRP_IOCTL_SESS_GET_PRIVATE_DATA:
+		rc = krrp_ioctl_sess_get_private_data(input, output, error);
+		break;
 	case KRRP_IOCTL_SESS_LIST:
 		krrp_svc_list_sessions(output);
 		break;
@@ -130,6 +142,8 @@ krrp_is_input_data_required(krrp_ioctl_cmd_t cmd)
 	switch (cmd) {
 	case KRRP_IOCTL_SVC_SET_CONFIG:
 	case KRRP_IOCTL_SVC_GET_CONFIG:
+	case KRRP_IOCTL_SESS_SET_PRIVATE_DATA:
+	case KRRP_IOCTL_SESS_GET_PRIVATE_DATA:
 	case KRRP_IOCTL_SESS_STATUS:
 	case KRRP_IOCTL_SESS_CREATE:
 	case KRRP_IOCTL_SESS_DESTROY:
@@ -147,6 +161,60 @@ krrp_is_input_data_required(krrp_ioctl_cmd_t cmd)
 	}
 
 	return (result);
+}
+
+static int
+krrp_ioctl_sess_set_private_data(nvlist_t *params,
+    krrp_error_t *error)
+{
+	krrp_sess_t *sess = NULL;
+	int rc;
+	nvlist_t *private_data = NULL;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		return (-1);
+
+	rc = krrp_param_get(KRRP_PARAM_SESS_PRIVATE_DATA,
+	    params, &private_data);
+	if (rc != 0) {
+		krrp_error_set(error, KRRP_ERRNO_SESS, ENODATA);
+		goto out;
+	}
+
+	if (sess->private_data != NULL)
+		fnvlist_free(sess->private_data);
+
+	sess->private_data = fnvlist_dup(private_data);
+
+out:
+	krrp_sess_rele(sess);
+	return (rc);
+}
+
+static int
+krrp_ioctl_sess_get_private_data(nvlist_t *params, nvlist_t *result,
+    krrp_error_t *error)
+{
+	krrp_sess_t *sess = NULL;
+	int rc = -1;
+
+	sess = krrp_ioctl_sess_action_common(params, error);
+	if (sess == NULL)
+		return (-1);
+
+	if (sess->private_data == NULL) {
+		krrp_error_set(error, KRRP_ERRNO_SESS, ENODATA);
+		goto out;
+	}
+
+	(void) krrp_param_put(KRRP_PARAM_SESS_PRIVATE_DATA,
+	    result, sess->private_data);
+	rc = 0;
+
+out:
+	krrp_sess_rele(sess);
+	return (rc);
 }
 
 static int

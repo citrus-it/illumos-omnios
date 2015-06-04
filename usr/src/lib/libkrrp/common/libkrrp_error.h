@@ -41,6 +41,8 @@ typedef enum {
 #define	LIBKRRP_EMSG_KSTATID_INVAL "kstat ID must be %d characters in length"
 #define	LIBKRRP_EMSG_SESS_ALREADY "Session already exists"
 #define	LIBKRRP_EMSG_SESS_NOENT "Session does not exist"
+#define	LIBKRRP_EMSG_SESS_NODATA1 "Session private data not specified"
+#define	LIBKRRP_EMSG_SESS_NODATA2 "Session private data does not exist"
 #define	LIBKRRP_EMSG_HOST_NOENT "Remote host is not specified"
 #define	LIBKRRP_EMSG_SESS_BUSY "Session is busy"
 #define	LIBKRRP_EMSG_HOST_INVAL "Invalid remote host"

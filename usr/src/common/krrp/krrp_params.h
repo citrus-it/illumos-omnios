@@ -72,6 +72,8 @@ extern "C" {
 	X(CFG_TYPE, INT32) \
 \
 	X(THROTTLE, UINT32) \
+\
+	X(SESS_PRIVATE_DATA, NVLIST) \
 
 typedef enum {
 	KRRP_PARAM_UNKNOWN = 0,

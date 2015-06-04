@@ -117,6 +117,66 @@ krrp_sess_destroy(libkrrp_handle_t *hdl, uuid_t sess_id)
 }
 
 int
+krrp_sess_set_private_data(libkrrp_handle_t *hdl, uuid_t sess_id,
+    nvlist_t *private_data)
+{
+	nvlist_t *params = NULL;
+	int rc;
+	krrp_sess_id_str_t sess_id_str;
+
+	VERIFY(hdl != NULL);
+	VERIFY(private_data != NULL);
+
+	libkrrp_reset(hdl);
+
+	uuid_unparse(sess_id, sess_id_str);
+	params = fnvlist_alloc();
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
+	(void) krrp_param_put(KRRP_PARAM_SESS_PRIVATE_DATA,
+	    params, private_data);
+
+	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SESS_SET_PRIVATE_DATA,
+	    params, NULL);
+
+	fnvlist_free(params);
+	return (rc);
+}
+
+int
+krrp_sess_get_private_data(libkrrp_handle_t *hdl, uuid_t sess_id,
+    nvlist_t **private_data)
+{
+	nvlist_t *params = NULL, *result = NULL, *tmp = NULL;
+	int rc;
+	krrp_sess_id_str_t sess_id_str;
+
+	VERIFY(hdl != NULL);
+	VERIFY(private_data != NULL && *private_data == NULL);
+
+	libkrrp_reset(hdl);
+
+	uuid_unparse(sess_id, sess_id_str);
+	params = fnvlist_alloc();
+	(void) krrp_param_put(KRRP_PARAM_SESS_ID, params, sess_id_str);
+
+	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SESS_GET_PRIVATE_DATA,
+	    params, &result);
+
+	if (rc != 0)
+		goto fini;
+
+	VERIFY0(krrp_param_get(KRRP_PARAM_SESS_PRIVATE_DATA,
+	    result, &tmp));
+
+	*private_data = fnvlist_dup(tmp);
+	fnvlist_free(result);
+
+fini:
+	fnvlist_free(params);
+	return (rc);
+}
+
+int
 krrp_sess_create_conn(libkrrp_handle_t *hdl, uuid_t sess_id,
     const char *address, const uint16_t port, const uint32_t conn_timeout)
 {
