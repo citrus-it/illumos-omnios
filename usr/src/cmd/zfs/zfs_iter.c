@@ -94,6 +94,9 @@ zfs_callback(zfs_handle_t *zhp, void *data)
 	boolean_t dontclose = B_FALSE;
 	boolean_t include_snaps = zfs_include_snapshots(zhp, cb);
 	boolean_t include_bmarks = (cb->cb_types & ZFS_TYPE_BOOKMARK);
+	boolean_t include_autosnaps =
+	    ((cb->cb_types & ZFS_TYPE_AUTOSNAP) &&
+	    !(cb->cb_flags & ZFS_ITER_PROP_LISTSNAPS));
 
 	if ((zfs_get_type(zhp) & cb->cb_types) ||
 	    ((zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT) && include_snaps)) {
@@ -135,8 +138,18 @@ zfs_callback(zfs_handle_t *zhp, void *data)
 		if (zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM)
 			(void) zfs_iter_filesystems(zhp, zfs_callback, data);
 		if (((zfs_get_type(zhp) & (ZFS_TYPE_SNAPSHOT |
-		    ZFS_TYPE_BOOKMARK)) == 0) && include_snaps)
-			(void) zfs_iter_snapshots(zhp, zfs_callback, data);
+		    ZFS_TYPE_BOOKMARK | ZFS_TYPE_AUTOSNAP)) == 0)) {
+			if (include_snaps) {
+				(void) zfs_iter_snapshots(zhp,
+				    zfs_callback, data);
+			}
+
+			if (include_autosnaps) {
+				(void) zfs_iter_autosnapshots(zhp,
+				    zfs_callback, data);
+			}
+		}
+
 		if (((zfs_get_type(zhp) & (ZFS_TYPE_SNAPSHOT |
 		    ZFS_TYPE_BOOKMARK)) == 0) && include_bmarks)
 			(void) zfs_iter_bookmarks(zhp, zfs_callback, data);

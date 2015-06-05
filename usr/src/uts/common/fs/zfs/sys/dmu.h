@@ -844,6 +844,7 @@ typedef struct dmu_objset_stats {
 	uint64_t dds_guid;
 	dmu_objset_type_t dds_type;
 	uint8_t dds_is_snapshot;
+	uint8_t dds_is_autosnapshot;
 	uint8_t dds_inconsistent;
 	char dds_origin[MAXNAMELEN];
 } dmu_objset_stats_t;

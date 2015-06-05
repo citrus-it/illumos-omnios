@@ -456,7 +456,9 @@ make_dataset_handle_common(zfs_handle_t *zhp, zfs_cmd_t *zc)
 	else
 		abort();
 
-	if (zhp->zfs_dmustats.dds_is_snapshot)
+	if (zhp->zfs_dmustats.dds_is_autosnapshot)
+		zhp->zfs_type = ZFS_TYPE_AUTOSNAP;
+	else if (zhp->zfs_dmustats.dds_is_snapshot)
 		zhp->zfs_type = ZFS_TYPE_SNAPSHOT;
 	else if (zhp->zfs_dmustats.dds_type == DMU_OST_ZVOL)
 		zhp->zfs_type = ZFS_TYPE_VOLUME;
@@ -2337,6 +2339,9 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 			break;
 		case ZFS_TYPE_SNAPSHOT:
 			str = "snapshot";
+			break;
+		case ZFS_TYPE_AUTOSNAP:
+			str = "autosnap";
 			break;
 		case ZFS_TYPE_BOOKMARK:
 			str = "bookmark";

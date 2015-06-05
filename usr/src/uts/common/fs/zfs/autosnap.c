@@ -1365,3 +1365,19 @@ autosnap_fini(spa_t *spa)
 	mutex_destroy(&autosnap->autosnap_lock);
 	cv_destroy(&autosnap->autosnap_cv);
 }
+
+boolean_t
+autosnap_is_autosnap(dsl_dataset_t *ds)
+{
+	char ds_name[MAXNAMELEN];
+	char *snap_name;
+
+	dsl_dataset_name(ds, ds_name);
+	snap_name = strchr(ds_name, '@');
+	snap_name++;
+	if (strncmp(snap_name, AUTOSNAP_PREFIX,
+	    AUTOSNAP_PREFIX_LEN) == 0)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}

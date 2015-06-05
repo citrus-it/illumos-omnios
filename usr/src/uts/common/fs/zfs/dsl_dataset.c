@@ -1760,12 +1760,17 @@ dsl_dataset_fast_stat(dsl_dataset_t *ds, dmu_objset_stats_t *stat)
 	    dsl_dataset_phys(ds)->ds_flags & DS_FLAG_INCONSISTENT;
 	stat->dds_guid = dsl_dataset_phys(ds)->ds_guid;
 	stat->dds_origin[0] = '\0';
+	stat->dds_is_snapshot = B_FALSE;
+	stat->dds_is_autosnapshot = B_FALSE;
 	if (ds->ds_is_snapshot) {
-		stat->dds_is_snapshot = B_TRUE;
+		if (autosnap_is_autosnap(ds))
+			stat->dds_is_autosnapshot = B_TRUE;
+		else
+			stat->dds_is_snapshot = B_TRUE;
+
 		stat->dds_num_clones =
 		    dsl_dataset_phys(ds)->ds_num_children - 1;
 	} else {
-		stat->dds_is_snapshot = B_FALSE;
 		stat->dds_num_clones = 0;
 
 		if (dsl_dir_is_clone(ds->ds_dir)) {

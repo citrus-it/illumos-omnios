@@ -271,11 +271,13 @@ zfs_prop_init(void)
 	    "1 | 2 | 3", "COPIES", copies_table);
 	zprop_register_index(ZFS_PROP_PRIMARYCACHE, "primarycache",
 	    ZFS_CACHE_ALL, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP |
+	    ZFS_TYPE_VOLUME,
 	    "all | none | metadata", "PRIMARYCACHE", primary_cache_table);
 	zprop_register_index(ZFS_PROP_SECONDARYCACHE, "secondarycache",
 	    ZFS_CACHE_ALL, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP |
+	    ZFS_TYPE_VOLUME,
 	    "all | none | metadata | data", "SECONDARYCACHE",
 	    secondary_cache_table);
 	zprop_register_index(ZFS_PROP_LOGBIAS, "logbias", ZFS_LOGBIAS_LATENCY,
@@ -293,45 +295,47 @@ zfs_prop_init(void)
 	/* special class */
 	zprop_register_index(ZFS_PROP_SPECIALCLASS, "specialclass",
 	    SPA_SPECIALCLASS_ZIL, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP |
+	    ZFS_TYPE_VOLUME,
 	    "zil | meta", "SPECIALCLASS", specialclass_table);
 #endif
 
 	zprop_register_index(ZFS_PROP_ZPL_TO_METADEV, "zpl_to_metadev",
 	    META_PLACEMENT_ON, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP |
+	    ZFS_TYPE_VOLUME,
 	    "on | dual | off", "ZPL_TO_MD", meta_placement_table);
 
 	/* inherit index (boolean) properties */
 	zprop_register_index(ZFS_PROP_ATIME, "atime", 1, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM, "on | off", "ATIME", boolean_table);
 	zprop_register_index(ZFS_PROP_DEVICES, "devices", 1, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "DEVICES",
-	    boolean_table);
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
+	    "on | off", "DEVICES", boolean_table);
 	zprop_register_index(ZFS_PROP_EXEC, "exec", 1, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "EXEC",
-	    boolean_table);
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
+	    "on | off", "EXEC", boolean_table);
 	zprop_register_index(ZFS_PROP_SETUID, "setuid", 1, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "SETUID",
-	    boolean_table);
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
+	    "on | off", "SETUID", boolean_table);
 	zprop_register_index(ZFS_PROP_READONLY, "readonly", 0, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "on | off", "RDONLY",
 	    boolean_table);
 	zprop_register_index(ZFS_PROP_ZONED, "zoned", 0, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM, "on | off", "ZONED", boolean_table);
 	zprop_register_index(ZFS_PROP_XATTR, "xattr", 1, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "XATTR",
-	    boolean_table);
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
+	    "on | off", "XATTR", boolean_table);
 	zprop_register_index(ZFS_PROP_VSCAN, "vscan", 0, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM, "on | off", "VSCAN",
 	    boolean_table);
 	zprop_register_index(ZFS_PROP_NBMAND, "nbmand", 0, PROP_INHERIT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "NBMAND",
-	    boolean_table);
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
+	    "on | off", "NBMAND", boolean_table);
 
 	/* default index properties */
 	zprop_register_index(ZFS_PROP_VERSION, "version", 0, PROP_DEFAULT,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
 	    "1 | 2 | 3 | 4 | 5 | current", "VERSION", version_table);
 	zprop_register_index(ZFS_PROP_CANMOUNT, "canmount", ZFS_CANMOUNT_ON,
 	    PROP_DEFAULT, ZFS_TYPE_FILESYSTEM, "on | off | noauto",
@@ -341,29 +345,30 @@ zfs_prop_init(void)
 	zprop_register_index(ZFS_PROP_MOUNTED, "mounted", 0, PROP_READONLY,
 	    ZFS_TYPE_FILESYSTEM, "yes | no", "MOUNTED", boolean_table);
 	zprop_register_index(ZFS_PROP_DEFER_DESTROY, "defer_destroy", 0,
-	    PROP_READONLY, ZFS_TYPE_SNAPSHOT, "yes | no", "DEFER_DESTROY",
-	    boolean_table);
+	    PROP_READONLY, ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
+	    "yes | no", "DEFER_DESTROY", boolean_table);
 
 	/* set once index properties */
 	zprop_register_index(ZFS_PROP_NORMALIZE, "normalization", 0,
-	    PROP_ONETIME, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
+	    PROP_ONETIME, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT |
+	    ZFS_TYPE_AUTOSNAP,
 	    "none | formC | formD | formKC | formKD", "NORMALIZATION",
 	    normalize_table);
 	zprop_register_index(ZFS_PROP_CASE, "casesensitivity",
 	    ZFS_CASE_SENSITIVE, PROP_ONETIME, ZFS_TYPE_FILESYSTEM |
-	    ZFS_TYPE_SNAPSHOT,
+	    ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
 	    "sensitive | insensitive | mixed", "CASE", case_table);
 
 	/* set once index (boolean) properties */
 	zprop_register_index(ZFS_PROP_UTF8ONLY, "utf8only", 0, PROP_ONETIME,
-	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
 	    "on | off", "UTF8ONLY", boolean_table);
 
 	/* string properties */
 	zprop_register_string(ZFS_PROP_ORIGIN, "origin", NULL, PROP_READONLY,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<snapshot>", "ORIGIN");
 	zprop_register_string(ZFS_PROP_CLONES, "clones", NULL, PROP_READONLY,
-	    ZFS_TYPE_SNAPSHOT, "<dataset>[,...]", "CLONES");
+	    ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP, "<dataset>[,...]", "CLONES");
 	zprop_register_string(ZFS_PROP_MOUNTPOINT, "mountpoint", "/",
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM, "<path> | legacy | none",
 	    "MOUNTPOINT");
@@ -372,7 +377,7 @@ zfs_prop_init(void)
 	    "SHARENFS");
 	zprop_register_string(ZFS_PROP_TYPE, "type", NULL, PROP_READONLY,
 	    ZFS_TYPE_DATASET | ZFS_TYPE_BOOKMARK,
-	    "filesystem | volume | snapshot | bookmark", "TYPE");
+	    "filesystem | volume | snapshot | autosnap | bookmark", "TYPE");
 	zprop_register_string(ZFS_PROP_SHARESMB, "sharesmb", "off",
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "on | off | sharemgr(1M) options", "SHARESMB");
@@ -409,7 +414,7 @@ zfs_prop_init(void)
 	    PROP_READONLY,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<size>", "USEDREFRESERV");
 	zprop_register_number(ZFS_PROP_USERREFS, "userrefs", 0, PROP_READONLY,
-	    ZFS_TYPE_SNAPSHOT, "<count>", "USERREFS");
+	    ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP, "<count>", "USERREFS");
 	zprop_register_number(ZFS_PROP_WRITTEN, "written", 0, PROP_READONLY,
 	    ZFS_TYPE_DATASET, "<size>", "WRITTEN");
 	zprop_register_number(ZFS_PROP_LOGICALUSED, "logicalused", 0,

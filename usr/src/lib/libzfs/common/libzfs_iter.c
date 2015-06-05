@@ -133,28 +133,40 @@ zfs_iter_filesystems(zfs_handle_t *zhp, zfs_iter_f func, void *data)
 	return ((ret < 0) ? ret : 0);
 }
 
-/*
- * Iterate over all snapshots
- */
-int
-zfs_iter_snapshots(zfs_handle_t *zhp, zfs_iter_f func, void *data)
+static int
+zfs_iter_snapshots_internal(zfs_handle_t *zhp, zfs_iter_f func,
+    void *data, boolean_t autosnaps)
 {
 	zfs_cmd_t zc = { 0 };
-	zfs_handle_t *nzhp;
 	int ret;
 
 	if (zhp->zfs_type == ZFS_TYPE_SNAPSHOT ||
-	    zhp->zfs_type == ZFS_TYPE_BOOKMARK)
+	    zhp->zfs_type == ZFS_TYPE_BOOKMARK ||
+	    zhp->zfs_type == ZFS_TYPE_AUTOSNAP)
 		return (0);
 
 	if (zcmd_alloc_dst_nvlist(zhp->zfs_hdl, &zc, 0) != 0)
 		return (-1);
+
 	while ((ret = zfs_do_list_ioctl(zhp, ZFS_IOC_SNAPSHOT_LIST_NEXT,
 	    &zc)) == 0) {
+		zfs_handle_t *nzhp;
 
 		if ((nzhp = make_dataset_handle_zc(zhp->zfs_hdl,
 		    &zc)) == NULL) {
 			continue;
+		}
+
+		if (autosnaps) {
+			if (zfs_get_type(nzhp) != ZFS_TYPE_AUTOSNAP) {
+				zfs_close(nzhp);
+				continue;
+			}
+		} else {
+			if (zfs_get_type(nzhp) != ZFS_TYPE_SNAPSHOT) {
+				zfs_close(nzhp);
+				continue;
+			}
 		}
 
 		if ((ret = func(nzhp, data)) != 0) {
@@ -162,8 +174,24 @@ zfs_iter_snapshots(zfs_handle_t *zhp, zfs_iter_f func, void *data)
 			return (ret);
 		}
 	}
+
 	zcmd_free_nvlists(&zc);
 	return ((ret < 0) ? ret : 0);
+}
+
+/*
+ * Iterate over all snapshots
+ */
+int
+zfs_iter_snapshots(zfs_handle_t *zhp, zfs_iter_f func, void *data)
+{
+	return (zfs_iter_snapshots_internal(zhp, func, data, B_FALSE));
+}
+
+int
+zfs_iter_autosnapshots(zfs_handle_t *zhp, zfs_iter_f func, void *data)
+{
+	return (zfs_iter_snapshots_internal(zhp, func, data, B_TRUE));
 }
 
 /*
@@ -177,7 +205,8 @@ zfs_iter_bookmarks(zfs_handle_t *zhp, zfs_iter_f func, void *data)
 	nvlist_t *bmarks = NULL;
 	int err;
 
-	if ((zfs_get_type(zhp) & (ZFS_TYPE_SNAPSHOT | ZFS_TYPE_BOOKMARK)) != 0)
+	if ((zfs_get_type(zhp) & (ZFS_TYPE_SNAPSHOT |
+	    ZFS_TYPE_BOOKMARK | ZFS_TYPE_AUTOSNAP)) != 0)
 		return (0);
 
 	/* Setup the requested properties nvlist. */
@@ -492,6 +521,12 @@ iter_dependents_cb(zfs_handle_t *zhp, void *arg)
 		err = zfs_iter_filesystems(zhp, iter_dependents_cb, ida);
 		if (err == 0)
 			err = zfs_iter_snapshots(zhp, iter_dependents_cb, ida);
+
+		if (err == 0) {
+			err = zfs_iter_autosnapshots(zhp,
+			    iter_dependents_cb, ida);
+		}
+
 		ida->stack = isf.next;
 	}
 

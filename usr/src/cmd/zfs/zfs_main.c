@@ -239,7 +239,7 @@ get_usage(zfs_help_t idx)
 	case HELP_LIST:
 		return (gettext("\tlist [-Hp] [-r|-d max] [-o property[,...]] "
 		    "[-s property]...\n\t    [-S property]... [-t type[,...]] "
-		    "[filesystem|volume|snapshot] ...\n"));
+		    "[filesystem|volume|snapshot|autosnapshot] ...\n"));
 	case HELP_MOUNT:
 		return (gettext("\tmount\n"
 		    "\tmount [-vO] [-o opts] <-a | filesystem>\n"));
@@ -1032,7 +1032,8 @@ destroy_callback(zfs_handle_t *zhp, void *data)
 	 * simply do all snap deletions and then all fs deletions,
 	 * because we must delete a clone before its origin.
 	 */
-	if (zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT) {
+	if (zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT ||
+	    zfs_get_type(zhp) == ZFS_TYPE_AUTOSNAP) {
 		fnvlist_add_boolean(cb->cb_batchedsnaps, name);
 	} else {
 		int error = zfs_destroy_snaps_nvl(g_zfs,
@@ -3141,7 +3142,7 @@ zfs_do_list(int argc, char **argv)
 			while (*optarg != '\0') {
 				static char *type_subopts[] = { "filesystem",
 				    "volume", "snapshot", "snap", "bookmark",
-				    "all", NULL };
+				    "all", "autosnapshot", NULL };
 
 				switch (getsubopt(&optarg, type_subopts,
 				    &value)) {
@@ -3160,7 +3161,11 @@ zfs_do_list(int argc, char **argv)
 					break;
 				case 5:
 					types = ZFS_TYPE_DATASET |
-					    ZFS_TYPE_BOOKMARK;
+					    ZFS_TYPE_BOOKMARK |
+					    ZFS_TYPE_AUTOSNAP;
+					break;
+				case 6:
+					types |= ZFS_TYPE_AUTOSNAP;
 					break;
 				default:
 					(void) fprintf(stderr,

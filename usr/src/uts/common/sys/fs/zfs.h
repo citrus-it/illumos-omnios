@@ -53,7 +53,8 @@ typedef enum {
 	ZFS_TYPE_POOL		= (1 << 3),
 	ZFS_TYPE_BOOKMARK	= (1 << 4),
 	ZFS_TYPE_VDEV		= (1 << 5),
-	ZFS_TYPE_COS		= (1 << 6)
+	ZFS_TYPE_COS		= (1 << 6),
+	ZFS_TYPE_AUTOSNAP	= (1 << 7)
 } zfs_type_t;
 
 typedef enum dmu_objset_type {
@@ -67,7 +68,8 @@ typedef enum dmu_objset_type {
 } dmu_objset_type_t;
 
 #define	ZFS_TYPE_DATASET	\
-	(ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME | ZFS_TYPE_SNAPSHOT)
+	(ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME |\
+    ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP)
 
 #define	ZAP_MAXNAMELEN 256
 #define	ZAP_MAXVALUELEN (1024 * 8)
