@@ -3456,3 +3456,119 @@ vdev_count_leaf_vdevs(vdev_t *vd)
 
 	return (cnt);
 }
+
+/*
+ * Implements the per-vdev portion of on-demand TRIM. The function passes
+ * over all metaslabs on this vdev and performs a metaslab_trim_all
+ * on them. It's is also responsible for rate-control if spa_trim_rate is
+ * non-zero.
+ */
+void
+vdev_trim_all(vdev_trim_info_t *vti)
+{
+	metaslab_group_t *mg = vti->vti_vdev->vdev_mg;
+	avl_tree_t *mg_ms_tree = &mg->mg_metaslab_tree;
+	clock_t t = ddi_get_lbolt();
+	spa_t *spa = vti->vti_vdev->vdev_spa;
+	vdev_t *vd = vti->vti_vdev;
+
+	vd->vdev_trim_prog = 0;
+
+	/*
+	 * We need to be careful here about how we access mg_metaslab_tree.
+	 * We drop the mg_lock while waiting for a metaslab trim to complete,
+	 * in order to allow for other allocations from the metaslab group
+	 * to happen. Unfortunately, other threads might, in the mean time,
+	 * reorganize the tree, leading our references for AVL_NEXT to
+	 * become invalid. To catch that, whenever the tree is modified
+	 * in metaslab_group_{add,remove,sort}, we set mg_metaslab_tree_dirty
+	 * to notify the vdev trim thread that it needs to restart the
+	 * search. This could lead to us restarting endlessly, so to avoid
+	 * that, we mark metaslabs we've trimmed already by setting their
+	 * ms_trimmed flag. Then, when the entire vdev trim is complete,
+	 * we simply run through all metaslabs and reset the flag to prepare
+	 * for the next trim run.
+	 */
+	spa_config_enter(spa, SCL_TRIM_ALL, FTAG, RW_READER);
+	mutex_enter(&mg->mg_lock);
+top:
+	/* when restarting the search, reset the tree dirty flag */
+	mg->mg_metaslab_tree_dirty = B_FALSE;
+	for (metaslab_t *msp = avl_first(mg_ms_tree); msp != NULL &&
+	    !spa->spa_trim_stop; msp = AVL_NEXT(mg_ms_tree, msp)) {
+		uint64_t delta;
+		zio_t *trim_io;
+
+		/*
+		 * Skip metaslabs we've trimmed already. Don't drop locks,
+		 * so that our progress through the tree is assured.
+		 */
+		if (msp->ms_trimmed)
+			continue;
+
+		/* First drop mg_lock, then trim_all (which acquires ms_lock) */
+		mutex_exit(&mg->mg_lock);
+		trim_io = metaslab_trim_all(msp, &delta);
+		atomic_add_64(&vd->vdev_trim_prog, msp->ms_size);
+		msp->ms_trimmed = B_TRUE;
+		spa_config_exit(spa, SCL_TRIM_ALL, FTAG);
+
+		(void) zio_wait(trim_io);
+
+		/* delay loop to handle fixed-rate trimming */
+		for (;;) {
+			uint64_t rate = spa->spa_trim_rate;
+			uint64_t sleep_delay;
+
+			if (rate == 0) {
+				/* No delay, just update 't' and move on. */
+				t = ddi_get_lbolt();
+				break;
+			}
+
+			sleep_delay = (delta * hz) / rate;
+			mutex_enter(&spa->spa_trim_lock);
+			(void) cv_timedwait(&spa->spa_trim_update_cv,
+			    &spa->spa_trim_lock, t);
+			mutex_exit(&spa->spa_trim_lock);
+
+			/* Timeout passed, move on to the next metaslab. */
+			if (ddi_get_lbolt() >= t + sleep_delay ||
+			    spa->spa_trim_stop) {
+				t += sleep_delay;
+				break;
+			}
+		}
+		/*
+		 * Regrab the locks and check if our tree reference is still
+		 * valid. If not, go back to the start of the tree. We'll
+		 * skip any metaslabs which have 'ms_trimmed' set, so we
+		 * won't try to retrim them anymore.
+		 */
+		spa_config_enter(spa, SCL_TRIM_ALL, FTAG, RW_READER);
+		mutex_enter(&mg->mg_lock);
+		if (mg->mg_metaslab_tree_dirty) {
+			DTRACE_PROBE2(vdev_trim_all_restart, vdev_t *, vd,
+			    metaslab_group_t *, mg);
+			goto top;
+		}
+	}
+	/* Reset the ms_trimmed flag on all metaslabs. */
+	for (metaslab_t *msp = avl_first(mg_ms_tree); msp != NULL;
+	    msp = AVL_NEXT(mg_ms_tree, msp)) {
+		msp->ms_trimmed = B_FALSE;
+	}
+	mutex_exit(&mg->mg_lock);
+	spa_config_exit(spa, SCL_TRIM_ALL, FTAG);
+
+	/*
+	 * Ensure we're marked as "completed" even if we've had to stop
+	 * before processing all metaslabs.
+	 */
+	vd->vdev_trim_prog = vd->vdev_asize;
+
+	ASSERT(vti->vti_done != NULL);
+	vti->vti_done(vti);
+
+	kmem_free(vti, sizeof (*vti));
+}

@@ -599,20 +599,26 @@ typedef enum spa_import_type {
 } spa_import_type_t;
 
 /*
- * zio_trim() behavior on a given spa:
- * - auto: issue TRIM iff the device supports it
- * - on: always issue TRIM, even if support is not indicated
- * - off: never issue TRIM, even is support is indicated
- * In addition to these, the global zfs_trim boolean_t serves as the
- * master mode switch. If zfs_trim == B_TRUE, "spa_force_trim" is
- * consulted. If zfs_trim == B_FALSE, TRIM is globally disabled,
- * regardless of the spa_force_trim setting.
+ * Should we force sending TRIM commands even to devices which evidently
+ * don't support it?
+ *	OFF: no, only send to devices which indicated support
+ *	ON: yes, force send to everybody
  */
 typedef enum {
-	SPA_FORCE_TRIM_AUTO,	/* default */
-	SPA_FORCE_TRIM_ON,
-	SPA_FORCE_TRIM_OFF
+	SPA_FORCE_TRIM_OFF = 0,	/* default */
+	SPA_FORCE_TRIM_ON
 } spa_force_trim_t;
+
+/*
+ * Should we send TRIM commands in-line during normal pool operation while
+ * deleting stuff?
+ *	OFF: no
+ *	ON: yes
+ */
+typedef enum {
+	SPA_AUTO_TRIM_OFF = 0,	/* default */
+	SPA_AUTO_TRIM_ON
+} spa_auto_trim_t;
 
 /* state manipulation functions */
 extern int spa_open(const char *pool, spa_t **, void *tag);
@@ -694,6 +700,11 @@ extern void spa_l2cache_drop(spa_t *spa);
 extern int spa_scan(spa_t *spa, pool_scan_func_t func);
 extern int spa_scan_stop(spa_t *spa);
 
+/* trimming */
+extern void spa_trim(spa_t *spa, uint64_t rate);
+extern void spa_trim_stop(spa_t *spa);
+extern uint64_t spa_get_trim_prog(spa_t *spa);
+
 /* spa syncing */
 extern void spa_sync(spa_t *spa, uint64_t txg); /* only for DMU use */
 extern void spa_sync_allpools(void);
@@ -747,6 +758,7 @@ extern boolean_t spa_refcount_zero(spa_t *spa);
 #define	SCL_LOCKS	7
 #define	SCL_ALL		((1 << SCL_LOCKS) - 1)
 #define	SCL_STATE_ALL	(SCL_STATE | SCL_L2ARC | SCL_ZIO)
+#define	SCL_TRIM_ALL	(SCL_STATE | SCL_ZIO)
 
 /* Pool configuration locks */
 extern int spa_config_tryenter(spa_t *spa, int locks, void *tag, krw_t rw);
@@ -822,6 +834,7 @@ extern uint64_t spa_delegation(spa_t *spa);
 extern objset_t *spa_meta_objset(spa_t *spa);
 extern uint64_t spa_deadman_synctime(spa_t *spa);
 extern spa_force_trim_t spa_get_force_trim(spa_t *spa);
+extern spa_auto_trim_t spa_get_auto_trim(spa_t *spa);
 
 /* Miscellaneous support routines */
 extern void spa_activate_mos_feature(spa_t *spa, const char *feature,

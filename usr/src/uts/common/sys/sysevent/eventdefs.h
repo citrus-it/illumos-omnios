@@ -274,6 +274,8 @@ extern "C" {
 #define	ESC_ZFS_HIGH_WATERMARK		"ESC_ZFS_high_watermark"
 #define	ESC_ZFS_DEDUP_OFF		"ESC_ZFS_dedup_off"
 #define	ESC_ZFS_DEDUP_ON		"ESC_ZFS_dedup_on"
+#define	ESC_ZFS_TRIM_START		"ESC_ZFS_trim_start"
+#define	ESC_ZFS_TRIM_FINISH		"ESC_ZFS_trim_finish"
 
 /*
  * datalink subclass definitions.

@@ -342,7 +342,16 @@ struct spa {
 	uint64_t	spa_deadman_calls;	/* number of deadman calls */
 	hrtime_t	spa_sync_starttime;	/* starting time fo spa_sync */
 	uint64_t	spa_deadman_synctime;	/* deadman expiration timer */
-	uint64_t	spa_force_trim;		/* zfs_trim behavior on spa */
+	uint64_t	spa_force_trim;		/* force sending trim? */
+	uint64_t	spa_auto_trim;		/* in-line switch */
+
+	/* On-demand TRIM */
+	kmutex_t	spa_trim_lock;
+	uint64_t	spa_trim_rate;		/* rate of trim in bytes/sec */
+	uint64_t	spa_num_trimming;	/* num of trimming threads */
+	boolean_t	spa_trim_stop;		/* requested a trim stop */
+	kcondvar_t	spa_trim_update_cv;	/* updates to TRIM settings */
+	kcondvar_t	spa_trim_done_cv;	/* trim on a vdev is done */
 
 	/*
 	 * spa_iokstat_lock protects spa_iokstat and

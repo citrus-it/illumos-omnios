@@ -457,6 +457,14 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	VERIFY(nvlist_add_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, nvroot) == 0);
 	nvlist_free(nvroot);
 
+	/* If we're getting stats, calculate trim progress from leaf vdevs. */
+	if (getstats) {
+		VERIFY3U(nvlist_add_uint64(config, ZPOOL_CONFIG_TRIM_PROG,
+		    spa_get_trim_prog(spa)), ==, 0);
+		VERIFY3U(nvlist_add_uint64(config, ZPOOL_CONFIG_TRIM_RATE,
+		    spa->spa_trim_rate), ==, 0);
+	}
+
 	/*
 	 * Store what's necessary for reading the MOS in the label.
 	 */

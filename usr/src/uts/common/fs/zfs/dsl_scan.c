@@ -1611,6 +1611,9 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 void
 dsl_resilver_restart(dsl_pool_t *dp, uint64_t txg)
 {
+	/* Stop any ongoing TRIMs */
+	spa_trim_stop(dp->dp_spa);
+
 	if (txg == 0) {
 		dmu_tx_t *tx;
 		tx = dmu_tx_create_dd(dp->dp_mos_dir);

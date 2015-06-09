@@ -216,6 +216,8 @@ struct vdev {
 	boolean_t	vdev_ishole;	/* is a hole in the namespace	*/
 	uint64_t	vdev_isspecial;	/* is a special device	*/
 
+	uint64_t	vdev_trim_prog;	/* trim progress in bytes	*/
+
 	/*
 	 * Leaf vdev state.
 	 */

@@ -69,6 +69,7 @@ void metaslab_free(spa_t *, const blkptr_t *, uint64_t, boolean_t);
 void metaslab_free_dva(spa_t *, const dva_t *, uint64_t, boolean_t);
 int metaslab_claim(spa_t *, const blkptr_t *, uint64_t);
 void metaslab_check_free(spa_t *, const blkptr_t *);
+zio_t *metaslab_trim_all(metaslab_t *, uint64_t *);
 
 metaslab_class_t *metaslab_class_create(spa_t *, metaslab_ops_t *);
 void metaslab_class_destroy(metaslab_class_t *);

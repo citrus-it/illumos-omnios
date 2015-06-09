@@ -1792,6 +1792,32 @@ vdev_raidz_asize(vdev_t *vd, uint64_t psize)
 	return (asize);
 }
 
+/*
+ * Converts an allocated size on a raidz vdev back to a logical block
+ * size. This is used in trimming to figure out the appropriate logical
+ * size to pass to vdev_raidz_map_alloc when splitting up extents of free
+ * space obtained from metaslabs. However, a range of free space on a
+ * raidz vdev might have originally consisted of multiple blocks and
+ * those, taken together with their skip blocks, might not always align
+ * neatly to a new vdev_raidz_map_alloc covering the entire unified
+ * range. So to ensure that the newly allocated raidz map *always* fits
+ * within the asize passed to this function and never exceeds it (since
+ * that might trim allocated data past it), we round it down to the
+ * nearest suitable multiple of the vdev ashift (hence the "_floor" in
+ * this function's name).
+ */
+static uint64_t
+vdev_raidz_psize_floor(vdev_t *vd, uint64_t asize)
+{
+	uint64_t psize = (asize / vd->vdev_children) *
+	    (vd->vdev_children - vd->vdev_nparity);
+
+	psize = P2ALIGN(psize, 1 << vd->vdev_top->vdev_ashift);
+	ASSERT(psize != 0);
+
+	return (psize);
+}
+
 static void
 vdev_raidz_child_done(zio_t *zio)
 {
@@ -2496,11 +2522,12 @@ vdev_raidz_trim(vdev_t *vd, zio_t *pio, void *trim_exts)
 	for (int i = 0; i < dfl->dfl_num_exts; i++) {
 		uint64_t start = dfl->dfl_exts[i].dfle_start;
 		uint64_t length = dfl->dfl_exts[i].dfle_length;
-		raidz_map_t *rm = vdev_raidz_map_alloc(NULL, length, start,
+		raidz_map_t *rm = vdev_raidz_map_alloc(NULL,
+		    vdev_raidz_psize_floor(vd, length), start,
 		    vd->vdev_top->vdev_ashift, vd->vdev_children,
 		    vd->vdev_nparity, B_FALSE);
 
-		for (int j = 0; j < rm->rm_cols; j++) {
+		for (uint64_t j = 0; j < rm->rm_cols; j++) {
 			const raidz_col_t *rc = &rm->rm_col[j];
 
 			sub_dfl[rc->rc_devidx]->dfl_exts[i].dfle_start =
@@ -2530,7 +2557,7 @@ vdev_raidz_trim(vdev_t *vd, zio_t *pio, void *trim_exts)
 			    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_PROPAGATE |
 			    ZIO_FLAG_DONT_RETRY));
 		} else {
-			kmem_free(sub_dfl[i], sizeof (*sub_dfl));
+			dfl_free(sub_dfl[i]);
 		}
 	}
 	kmem_free(sub_dfl, sizeof (*sub_dfl) * vd->vdev_children);

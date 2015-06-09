@@ -842,9 +842,16 @@ vdev_disk_io_start(zio_t *zio)
 			break;
 
 		case DKIOCFREE:
-
-			if (vd->vdev_notrim) {
-				zio->io_error = ENOTSUP;
+			/*
+			 * We perform device support checks here instead of
+			 * in zio_trim(), as zio_trim() might be invoked on
+			 * top of a top-level vdev, whereas vdev_disk_io_start
+			 * is guaranteed to be operating a leaf vdev.
+			 */
+			if (vd->vdev_notrim &&
+			    spa_get_force_trim(vd->vdev_spa) !=
+			    SPA_FORCE_TRIM_ON) {
+				zio->io_error = SET_ERROR(ENOTSUP);
 				break;
 			}
 
@@ -854,7 +861,7 @@ vdev_disk_io_start(zio_t *zio)
 			 */
 			ASSERT(zio->io_private != NULL);
 			error = ldi_ioctl(dvd->vd_lh, zio->io_cmd,
-			    (uintptr_t) zio->io_private, FKIOCTL, kcred, NULL);
+			    (uintptr_t)zio->io_private, FKIOCTL, kcred, NULL);
 
 			if (error == ENOTSUP || error == ENOTTY)
 				vd->vdev_notrim = B_TRUE;

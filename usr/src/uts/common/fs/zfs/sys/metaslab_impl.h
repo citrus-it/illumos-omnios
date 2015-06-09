@@ -83,6 +83,7 @@ struct metaslab_class {
 struct metaslab_group {
 	kmutex_t		mg_lock;
 	avl_tree_t		mg_metaslab_tree;
+	boolean_t		mg_metaslab_tree_dirty;
 	uint64_t		mg_aliquot;
 	boolean_t		mg_allocatable;		/* can we allocate? */
 	uint64_t		mg_free_capacity;	/* percentage free */
@@ -176,12 +177,14 @@ struct metaslab {
 	range_tree_t		*ms_tree;
 	metaslab_trimset_t	*ms_cur_ts; /* currently prepared trims */
 	metaslab_trimset_t	*ms_prev_ts;  /* previous (aging) trims */
+	kcondvar_t		ms_trim_cv;
 	metaslab_trimset_t	*ms_trimming_ts;
 
 	boolean_t	ms_condensing;	/* condensing? */
 	boolean_t	ms_condense_wanted;
 	boolean_t	ms_loaded;
 	boolean_t	ms_loading;
+	boolean_t	ms_trimmed;
 
 	int64_t		ms_deferspace;	/* sum of ms_defermap[] space	*/
 	uint64_t	ms_weight;	/* weight vs. others in group	*/

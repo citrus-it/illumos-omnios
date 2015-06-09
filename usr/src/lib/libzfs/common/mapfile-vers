@@ -232,6 +232,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_stage_history;
 	zpool_standard_error;
 	zpool_state_to_name;
+	zpool_trim;
 	zpool_unmount_datasets;
 	zpool_upgrade;
 	zpool_vdev_attach;
