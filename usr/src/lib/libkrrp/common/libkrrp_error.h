@@ -6,6 +6,7 @@
 #define	_LIBKRRP_ERROR_H
 
 #include <sys/nvpair.h>
+
 #include "libkrrp.h"
 #include "krrp_error.h"
 
@@ -109,7 +110,18 @@ typedef enum {
 #define	LIBKRRP_EMSG_OK "No error"
 #define	LIBKRRP_EMSG_UNKNOWN "Unknown error"
 #define	LIBKRRP_EMSG_WRITEFAIL "Session write stream error (%s)"
+#define	LIBKRRP_EMSG_SNAPMISMATCH "Most recent snapshot does not match " \
+	    "incremental source"
+#define	LIBKRRP_EMSG_DESTMODIFIED "Destination has been modified since most " \
+	    "recent snapshot"
+#define	LIBKRRP_EMSG_DESTEXISTS "Destination already exists"
+#define	LIBKRRP_EMSG_WRITEINVAL "Invalid stream"
+#define	LIBKRRP_EMSG_CHKSUMMISMATCH "Invalid stream (checksum mismatch)"
+#define	LIBKRRP_EMSG_OLDPOOL "Pool must be upgraded to receive this stream"
+#define	LIBKRRP_EMSG_DESTQUOTA "Destination space quota exceeded"
 #define	LIBKRRP_EMSG_READFAIL "Session read stream error (%s)"
+#define	LIBKRRP_EMSG_NOTEARLIERSNAP \
+	    "Not an earlier snapshot from the same fs"
 #define	LIBKRRP_EMSG_SENDMBLKFAIL "ksocket_sendmblk error (%s)"
 #define	LIBKRRP_EMSG_SNAPFAIL "Failed to create snapshot (%s)"
 #define	LIBKRRP_EMSG_CONNTIMEOUT_INVAL \
@@ -138,6 +150,9 @@ typedef enum {
 	    "target ZFS pool"
 #define	LIBKRRP_EMSG_SESS_CREATE_AUTH_INVAL "Authentication digest " \
 	    "must not be greater than %d characters in length"
+#define	LIBKRRP_EMSG_DSNAMETOOLONG "Failed to create autosnapshot: " \
+	    "dataset name too long"
+#define	LIBKRRP_EMSG_CANNOT_STOP_SESS "Cannot stop non-continuous session"
 #define	LIBKRRP_EMSG_SESS_CREATE_CONN_AUTH_INVAL "Invalid authentication digest"
 
 #define	libkrrp_error_init(error) (void) memset(error, 0, \
