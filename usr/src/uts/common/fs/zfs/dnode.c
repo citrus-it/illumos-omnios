@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  */
 
@@ -1686,7 +1686,7 @@ dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 
 		int shift = dn->dn_datablkshift + dn->dn_indblkshift -
 		    SPA_BLKPTRSHIFT;
-		for (uint64_t i = first; i <= last; i++) {
+		for (uint64_t i = first + 1; i < last; i++) {
 			/*
 			 * Set i to the blockid of the next non-hole
 			 * level-1 indirect block at or after i.  Note
@@ -1697,7 +1697,7 @@ dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 			int err = dnode_next_offset(dn, DNODE_FIND_HAVELOCK,
 			    &ibyte, 2, 1, 0);
 			i = ibyte >> shift;
-			if (i > last)
+			if (i >= last)
 				break;
 
 			/*

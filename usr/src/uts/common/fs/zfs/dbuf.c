@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
@@ -1492,11 +1492,6 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		ASSERT(dr->dt.dl.dr_data != NULL);
 		if (dr->dt.dl.dr_data != db->db_buf)
 			VERIFY(arc_buf_remove_ref(dr->dt.dl.dr_data, db));
-	}
-
-	if (db->db_level != 0) {
-		mutex_destroy(&dr->dt.di.dr_mtx);
-		list_destroy(&dr->dt.di.dr_children);
 	}
 
 	kmem_free(dr, sizeof (dbuf_dirty_record_t));
