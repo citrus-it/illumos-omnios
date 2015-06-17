@@ -629,6 +629,15 @@ spa_vdev_walk_stats(vdev_t *pvd, spa_load_cb func,
 {
 	int i;
 	if (pvd->vdev_children == 0) {
+		/*
+		 * If vdev_physpath is not defined, this vdev
+		 * is not a real-device so it is impossible
+		 * to collect stats for this vdev, because
+		 * stats available only for real-devices.
+		 */
+		if (pvd->vdev_physpath == NULL)
+			return;
+
 		/* single vdev (itself) */
 		ASSERT(pvd->vdev_ops->vdev_op_leaf);
 		DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, pvd);
@@ -651,6 +660,15 @@ spa_vdev_walk_stats(vdev_t *pvd, spa_load_cb func,
 				DTRACE_PROBE1(spa_vdev_walk_nl, vdev_t *, vd);
 				spa_vdev_walk_stats(vd, func, st, nvdev);
 			} else {
+				/*
+				 * If vdev_physpath is not defined, this vdev
+				 * is not a real-device so it is impossible
+				 * to collect stats for this vdev, because
+				 * stats available only for real-devices.
+				 */
+				if (vd->vdev_physpath == NULL)
+					continue;
+
 				DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, vd);
 				mutex_enter(&vd->vdev_stat_lock);
 				*st += func(vd);
@@ -757,15 +775,6 @@ spa_class_collect_lt(spa_t *spa, uint64_t weight)
 		    vd->vdev_isspare || vd->vdev_isl2cache)
 			continue;
 
-		/*
-		 * If vdev_physpath is not defined, this vdev
-		 * is not a real-device so it is impossible
-		 * to collect stats for this vdev, because
-		 * stats available only for real-devices.
-		 */
-		if (vd->vdev_physpath == NULL)
-			continue;
-
 		if (vd->vdev_isspecial) {
 			spa_vdev_walk_stats(vd, spa_vdev_process_lt,
 			    &spa->spa_special_stat.special_lt, &nspecial);
@@ -775,8 +784,11 @@ spa_class_collect_lt(spa_t *spa, uint64_t weight)
 		}
 	}
 
-	spa->spa_special_stat.special_lt /= nspecial;
-	spa->spa_special_stat.normal_lt /= nnormal;
+	if (nspecial != 0)
+		spa->spa_special_stat.special_lt /= nspecial;
+
+	if (nnormal != 0)
+		spa->spa_special_stat.normal_lt /= nnormal;
 
 	spa->spa_special_stat.ac_normal_lt +=
 	    weight * spa->spa_special_stat.normal_lt;
@@ -807,15 +819,6 @@ spa_class_collect_ut(spa_t *spa, uint64_t weight)
 
 		if (vd->vdev_islog || vd->vdev_ishole ||
 		    vd->vdev_isspare || vd->vdev_isl2cache)
-			continue;
-
-		/*
-		 * If vdev_physpath is not defined, this vdev
-		 * is not a real-device so it is impossible
-		 * to collect stats for this vdev, because
-		 * stats available only for real-devices.
-		 */
-		if (vd->vdev_physpath == NULL)
 			continue;
 
 		if (vd->vdev_isspecial) {
