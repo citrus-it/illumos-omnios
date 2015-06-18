@@ -745,6 +745,13 @@ out:
 		while (traverse_root &&
 		    strcmp(traverse_root->name, last_snap) != 0)
 			traverse_root = list_next(&ds_to_send, traverse_root);
+
+		if (traverse_root == NULL) {
+			/* It seems the given cookie is incorrect */
+			err = ENOSR;
+			goto final;
+		}
+
 		prev_snap = traverse_root;
 		traverse_root = list_next(&ds_to_send, traverse_root);
 	}
@@ -779,6 +786,7 @@ out:
 		traverse_root = list_next(&ds_to_send, traverse_root);
 	}
 
+final:
 	while ((traverse_root = list_head(&ds_to_send)) != NULL) {
 		(void) list_remove_head(&ds_to_send);
 		if (traverse_root->ds) {
