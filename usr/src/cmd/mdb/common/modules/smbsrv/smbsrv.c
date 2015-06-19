@@ -33,6 +33,7 @@
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/smb_ktypes.h>
+#include <smbsrv/smb_token.h>
 
 #ifndef _KMDB
 #include "smbsrv_pcap.h"
@@ -125,6 +126,72 @@ static smb_mdb_opts_t smb_opts[SMB_MDB_MAX_OPTS] =
 	{ "-d", SMB_OPT_ODIR	},
 	{ "-w", SMB_OPT_WALK	},
 	{ "-v", SMB_OPT_VERBOSE	}
+};
+
+/*
+ * These access mask bits are generic enough they could move into the
+ * genunix mdb module or somewhere so they could be shared.
+ */
+static const mdb_bitmask_t
+nt_access_bits[] = {
+	{ "READ_DATA",
+	    FILE_READ_DATA,
+	    FILE_READ_DATA },
+	{ "WRITE_DATA",
+	    FILE_WRITE_DATA,
+	    FILE_WRITE_DATA },
+	{ "APPEND_DATA",
+	    FILE_APPEND_DATA,
+	    FILE_APPEND_DATA },
+	{ "READ_EA",
+	    FILE_READ_EA,
+	    FILE_READ_EA },
+	{ "WRITE_EA",
+	    FILE_WRITE_EA,
+	    FILE_WRITE_EA },
+	{ "EXECUTE",
+	    FILE_EXECUTE,
+	    FILE_EXECUTE },
+	{ "DELETE_CHILD",
+	    FILE_DELETE_CHILD,
+	    FILE_DELETE_CHILD },
+	{ "READ_ATTR",
+	    FILE_READ_ATTRIBUTES,
+	    FILE_READ_ATTRIBUTES },
+	{ "WRITE_ATTR",
+	    FILE_WRITE_ATTRIBUTES,
+	    FILE_WRITE_ATTRIBUTES },
+	{ "DELETE",
+	    DELETE,
+	    DELETE },
+	{ "READ_CTRL",
+	    READ_CONTROL,
+	    READ_CONTROL },
+	{ "WRITE_DAC",
+	    WRITE_DAC,
+	    WRITE_DAC },
+	{ "WRITE_OWNER",
+	    WRITE_OWNER,
+	    WRITE_OWNER },
+	{ "SYNCH",
+	    SYNCHRONIZE,
+	    SYNCHRONIZE },
+	{ "ACC_SEC",
+	    ACCESS_SYSTEM_SECURITY,
+	    ACCESS_SYSTEM_SECURITY },
+	{ "MAX_ALLOWED",
+	    MAXIMUM_ALLOWED,
+	    MAXIMUM_ALLOWED },
+	{ "GEN_X",
+	    GENERIC_EXECUTE,
+	    GENERIC_EXECUTE },
+	{ "GEN_W",
+	    GENERIC_WRITE,
+	    GENERIC_WRITE },
+	{ "GEN_R",
+	    GENERIC_READ,
+	    GENERIC_READ },
+	{ NULL, 0, 0 }
 };
 
 static smb_com_entry_t	smb_com[256] =
@@ -1240,6 +1307,43 @@ typedef struct mdb_smb_user {
 	uint16_t		u_uid;
 } mdb_smb_user_t;
 
+static const mdb_bitmask_t
+user_flag_bits[] = {
+	{ "ANON",
+	    SMB_USER_FLAG_ANON,
+	    SMB_USER_FLAG_ANON },
+	{ "GUEST",
+	    SMB_USER_FLAG_GUEST,
+	    SMB_USER_FLAG_GUEST },
+	{ "POWER_USER",
+	    SMB_USER_FLAG_POWER_USER,
+	    SMB_USER_FLAG_POWER_USER },
+	{ "BACKUP_OP",
+	    SMB_USER_FLAG_BACKUP_OPERATOR,
+	    SMB_USER_FLAG_BACKUP_OPERATOR },
+	{ "ADMIN",
+	    SMB_USER_FLAG_ADMIN,
+	    SMB_USER_FLAG_ADMIN },
+	{ NULL, 0, 0 }
+};
+
+static const mdb_bitmask_t
+user_priv_bits[] = {
+	{ "TAKE_OWNER",
+	    SMB_USER_PRIV_TAKE_OWNERSHIP,
+	    SMB_USER_PRIV_TAKE_OWNERSHIP },
+	{ "BACKUP",
+	    SMB_USER_PRIV_BACKUP,
+	    SMB_USER_PRIV_BACKUP },
+	{ "RESTORE",
+	    SMB_USER_PRIV_RESTORE,
+	    SMB_USER_PRIV_RESTORE },
+	{ "SECURITY",
+	    SMB_USER_PRIV_SECURITY,
+	    SMB_USER_PRIV_SECURITY },
+	{ NULL, 0, 0 }
+};
+
 static void
 smbuser_help(void)
 {
@@ -1301,8 +1405,11 @@ smbuser_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    "%</u>%</b>\n", addr);
 			mdb_printf("UID: %u\n", user->u_uid);
 			mdb_printf("State: %d (%s)\n", user->u_state, state);
-			mdb_printf("Flags: 0x%08x\n", user->u_flags);
-			mdb_printf("Privileges: 0x%08x\n", user->u_privileges);
+			mdb_printf("Flags: 0x%08x <%b>\n", user->u_flags,
+			    user->u_flags, user_flag_bits);
+			mdb_printf("Privileges: 0x%08x <%b>\n",
+			    user->u_privileges,
+			    user->u_privileges, user_priv_bits);
 			mdb_printf("Credential: %p\n", user->u_cred);
 			mdb_printf("Reference Count: %d\n", user->u_refcnt);
 			mdb_printf("User Account: %s\n\n", account);
@@ -1381,6 +1488,71 @@ static const smb_exp_t smb_tree_exp[] =
 	{ 0, 0, NULL, NULL}
 };
 
+static const mdb_bitmask_t
+tree_flag_bits[] = {
+	{ "RO",
+	    SMB_TREE_READONLY,
+	    SMB_TREE_READONLY },
+	{ "ACLS",
+	    SMB_TREE_SUPPORTS_ACLS,
+	    SMB_TREE_SUPPORTS_ACLS },
+	{ "STREAMS",
+	    SMB_TREE_STREAMS,
+	    SMB_TREE_STREAMS },
+	{ "CI",
+	    SMB_TREE_CASEINSENSITIVE,
+	    SMB_TREE_CASEINSENSITIVE },
+	{ "NO_CS",
+	    SMB_TREE_NO_CASESENSITIVE,
+	    SMB_TREE_NO_CASESENSITIVE },
+	{ "NO_EXPORT",
+	    SMB_TREE_NO_EXPORT,
+	    SMB_TREE_NO_EXPORT },
+	{ "OPLOCKS",
+	    SMB_TREE_OPLOCKS,
+	    SMB_TREE_OPLOCKS },
+	{ "SHORTNAMES",
+	    SMB_TREE_SHORTNAMES,
+	    SMB_TREE_SHORTNAMES },
+	{ "XVATTR",
+	    SMB_TREE_XVATTR,
+	    SMB_TREE_XVATTR },
+	{ "DIRENTFLAGS",
+	    SMB_TREE_DIRENTFLAGS,
+	    SMB_TREE_DIRENTFLAGS },
+	{ "ACL_CR",
+	    SMB_TREE_ACLONCREATE,
+	    SMB_TREE_ACLONCREATE },
+	{ "ACEMASK",
+	    SMB_TREE_ACEMASKONACCESS,
+	    SMB_TREE_ACEMASKONACCESS },
+	{ "NFS_MNT",
+	    SMB_TREE_NFS_MOUNTED,
+	    SMB_TREE_NFS_MOUNTED },
+	{ "UNICODE",
+	    SMB_TREE_UNICODE_ON_DISK,
+	    SMB_TREE_UNICODE_ON_DISK },
+	{ "CATIA",
+	    SMB_TREE_CATIA,
+	    SMB_TREE_CATIA },
+	{ "ABE",
+	    SMB_TREE_ABE,
+	    SMB_TREE_ABE },
+	{ "QUOTA",
+	    SMB_TREE_QUOTA,
+	    SMB_TREE_QUOTA },
+	{ "DFSROOT",
+	    SMB_TREE_DFSROOT,
+	    SMB_TREE_DFSROOT },
+	{ "SPARSE",
+	    SMB_TREE_SPARSE,
+	    SMB_TREE_SPARSE },
+	{ "XMNT",
+	    SMB_TREE_TRAVERSE_MOUNTS,
+	    SMB_TREE_TRAVERSE_MOUNTS },
+	{ NULL, 0, 0 }
+};
+
 static void
 smbtree_help(void)
 {
@@ -1439,7 +1611,8 @@ smbtree_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf("Type: %s\n", tree->t_typename);
 			mdb_printf("Volume: %s\n", tree->t_volume);
 			mdb_printf("Umask: %04x\n", tree->t_umask);
-			mdb_printf("Flags: %08x\n", tree->t_flags);
+			mdb_printf("Flags: %08x <%b>\n", tree->t_flags,
+			    tree->t_flags, tree_flag_bits);
 			mdb_printf("SMB Node: %llx\n", tree->t_snode);
 			mdb_printf("Reference Count: %d\n\n", tree->t_refcnt);
 		} else {
@@ -1552,6 +1725,8 @@ typedef struct mdb_smb_ofile {
 	uint32_t		f_uniqid;
 	uint32_t		f_refcnt;
 	uint32_t		f_flags;
+	uint32_t		f_granted_access;
+	uint32_t		f_share_access;
 
 	uint16_t		f_fid;
 	uint16_t		f_ftype;
@@ -1560,6 +1735,37 @@ typedef struct mdb_smb_ofile {
 	cred_t			*f_cr;
 	pid_t			f_pid;
 } mdb_smb_ofile_t;
+
+static const mdb_bitmask_t
+ofile_flag_bits[] = {
+	{ "RO",
+	    SMB_OFLAGS_READONLY,
+	    SMB_OFLAGS_READONLY },
+	{ "EXEC",
+	    SMB_OFLAGS_EXECONLY,
+	    SMB_OFLAGS_EXECONLY },
+	{ "DELETE",
+	    SMB_OFLAGS_SET_DELETE_ON_CLOSE,
+	    SMB_OFLAGS_SET_DELETE_ON_CLOSE },
+	{ "POS_VALID",
+	    SMB_OFLAGS_LLF_POS_VALID,
+	    SMB_OFLAGS_LLF_POS_VALID },
+	{ NULL, 0, 0}
+};
+
+static const mdb_bitmask_t
+smb_sharemode_bits[] = {
+	{ "READ",
+	    FILE_SHARE_READ,
+	    FILE_SHARE_READ },
+	{ "WRITE",
+	    FILE_SHARE_WRITE,
+	    FILE_SHARE_WRITE },
+	{ "DELETE",
+	    FILE_SHARE_DELETE,
+	    FILE_SHARE_DELETE },
+	{ NULL, 0, 0}
+};
 
 static int
 smbofile_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -1603,7 +1809,14 @@ smbofile_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    of->f_llf_pos,
 			    ((of->f_flags & SMB_OFLAGS_LLF_POS_VALID) ?
 			    "Valid" : "Invalid"));
-			mdb_printf("Flags: 0x%08x\n", of->f_flags);
+			mdb_printf("Flags: 0x%08x <%b>\n", of->f_flags,
+			    of->f_flags, ofile_flag_bits);
+			mdb_printf("Granted Acc.: 0x%08x <%b>\n",
+			    of->f_granted_access,
+			    of->f_granted_access, nt_access_bits);
+			mdb_printf("Share Mode: 0x%08x <%b>\n",
+			    of->f_share_access,
+			    of->f_share_access, smb_sharemode_bits);
 			mdb_printf("User: %p\n", of->f_user);
 			mdb_printf("Tree: %p\n", of->f_tree);
 			mdb_printf("Credential: %p\n\n", of->f_cr);
