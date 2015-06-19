@@ -1205,7 +1205,7 @@ zfs_recv_thread(void *krrp_task_void)
 		    drr.drr_type != BSWAP_32(DRR_END))
 			err = EBADMSG;
 
-		if (!err &&
+		if (!err && krrp_task->buffer_args.force_cksum &&
 		    !ZIO_CHECKSUM_EQUAL(drr.drr_u.drr_end.drr_checksum, zcksum))
 			err = ECKSUM;
 
