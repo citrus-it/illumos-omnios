@@ -21,13 +21,14 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <scsi/libses.h>
 #include "ses_impl.h"
 
 #define	NEXT_ED(eip)	\
-	((ses2_ed_impl_t *)((uint8_t *)(eip) + 	\
+	((ses2_ed_impl_t *)((uint8_t *)(eip) +	\
 	    ((eip)->st_hdr.sehi_ed_len + sizeof (ses2_ed_hdr_impl_t))))
 
 static ses_node_t *
@@ -168,6 +169,12 @@ ses_build_snap_skel(ses_snap_t *sp)
 	    libscsi_product(sp->ss_target->st_target));
 	SES_NV_ADD(string, err, root->sn_props, SCSI_PROP_REVISION,
 	    libscsi_revision(sp->ss_target->st_target));
+	if (libscsi_usn(sp->ss_target->st_target) != NULL)
+		SES_NV_ADD(string, err, root->sn_props, SCSI_PROP_USN,
+		    libscsi_usn(sp->ss_target->st_target));
+	if (libscsi_lid(sp->ss_target->st_target) != NULL)
+		SES_NV_ADD(string, err, root->sn_props, SCSI_PROP_LID,
+		    libscsi_lid(sp->ss_target->st_target));
 
 	for (eip = (ses2_ed_impl_t *)pip->scpi_data, i = 0;
 	    i < pip->scpi_n_subenclosures + 1;
@@ -210,6 +217,14 @@ ses_build_snap_skel(ses_snap_t *sp)
 
 		if (enc_parse_ed(eip, np->sn_props) != 0)
 			return (-1);
+
+		if (libscsi_usn(sp->ss_target->st_target) != NULL)
+			SES_NV_ADD(string, err, np->sn_props, SCSI_PROP_USN,
+			    libscsi_usn(sp->ss_target->st_target));
+
+		if (libscsi_lid(sp->ss_target->st_target) != NULL)
+			SES_NV_ADD(string, err, np->sn_props, SCSI_PROP_LID,
+			    libscsi_lid(sp->ss_target->st_target));
 	}
 
 	if (root->sn_first_child == NULL)

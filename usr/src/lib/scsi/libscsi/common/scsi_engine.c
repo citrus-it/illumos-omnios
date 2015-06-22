@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -198,6 +199,11 @@ libscsi_open(libscsi_hdl_t *hp, const char *engine, const void *target)
 		return (NULL);
 	}
 
+	if (libscsi_get_inquiry_dev_id(hp, tp) != 0)
+		tp->lst_lid = NULL;
+	if (libscsi_get_inquiry_usn(hp, tp) != 0)
+		tp->lst_usn = NULL;
+
 	return (tp);
 }
 
@@ -214,6 +220,10 @@ libscsi_close(libscsi_hdl_t *hp, libscsi_target_t *tp)
 	libscsi_free(hp, tp->lst_vendor);
 	libscsi_free(hp, tp->lst_product);
 	libscsi_free(hp, tp->lst_revision);
+	if (tp->lst_lid != NULL)
+		libscsi_free(hp, tp->lst_lid);
+	if (tp->lst_usn != NULL)
+		libscsi_free(hp, tp->lst_usn);
 	libscsi_free(hp, tp);
 	--hp->lsh_targets;
 }

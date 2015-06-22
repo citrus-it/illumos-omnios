@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBSCSI_IMPL_H
@@ -73,6 +74,8 @@ struct libscsi_target {
 	char *lst_vendor;
 	char *lst_product;
 	char *lst_revision;
+	char *lst_lid;
+	char *lst_usn;
 	void *lst_priv;
 	uint_t lst_mtbf_cdb;
 	uint_t lst_mtbf_read;
@@ -92,6 +95,10 @@ struct libscsi_target {
 
 extern int libscsi_assert(const char *, const char *, int);
 extern int libscsi_get_inquiry(struct libscsi_hdl *, struct libscsi_target *);
+extern int libscsi_get_inquiry_dev_id(struct libscsi_hdl *,
+    struct libscsi_target *);
+extern int libscsi_get_inquiry_usn(struct libscsi_hdl *,
+    struct libscsi_target *);
 
 #ifdef	__cplusplus
 }

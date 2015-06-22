@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SPC3_TYPES_H
@@ -35,6 +36,7 @@ extern "C" {
 #include <sys/sysmacros.h>
 #include <sys/scsi/generic/commands.h>
 #include <sys/scsi/impl/commands.h>
+#include <sys/scsi/generic/inquiry.h>
 
 typedef enum spc3_cmd {
 	SPC3_CMD_TEST_UNIT_READY = SCMD_TEST_UNIT_READY,
@@ -862,6 +864,22 @@ typedef struct spc3_supported_diag_page_impl {
 	uint16_t ssdpi_page_length;
 	uint8_t ssdpi_page_list[1];
 } spc3_supported_diag_page_impl_t;
+
+/*
+ * SPC-3 Device Identification VPD page (Table 294, 7.6.3)
+ */
+typedef struct spc3_dev_id_vpd_page_impl {
+	struct vpd_hdr divpi_hdr;
+	uint8_t divpi_descrs[252]; /* Flexible */
+} spc3_dev_id_vpd_page_impl_t;
+
+/*
+ * SPC-3 Unit Serial Number VPD page (Table 332, 7.6.10)
+ */
+typedef struct spc3_usn_vpd_page_impl {
+	struct vpd_hdr uvpi_hdr;
+	uint64_t uvpi_usn[2]; /* Flexible */
+} spc3_usn_vpd_page_impl_t;
 
 /*
  * SPC-3 6.21 REPORT LUNS

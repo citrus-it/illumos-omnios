@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -37,6 +38,7 @@
 #include <dlfcn.h>
 
 #include <scsi/libscsi.h>
+#include <sys/byteorder.h>
 #include "libscsi_impl.h"
 
 int
@@ -298,7 +300,7 @@ libscsi_get_inquiry(libscsi_hdl_t *hp, libscsi_target_t *tp)
 	if ((ap = libscsi_action_alloc(hp, SPC3_CMD_INQUIRY,
 	    LIBSCSI_AF_READ | LIBSCSI_AF_SILENT | LIBSCSI_AF_DIAGNOSE, &data,
 	    offsetof(spc3_inquiry_data_t, id_vs_36[0]))) == NULL)
-		return (-1);
+		return (libscsi_set_errno(hp, ESCSI_INQUIRY_FAILED));
 
 	cp = (spc3_inquiry_cdb_t *)libscsi_action_get_cdb(ap);
 
@@ -324,8 +326,175 @@ libscsi_get_inquiry(libscsi_hdl_t *hp, libscsi_target_t *tp)
 	    (tp->lst_revision = libscsi_process_inquiry_string(hp,
 	    data.id_product_revision,
 	    sizeof (data.id_product_revision))) == NULL) {
-		return (-1);
+		return (libscsi_set_errno(hp, ESCSI_INQUIRY_FAILED));
 	}
+
+	return (0);
+}
+
+/*
+ * A designation descriptor consists of the header followed by data.
+ * When given a pointer to the header to get to next descriptor we need to add
+ * to hdr pointer the number of data bytes plus size of the header itself.
+ */
+#define NEXT_DESC(hdr, data_len, hdr_type) ((hdr_type *)((((uint8_t *)hdr) + \
+    data_len + sizeof (hdr_type))))
+
+int
+libscsi_get_inquiry_dev_id(libscsi_hdl_t *hp, libscsi_target_t *tp)
+{
+	libscsi_action_t *ap;
+	spc3_inquiry_cdb_t *cp;
+	spc3_dev_id_vpd_page_impl_t data;
+	size_t len;
+	int des_bytes_left;
+	struct vpd_desc *cur_desc;
+	char lid[17];
+
+	if ((ap = libscsi_action_alloc(hp, SPC3_CMD_INQUIRY,
+	    LIBSCSI_AF_READ | LIBSCSI_AF_SILENT | LIBSCSI_AF_DIAGNOSE, &data,
+	    sizeof (spc3_dev_id_vpd_page_impl_t))) == NULL)
+		return (libscsi_set_errno(hp, ESCSI_NOMEM));
+
+	cp = (spc3_inquiry_cdb_t *)libscsi_action_get_cdb(ap);
+	cp->ic_evpd = 1; /* return vital product data for bellow page code */
+	cp->ic_page_code = DEV_ID_VPD_PAGE_CODE;
+	SCSI_WRITE16(&cp->ic_allocation_length,
+	    sizeof (spc3_dev_id_vpd_page_impl_t));
+
+	if (libscsi_exec(ap, tp) != 0 ||
+	    libscsi_action_get_status(ap) != 0) {
+		libscsi_action_free(ap);
+		return (libscsi_set_errno(hp, ESCSI_IO));
+	}
+
+	(void) libscsi_action_get_buffer(ap, NULL, NULL, &len);
+	libscsi_action_free(ap);
+
+	/* make sure we at least got the header */
+	if (len < offsetof(spc3_dev_id_vpd_page_impl_t, divpi_descrs[0]))
+		return (libscsi_set_errno(hp, ESCSI_BADLENGTH));
+
+	/* make sure we got the page we asked for */
+	if (data.divpi_hdr.page_code != DEV_ID_VPD_PAGE_CODE)
+		return (libscsi_set_errno(hp, ESCSI_IO));
+
+	/* check for page truncation */
+	len = ((data.divpi_hdr.page_len)[0] << 8 |
+	    (data.divpi_hdr.page_len)[1]);
+	if (len > sizeof (data.divpi_descrs))
+		return (libscsi_set_errno(hp, ESCSI_BADLENGTH));
+
+	/* get the first descriptor */
+	cur_desc = (struct vpd_desc *)(data.divpi_descrs);
+	/* iterate over descriptors looking for the one we need */
+	des_bytes_left = len;
+	for (; des_bytes_left > sizeof (struct vpd_desc);
+	    des_bytes_left -= (sizeof (struct vpd_desc) + cur_desc->len),
+	    cur_desc = NEXT_DESC(cur_desc, cur_desc->len, struct vpd_desc)) {
+
+		/*
+		 * Len for the NAA IEEE designators is 12 (aka 0x08).
+		 * Designator type (id_type) 3 means a NAA formatted
+		 * designator.
+		 * Code set for the NAA IEEE designators is 1 (binary format).
+		 * Association 0 means this designator is for a Logical Unit.
+		 * Association 2 means this designator is for a SCSI device
+		 * that contains the Logical Unit.
+		 * With the ASSOCIATION field set to 0 or 2, device shall
+		 * return the same descriptor when it is accessed through any
+		 * other I_T nexus. See SPC4 7.8.6.1
+		 */
+		if (cur_desc->len == 0x08 && cur_desc->id_type == 0x3 &&
+		    cur_desc->code_set == 0x1 &&
+		    (cur_desc->association == 0x0 ||
+		     cur_desc->association == 0x2)) {
+			/* get to the data - skip the descriptor header */
+			cur_desc = (struct vpd_desc *)(((uint8_t *)cur_desc) +
+			    sizeof (struct vpd_desc));
+
+			/*
+			 * Bits 7-4 of the NAA formatted designator hold
+			 * the designator type. We're only interested
+			 * in designator type 0x5 - a 64bit value
+			 * (including this type filed) that represents a
+			 * NAA IEEE Registered designator that we use as
+			 * the LID.
+			 * See SPC4 "NAA designator format" section.
+			 */
+			if (((*((uint8_t *)cur_desc)) & 0x50) != 0x50) {
+				/*
+				 * This is not an IEEE Registered NAA
+				 * designator, point cur_desc back to the
+				 * header and skip this designator.
+				 */
+				cur_desc = (struct vpd_desc * )
+				    (((uint8_t *)cur_desc) -
+				    sizeof (struct vpd_desc));
+				continue;
+			}
+
+			/* byte swap to have LID match what libses displays */
+			if (snprintf(lid, sizeof (lid), "%llx",
+				    BE_IN64(((uint64_t *)cur_desc))) < 0)
+				return (libscsi_set_errno(hp, ESCSI_UNKNOWN));
+
+			if ((tp->lst_lid = libscsi_process_inquiry_string(hp,
+			    lid, sizeof (lid))) == NULL)
+				return (libscsi_set_errno(hp, ESCSI_NOMEM));
+
+			return (0);
+		}
+	}
+
+	return (libscsi_set_errno(hp, ESCSI_NOTSUP));
+}
+
+int
+libscsi_get_inquiry_usn(libscsi_hdl_t *hp, libscsi_target_t *tp)
+{
+	libscsi_action_t *ap;
+	spc3_inquiry_cdb_t *cp;
+	spc3_usn_vpd_page_impl_t data;
+	size_t len;
+
+	if ((ap = libscsi_action_alloc(hp, SPC3_CMD_INQUIRY,
+	    LIBSCSI_AF_READ | LIBSCSI_AF_SILENT | LIBSCSI_AF_DIAGNOSE, &data,
+	    sizeof (spc3_usn_vpd_page_impl_t))) == NULL)
+		return (libscsi_set_errno(hp, ESCSI_NOMEM));
+
+	cp = (spc3_inquiry_cdb_t *)libscsi_action_get_cdb(ap);
+	cp->ic_evpd = 1; /* return vital product data for bellow page code */
+	cp->ic_page_code = USN_VPD_PAGE_CODE;
+	SCSI_WRITE16(&cp->ic_allocation_length,
+	    sizeof (spc3_usn_vpd_page_impl_t));
+
+	if (libscsi_exec(ap, tp) != 0 ||
+	    libscsi_action_get_status(ap) != 0) {
+		libscsi_action_free(ap);
+		return (libscsi_set_errno(hp, ESCSI_IO));
+	}
+
+	(void) libscsi_action_get_buffer(ap, NULL, NULL, &len);
+	libscsi_action_free(ap);
+
+	/* make sure we at least got the header */
+	if (len < offsetof(spc3_usn_vpd_page_impl_t, uvpi_usn[0]))
+		return (libscsi_set_errno(hp, ESCSI_BADLENGTH));
+
+	/* make sure we got the page we asked for */
+	if (data.uvpi_hdr.page_code != USN_VPD_PAGE_CODE)
+		return (libscsi_set_errno(hp, ESCSI_IO));
+
+	/* check for USN truncation */
+	len = ((data.uvpi_hdr.page_len)[0] << 8 | (data.uvpi_hdr.page_len)[1]);
+	if (len > sizeof (data.uvpi_usn))
+		return (libscsi_set_errno(hp, ESCSI_BADLENGTH));
+
+	/* USN is ASCI encoded */
+	if ((tp->lst_usn = libscsi_process_inquiry_string(hp,
+	    (char *)data.uvpi_usn, sizeof (data.uvpi_usn))) == NULL)
+	    return (libscsi_set_errno(hp, ESCSI_NOMEM));
 
 	return (0);
 }
@@ -346,4 +515,16 @@ const char *
 libscsi_revision(libscsi_target_t *tp)
 {
 	return (tp->lst_revision);
+}
+
+const char *
+libscsi_lid(libscsi_target_t *tp)
+{
+	return (tp->lst_lid);
+}
+
+const char *
+libscsi_usn(libscsi_target_t *tp)
+{
+	return (tp->lst_usn);
 }

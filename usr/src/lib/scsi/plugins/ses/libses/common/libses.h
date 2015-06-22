@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_FRAMEWORK_LIBSES_H
@@ -37,6 +38,8 @@ extern "C" {
 #define	SCSI_PROP_VENDOR		"scsi-inquiry-vendor"
 #define	SCSI_PROP_PRODUCT		"scsi-inquiry-product"
 #define	SCSI_PROP_REVISION		"scsi-inquiry-revision"
+#define	SCSI_PROP_LID                   "scsi-inquiry-lu-naa-designator"
+#define	SCSI_PROP_USN                   "scsi-inquiry-unit-serial-number"
 
 /*
  * This property provides a human-readable name for the element type.  This is

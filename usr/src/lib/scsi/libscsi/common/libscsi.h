@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBSCSI_H
@@ -116,6 +117,8 @@ extern libscsi_hdl_t *libscsi_get_handle(libscsi_target_t *);
 extern const char *libscsi_vendor(libscsi_target_t *);
 extern const char *libscsi_product(libscsi_target_t *);
 extern const char *libscsi_revision(libscsi_target_t *);
+extern const char *libscsi_lid(libscsi_target_t *);
+extern const char *libscsi_usn(libscsi_target_t *);
 
 extern libscsi_errno_t libscsi_errno(libscsi_hdl_t *);
 extern const char *libscsi_errmsg(libscsi_hdl_t *);

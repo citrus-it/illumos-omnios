@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_SCSI_GENERIC_INQUIRY_H
@@ -379,6 +380,12 @@ struct scsi_inquiry {
 #define	TPGS_FAILOVER_IMPLICIT	0x1
 #define	TPGS_FAILOVER_EXPLICIT	0x2
 #define	TPGS_FAILOVER_BOTH	0x3
+
+/*
+ * VPD page code macros:
+ */
+#define	DEV_ID_VPD_PAGE_CODE 0x83 /* this page is mandatory */
+#define	USN_VPD_PAGE_CODE 0x80
 
 /*
  * SPC-3 revision 21c, section 7.6.4.1
