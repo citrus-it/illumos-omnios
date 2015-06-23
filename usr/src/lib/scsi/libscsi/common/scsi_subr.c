@@ -436,7 +436,7 @@ libscsi_get_inquiry_dev_id(libscsi_hdl_t *hp, libscsi_target_t *tp)
 
 			/* byte swap to have LID match what libses displays */
 			if (snprintf(lid, sizeof (lid), "%llx",
-				    BE_IN64(((uint64_t *)cur_desc))) < 0)
+				    BE_IN64(cur_desc)) < 0)
 				return (libscsi_set_errno(hp, ESCSI_UNKNOWN));
 
 			if ((tp->lst_lid = libscsi_process_inquiry_string(hp,
