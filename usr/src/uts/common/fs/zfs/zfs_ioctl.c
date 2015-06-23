@@ -6681,7 +6681,7 @@ zfs_ioc_pool_get_props_nvl(const char *poolname, nvlist_t *innvl,
 {
 	spa_t *spa;
 	int error;
-	nvlist_t *props;
+	nvlist_t *props = NULL;
 
 	ASSERT3P(innvl, ==, NULL);
 	if ((error = spa_open(poolname, &spa, FTAG)) != 0) {
@@ -6699,9 +6699,11 @@ zfs_ioc_pool_get_props_nvl(const char *poolname, nvlist_t *innvl,
 		spa_close(spa, FTAG);
 	}
 
-	if (props) {
+	if (props != NULL) {
 		fnvlist_merge(outnvl, props);
 		nvlist_free(props);
+	} else {
+		ASSERT3S(error, !=, 0);
 	}
 
 	return (error);
