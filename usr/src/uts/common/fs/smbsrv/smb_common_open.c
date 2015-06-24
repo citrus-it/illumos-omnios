@@ -38,6 +38,8 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
 
+int smb_disable_streams_on_share_root = 0;
+
 static volatile uint32_t smb_fids = 0;
 #define	SMB_UNIQ_FID()	atomic_inc_32_nv(&smb_fids)
 
@@ -403,11 +405,15 @@ smb_open_subr(smb_request_t *sr)
 	 */
 	if (!is_dir && !pn->pn_pname && !pn->pn_fname && pn->pn_sname) {
 		/*
-		 * Can't currently handle a stream on the tree root.
-		 * If a stream is being opened return "not found", otherwise
-		 * return "access denied".
+		 * There were historically some problems with allowing
+		 * NT named streams at the root of a share, but all the
+		 * details about such problem are long gone.  Windows
+		 * allows these; the Mac expects them to work.  Let's
+		 * allow this but provide a way to disable it in case
+		 * someone rediscovers the historical problem.
 		 */
-		if (cur_node == sr->tid_tree->t_snode) {
+		if (smb_disable_streams_on_share_root != 0 &&
+		    cur_node == sr->tid_tree->t_snode) {
 			if (op->create_disposition == FILE_OPEN) {
 				return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
 			}
