@@ -539,23 +539,6 @@ spa_deadman(void *arg)
 		vdev_deadman(spa->spa_root_vdev);
 }
 
-static int
-wrc_blocks_compare(const void *arg1, const void *arg2)
-{
-	wrc_block_t *b1 = (wrc_block_t *)arg1;
-	wrc_block_t *b2 = (wrc_block_t *)arg2;
-
-	uint64_t d11 = b1->dva[0].dva_word[0];
-	uint64_t d12 = b1->dva[0].dva_word[1];
-	uint64_t d21 = b2->dva[0].dva_word[0];
-	uint64_t d22 = b2->dva[0].dva_word[1];
-	int cmp1 = (d11 < d21) ? (-1) : (d11 == d21 ? 0 : 1);
-	int cmp2 = (d12 < d22) ? (-1) : (d12 == d22 ? 0 : 1);
-	int cmp = (cmp1 == 0) ? cmp2 : cmp1;
-
-	return (cmp);
-}
-
 /*
  * Create an uninitialized spa_t with the given name.  Requires
  * spa_namespace_lock.  The caller must ensure that the spa_t doesn't already
@@ -586,7 +569,6 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_iokstat_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_cos_props_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_vdev_props_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_wrc.wrc_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_perfmon.perfmon_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
@@ -594,7 +576,6 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	cv_init(&spa->spa_proc_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_scrub_io_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_suspend_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&spa->spa_wrc.wrc_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_perfmon.perfmon_cv, NULL, CV_DEFAULT, NULL);
 
 	for (int t = 0; t < TXG_SIZE; t++)
@@ -680,14 +661,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 
 	spa_cos_init(spa);
 
-	avl_create(&spa->spa_wrc.wrc_blocks,
-	    wrc_blocks_compare, sizeof (wrc_block_t),
-	    offsetof(wrc_block_t, node));
-	avl_create(&spa->spa_wrc.wrc_moved_blocks,
-	    wrc_blocks_compare, sizeof (wrc_block_t),
-	    offsetof(wrc_block_t, node));
-	spa->spa_wrc.wrc_block_count = 0;
-	spa->spa_wrc.wrc_thread = NULL;
+	wrc_init(&spa->spa_wrc, spa);
 
 	bzero(&(spa->spa_special_stat), sizeof (spa_special_stat_t));
 	spa->spa_special_stat_rotor = 0;
@@ -742,10 +716,8 @@ spa_remove(spa_t *spa)
 	}
 
 	list_destroy(&spa->spa_config_list);
-	wrc_clean_plan_tree(spa);
-	wrc_clean_moved_tree(spa);
-	avl_destroy(&spa->spa_wrc.wrc_blocks);
-	avl_destroy(&spa->spa_wrc.wrc_moved_blocks);
+
+	wrc_fini(&spa->spa_wrc);
 
 	spa_cos_fini(spa);
 
@@ -774,7 +746,6 @@ spa_remove(spa_t *spa)
 	cv_destroy(&spa->spa_proc_cv);
 	cv_destroy(&spa->spa_scrub_io_cv);
 	cv_destroy(&spa->spa_suspend_cv);
-	cv_destroy(&spa->spa_wrc.wrc_cv);
 	cv_destroy(&spa->spa_perfmon.perfmon_cv);
 
 	mutex_destroy(&spa->spa_async_lock);
@@ -790,7 +761,6 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_iokstat_lock);
 	mutex_destroy(&spa->spa_cos_props_lock);
 	mutex_destroy(&spa->spa_vdev_props_lock);
-	mutex_destroy(&spa->spa_wrc.wrc_lock);
 	mutex_destroy(&spa->spa_perfmon.perfmon_lock);
 
 	kmem_free(spa, sizeof (spa_t));

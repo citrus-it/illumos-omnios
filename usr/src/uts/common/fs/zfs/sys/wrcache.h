@@ -175,10 +175,13 @@ typedef struct wrc_parseblock_cb {
 	uint64_t	actv_txg;
 } wrc_parseblock_cb_t;
 
+void wrc_init(wrc_data_t *wrc_data, spa_t *spa);
+void wrc_fini(wrc_data_t *wrc_data);
+
 boolean_t wrc_activate(spa_t *spa);
-void wrc_reactivate(spa_t *);
 void wrc_deactivate(spa_t *spa);
 void wrc_enter_fault_state(spa_t *spa);
+void wrc_switch_mode(spa_t *spa);
 
 wrc_data_t *spa_get_wrc_data(spa_t *spa);
 
@@ -187,7 +190,7 @@ void wrc_add_bytes(spa_t *spa, uint64_t txg, uint64_t bytes);
 /*
  * write cache thread.
  */
-boolean_t wrc_start_thread(spa_t *);
+void wrc_start_thread(spa_t *);
 boolean_t wrc_stop_thread(spa_t *);
 void wrc_trigger_wrcthread(spa_t *, uint64_t);
 
@@ -203,8 +206,6 @@ boolean_t wrc_try_hold(spa_t *);
 int wrc_walk_lock(spa_t *);
 void wrc_walk_unlock(spa_t *);
 
-void wrc_init();
-void wrc_fini();
 void wrc_free_block(wrc_block_t *block);
 void wrc_clean_plan_tree(spa_t *spa);
 void wrc_clean_moved_tree(spa_t *spa);

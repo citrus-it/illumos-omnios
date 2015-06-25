@@ -85,6 +85,7 @@ uint64_t wrc_mv_cancel_threshold_initial = 20;
 uint64_t wrc_mv_cancel_threshold_step = 0;
 uint64_t wrc_mv_cancel_threshold_cap = 50;
 
+static boolean_t wrc_activate_impl(spa_t *spa);
 static wrc_block_t *wrc_create_block(wrc_data_t *wrc_data,
     const blkptr_t *bp);
 static void wrc_move_block(void *arg);
@@ -95,15 +96,35 @@ static void wrc_write_update_window(void *void_spa, dmu_tx_t *tx);
 static boolean_t dsl_pool_wrcio_limit(dsl_pool_t *dp, uint64_t txg);
 
 static int wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data);
+static int wrc_blocks_compare(const void *arg1, const void *arg2);
 
 void
-wrc_init()
+wrc_init(wrc_data_t *wrc_data, spa_t *spa)
 {
+	(void) memset(wrc_data, 0, sizeof (wrc_data_t));
+
+	wrc_data->wrc_spa = spa;
+
+	mutex_init(&wrc_data->wrc_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&wrc_data->wrc_cv, NULL, CV_DEFAULT, NULL);
+
+	avl_create(&wrc_data->wrc_blocks, wrc_blocks_compare,
+	    sizeof (wrc_block_t), offsetof(wrc_block_t, node));
+	avl_create(&wrc_data->wrc_moved_blocks, wrc_blocks_compare,
+	    sizeof (wrc_block_t), offsetof(wrc_block_t, node));
 }
 
 void
-wrc_fini()
+wrc_fini(wrc_data_t *wrc_data)
 {
+	wrc_clean_plan_tree(wrc_data->wrc_spa);
+	wrc_clean_moved_tree(wrc_data->wrc_spa);
+
+	avl_destroy(&wrc_data->wrc_blocks);
+	avl_destroy(&wrc_data->wrc_moved_blocks);
+
+	cv_destroy(&wrc_data->wrc_cv);
+	mutex_destroy(&wrc_data->wrc_lock);
 }
 
 #ifndef _KERNEL
@@ -931,20 +952,15 @@ dsl_pool_wrcio_limit(dsl_pool_t *dp, uint64_t txg)
 /* WRC-THREAD_CONTROL */
 
 /* Starts wrc threads and set associated structures */
-boolean_t
+void
 wrc_start_thread(spa_t *spa)
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 
-	if (strcmp(spa->spa_name, TRYIMPORT_NAME) == 0)
-		return (B_FALSE);
+	ASSERT(strcmp(spa->spa_name, TRYIMPORT_NAME) != 0);
+	ASSERT(wrc_data->wrc_isvalid);
 
 	mutex_enter(&wrc_data->wrc_lock);
-
-	if (!wrc_activate(spa)) {
-		mutex_exit(&wrc_data->wrc_lock);
-		return (B_FALSE);
-	}
 
 	if (wrc_data->wrc_thread == NULL && wrc_data->wrc_walk_thread == NULL) {
 		wrc_data->wrc_thr_exit = B_FALSE;
@@ -957,8 +973,6 @@ wrc_start_thread(spa_t *spa)
 #endif
 	}
 	mutex_exit(&wrc_data->wrc_lock);
-
-	return (B_TRUE);
 }
 
 /* Disables wrc thread and reset associated data structures */
@@ -983,7 +997,6 @@ wrc_stop_thread(spa_t *spa)
 		mutex_enter(&wrc_data->wrc_lock);
 		wrc_data->wrc_thread = NULL;
 		wrc_data->wrc_walk_thread = NULL;
-		wrc_deactivate(spa);
 		stop |= B_TRUE;
 	}
 
@@ -1394,116 +1407,134 @@ wrc_add_bytes(spa_t *spa, uint64_t txg, uint64_t bytes)
 
 /* WRC-INIT routines */
 
+boolean_t
+wrc_activate(spa_t *spa)
+{
+	boolean_t result = B_FALSE;
+
+	if (spa_has_special(spa) && spa->spa_wrc_mode != WRC_MODE_OFF) {
+		if (wrc_activate_impl(spa)) {
+			wrc_start_thread(spa);
+			result = B_TRUE;
+		}
+	}
+
+	return (result);
+}
+
 #define	ZFS_PROP_WRC_PASSIVE_MODE_DS "syskrrp:wrc_passive_mode_ds"
 /*
  * Initialize wrc properties for the given pool.
  */
-boolean_t
-wrc_activate(spa_t *spa)
+static boolean_t
+wrc_activate_impl(spa_t *spa)
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
-	boolean_t start = B_FALSE;
+	int err = 0;
+	char name[MAXPATHLEN];
+	boolean_t hold = B_FALSE;
 
-	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
-	if (!spa_has_special(spa) ||
-	    wrc_data->wrc_thr_exit)
+	mutex_enter(&spa->spa_wrc.wrc_lock);
+
+	if (wrc_data->wrc_thr_exit) {
+		mutex_exit(&spa->spa_wrc.wrc_lock);
 		return (B_FALSE);
+	}
 
-	if (spa->spa_wrc_mode != WRC_MODE_OFF)
-		start = B_TRUE;
+	if (wrc_data->wrc_isvalid) {
+		mutex_exit(&spa->spa_wrc.wrc_lock);
+		return (B_TRUE);
+	}
 
-	if (!wrc_data->wrc_isvalid && start) {
-		int err = 0;
-		char name[MAXPATHLEN];
-		boolean_t hold = B_FALSE;
+	(void) strcpy(name, spa->spa_name);
+	(void) strcat(name, "_wrc_move");
 
-		(void) strcpy(name, spa->spa_name);
-		(void) strcat(name, "_wrc_move");
+	DTRACE_PROBE2(wrc_spa_add, char *, spa->spa_name,
+	    spa_t *, spa);
 
-		DTRACE_PROBE2(wrc_spa_add, char *, spa->spa_name,
-		    spa_t *, spa);
+	/* Reset bookmerk */
+	bzero(&spa->spa_lszb, sizeof (spa->spa_lszb));
 
-		/* Reset bookmerk */
-		bzero(&spa->spa_lszb, sizeof (spa->spa_lszb));
+	wrc_data->wrc_roll_threshold = wrc_mv_cancel_threshold_initial;
+	wrc_data->wrc_altered_limit = 0;
+	wrc_data->wrc_altered_bytes = 0;
+	wrc_data->wrc_window_bytes = 0;
 
-		wrc_data->wrc_roll_threshold = wrc_mv_cancel_threshold_initial;
-		wrc_data->wrc_altered_limit = 0;
-		wrc_data->wrc_altered_bytes = 0;
-		wrc_data->wrc_window_bytes = 0;
-
-		/* Set up autosnap handler */
+	/* Set up autosnap handler */
 #ifdef _KERNEL
-		if (spa->spa_wrc_mode == WRC_MODE_ACTIVE) {
-			wrc_data->wrc_autosnap_hdl =
-			    autosnap_register_handler(spa->spa_name,
-			    AUTOSNAP_CREATOR | AUTOSNAP_DESTROYER |
-			    AUTOSNAP_GLOBAL,
-			    wrc_confirm_cv, wrc_nc_cb, wrc_err_cb, spa);
-		} else {
-			wrc_data->wrc_autosnap_hdl =
-			    autosnap_register_handler(spa->spa_name,
-			    AUTOSNAP_DESTROYER | AUTOSNAP_GLOBAL,
-			    wrc_confirm_cv, wrc_nc_cb, wrc_err_cb, spa);
-		}
+	if (spa->spa_wrc_mode == WRC_MODE_ACTIVE) {
+		wrc_data->wrc_autosnap_hdl =
+		    autosnap_register_handler(spa->spa_name,
+		    AUTOSNAP_CREATOR | AUTOSNAP_DESTROYER |
+		    AUTOSNAP_GLOBAL,
+		    wrc_confirm_cv, wrc_nc_cb, wrc_err_cb, spa);
+	} else {
+		wrc_data->wrc_autosnap_hdl =
+		    autosnap_register_handler(spa->spa_name,
+		    AUTOSNAP_DESTROYER | AUTOSNAP_GLOBAL,
+		    wrc_confirm_cv, wrc_nc_cb, wrc_err_cb, spa);
+	}
 
-		if (wrc_data->wrc_autosnap_hdl == NULL)
-			return (B_FALSE);
+	if (wrc_data->wrc_autosnap_hdl == NULL) {
+		mutex_exit(&spa->spa_wrc.wrc_lock);
+		return (B_FALSE);
+	}
 
 #endif
 
-		/*
-		 * Read wrc parameters to restore
-		 * latest wrc window's boundaries
-		 */
-		if (!rrw_held(&spa->spa_dsl_pool->dp_config_rwlock,
-		    RW_WRITER)) {
-			rrw_enter(&spa->spa_dsl_pool->dp_config_rwlock,
-			    RW_READER, FTAG);
-			hold = B_TRUE;
-		}
-		err = zap_lookup(spa->spa_dsl_pool->dp_meta_objset,
-		    DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_WRC_START_TXG, sizeof (uint64_t), 1,
-		    &wrc_data->wrc_start_txg);
-		if (err)
-			wrc_data->wrc_start_txg = 4;
-		err = zap_lookup(spa->spa_dsl_pool->dp_meta_objset,
-		    DMU_POOL_DIRECTORY_OBJECT,
-		    DMU_POOL_WRC_FINISH_TXG, sizeof (uint64_t), 1,
-		    &wrc_data->wrc_finish_txg);
-		if (!err) {
-			err = zap_lookup(spa->spa_dsl_pool->dp_meta_objset,
-			    DMU_POOL_DIRECTORY_OBJECT,
-			    DMU_POOL_WRC_TO_RELE_TXG, sizeof (uint64_t), 1,
-			    &wrc_data->wrc_txg_to_rele);
-		}
-		if (hold)
-			rrw_exit(&spa->spa_dsl_pool->dp_config_rwlock, FTAG);
-		if (err) {
-			wrc_data->wrc_finish_txg = 0;
-			wrc_data->wrc_txg_to_rele = 0;
-		}
-		wrc_data->wrc_latest_window_time = ddi_get_lbolt();
-
-		/* Prepare move queue and make the wrc active */
-		wrc_data->wrc_move_taskq = taskq_create(name, 10, maxclsyspri,
-		    50, INT_MAX, TASKQ_PREPOPULATE);
-
-		wrc_data->wrc_purge = B_FALSE;
-		wrc_data->wrc_walk = B_TRUE;
-		wrc_data->wrc_spa = spa;
-		wrc_data->wrc_isvalid = B_TRUE;
-
-		/* Finalize window interrupted with power cycle */
-		wrc_free_restore(spa);
+	/*
+	 * Read wrc parameters to restore
+	 * latest wrc window's boundaries
+	 */
+	if (!rrw_held(&spa->spa_dsl_pool->dp_config_rwlock,
+	    RW_WRITER)) {
+		rrw_enter(&spa->spa_dsl_pool->dp_config_rwlock,
+		    RW_READER, FTAG);
+		hold = B_TRUE;
 	}
+	err = zap_lookup(spa->spa_dsl_pool->dp_meta_objset,
+	    DMU_POOL_DIRECTORY_OBJECT,
+	    DMU_POOL_WRC_START_TXG, sizeof (uint64_t), 1,
+	    &wrc_data->wrc_start_txg);
+	if (err)
+		wrc_data->wrc_start_txg = 4;
+	err = zap_lookup(spa->spa_dsl_pool->dp_meta_objset,
+	    DMU_POOL_DIRECTORY_OBJECT,
+	    DMU_POOL_WRC_FINISH_TXG, sizeof (uint64_t), 1,
+	    &wrc_data->wrc_finish_txg);
+	if (!err) {
+		err = zap_lookup(spa->spa_dsl_pool->dp_meta_objset,
+		    DMU_POOL_DIRECTORY_OBJECT,
+		    DMU_POOL_WRC_TO_RELE_TXG, sizeof (uint64_t), 1,
+		    &wrc_data->wrc_txg_to_rele);
+	}
+	if (hold)
+		rrw_exit(&spa->spa_dsl_pool->dp_config_rwlock, FTAG);
+	if (err) {
+		wrc_data->wrc_finish_txg = 0;
+		wrc_data->wrc_txg_to_rele = 0;
+	}
+	wrc_data->wrc_latest_window_time = ddi_get_lbolt();
 
-	return (wrc_data->wrc_isvalid);
+	/* Prepare move queue and make the wrc active */
+	wrc_data->wrc_move_taskq = taskq_create(name, 10, maxclsyspri,
+	    50, INT_MAX, TASKQ_PREPOPULATE);
+
+	wrc_data->wrc_purge = B_FALSE;
+	wrc_data->wrc_walk = B_TRUE;
+	wrc_data->wrc_spa = spa;
+	wrc_data->wrc_isvalid = B_TRUE;
+
+	/* Finalize window interrupted with power cycle */
+	wrc_free_restore(spa);
+
+	mutex_exit(&spa->spa_wrc.wrc_lock);
+
+	return (B_TRUE);
 }
 
-/* Switch wrc mode */
 void
-wrc_reactivate(spa_t *spa)
+wrc_switch_mode(spa_t *spa)
 {
 	autosnap_toggle_global_mode(spa,
 	    (spa->spa_wrc_mode == WRC_MODE_ACTIVE));
@@ -1517,12 +1548,14 @@ wrc_deactivate(spa_t *spa)
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 
-	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
+	mutex_enter(&spa->spa_wrc.wrc_lock);
 
-	if (!spa_has_special(spa) ||
-	    !wrc_data->wrc_isvalid) {
+	if (!spa_has_special(spa) || !wrc_data->wrc_isvalid) {
+		mutex_exit(&spa->spa_wrc.wrc_lock);
 		return;
 	}
+
+	DTRACE_PROBE1(wrc_deactiv_start, char *, spa->spa_name);
 
 #ifdef _KERNEL
 	autosnap_unregister_handler(wrc_data->wrc_autosnap_hdl);
@@ -1540,12 +1573,29 @@ wrc_deactivate(spa_t *spa)
 	taskq_destroy(wrc_data->wrc_move_taskq);
 	mutex_enter(&wrc_data->wrc_lock);
 
-	DTRACE_PROBE1(wrc_deactiv_start, char *, spa->spa_name);
-
-	VERIFY(avl_first(&wrc_data->wrc_blocks) == NULL);
-	VERIFY(avl_first(&wrc_data->wrc_moved_blocks) == NULL);
+	VERIFY(avl_is_empty(&wrc_data->wrc_blocks));
+	VERIFY(avl_is_empty(&wrc_data->wrc_moved_blocks));
 
 	DTRACE_PROBE1(wrc_deactiv_done, char *, spa->spa_name);
+
+	mutex_exit(&spa->spa_wrc.wrc_lock);
+}
+
+static int
+wrc_blocks_compare(const void *arg1, const void *arg2)
+{
+	wrc_block_t *b1 = (wrc_block_t *)arg1;
+	wrc_block_t *b2 = (wrc_block_t *)arg2;
+
+	uint64_t d11 = b1->dva[0].dva_word[0];
+	uint64_t d12 = b1->dva[0].dva_word[1];
+	uint64_t d21 = b2->dva[0].dva_word[0];
+	uint64_t d22 = b2->dva[0].dva_word[1];
+	int cmp1 = (d11 < d21) ? (-1) : (d11 == d21 ? 0 : 1);
+	int cmp2 = (d12 < d22) ? (-1) : (d12 == d22 ? 0 : 1);
+	int cmp = (cmp1 == 0) ? cmp2 : cmp1;
+
+	return (cmp);
 }
 
 static int
