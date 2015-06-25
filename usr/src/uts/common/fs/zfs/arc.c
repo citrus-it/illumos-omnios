@@ -7621,7 +7621,10 @@ l2arc_spa_rebuild_start(spa_t *spa)
 	for (int i = 0; i < spa->spa_l2cache.sav_count; i++) {
 		l2arc_dev_t *dev =
 		    l2arc_vdev_get(spa->spa_l2cache.sav_vdevs[i]);
-		ASSERT(dev != NULL);
+		if (dev == NULL) {
+			/* Don't attempt a rebuild if the vdev is UNAVAIL */
+			continue;
+		}
 		if (dev->l2ad_rebuild && !dev->l2ad_rebuild_cancel) {
 			VERIFY3U(dev->l2ad_rebuild_did, ==, 0);
 #ifdef	_KERNEL
