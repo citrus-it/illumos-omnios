@@ -37,6 +37,7 @@ verify_runnable "global"
 $DF -F zfs -h | $GREP "$TESTFS " >/dev/null
 [[ $? == 0 ]] && log_must $ZFS umount -f $TESTDIR
 destroy_pool $TESTPOOL
+[[ -e $TESTDIR ]] && log_must $RM -rf $TESTDIR
 
 # recreate and destroy a zpool over the disks to restore the partitions to
 # normal

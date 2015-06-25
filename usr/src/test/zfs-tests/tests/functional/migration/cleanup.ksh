@@ -28,6 +28,8 @@
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+#
 
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/migration/migration.cfg
@@ -40,6 +42,7 @@ ismounted $NONZFS_TESTDIR ufs
 ismounted $TESTPOOL/$TESTFS
 [[ $? == 0 ]] && log_must $ZFS umount -f $TESTDIR
 destroy_pool $TESTPOOL
+[[ -e $TESTDIR ]] && log_must $RM -rf $TESTDIR
 
 # recreate and destroy a zpool over the disks to restore the partitions to
 # normal

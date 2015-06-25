@@ -433,6 +433,9 @@ function default_cleanup_noexit
 
 	[[ -d $TESTDIR ]] && \
 		log_must $RM -rf $TESTDIR
+	[[ -d $TESTDIR1 ]] && \
+		log_must $RM -rf $TESTDIR1
+
 }
 
 

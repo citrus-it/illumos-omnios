@@ -24,6 +24,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+#
 
 . $STF_SUITE/include/libtest.shlib
 
@@ -67,6 +69,8 @@ function cleanup
 	if snapexists "$TESTPOOL/$TESTFS@snapshot"; then
 		log_must $ZFS destroy -f $TESTPOOL/$TESTFS@snapshot
 	fi
+
+	[[ -e $TESTDIR2 ]] && log_must $RM -rf $TESTDIR2
 }
 
 

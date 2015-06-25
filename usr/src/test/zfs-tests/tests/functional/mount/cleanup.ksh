@@ -28,10 +28,17 @@
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+#
 
 . $STF_SUITE/include/libtest.shlib
 
 log_must destroy_pool $TESTPOOL
+
+for i in 1 2 3; do
+        dir=$TESTDIR.$i
+        [[ -e $dir ]] && log_must $RM -rf $dir
+done
 
 for dir in $TESTDIRS; do
 	$RM -rf $dir

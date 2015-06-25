@@ -28,6 +28,8 @@
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+#
 
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/online_offline/online_offline.cfg
@@ -60,6 +62,7 @@ function cleanup
 		destroy_pool $TESTPOOL1
 	fi
 
+	[[ -e $TESTDIR1 ]] && log_must $RM -rf $TESTDIR1
 	[[ -e $TESTDIR ]] && log_must $RM -rf $TESTDIR/*
 }
 
