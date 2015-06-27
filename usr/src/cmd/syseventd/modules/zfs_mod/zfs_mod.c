@@ -587,15 +587,9 @@ zfsdle_vdev_online(zpool_handle_t *zhp, void *data)
 }
 
 /*
- * This function is called for each vdev of a pool for which any of the
- * following events was recieved:
- *  - ESC_ZFS_vdev_add
- *  - ESC_ZFS_vdev_attach
- *  - ESC_ZFS_vdev_clear
- *  - ESC_ZFS_vdev_online
- *  - ESC_ZFS_pool_create
- *  - ESC_ZFS_pool_import
- * It will update the vdevs FRU property if it is out of date.
+ * This function is called for each vdev of a pool for which an
+ * ESC_ZFS_config_sync event was recieved. It will update the vdevs
+ * FRU property if it is out of date.
  */
 /*ARGSUSED2*/
 static void
@@ -634,14 +628,8 @@ zfs_sync_vdev_fru(zpool_handle_t *zhp, nvlist_t *vdev, boolean_t isdisk)
 }
 
 /*
- * This function handles the following events:
- *  - ESC_ZFS_vdev_add
- *  - ESC_ZFS_vdev_attach
- *  - ESC_ZFS_vdev_clear
- *  - ESC_ZFS_vdev_online
- *  - ESC_ZFS_pool_create
- *  - ESC_ZFS_pool_import
- * It will iterate over the pool vdevs to update the FRU property.
+ * This function handles the ESC_ZFS_config_sync event. It will iterate over
+ * the pools vdevs and to update the FRU property.
  */
 int
 zfs_deliver_sync(nvlist_t *nvl)
