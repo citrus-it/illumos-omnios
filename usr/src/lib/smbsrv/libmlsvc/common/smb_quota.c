@@ -1173,8 +1173,9 @@ smb_quota_add_ctrldir(const char *path)
 		if (nvlist_alloc(&attr, NV_UNIQUE_NAME, 0) == 0) {
 			if ((nvlist_add_boolean_value(
 			    attr, A_HIDDEN, 1) != 0) ||
-			    (nvlist_add_boolean_value(attr, A_SYSTEM, 1) != 0)
-			    || (fsetattr(dirfd, XATTR_VIEW_READWRITE, attr))) {
+			    (nvlist_add_boolean_value(
+			    attr, A_SYSTEM, 1) != 0) ||
+			    (fsetattr(dirfd, XATTR_VIEW_READWRITE, attr))) {
 				nvlist_free(attr);
 				(void) close(dirfd);
 				if (qdir_created)
@@ -1217,12 +1218,13 @@ smb_quota_add_ctrldir(const char *path)
 	if (acl_text == NULL) {
 		acl_free(existing_aclp);
 		(void) unlink(file);
-                if (qdir_created)
-                        (void) remove(dir);
-                return;
+		if (qdir_created)
+			(void) remove(dir);
+		return;
 	}
 	acl_free(existing_aclp);
 
+	aclp = NULL;
 	if (strcmp(acl_text, SMB_QUOTA_CNTRL_PERM) != 0) {
 		if (acl_fromtext(SMB_QUOTA_CNTRL_PERM, &aclp) != 0) {
 			free(acl_text);
@@ -1239,9 +1241,9 @@ smb_quota_add_ctrldir(const char *path)
 			acl_free(aclp);
 			return;
 		}
+		acl_free(aclp);
 	}
 	free(acl_text);
-	acl_free(aclp);
 }
 
 /*
