@@ -495,12 +495,7 @@ dsl_destroy_snapshot_sync(void *arg, dmu_tx_t *tx)
 		dsl_dataset_t *ds;
 		char *snapname;
 
-		snapname = strchr(nvpair_name(pair), '@');
-		ASSERT(snapname != NULL);
-		snapname++;
-
-		if (strncmp(snapname, AUTOSNAP_PREFIX,
-		    AUTOSNAP_PREFIX_LEN) == 0)
+		if (autosnap_check_name(strchr(nvpair_name(pair), '@')))
 			autosnap_exempt_snapshot(dp->dp_spa, nvpair_name(pair));
 
 		VERIFY0(dsl_dataset_hold(dp, nvpair_name(pair), FTAG, &ds));

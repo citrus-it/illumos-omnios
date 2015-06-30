@@ -448,10 +448,8 @@ zfs_send_collect_snaps(char *fds, char *from_snap, char *to_snap,
 				dsl_dataset_rele(pdss, NULL);
 				kmem_free(el, sizeof (zfs_snap_avl_node_t));
 			} else {
-				char *snap = strchr(el->name, '@') + 1;
-				int cmp = strncmp(snap, AUTOSNAP_PREFIX,
-				    AUTOSNAP_PREFIX_LEN);
-				if (cmp == 0 &&
+				char *snap_name = strchr(el->name, '@');
+				if (autosnap_check_name(snap_name) &&
 				    el->txg != txg_first &&
 				    el->txg != txg_last) {
 					dsl_dataset_rele(pdss, NULL);

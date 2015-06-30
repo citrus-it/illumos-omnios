@@ -52,6 +52,7 @@
 #include <sys/dsl_destroy.h>
 #include <sys/dsl_userhold.h>
 #include <sys/dsl_bookmark.h>
+#include <sys/autosnap.h>
 
 /*
  * The SPA supports block sizes up to 16MB.  However, very large blocks
@@ -1247,7 +1248,6 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 	uint64_t dsobj, crtxg;
 	objset_t *mos = dp->dp_meta_objset;
 	objset_t *os;
-	boolean_t autosnap;
 	uint64_t unique_bytes = 0;
 
 	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
@@ -1367,15 +1367,13 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 
 	spa_history_log_internal_ds(ds->ds_prev, "snapshot", tx, "");
 
-	autosnap = strncmp(snapname, AUTOSNAP_PREFIX, AUTOSNAP_PREFIX_LEN) == 0;
-
 	/*
 	 * With an active WRC all autosnapshot are globalized
 	 * With no wrc and a dataset which is either a standalone or root of
 	 * recursion, just notify about creation
 	 * With no wrc and dataset not being a part of any zone, just reject it
 	 */
-	if (autosnap) {
+	if (autosnap_check_name(snapname)) {
 		autosnap_zone_t *zone = NULL;
 		autosnap_zone_t *rzone = NULL;
 		char fullname[MAXNAMELEN];
@@ -1887,6 +1885,14 @@ dsl_dataset_rename_snapshot_check(void *arg, dmu_tx_t *tx)
 	dsl_pool_t *dp = dmu_tx_pool(tx);
 	dsl_dataset_t *hds;
 	int error;
+
+	/* You cannot rename an autosnapshot */
+	if (autosnap_check_name(ddrsa->ddrsa_oldsnapname))
+		return (SET_ERROR(EPERM));
+
+	/* New name cannot match the AUTOSNAP prefix */
+	if (autosnap_check_name(ddrsa->ddrsa_newsnapname))
+		return (SET_ERROR(EPERM));
 
 	error = dsl_dataset_hold(dp, ddrsa->ddrsa_fsname, FTAG, &hds);
 	if (error != 0)

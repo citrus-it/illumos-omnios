@@ -9,6 +9,7 @@
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_destroy.h>
 #include <sys/unique.h>
+#include <sys/ctype.h>
 
 /* AUTOSNAP-recollect routines */
 
@@ -70,13 +71,9 @@ autosnap_collect_orphaned_snapshots(spa_t *spa)
 			}
 
 			if (!err) {
-				char *snap = strchr(name, '@') + 1;
 				autosnap_snapshot_t *snap_node;
 				/* only autosnaps are collected */
-				int cmp = strncmp(snap, AUTOSNAP_PREFIX,
-				    AUTOSNAP_PREFIX_LEN);
-
-				if (cmp != 0)
+				if (!autosnap_check_name(strchr(name, '@')))
 					continue;
 
 				err = dsl_dataset_hold(dp, name, FTAG, &ds);
@@ -966,7 +963,6 @@ autosnap_notify_created_globalized(const char *snapname,
 	boolean_t destruction;
 	boolean_t asnap = B_FALSE;
 	boolean_t resumed = B_FALSE;
-	char *snap_start = strchr(snapname, '@') + 1;
 
 	ASSERT(MUTEX_HELD(&autosnap->autosnap_lock));
 
@@ -988,8 +984,7 @@ autosnap_notify_created_globalized(const char *snapname,
 	snapshot->txg = ftxg;
 	snapshot->etxg = ttxg;
 
-	if (strncmp(snap_start, AUTOSNAP_PREFIX, AUTOSNAP_PREFIX_LEN) == 0)
-		asnap = B_TRUE;
+	asnap = autosnap_check_name(strchr(snapname, '@'));
 
 	for (zone = list_head(&autosnap->autosnap_zones);
 	    zone != NULL;
@@ -1029,7 +1024,7 @@ autosnap_notify_received(const char *name)
 	char *slash;
 	char snapname[MAXPATHLEN];
 
-	if (strncmp(snap + 1, AUTOSNAP_PREFIX, AUTOSNAP_PREFIX_LEN))
+	if (!autosnap_check_name(snap))
 		return;
 
 	(void) strcpy(snapname, name);
@@ -1059,19 +1054,12 @@ autosnap_notify_created(const char *name, uint64_t txg,
 {
 	autosnap_snapshot_t *snapshot = NULL, search;
 	boolean_t found = B_FALSE;
-	char *snapname = strchr(name, '@');
 	boolean_t autosnap = B_FALSE;
 	boolean_t destruction = B_TRUE;
 
 	ASSERT(MUTEX_HELD(&zone->autosnap->autosnap_lock));
 
-	if (!snapname)
-		return;
-
-	snapname++;
-
-	if (strncmp(snapname, AUTOSNAP_PREFIX, AUTOSNAP_PREFIX_LEN) == 0)
-		autosnap = B_TRUE;
+	autosnap = autosnap_check_name(strchr(name, '@'));
 
 	destruction = (autosnap && (!!(zone->flags & AUTOSNAP_DESTROYER)));
 
@@ -1111,15 +1099,11 @@ autosnap_notify_created(const char *name, uint64_t txg,
 void
 autosnap_reject_snap(const char *name, uint64_t txg, zfs_autosnap_t *autosnap)
 {
-	char *snapname = strchr(name, '@');
 	autosnap_snapshot_t *snapshot = NULL;
 
 	ASSERT(MUTEX_HELD(&autosnap->autosnap_lock));
 
-	if (!snapname)
-		return;
-	snapname++;
-	if (strncmp(snapname, AUTOSNAP_PREFIX, AUTOSNAP_PREFIX_LEN))
+	if (!autosnap_check_name(strchr(name, '@')))
 		return;
 
 	snapshot = kmem_zalloc(sizeof (autosnap_snapshot_t), KM_SLEEP);
@@ -1370,14 +1354,41 @@ boolean_t
 autosnap_is_autosnap(dsl_dataset_t *ds)
 {
 	char ds_name[MAXNAMELEN];
-	char *snap_name;
+
+	ASSERT(ds != NULL && ds->ds_is_snapshot);
 
 	dsl_dataset_name(ds, ds_name);
-	snap_name = strchr(ds_name, '@');
-	snap_name++;
-	if (strncmp(snap_name, AUTOSNAP_PREFIX,
-	    AUTOSNAP_PREFIX_LEN) == 0)
-		return (B_TRUE);
+	return (autosnap_check_name(strchr(ds_name, '@')));
+}
 
-	return (B_FALSE);
+/*
+ * Returns B_TRUE if the given name is the name of an autosnap
+ * otherwise B_FASLE
+ *
+ * the name of an autosnap matches the following regexp:
+ *
+ * /^@?AUTOSNAP_PREFIX\d+$/
+ */
+boolean_t
+autosnap_check_name(const char *snap_name)
+{
+	size_t len, i = AUTOSNAP_PREFIX_LEN;
+
+	ASSERT(snap_name != NULL);
+
+	if (snap_name[0] == '@')
+		snap_name++;
+
+	len = strlen(snap_name);
+	if (strncmp(snap_name, AUTOSNAP_PREFIX, i) != 0 || len == i)
+		return (B_FALSE);
+
+	while (i < len) {
+		if (!isdigit(snap_name[i]))
+			return (B_FALSE);
+
+		i++;
+	}
+
+	return (B_TRUE);
 }

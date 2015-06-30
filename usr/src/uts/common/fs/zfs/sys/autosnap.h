@@ -110,7 +110,7 @@ extern void autosnap_notify_received(const char *name);
 extern void autosnap_reject_snap(const char *name, uint64_t txg,
     zfs_autosnap_t *autosnap);
 
-#define	AUTOSNAP_PREFIX "autosnap"
+#define	AUTOSNAP_PREFIX ".autosnap_"
 #define	AUTOSNAP_PREFIX_LEN (sizeof (AUTOSNAP_PREFIX) - 1)
 #define	AUTOSNAP_NO_SNAP UINT64_MAX
 #define	AUTOSNAP_LAST_SNAP (UINT64_MAX-1)
@@ -143,6 +143,7 @@ int autosnap_lock(spa_t *spa);
 void autosnap_unlock(spa_t *spa);
 
 boolean_t autosnap_is_autosnap(dsl_dataset_t *ds);
+boolean_t autosnap_check_name(const char *snap_name);
 
 extern void autosnap_destroyer_thread_start(spa_t *spa);
 extern void autosnap_destroyer_thread_stop(spa_t *spa);

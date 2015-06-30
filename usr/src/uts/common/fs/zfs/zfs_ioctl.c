@@ -3530,8 +3530,8 @@ zfs_ioc_clone(const char *fsname, nvlist_t *innvl, nvlist_t *outnvl)
 	origin_snap = strchr(origin_name, '@');
 	if (!origin_snap)
 		return (SET_ERROR(EINVAL));
-	origin_snap++;
-	if (strncmp(origin_snap, AUTOSNAP_PREFIX, AUTOSNAP_PREFIX_LEN) == 0)
+
+	if (autosnap_check_name(origin_snap))
 		return (SET_ERROR(EPERM));
 
 	(void) nvlist_lookup_nvlist(innvl, "props", &nvprops);
@@ -3610,8 +3610,7 @@ zfs_ioc_snapshot(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
 		    zfs_component_namecheck(cp + 1, NULL, NULL) != 0)
 			return (SET_ERROR(EINVAL));
 
-		if (strncmp(cp + 1, AUTOSNAP_PREFIX,
-		    AUTOSNAP_PREFIX_LEN) == 0)
+		if (autosnap_check_name(cp))
 			return (EINVAL);
 
 		/*
@@ -3762,10 +3761,8 @@ zfs_destroy_check_autosnap(spa_t *spa, const char *name)
 
 	if (snap == NULL)
 		return (EINVAL);
-	snap++;
 
-	if (strncmp(snap, AUTOSNAP_PREFIX,
-	    AUTOSNAP_PREFIX_LEN) == 0) {
+	if (autosnap_check_name(snap)) {
 		autosnap_zone_t *rzone;
 		zfs_autosnap_t *autosnap;
 

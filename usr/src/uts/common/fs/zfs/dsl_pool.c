@@ -592,7 +592,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 
 	tx = dmu_tx_create_assigned(dp, txg);
 
-	(void) sprintf(snap, "%s_%llu", AUTOSNAP_PREFIX,
+	(void) sprintf(snap, "%s%llu", AUTOSNAP_PREFIX,
 	    (unsigned long long int) txg);
 
 	if (spa->spa_autosnap.initialized) {
