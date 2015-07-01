@@ -537,6 +537,9 @@ extern zio_t *zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset,
     zio_done_func_t *done, void *private, zio_priority_t priority,
     enum zio_flag flags, boolean_t labels);
 
+extern zio_t *zio_wrc(zio_type_t type, vdev_t *vd, void *data,
+    uint64_t size, uint64_t offset);
+
 extern zio_t *zio_free_sync(zio_t *pio, spa_t *spa, uint64_t txg,
     const blkptr_t *bp, enum zio_flag flags);
 

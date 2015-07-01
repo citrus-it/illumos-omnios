@@ -3543,6 +3543,34 @@ zio_done(zio_t *zio)
 	return (ZIO_PIPELINE_STOP);
 }
 
+zio_t *
+zio_wrc(zio_type_t type, vdev_t *vd, void *data,
+    uint64_t size, uint64_t offset)
+{
+	zio_t *zio = NULL;
+
+	switch (type) {
+	case ZIO_TYPE_WRITE:
+		zio = zio_create(NULL, vd->vdev_spa, 0, NULL, data, size,
+		    NULL, NULL, ZIO_TYPE_WRITE, ZIO_PRIORITY_ASYNC_WRITE,
+		    ZIO_FLAG_PHYSICAL, vd, offset,
+		    NULL, ZIO_STAGE_OPEN, ZIO_WRITE_PHYS_PIPELINE);
+		break;
+	case ZIO_TYPE_READ:
+		zio = zio_create(NULL, vd->vdev_spa, 0, NULL, data, size,
+		    NULL, NULL, ZIO_TYPE_READ, ZIO_PRIORITY_ASYNC_READ,
+		    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_PHYSICAL, vd, offset,
+		    NULL, ZIO_STAGE_OPEN, ZIO_READ_PHYS_PIPELINE);
+		break;
+	default:
+		ASSERT(0);
+	}
+
+	zio->io_prop.zp_checksum = ZIO_CHECKSUM_OFF;
+
+	return (zio);
+}
+
 /*
  * ==========================================================================
  * I/O pipeline definition

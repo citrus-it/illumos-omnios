@@ -2213,8 +2213,6 @@ vdev_raidz_io_done(zio_t *zio)
 	int tgts[VDEV_RAIDZ_MAXPARITY];
 	int code;
 
-	ASSERT(zio->io_bp != NULL);  /* XXX need to add code to enforce this */
-
 	ASSERT(rm->rm_missingparity <= rm->rm_firstdatacol);
 	ASSERT(rm->rm_missingdata <= rm->rm_cols - rm->rm_firstdatacol);
 

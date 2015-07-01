@@ -67,6 +67,11 @@ extern int zfs_scan_min_time_ms;
 extern uint64_t zfs_dirty_data_sync;
 extern uint64_t krrp_debug;
 
+typedef enum {
+	WRC_READ_FROM_SPECIAL = 1,
+	WRC_WRITE_TO_NORMAL,
+} wrc_io_type_t;
+
 /*
  * timeout (in seconds) that is used to schedule a job that moves
  * blocks from a special device to other deivices in a pool
@@ -88,6 +93,8 @@ static int wrc_collect_special_blocks(dsl_pool_t *dp);
 static void wrc_close_window(spa_t *spa);
 static void wrc_write_update_window(void *void_spa, dmu_tx_t *tx);
 static boolean_t dsl_pool_wrcio_limit(dsl_pool_t *dp, uint64_t txg);
+
+static int wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data);
 
 void
 wrc_init()
@@ -431,8 +438,6 @@ wrc_move_block(void *arg)
 static int
 wrc_move_block_impl(wrc_block_t *block)
 {
-	vdev_t *vd1, *vd2;
-	uint64_t bias1, bias2;
 	void *buf;
 	int err = 0;
 	wrc_data_t *wrc_data = block->data;
@@ -442,15 +447,6 @@ wrc_move_block_impl(wrc_block_t *block)
 		return (0);
 
 	spa_config_enter(spa, SCL_VDEV | SCL_STATE_ALL, FTAG, RW_READER);
-	vd1 = vdev_lookup_top(spa, DVA_GET_VDEV(&block->dva[0]));
-	vd2 = vdev_lookup_top(spa, DVA_GET_VDEV(&block->dva[1]));
-
-	/*
-	 * If vd is a simple leaf device than we need to add offset which
-	 * othervise is added in zio pipeline
-	 */
-	bias1 = vd1->vdev_children == 0 ? VDEV_LABEL_START_SIZE : 0;
-	bias2 = vd2->vdev_children == 0 ? VDEV_LABEL_START_SIZE : 0;
 
 	buf = zio_data_buf_alloc(WRCBP_GET_PSIZE(block));
 
@@ -515,12 +511,7 @@ wrc_move_block_impl(wrc_block_t *block)
 	 * slow path
 	 */
 	if (err) {
-		zio_t *rio = zio_read_phys(NULL, vd1,
-		    DVA_GET_OFFSET(&block->dva[0]) + bias1,
-		    WRCBP_GET_PSIZE(block), buf,
-		    ZIO_CHECKSUM_OFF, NULL, NULL, ZIO_PRIORITY_ASYNC_READ,
-		    ZIO_FLAG_DONT_CACHE, B_FALSE);
-		err = zio_wait(rio);
+		err = wrc_io(WRC_READ_FROM_SPECIAL, block, buf);
 		if (err) {
 			cmn_err(CE_WARN, "WRC: move task has failed to read:"
 			    " error [%d]", err);
@@ -531,12 +522,7 @@ wrc_move_block_impl(wrc_block_t *block)
 		DTRACE_PROBE(wrc_move_from_arc);
 	}
 
-	zio_t *wio = zio_write_phys(NULL, vd2,
-	    DVA_GET_OFFSET(&block->dva[1]) + bias2,
-	    WRCBP_GET_PSIZE(block), buf,
-	    ZIO_CHECKSUM_OFF, NULL, NULL, ZIO_PRIORITY_ASYNC_WRITE,
-	    0, B_FALSE);
-	err = zio_wait(wio);
+	err = wrc_io(WRC_WRITE_TO_NORMAL, block, buf);
 	if (err) {
 		cmn_err(CE_WARN, "WRC: move task has failed to write: "
 		    "error [%d]", err);
@@ -1560,4 +1546,31 @@ wrc_deactivate(spa_t *spa)
 	VERIFY(avl_first(&wrc_data->wrc_moved_blocks) == NULL);
 
 	DTRACE_PROBE1(wrc_deactiv_done, char *, spa->spa_name);
+}
+
+static int
+wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data)
+{
+	zio_t *zio;
+	zio_type_t zio_type;
+	vdev_t *vd;
+	uint64_t bias;
+	size_t dva_num;
+
+	if (type == WRC_READ_FROM_SPECIAL) {
+		zio_type = ZIO_TYPE_READ;
+		dva_num = 0;
+	} else {
+		ASSERT(type == WRC_WRITE_TO_NORMAL);
+		zio_type = ZIO_TYPE_WRITE;
+		dva_num = 1;
+	}
+
+	vd = vdev_lookup_top(block->data->wrc_spa,
+	    DVA_GET_VDEV(&block->dva[dva_num]));
+	bias = vd->vdev_children == 0 ? VDEV_LABEL_START_SIZE : 0;
+	zio = zio_wrc(zio_type, vd, data, WRCBP_GET_PSIZE(block),
+	    DVA_GET_OFFSET(&block->dva[dva_num]) + bias);
+
+	return (zio_wait(zio));
 }
