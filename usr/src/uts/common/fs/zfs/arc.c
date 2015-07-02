@@ -2176,10 +2176,10 @@ arc_space_consume(uint64_t space, arc_space_type_t type)
 		break;
 	}
 
-	if (type == ARC_SPACE_META)
-		ARCSTAT_INCR(arcstat_meta_used, space);
-	else if (type == ARC_SPACE_DDT)
+	if (type == ARC_SPACE_DDT)
 		ARCSTAT_INCR(arcstat_ddt_used, space);
+	else if (type != ARC_SPACE_DATA)
+		ARCSTAT_INCR(arcstat_meta_used, space);
 
 	atomic_add_64(&arc_size, space);
 }
@@ -2210,14 +2210,14 @@ arc_space_return(uint64_t space, arc_space_type_t type)
 		break;
 	}
 
-	if (type == ARC_SPACE_META) {
+	if (type == ARC_SPACE_DDT) {
+		ASSERT(arc_ddt_used >= space);
+		ARCSTAT_INCR(arcstat_ddt_used, -space);
+	} else if (type != ARC_SPACE_DATA) {
 		ASSERT(arc_meta_used >= space);
 		if (arc_meta_max < arc_meta_used)
 			arc_meta_max = arc_meta_used;
 		ARCSTAT_INCR(arcstat_meta_used, -space);
-	} else if (type == ARC_SPACE_DDT) {
-		ASSERT(arc_ddt_used >= space);
-		ARCSTAT_INCR(arcstat_ddt_used, -space);
 	}
 
 	ASSERT(arc_size >= space);
@@ -3476,8 +3476,8 @@ arc_adjust(void)
 	 * arc_p here, and then evict more from the MFU below.
 	 */
 	target = MIN((int64_t)(arc_size - arc_c),
-	    (int64_t)(arc_anon->arcs_size + arc_mru->arcs_size + arc_meta_used +
-	    arc_ddt_used - arc_p));
+	    (int64_t)(arc_anon->arcs_size + arc_mru->arcs_size +
+	    arc_meta_used + arc_ddt_used - arc_p));
 
 	/*
 	 * If we're below arc_meta_min, always prefer to evict data.
@@ -3898,10 +3898,10 @@ arc_kmem_reap_now(void)
 	extern kmem_cache_t	*range_seg_cache;
 
 #ifdef _KERNEL
-	if (arc_meta_used >= arc_meta_limit) {
+	if (arc_meta_used >= arc_meta_limit || arc_ddt_used >= arc_ddt_limit) {
 		/*
-		 * We are exceeding our meta-data cache limit.
-		 * Purge some DNLC entries to release holds on meta-data.
+		 * We are exceeding our meta-data or DDT cache limit.
+		 * Purge some DNLC entries to release holds on meta-data/DDT.
 		 */
 		dnlc_reduce_cache((void *)(uintptr_t)arc_reduce_dnlc_percent);
 	}
