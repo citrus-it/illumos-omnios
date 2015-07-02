@@ -3531,7 +3531,7 @@ arc_adjust(void)
 	 */
 	target = arc_size - arc_c;
 
-	if (arc_adjust_type(arc_mru) == ARC_BUFC_METADATA &&
+	if (arc_adjust_type(arc_mfu) == ARC_BUFC_METADATA &&
 	    arc_meta_used > arc_meta_min) {
 		bytes = arc_adjust_impl(arc_mfu, 0, target, ARC_BUFC_METADATA);
 		total_evicted += bytes;
@@ -3564,7 +3564,7 @@ arc_adjust(void)
 	 */
 	target -= bytes;
 	total_evicted +=
-	    arc_adjust_impl(arc_mru, 0, target, ARC_BUFC_DDT);
+	    arc_adjust_impl(arc_mfu, 0, target, ARC_BUFC_DDT);
 
 	/*
 	 * Adjust ghost lists
