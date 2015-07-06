@@ -4054,13 +4054,29 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	} else {
 		lu = lun_map_ent->ent_lu;
 	}
+
 	ilu = lu->lu_stmf_private;
 	if (ilu->ilu_flags & ILU_RESET_ACTIVE) {
 		rw_exit(iss->iss_lockp);
 		return (NULL);
 	}
-	ASSERT(lu == dlun0 || (ilu->ilu_state != STMF_STATE_OFFLINING &&
-	    ilu->ilu_state != STMF_STATE_OFFLINE));
+
+	/*
+	 * if the LUN is being offlined or is offline then only command
+	 * that are to query the LUN are allowed.  These are handled in
+	 * stmf via the dlun0 vector.  It is possible that a race condition
+	 * will cause other commands to arrive while the lun is in the
+	 * process of being offlined.  Check for those and just let the
+	 * protocol stack handle the error.
+	 */
+	if ((ilu->ilu_state == STMF_STATE_OFFLINING) ||
+	    (ilu->ilu_state == STMF_STATE_OFFLINE)) {
+		if (lu != dlun0) {
+			rw_exit(iss->iss_lockp);
+			return (NULL);
+		}
+	}
+
 	do {
 		if (ilu->ilu_free_tasks == NULL) {
 			new_task = 1;
