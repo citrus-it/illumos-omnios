@@ -493,7 +493,6 @@ dsl_destroy_snapshot_sync(void *arg, dmu_tx_t *tx)
 	    pair != NULL;
 	    pair = nvlist_next_nvpair(dsda->dsda_successful_snaps, pair)) {
 		dsl_dataset_t *ds;
-		char *snapname;
 
 		if (autosnap_check_name(strchr(nvpair_name(pair), '@')))
 			autosnap_exempt_snapshot(dp->dp_spa, nvpair_name(pair));
