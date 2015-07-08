@@ -937,8 +937,7 @@ mbc_marshal_make_room(mbuf_chain_t *mbc, int32_t bytes_needed)
 	if ((m = mbc->chain) == 0) {
 		MGET(m, M_WAIT, MT_DATA);
 		m->m_len = 0;
-		if (mbc->max_bytes > MLEN)
-			MCLGET(m, M_WAIT);
+		MCLGET(m, M_WAIT);
 		mbc->chain = m;
 		/* xxxx */
 		/* ^    */
@@ -982,11 +981,10 @@ mbc_marshal_make_room(mbuf_chain_t *mbc, int32_t bytes_needed)
 		MGET(m->m_next, M_WAIT, MT_DATA);
 		m = m->m_next;
 		m->m_len = 0;
-		if (bytes_needed > MLEN)
-			MCLGET(m, M_WAIT);
+		MCLGET(m, M_WAIT);
 
-		bytes_available = (m->m_flags & M_EXT) ?
-		    m->m_ext.ext_size : MLEN;
+		ASSERT((m->m_flags & M_EXT) != 0);
+		bytes_available = m->m_ext.ext_size;
 
 		/* ---- ----- --xx ------ xxxx */
 		/*			  ^    */
