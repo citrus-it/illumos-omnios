@@ -3834,6 +3834,12 @@ zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive,
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
 	    "cannot rename to '%s'"), target);
 
+	if (zhp->zfs_type == ZFS_TYPE_AUTOSNAP) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "autosnapshots cannot be renamed"));
+			return (zfs_error(hdl, EZFS_PERM, errbuf));
+	}
+
 	/*
 	 * Make sure the target name is valid
 	 */
