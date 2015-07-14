@@ -27,8 +27,6 @@ typedef struct {
 #define	OPTIMAL_PARALLEL_SHAX_CHECKSUMS	6
 
 extern uint32_t zfs_accel_lib_version;
-extern uint32_t (*zfs_crc32c_hook)(unsigned char *buf, unsigned int size);
-extern void (*zfs_parallel_sha1crc32_hook)(cksum_op_t *ops, int num_ops);
 extern void (*zfs_parallel_sha256_hook)(cksum_op_t *ops, int num_ops);
 extern uint32_t zfs_optimal_parallel_shax_ops;
 

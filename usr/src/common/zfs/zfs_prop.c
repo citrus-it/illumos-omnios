@@ -73,7 +73,6 @@ zfs_prop_init(void)
 		{ "fletcher4",	ZIO_CHECKSUM_FLETCHER_4 },
 		{ "sha256",	ZIO_CHECKSUM_SHA256 },
 		{ "noparity",	ZIO_CHECKSUM_NOPARITY },
-		{ "sha1crc32",	ZIO_CHECKSUM_SHA1CRC32 },
 		{ NULL }
 	};
 
@@ -84,9 +83,6 @@ zfs_prop_init(void)
 		{ "sha256",	ZIO_CHECKSUM_SHA256 },
 		{ "sha256,verify",
 				ZIO_CHECKSUM_SHA256 | ZIO_CHECKSUM_VERIFY },
-		{ "sha1crc32",	ZIO_CHECKSUM_SHA1CRC32 },
-		{ "sha1crc32,verify",
-				ZIO_CHECKSUM_SHA1CRC32 | ZIO_CHECKSUM_VERIFY },
 		{ NULL }
 	};
 

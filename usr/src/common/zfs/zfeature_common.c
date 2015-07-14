@@ -244,7 +244,4 @@ zpool_feature_init(void)
 	    "com.nexenta:class_of_storage", "class_of_storage",
 	    "Properties for groups of vdevs.", B_TRUE, B_FALSE, B_FALSE,
 	    cos_deps);
-	zfeature_register(SPA_FEATURE_SHA1CRC32,
-	    "com.nexenta:checksum_sha1crc32", "checksum_sha1crc32",
-	    "Support for sha1crc32 checksum.", B_FALSE, B_FALSE, B_FALSE, NULL);
 }

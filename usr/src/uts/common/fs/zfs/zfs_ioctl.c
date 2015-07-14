@@ -2659,33 +2659,6 @@ zfs_prop_set_special(const char *dsname, zprop_source_t source,
 		}
 		break;
 	}
-	case ZFS_PROP_DEDUP:
-	case ZFS_PROP_CHECKSUM:
-		if (intval == ZIO_CHECKSUM_SHA1CRC32) {
-			spa_t *spa;
-
-			if ((err = spa_open(dsname, &spa, FTAG)) != 0)
-				return (err);
-
-			if (!spa_feature_is_enabled(spa,
-			    SPA_FEATURE_SHA1CRC32)) {
-				spa_close(spa, FTAG);
-				return (ENOTSUP);
-			}
-
-			if (!spa_feature_is_active(spa,
-			    SPA_FEATURE_SHA1CRC32)) {
-				if ((err = zfs_prop_activate_feature(spa,
-				    SPA_FEATURE_SHA1CRC32)) != 0) {
-					spa_close(spa, FTAG);
-					return (err);
-				}
-			}
-
-			spa_close(spa, FTAG);
-		}
-		err = -1;
-		break;
 	default:
 		err = -1;
 	}
@@ -4210,31 +4183,6 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 	 * Check that this value is valid for this pool version
 	 */
 	switch (prop) {
-	case ZFS_PROP_CHECKSUM:
-		/*
-		 * If the user specified SHA1CRC32, make sure
-		 * the SPA supports it. We ignore any errors here since
-		 * we'll catch them later.
-		 */
-		if (nvpair_type(pair) == DATA_TYPE_UINT64 &&
-		    nvpair_value_uint64(pair, &intval) == 0) {
-			if (intval == ZIO_CHECKSUM_SHA1CRC32) {
-				spa_t *spa;
-
-				if ((err = spa_open(dsname, &spa, FTAG)) != 0)
-					return (err);
-
-				if (!spa_feature_is_enabled(spa,
-				    SPA_FEATURE_SHA1CRC32)) {
-					spa_close(spa, FTAG);
-					return (SET_ERROR(ENOTSUP));
-				}
-
-				spa_close(spa, FTAG);
-			}
-		}
-		break;
-
 	case ZFS_PROP_COMPRESSION:
 		/*
 		 * If the user specified gzip compression, make sure

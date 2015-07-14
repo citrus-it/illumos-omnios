@@ -91,8 +91,6 @@ zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	{{fletcher_4_native,	fletcher_4_byteswap},	1, 0, 0, "fletcher4"},
 	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 0, 1, "sha256"},
 	{{fletcher_4_native,	fletcher_4_byteswap},	0, 1, 0, "zilog2"},
-	{{zio_checksum_SHA1CRC32,	zio_checksum_SHA1CRC32},	0, 0, 1,
-	    "sha1crc32"},
 	{{zio_checksum_off,	zio_checksum_off},	0, 0, 0, "noparity"},
 };
 
@@ -199,7 +197,7 @@ zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
 		ci->ci_func[0](data, size, &cksum);
 		eck->zec_cksum = cksum;
 	} else {
-		/* ci_eck is 0 for sha1crc32, sha256 */
+		/* ci_eck is 0 for sha256 */
 		if ((zfs_parallel_checksum_enabled_write == 0) ||
 		    (zio_parallel_checksum_fsm(zio, checksum, data, size,
 		    can_accumulate, &bp->blk_cksum, &zio_progress))) {
@@ -210,9 +208,6 @@ zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
 
 	return (zio_progress);
 }
-
-#define	ZIO_CHECKSUM_CRC32_EQUAL(zc1, zc2) \
-	((zc1).zc_word[3] == (zc2).zc_word[3])
 
 int
 zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info, int *zio_progress_p)
@@ -276,16 +271,12 @@ zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info, int *zio_progress_p)
 			    sizeof (zio_cksum_t));
 	} else {
 		boolean_t cksum_ready = B_FALSE;
-		/* ci_eck is 0 for sha256, sha1crc32 */
+		/* ci_eck is 0 for sha256 */
 		ASSERT(!BP_IS_GANG(bp));
 		byteswap = BP_SHOULD_BYTESWAP(bp);
 		expected_cksum = bp->blk_cksum;
-		/*
-		 * SHA1CRC32 for reading computes only CRC, but CRC
-		 * is not parallel in ISA-L
-		 */
-		if (checksum != ZIO_CHECKSUM_SHA1CRC32 &&
-		    (byteswap == 0) && (zfs_parallel_checksum_enabled_read)) {
+
+		if ((byteswap == 0) && (zfs_parallel_checksum_enabled_read)) {
 			int zio_progress = ZIO_PIPELINE_CONTINUE;
 			int rc = 0;
 			int can_accumulate = (zio_progress_p != NULL);
@@ -312,19 +303,7 @@ zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info, int *zio_progress_p)
 
 		if (!cksum_ready) {
 			/* invoke standard algo because of byteswap */
-			if (checksum == ZIO_CHECKSUM_SHA1CRC32) {
-				/*
-				 * SHA1CRC32 is special case
-				 * for read path it computes only CRC32
-				 */
-				_zio_checksum_SHA1CRC32(data, size,
-				    &actual_cksum, B_TRUE);
-				cksum_ready = B_TRUE;
-			}
-			if (!cksum_ready) {
-				ci->ci_func[byteswap](data, size,
-				    &actual_cksum);
-			}
+			ci->ci_func[byteswap](data, size, &actual_cksum);
 		}
 	}
 
@@ -335,12 +314,7 @@ zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info, int *zio_progress_p)
 	info->zbc_injected = 0;
 	info->zbc_has_cksum = 1;
 
-	/*
-	 * SHA1CRC32 is special case - check only CRC32 for read path
-	 */
-	if (!((checksum == ZIO_CHECKSUM_SHA1CRC32) ?
-	    ZIO_CHECKSUM_CRC32_EQUAL(actual_cksum, expected_cksum) :
-	    ZIO_CHECKSUM_EQUAL(actual_cksum, expected_cksum))) {
+	if (!(ZIO_CHECKSUM_EQUAL(actual_cksum, expected_cksum))) {
 		DTRACE_PROBE2(cksum_error, zio_cksum_t *, &actual_cksum,
 		    zio_cksum_t *, &expected_cksum);
 		return (SET_ERROR(ECKSUM));

@@ -19,7 +19,6 @@
 
 typedef enum zio_parallel_checksum {
 	ZIO_PARALLEL_CHECKSUM_SHA256,
-	ZIO_PARALLEL_CHECKSUM_SHA1CRC32,
 	ZIO_NUM_PARALLEL_CHECKSUMS
 } zio_parallel_checksum_t;
 
@@ -32,8 +31,8 @@ extern kmutex_t zfs_checksum_accum_lock[ZIO_NUM_PARALLEL_CHECKSUMS];
  * the mutex protects the list/count
  */
 kmutex_t zfs_checksum_accum_lock[ZIO_NUM_PARALLEL_CHECKSUMS];
-zio_t *zfs_parallel_checksum_zios[ZIO_NUM_PARALLEL_CHECKSUMS] = { NULL, NULL };
-int zfs_parallel_checksum_zios_count[ZIO_NUM_PARALLEL_CHECKSUMS] = { 0, 0 };
+zio_t *zfs_parallel_checksum_zios[ZIO_NUM_PARALLEL_CHECKSUMS];
+int zfs_parallel_checksum_zios_count[ZIO_NUM_PARALLEL_CHECKSUMS];
 
 /*
  * Tunables
@@ -42,7 +41,6 @@ int zfs_parallel_checksum_min_size = 4096;
 
 /* Exports for the acceleration library */
 uint32_t zfs_accel_lib_version = ACCEL_LIB_VERSION;
-void (*zfs_parallel_sha1crc32_hook)(cksum_op_t *ops, int num_ops) = NULL;
 void (*zfs_parallel_sha256_hook)(cksum_op_t *ops, int num_ops) = NULL;
 int (*zfs_gzip_hook)(void *in, int insize, void *out, int *outsize) = NULL;
 /* Another tunable */
@@ -105,8 +103,6 @@ zio_parallel_checksum(zio_parallel_checksum_t pll_checksum)
 
 	if (pll_checksum == ZIO_PARALLEL_CHECKSUM_SHA256)
 		zfs_parallel_sha256_hook(ops, count);
-	else
-		zfs_parallel_sha1crc32_hook(ops, count);
 
 	/* No need to grab the lock for doing this state transition. */
 	for (zio = saved; zio; zio = zio->zio_checksum_next) {
@@ -150,12 +146,6 @@ zio_parallel_checksum_fsm(zio_t *zio, enum zio_checksum checksum,
 		return (1);
 
 	switch (checksum) {
-	case ZIO_CHECKSUM_SHA1CRC32:
-		if (zfs_parallel_sha1crc32_hook == NULL)
-			return (1);
-
-		pll_checksum = ZIO_PARALLEL_CHECKSUM_SHA1CRC32;
-		break;
 	case ZIO_CHECKSUM_SHA256:
 		if (zfs_parallel_sha256_hook == NULL)
 			return (1);

@@ -1453,7 +1453,6 @@ ZFS_COMMON_OBJS +=		\
 	zle.o			\
 	zrlock.o		\
 	zio_parallel_checksum.o	\
-	sha1crc32.o		\
 	special.o		\
 	cos.o			\
 	spa_vdev_props.o	\

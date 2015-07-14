@@ -63,13 +63,10 @@ extern zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS];
  * Checksum routines.
  */
 extern zio_checksum_t zio_checksum_SHA256;
-extern zio_checksum_t zio_checksum_SHA1CRC32;
 extern void zio_parallel_checksum_init(void);
 extern void zio_parallel_checksum_fini(void);
 extern int zio_parallel_checksum_fsm(zio_t *, enum zio_checksum,
     void *, uint64_t, int, zio_cksum_t *, int *);
-extern void _zio_checksum_SHA1CRC32(const void *buf, uint64_t size,
-    zio_cksum_t *zcp, boolean_t crc_only);
 
 extern int zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
     void *data, uint64_t size, int can_accumulate);
