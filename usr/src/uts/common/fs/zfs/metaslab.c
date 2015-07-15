@@ -2906,6 +2906,10 @@ metaslab_trim_all(metaslab_t *msp, uint64_t *delta)
 
 	open_txg = spa_syncing_txg(msp->ms_group->mg_class->mc_spa) + 1;
 	mutex_enter(&msp->ms_lock);
+
+	while (msp->ms_loading)
+		metaslab_load_wait(msp);
+	/* If we loaded the metaslab, unload it when we're done. */
 	was_loaded = msp->ms_loaded;
 	if (!was_loaded) {
 		if (metaslab_load(msp) != 0) {
