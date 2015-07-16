@@ -1372,6 +1372,11 @@ spa_unload(spa_t *spa)
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
+	mutex_enter(&spa->spa_wrc.wrc_lock);
+	wrc_deactivate(spa);
+	mutex_exit(&spa->spa_wrc.wrc_lock);
+	autosnap_fini(spa);
+
 	/*
 	 * Stop async tasks.
 	 */
@@ -2834,6 +2839,9 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa->spa_autoreplace = (autoreplace != 0);
 	}
 
+	if (spa->spa_wrc_mode != WRC_MODE_OFF && state != SPA_LOAD_TRYIMPORT)
+		(void) wrc_start_thread(spa);
+
 	error = spa_dir_prop(spa, DMU_POOL_COS_PROPS,
 	    &spa->spa_cos_props_object);
 	if (error == 0)
@@ -2934,10 +2942,24 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	 * to start pushing transactions.
 	 */
 	if (state != SPA_LOAD_TRYIMPORT) {
+		autosnap_init(spa);
+		mutex_enter(&spa->spa_wrc.wrc_lock);
+		(void) wrc_activate(spa);
+		mutex_exit(&spa->spa_wrc.wrc_lock);
+
 		if (error = spa_load_verify(spa)) {
+
+			mutex_enter(&spa->spa_wrc.wrc_lock);
+			wrc_deactivate(spa);
+			mutex_exit(&spa->spa_wrc.wrc_lock);
+			autosnap_fini(spa);
+
 			return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA,
 			    error));
 		}
+
+		if (spa->spa_wrc_mode != WRC_MODE_OFF)
+			(void) wrc_start_thread(spa);
 	}
 
 	if (spa_writeable(spa) && (state == SPA_LOAD_RECOVER ||
@@ -3718,13 +3740,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 		return (SET_ERROR(EEXIST));
 	}
 
-	/* WRC mode cannot be changed during creation of a pool */
-	if (nvlist_exists(props,
-	    zpool_prop_to_name(ZPOOL_PROP_WRC_MODE))) {
-		mutex_exit(&spa_namespace_lock);
-		return (SET_ERROR(ENOTSUP));
-	}
-
 	/*
 	 * Allocate a new spa_t structure.
 	 */
@@ -3970,10 +3985,13 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
 
 	mutex_exit(&spa_namespace_lock);
-
 	autosnap_init(spa);
-
+	mutex_enter(&spa->spa_wrc.wrc_lock);
 	(void) wrc_activate(spa);
+	mutex_exit(&spa->spa_wrc.wrc_lock);
+
+	if (spa->spa_wrc_mode != WRC_MODE_OFF)
+		(void) wrc_start_thread(spa);
 
 	return (0);
 }
@@ -4251,13 +4269,6 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 		return (SET_ERROR(EEXIST));
 	}
 
-	/* WRC mode cannot be changed during import of a pool */
-	if (nvlist_exists(props,
-	    zpool_prop_to_name(ZPOOL_PROP_WRC_MODE))) {
-		mutex_exit(&spa_namespace_lock);
-		return (SET_ERROR(ENOTSUP));
-	}
-
 	/*
 	 * Create and initialize the spa structure.
 	 */
@@ -4423,10 +4434,6 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 
 	if (!spa_writeable(spa))
 		return (0);
-
-	autosnap_init(spa);
-
-	(void) wrc_activate(spa);
 
 	return (dsl_sync_task(spa->spa_name, NULL, spa_special_feature_activate,
 	    spa, 3, ZFS_SPACE_CHECK_RESERVED));
@@ -4640,9 +4647,6 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	spa_event_notify(spa, NULL, ESC_ZFS_POOL_DESTROY);
 
 	if (spa->spa_state != POOL_STATE_UNINITIALIZED) {
-		wrc_deactivate(spa);
-		autosnap_fini(spa);
-
 		spa_unload(spa);
 		spa_deactivate(spa);
 	}
@@ -4653,7 +4657,6 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	if (new_state != POOL_STATE_UNINITIALIZED) {
 		if (!hardforce)
 			spa_config_sync(spa, !saveconfig, B_TRUE);
-
 		spa_remove(spa);
 	}
 	mutex_exit(&spa_namespace_lock);
@@ -5305,13 +5308,6 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 
 	ASSERT(spa_writeable(spa));
 
-	/*
-	 * split for pools with activated WRC
-	 * will be implemented in the next release
-	 */
-	if (spa->spa_wrc_mode != WRC_MODE_OFF)
-		return (SET_ERROR(ENOTSUP));
-
 	txg = spa_vdev_enter(spa);
 	spa_trim_stop_wait(spa);
 
@@ -5514,8 +5510,6 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 		zio_handle_panic_injection(spa, FTAG, 2);
 
 	spa_async_resume(newspa);
-
-	autosnap_init(newspa);
 
 	/* finally, update the original pool's config */
 	txg = spa_vdev_config_enter(spa);
@@ -6563,8 +6557,7 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 				spa->spa_hiwat = intval;
 				break;
 			case ZPOOL_PROP_WRC_MODE:
-				if (intval != WRC_MODE_OFF &&
-				    intval != spa->spa_wrc_mode) {
+				if (intval != WRC_MODE_OFF) {
 					boolean_t set = B_TRUE;
 					uint64_t old_mode = spa->spa_wrc_mode;
 					boolean_t reactivate =
@@ -6577,10 +6570,11 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 					 */
 					spa->spa_wrc_mode = intval;
 
-					if (reactivate)
-						wrc_switch_mode(spa);
-					else
-						set = wrc_activate(spa);
+					if (reactivate) {
+						wrc_reactivate(spa);
+					} else {
+						set = wrc_start_thread(spa);
+					}
 
 					/* rollback the zap-record */
 					if (!set) {
@@ -6995,13 +6989,9 @@ spa_evict_all(void)
 		spa_close(spa, FTAG);
 
 		if (spa->spa_state != POOL_STATE_UNINITIALIZED) {
-			wrc_deactivate(spa);
-			autosnap_fini(spa);
-
 			spa_unload(spa);
 			spa_deactivate(spa);
 		}
-
 		spa_remove(spa);
 	}
 	mutex_exit(&spa_namespace_lock);
