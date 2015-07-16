@@ -29,17 +29,21 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/cli_user/misc/misc.cfg
 . $STF_SUITE/include/libtest.shlib
 
 if poolexists $TESTPOOL.virt
 then
-	log_must $ZPOOL destroy $TESTPOOL.virt
+	log_must destroy_pool_no_force $TESTPOOL.virt
 fi
 
 if poolexists v1-pool
 then
-	log_must $ZPOOL destroy v1-pool
+	log_must destroy_pool_no_force v1-pool
 fi
 
 if [[ -f /tmp/zfstest_datastream.dat ]]

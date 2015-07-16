@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -44,7 +48,7 @@ verify_runnable "global"
 # before running this test...
 function cleanup {
 
-	$ZPOOL destroy bootfs
+	destroy_pool_no_force bootfs
 	$RM /tmp/zpool_set_002.$$.dat
 }
 

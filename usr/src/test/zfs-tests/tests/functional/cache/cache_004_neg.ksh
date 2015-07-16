@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/cache/cache.cfg
 . $STF_SUITE/tests/functional/cache/cache.kshlib
 
@@ -58,7 +62,7 @@ do
 	log_mustnot $ZPOOL attach $TESTPOOL $ldev $ldev2
 	log_must check_vdev_state $TESTPOOL $ldev2 ""
 
-	log_must $ZPOOL destroy -f $TESTPOOL
+	log_must destroy_pool  $TESTPOOL
 done
 
 log_pass "Attaching a cache device fails for an existing cache device."

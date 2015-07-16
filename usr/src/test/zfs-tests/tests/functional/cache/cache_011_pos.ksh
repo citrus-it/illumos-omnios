@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/cache/cache.cfg
 . $STF_SUITE/tests/functional/cache/cache.kshlib
 
@@ -47,7 +51,7 @@ verify_disk_count "$LDEV2"
 
 function cleanup {
 	if datasetexists $TESTPOOL ; then
-		log_must $ZPOOL destroy -f $TESTPOOL
+		log_must destroy_pool $TESTPOOL
 	fi
 }
 
@@ -62,7 +66,7 @@ do
 	log_must $ZPOOL remove $TESTPOOL $LDEV
 	log_must display_status $TESTPOOL
 
-	log_must $ZPOOL destroy -f $TESTPOOL
+	log_must destroy_pool $TESTPOOL
 done
 
 log_pass "Remove cache device from pool with spare device should succeed"

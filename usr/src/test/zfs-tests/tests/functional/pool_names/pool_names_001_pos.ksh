@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -51,7 +55,7 @@ log_assert "Ensure that pool names can use the ASCII subset of UTF-8"
 function cleanup
 {
 	if [[ -n $name ]] && poolexists $name ; then
-		log_must $ZPOOL destroy $name
+		log_must destroy_pool_no_force $name
 	fi
 
 	if [[ -d $TESTDIR ]]; then

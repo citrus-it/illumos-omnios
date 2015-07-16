@@ -29,12 +29,16 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 verify_runnable "global"
 
-log_must $ZPOOL destroy $TESTPOOL
-log_must $ZPOOL destroy $TESTPOOL2
+log_must destroy_pool_no_force $TESTPOOL
+log_must destroy_pool_no_force $TESTPOOL2
 
 log_must $RM /tmp/zpool_version_1.dat
 log_must $RM /tmp/zpool2_version_1.dat

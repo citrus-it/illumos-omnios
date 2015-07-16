@@ -24,6 +24,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 ################################################################################
@@ -43,7 +47,7 @@ verify_runnable "global"
 
 function cleanup
 {
-	datasetexists $TESTPOOL && log_must $ZPOOL destroy $TESTPOOL
+	datasetexists $TESTPOOL && log_must destroy_pool_no_force $TESTPOOL
 }
 
 function check_features
@@ -62,7 +66,7 @@ log_assert "'zpool create' creates pools with all features enabled"
 
 log_must $ZPOOL create -f $TESTPOOL $DISKS
 check_features
-log_must $ZPOOL destroy -f $TESTPOOL
+log_must destroy_pool $TESTPOOL
 
 log_must $ZPOOL create -f -o feature@async_destroy=enabled $TESTPOOL $DISKS
 check_features

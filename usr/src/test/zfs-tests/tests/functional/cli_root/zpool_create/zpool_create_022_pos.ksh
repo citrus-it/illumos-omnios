@@ -29,6 +29,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zfs_create/zfs_create_common.kshlib
 
@@ -47,7 +51,7 @@ verify_runnable "global"
 
 function cleanup
 {
-	datasetexists $TESTPOOL && log_must $ZPOOL destroy $TESTPOOL
+	datasetexists $TESTPOOL && log_must destroy_pool_no_force $TESTPOOL
 }
 
 log_onexit cleanup

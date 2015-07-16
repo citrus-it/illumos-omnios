@@ -29,6 +29,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -57,7 +61,7 @@ function cleanup
 	if [[ -n $globalzone ]] ; then
 		for pool in $TESTPOOL1 $TESTPOOL2 $TESTPOOL3; do
 			poolexists $pool && \
-				log_must $ZPOOL destroy -f $pool
+				log_must destroy_pool $pool
 		done
 		for file in `$LS $TESTDIR1/poolfile*`; do
 			$RM -f $file

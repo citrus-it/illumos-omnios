@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cachefile/cachefile.cfg
 . $STF_SUITE/tests/functional/cachefile/cachefile.kshlib
@@ -65,18 +69,18 @@ log_must $ZPOOL create -o cachefile=none $TESTPOOL $DISKS
 typeset DEVICEDIR=$(get_device_dir $DISKS)
 log_mustnot pool_in_cache $TESTPOOL
 
-log_must $ZPOOL export $TESTPOOL
+log_must export_pool $TESTPOOL
 log_must $ZPOOL import -d $DEVICEDIR $TESTPOOL
 log_must pool_in_cache $TESTPOOL
 
-log_must $ZPOOL export $TESTPOOL
+log_must export_pool $TESTPOOL
 log_must $ZPOOL import -o cachefile=none -d $DEVICEDIR $TESTPOOL
 log_mustnot pool_in_cache $TESTPOOL
 
-log_must $ZPOOL export $TESTPOOL
+log_must export_pool $TESTPOOL
 log_must $ZPOOL import -o cachefile=$CPATH -d $DEVICEDIR $TESTPOOL
 log_must pool_in_cache $TESTPOOL
 
-log_must $ZPOOL destroy $TESTPOOL
+log_must destroy_pool $TESTPOOL
 
 log_pass "Importing a pool with \"cachefile\" set doesn't update zpool.cache"

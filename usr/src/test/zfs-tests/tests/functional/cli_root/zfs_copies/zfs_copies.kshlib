@@ -28,6 +28,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zfs_copies/zfs_copies.cfg
 
@@ -137,7 +141,7 @@ function do_vol_test
 	if [[ $type == "ufs" ]]; then
 		$UMOUNT $mntp
 	else
-		log_must $ZPOOL destroy $TESTPOOL1
+		log_must destroy_pool_no_force $TESTPOOL1
 	fi
 
 	log_must $ZFS destroy $vol

@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/slog/slog.kshlib
 
 #
@@ -78,14 +82,14 @@ do
 			#
 			# Destroy the pool and import again
 			#
-			log_must $ZPOOL destroy $TESTPOOL
+			log_must destroy_pool_no_force $TESTPOOL
 			log_must $ZPOOL import -Df -d $VDIR -d $VDIR2 $TESTPOOL
 			log_must display_status $TESTPOOL
 			ldev=$(random_get $LDEV $LDEV2)
 			log_must verify_slog_device \
 				$TESTPOOL $ldev 'ONLINE' $logtype
 
-			log_must $ZPOOL destroy -f $TESTPOOL
+			log_must destroy_pool $TESTPOOL
 		done
 	done
 done

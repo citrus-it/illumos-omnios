@@ -29,6 +29,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_create/zpool_create.shlib
 
@@ -47,7 +51,7 @@ verify_runnable "global"
 function cleanup
 {
 	poolexists $TESTPOOL && \
-		log_must $ZPOOL destroy -f $TESTPOOL
+		log_must destroy_pool $TESTPOOL
 
 	for dir in $TESTDIR $TESTDIR1; do
 		[[ -d $dir ]] && $RM -rf $dir
@@ -90,7 +94,7 @@ do
 	while (( i < ${#pooltype[*]} )); do
 		#Remove the testing pool and its mount directory
 		poolexists $TESTPOOL && \
-			log_must $ZPOOL destroy -f $TESTPOOL
+			log_must destroy_pool $TESTPOOL
 		[[ -d $TESTDIR1 ]] && $RM -rf $TESTDIR1
 		log_must $ZPOOL create $opt $TESTPOOL ${pooltype[i]} \
 			$file.1 $file.2 $file.3

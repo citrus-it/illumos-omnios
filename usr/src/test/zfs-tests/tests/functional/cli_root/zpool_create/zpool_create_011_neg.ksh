@@ -29,6 +29,11 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_create/zpool_create.shlib
 
@@ -112,12 +117,12 @@ while (( i < ${#arg[*]} )); do
 done
 
 # now destroy the pool to be polite
-log_must $ZPOOL destroy -f $TESTPOOL
+log_must destroy_pool $TESTPOOL
 
 # create/destroy a pool as a simple way to set the partitioning
 # back to something normal so we can use this $disk as a dump device
 log_must $ZPOOL create -f $TESTPOOL3 $disk
-log_must $ZPOOL destroy -f $TESTPOOL3
+log_must destroy_pool  $TESTPOOL3
 
 log_must $DUMPADM -d /dev/dsk/$specified_dump_dev
 log_mustnot $ZPOOL create -f $TESTPOOL1 "$specified_dump_dev"

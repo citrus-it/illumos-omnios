@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -105,7 +109,7 @@ i=0
 while ((i < ${#valid_args[@]})); do
 	log_must $ZPOOL create $TESTPOOL1 ${valid_args[$i]}
 	$SYNC; $SYNC
-	log_must $ZPOOL destroy -f $TESTPOOL1
+	log_must destroy_pool $TESTPOOL1
 
 	((i += 1))
 done
@@ -115,7 +119,7 @@ while ((i < ${#forced_args[@]})); do
 	log_mustnot $ZPOOL create $TESTPOOL1 ${forced_args[$i]}
 	log_must $ZPOOL create -f $TESTPOOL1 ${forced_args[$i]}
 	$SYNC; $SYNC
-	log_must $ZPOOL destroy -f $TESTPOOL1
+	log_must destroy_pool $TESTPOOL1
 
 	((i += 1))
 done

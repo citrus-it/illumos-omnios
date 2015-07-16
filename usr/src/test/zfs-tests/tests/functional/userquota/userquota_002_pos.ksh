@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# 
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/userquota/userquota_common.kshlib
 
@@ -46,7 +50,7 @@ verify_runnable "global"
 function cleanup
 {
 	if poolexists $TESTPOOL1; then
-		log_must $ZPOOL destroy $TESTPOOL1
+		log_must destroy_pool_no_force $TESTPOOL1
 	fi
 
 	if [[ -f $pool_vdev ]]; then
@@ -64,7 +68,7 @@ typeset pool_vdev=/var/tmp/pool_dev.$$
 log_must $MKFILE 500m $pool_vdev
 
 if poolexists $TESTPOOL1; then
-	$ZPOOL destroy $TESTPOOL1
+	destroy_pool_no_force $TESTPOOL1
 fi
 
 log_must $ZPOOL create -O userquota@$QUSER1=$UQUOTA_SIZE \

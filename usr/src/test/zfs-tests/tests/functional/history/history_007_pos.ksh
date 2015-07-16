@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/history/history_common.kshlib
 
@@ -47,7 +51,7 @@ verify_runnable "global"
 function cleanup
 {
 	poolexists $migratedpoolname &&  \
-		log_must $ZPOOL destroy -f $migratedpoolname
+		log_must destroy_pool $migratedpoolname
 
 	[[ -d $import_dir ]] && $RM -rf $import_dir
 }
@@ -77,7 +81,7 @@ for arch in "i386" "sparc"; do
 
 	# destroy the pool with same name, so that import operation succeeds.
 	poolexists $migratedpoolname && \
-	    log_must $ZPOOL destroy -f $migratedpoolname
+	    log_must destroy_pool $migratedpoolname
 
 	log_must $ZPOOL import -d $import_dir $migratedpoolname
 	TZ=$TIMEZONE $ZPOOL history $migratedpoolname | $GREP -v "^$" \
@@ -105,7 +109,7 @@ for arch in "i386" "sparc"; do
 	log_must $DIFF $tmpfile $orig_cmds_f1
 
 	# cleanup for next loop testing
-	log_must $ZPOOL destroy -f $migratedpoolname
+	log_must destroy_pool $migratedpoolname
 	log_must $RM -f `$LS $import_dir`
 done
 

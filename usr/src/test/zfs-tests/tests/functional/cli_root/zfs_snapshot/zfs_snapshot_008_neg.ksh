@@ -24,6 +24,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/cli_root/zfs_snapshot/zfs_snapshot.cfg
 
 #
@@ -43,7 +47,7 @@ function cleanup
 {
 	for pool in $SNAPPOOL1 $SNAPPOOL2 ; do
 		if poolexists $pool ; then
-			log_must $ZPOOL destroy -f $pool
+			log_must destroy_pool $pool
 		fi
 	done
 

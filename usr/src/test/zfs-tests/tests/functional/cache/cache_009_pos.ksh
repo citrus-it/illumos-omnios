@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/cache/cache.cfg
 . $STF_SUITE/tests/functional/cache/cache.kshlib
 
@@ -63,7 +67,7 @@ do
 	log_must display_status $TESTPOOL
 	log_must verify_cache_device $TESTPOOL $ldev 'ONLINE' ''
 
-	log_must $ZPOOL destroy -f $TESTPOOL
+	log_must destroy_pool $TESTPOOL
 done
 
 log_pass "Offline and online a cache device succeed."

@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -47,7 +51,7 @@ verify_runnable "global"
 
 function cleanup
 {
-	datasetexists $spool && log_must $ZPOOL destroy $spool
+	datasetexists $spool && log_must destroy_pool_no_force $spool
 	[[ -f $VDEV0 ]] && log_must $RM -f $VDEV0
 	[[ -f $VDEV1 ]] && log_must $RM -f $VDEV1
 	[[ -f $TMPFILE ]] && log_must $RM -f $TMPFILE

@@ -22,7 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2015, Nexenta Systems Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 #
@@ -1101,11 +1101,13 @@ function create_pool #pool devs_list
 # Note: In local zones, this function should return 0 silently.
 #
 # $1 - pool name
+# $2 - optional force flag 
 # Destroy pool with the given parameters.
 
-function destroy_pool #pool
+function do_destroy_pool #pool <-f>
 {
 	typeset pool=${1%%/*}
+	typeset force=$2
 	typeset mtpt
 
 	if [[ -z $pool ]]; then
@@ -1116,17 +1118,81 @@ function destroy_pool #pool
 	if is_global_zone ; then
 		if poolexists "$pool" ; then
 			mtpt=$(get_prop mountpoint "$pool")
-			log_must $ZPOOL destroy -f $pool
-
-			[[ -d $mtpt ]] && \
-				log_must $RM -rf $mtpt
+			# Checking to see if the device is busy. If so, we'll
+			# retry the destroy a few times with a sleep between tries. 
+			errmsg='device is busy'
+			retry_num=$NUM_RETRIES
+			TMPFILE=`mktemp`
+			if [ -z "$TMPFILE" ] ; then
+				log_note "Unable to create temporary file $TMPFILE"
+				return 1
+			fi 
+			until [ $retry_num == 0 ] ; do
+				$ZPOOL destroy $force $pool 2>$TMPFILE
+				# If the destroy failed, see if it's due to a 
+				# device is busy issue and retry if it is.
+				if (( $? != 0 )); then
+					# if this is busy then we want to retry
+					if [ "`grep "$errmsg" $TMPFILE`" != "" ]; then
+						retry_num-=1
+						log_note "Device is busy, retry zpool destroy"
+						$SLEEP $DESTROY_SLEEP_TIME 
+					else # return here if error is something else
+						$RM $TMPFILE 
+						return 1
+					fi
+				else
+					# destroy succeeded.
+					$RM $TMPFILE
+					[[ -d $mtpt ]] && log_must $RM -rf $mtpt
+					return 0
+				fi
+			done
+			log_must $ZPOOL destroy $force $pool
+			[[ -d $mtpt ]] && log_must $RM -rf $mtpt
 		else
-			log_note "Pool not exist. ($pool)"
+			log_note "Pool does not exist. ($pool)"
 			return 1
 		fi
 	fi
 
 	return 0
+}
+
+# Return 0 if destroy successfully or the pool exists; $? otherwise
+# Note: In local zones, this function should return 0 silently.
+#
+# $1 - pool name
+# Destroy pool with the given parameters.
+
+function destroy_pool_no_force #pool
+{
+	typeset pool=${1%%/*}
+
+	do_destroy_pool $pool
+	if (( $? != 0 )); then
+		return 1
+	else
+		return 0
+	fi
+}
+
+# Return 0 if destroy successfully or the pool exists; $? otherwise
+# Note: In local zones, this function should return 0 silently.
+#
+# $1 - pool name
+# Force a destroy pool with the given parameters.
+
+function destroy_pool #pool
+{
+	typeset pool=${1%%/*}
+
+	do_destroy_pool $pool -f
+	if (( $? != 0 )); then
+		return 1
+	else
+		return 0
+	fi
 }
 
 #
@@ -2569,4 +2635,46 @@ function user_run
 
 	eval \$SU \$user -c \"$@\" > /tmp/out 2>/tmp/err
 	return $?
+}
+
+# Return 0 if the pool is successfully epxorted; $? otherwise
+#
+# $1 - pool name
+# Export pool.
+function export_pool #pool
+{
+	typeset pool=${1%%/*}
+	# Checking to see if the device is busy. If so, we'll
+	# retry the export a few times with a sleep between tries. 
+	errmsg='device is busy'
+	retry_num=$NUM_RETRIES
+	TMPFILE=`mktemp`
+	if [ -z "$TMPFILE" ] ; then
+		log_note "Unable to create temporary file $TMPFILE"
+		return 1
+	fi 
+	until [ $retry_num == 0 ] ; do
+		log_note "zpool export $pool"
+		$ZPOOL export $pool 2>$TMPFILE
+		# If the export failed, see if it's due to a 
+		# device is busy issue and retry if it is.
+		if (( $? != 0 )); then
+			# if this is busy then we want to retry
+			if [ "`grep "$errmsg" $TMPFILE`" != "" ]; then
+				retry_num-=1
+				log_note "Device is busy, retry zpool export"
+				$SLEEP $EXPORT_SLEEP_TIME 
+			else # return here if error is something else
+				$RM $TMPFILE 
+				return 1
+			fi
+		else
+			# export succeeded.
+			$RM $TMPFILE 
+			return 0	
+		fi
+	done
+	# We've reached our max retries, try to export one more time
+	# and require it to succeed.
+	log_must $ZPOOL export $pool
 }

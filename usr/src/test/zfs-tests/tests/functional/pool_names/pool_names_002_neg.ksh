@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -53,7 +57,7 @@ POOLNAME=""
 function cleanup
 {
 	if poolexists $POOLNAME; then
-		log_must $ZPOOL destroy $POOLNAME
+		log_must destroy_pool_no_force $POOLNAME
 	fi
 
 	if [[ -d $TESTDIR ]]; then
@@ -68,7 +72,7 @@ for pool in $($ZPOOL list -H -o name | \
 	$EGREP -v "$exclude" | \
 	$GREP -v "$TESTPOOL" | \
 	$EGREP -v "$NO_POOLS"); do
-	log_must $ZPOOL destroy $pool
+	log_must destroy_pool $pool
 done
 
 DISK=${DISKS%% *}

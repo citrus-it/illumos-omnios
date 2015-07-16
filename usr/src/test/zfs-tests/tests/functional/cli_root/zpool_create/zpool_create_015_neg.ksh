@@ -29,6 +29,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_create/zpool_create.shlib
 
@@ -91,6 +95,6 @@ done
 # cleanup
 log_must $SWAP -d /dev/zvol/dsk/${vol_name}
 log_must $ZFS destroy $vol_name
-log_must $ZPOOL destroy $TESTPOOL
+log_must destroy_pool_no_force $TESTPOOL
 
 log_pass "'zpool create' passed as expected with inapplicable scenario."

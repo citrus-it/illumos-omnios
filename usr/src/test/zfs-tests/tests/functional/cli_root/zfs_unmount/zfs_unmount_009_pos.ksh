@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -110,7 +114,7 @@ for fs in $TESTPOOL/$TESTFS $TESTPOOL ; do
 done
 
 if is_global_zone ; then
-	log_must $ZPOOL destroy -f $TESTPOOL
+	log_must destroy_pool $TESTPOOL
 	log_mustnot $LS
 	log_must cd /
 fi

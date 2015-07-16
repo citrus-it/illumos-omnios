@@ -29,16 +29,20 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/cache/cache.cfg
 . $STF_SUITE/tests/functional/cache/cache.kshlib
 
 verify_runnable "global"
 
 if datasetexists $TESTPOOL ; then
-	log_must $ZPOOL destroy -f $TESTPOOL
+	log_must destroy_pool $TESTPOOL
 fi
 if datasetexists $TESTPOOL2 ; then
-	log_must $ZPOOL destroy -f $TESTPOOL2
+	log_must destroy_pool $TESTPOOL2
 fi
 
 log_must $RM -rf $VDIR $VDIR2

@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/cache/cache.cfg
 . $STF_SUITE/tests/functional/cache/cache.kshlib
 
@@ -59,7 +63,7 @@ do
 	log_must verify_cache_device $TESTPOOL $sdev 'ONLINE'
 	log_must check_vdev_state $TESTPOOL $tdev ""
 
-	log_must $ZPOOL destroy -f $TESTPOOL
+	log_must destroy_pool $TESTPOOL
 done
 
 log_pass "Replacing a cache device fails."

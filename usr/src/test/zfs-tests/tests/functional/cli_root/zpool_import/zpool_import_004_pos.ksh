@@ -29,6 +29,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_import/zpool_import.cfg
 
@@ -77,12 +81,12 @@ log_must $MV $VDEV1 $DEVICE_DIR/newdir1
 log_must $MV $VDEV2 $DEVICE_DIR/newdir2
 log_must $ZPOOL import -d $DEVICE_DIR/newdir1 -d $DEVICE_DIR/newdir2 \
 	-d $DEVICE_DIR -D -f $target
-log_must $ZPOOL destroy -f $TESTPOOL1
+log_must destroy_pool $TESTPOOL1
 
 log_note "Devices was moved to same directory."
 log_must $MV $VDEV0 $DEVICE_DIR/newdir2
 log_must $MV $DEVICE_DIR/newdir1/* $DEVICE_DIR/newdir2
 log_must $ZPOOL import -d $DEVICE_DIR/newdir2 -D -f $target
-log_must $ZPOOL destroy -f $TESTPOOL1
+log_must destroy_pool $TESTPOOL1
 
 log_pass "Destroyed pools devices was moved, 'zpool import -D' passed."

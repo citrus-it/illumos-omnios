@@ -43,7 +43,7 @@ verify_runnable "global"
 
 function cleanup {
 	if poolexists $TESTPOOL ; then
-		log_must $ZPOOL destroy $TESTPOOL
+		log_must destroy_pool_no_force $TESTPOOL
 	fi
 
 	if [[ -f $VDEV ]]; then

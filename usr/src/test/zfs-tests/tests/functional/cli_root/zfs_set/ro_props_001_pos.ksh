@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zfs_set/zfs_set_common.kshlib
 
@@ -73,6 +77,8 @@ log_onexit cleanup
 create_snapshot $TESTPOOL/$TESTFS $TESTSNAP
 create_snapshot $TESTPOOL/$TESTVOL $TESTSNAP
 
+# Sometimes the update of the counters is delayed. 
+$SLEEP 10
 typeset -i i=0
 typeset -i j=0
 typeset cur_value=""

@@ -14,6 +14,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 # DESCRIPTION
 #	zfs destroy <dataset@snap1,snap2..> can destroy a list of multiple
 #	snapshots from the same datasets
@@ -32,7 +36,7 @@ function cleanup
 {
 	datasetexists $TESTPOOL/$TESTFS1 && $ZFS destroy -R $TESTPOOL/$TESTFS1
 	datasetexists $TESTPOOL/$TESTFS2 && $ZFS destroy -R $TESTPOOL/$TESTFS2
-	poolexists $TESTPOOL2 && $ZPOOL destroy $TESTPOOL2
+	poolexists $TESTPOOL2 && destroy_pool_no_force $TESTPOOL2
 	$RM -rf $VIRTUAL_DISK
 }
 

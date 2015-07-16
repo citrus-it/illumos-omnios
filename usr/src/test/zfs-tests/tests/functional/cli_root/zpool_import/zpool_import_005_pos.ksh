@@ -29,6 +29,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_import/zpool_import.cfg
 
@@ -72,7 +76,7 @@ log_must $ZPOOL destroy $TESTPOOL1
 log_note "Part of devices was renamed in the same directory."
 log_must $MV $VDEV0 $DEVICE_DIR/vdev0-new
 log_must $ZPOOL import -d $DEVICE_DIR -D -f $target
-log_must $ZPOOL destroy -f $TESTPOOL1
+log_must destroy_pool $TESTPOOL1
 
 log_note "All of devices was rename to different directories."
 log_must $MKDIR $DEVICE_DIR/newdir1 $DEVICE_DIR/newdir2
@@ -80,6 +84,6 @@ log_must $MV $VDEV1 $DEVICE_DIR/newdir1/vdev1-new
 log_must $MV $VDEV2 $DEVICE_DIR/newdir2/vdev2-new
 log_must $ZPOOL import -d $DEVICE_DIR/newdir1 -d $DEVICE_DIR/newdir2 \
 	-d $DEVICE_DIR -D -f $target
-log_must $ZPOOL destroy -f $TESTPOOL1
+log_must destroy_pool $TESTPOOL1
 
 log_pass "Destroyed pools devices was renamed, 'zpool import -D' passed."

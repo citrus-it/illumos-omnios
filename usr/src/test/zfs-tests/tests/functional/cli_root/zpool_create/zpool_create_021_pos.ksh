@@ -29,6 +29,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zfs_create/zfs_create_common.kshlib
 
@@ -80,7 +84,7 @@ while (( $i < ${#RW_FS_PROP[*]} )); do
 		log_fail "zpool create $TESTPOOL fail."
 	propertycheck $TESTPOOL ${RW_FS_PROP[i]} || \
 		log_fail "${RW_FS_PROP[i]} is failed to set."
-	log_must $ZPOOL destroy $TESTPOOL
+	log_must destroy_pool_no_force $TESTPOOL
 	(( i = i + 1 ))
 done
 

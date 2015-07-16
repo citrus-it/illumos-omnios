@@ -29,6 +29,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_import/zpool_import.cfg
 
@@ -60,7 +64,7 @@ function uncompress_pool
 
 function cleanup
 {
-	poolexists $POOL_NAME && log_must $ZPOOL destroy $POOL_NAME
+	poolexists $POOL_NAME && log_must destroy_pool_no_force $POOL_NAME
 	[[ -e /$TESTPOOL/$POOL_FILE ]] && $RM /$TESTPOOL/$POOL_FILE
 	return 0
 }

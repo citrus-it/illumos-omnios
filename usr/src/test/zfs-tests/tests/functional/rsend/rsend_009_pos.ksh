@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/rsend/rsend.kshlib
 
 #
@@ -48,10 +52,10 @@ verify_runnable "global"
 function cleanup
 {
 	if datasetexists bpool ; then
-		log_must $ZPOOL destroy -f bpool
+		log_must destroy_pool bpool
 	fi
 	if datasetexists spool ; then
-		log_must $ZPOOL destroy -f spool
+		log_must destroy_pool spool
 	fi
 }
 

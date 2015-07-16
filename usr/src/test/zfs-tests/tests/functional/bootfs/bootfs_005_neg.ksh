@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_upgrade/zpool_upgrade.kshlib
 
@@ -50,12 +54,12 @@ function cleanup {
 	for config in $CONFIGS; do
 		pool_name=$(eval $ECHO \$ZPOOL_VERSION_${config}_NAME)
 		if poolexists $pool_name; then
-			log_must $ZPOOL destroy $pool_name
+			log_must destroy_pool_no_force $pool_name
 		fi
 	done
 
 	if poolexists $TESTPOOL ; then
-		log_must $ZPOOL destroy $TESTPOOL
+		log_must destroy_pool_no_force $TESTPOOL
 	fi
 }
 

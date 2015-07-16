@@ -24,6 +24,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 ################################################################################
@@ -47,7 +51,7 @@ unsupported@some_feature=readonly \
 
 function cleanup
 {
-	datasetexists $TESTPOOL && log_must $ZPOOL destroy $TESTPOOL
+	datasetexists $TESTPOOL && log_must destroy_pool_no_force $TESTPOOL
 }
 
 log_assert "'zpool create' with invalid feature names/states fails"

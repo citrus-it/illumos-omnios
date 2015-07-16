@@ -29,6 +29,10 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_clear/zpool_clear.cfg
 
@@ -47,7 +51,7 @@ verify_runnable "global"
 function cleanup
 {
         poolexists $TESTPOOL1 && \
-                log_must $ZPOOL destroy -f $TESTPOOL1
+                log_must destroy_pool $TESTPOOL1
 
         for file in `$LS $TESTDIR/file.*`; do
 		log_must $RM -f $file

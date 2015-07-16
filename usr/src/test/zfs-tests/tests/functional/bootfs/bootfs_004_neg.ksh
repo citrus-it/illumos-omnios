@@ -25,6 +25,10 @@
 # Use is subject to license terms.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/include/libtest.shlib
 
 #
@@ -45,7 +49,7 @@ set -A pools "pool//$$" "pool%d123" "mirror" "c0t0d0s0" "pool*23*" "*po!l" \
 
 function cleanup {
 	if poolexists $POOL; then
-		log_must $ZPOOL destroy $POOL
+		log_must destroy_pool_no_force $POOL
 	fi
 	$RM /bootfs_004.$$.dat
 }

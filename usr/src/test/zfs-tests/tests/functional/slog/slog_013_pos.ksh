@@ -29,6 +29,10 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
 . $STF_SUITE/tests/functional/slog/slog.kshlib
 
 #
@@ -48,7 +52,7 @@ function cleanup_testenv
 {
 	cleanup
 	if datasetexists $TESTPOOL2 ; then
-		log_must $ZPOOL destroy -f $TESTPOOL2
+		log_must destroy_pool $TESTPOOL2
 	fi
 	if [[ -n $lofidev ]]; then
 		$LOFIADM -d $lofidev
