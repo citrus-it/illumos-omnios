@@ -1553,3 +1553,30 @@ dmu_krrp_lend_recv_buffer(void *krrp_task_void, kreplication_buffer_t *buffer)
 	ASSERT(buffer != NULL);
 	return (dmu_krrp_lend_buffer(krrp_task_void, buffer, B_TRUE));
 }
+
+int
+dmu_krrp_direct_arc_read(spa_t *spa, dmu_krrp_task_t *krrp_task,
+    zio_cksum_t *zc, const blkptr_t *bp)
+{
+	int error;
+	dmu_krrp_arc_bypass_t bypass = {
+	    .krrp_task = krrp_task,
+	    .zc = zc,
+	    .cb = dmu_krrp_buffer_write,
+	};
+
+	error = arc_io_bypass(spa, bp, dmu_krrp_arc_bypass, &bypass);
+	if (error == 0) {
+		DTRACE_PROBE(krrp_send_arc_bypass);
+	} else if (error == ENODATA) {
+		DTRACE_PROBE(krrp_send_disk_read);
+		return (error);
+	}
+
+	if (error != 0) {
+		DTRACE_PROBE1(orig_error, int, error);
+		error = SET_ERROR(EINTR);
+	}
+
+	return (error);
+}

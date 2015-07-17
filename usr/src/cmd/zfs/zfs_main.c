@@ -765,7 +765,7 @@ zfs_do_create(int argc, char **argv)
 				nomem();
 			break;
 		case 'o':
-			if (parseprop(props, optarg))
+			if (parseprop(props, optarg) != 0)
 				goto error;
 			break;
 		case 's':
@@ -3676,7 +3676,7 @@ zfs_do_snapshot(int argc, char **argv)
 	while ((c = getopt(argc, argv, "ro:")) != -1) {
 		switch (c) {
 		case 'o':
-			if (parseprop(props, optarg))
+			if (parseprop(props, optarg) != 0)
 				return (1);
 			break;
 		case 'r':
@@ -3949,6 +3949,7 @@ zfs_do_receive(int argc, char **argv)
 	int c, err;
 	nvlist_t *exprops, *limitds;
 	recvflags_t flags = { 0 };
+
 	if (nvlist_alloc(&exprops, NV_UNIQUE_NAME, 0) != 0)
 		nomem();
 	if (nvlist_alloc(&limitds, NV_UNIQUE_NAME, 0) != 0)
@@ -3971,7 +3972,7 @@ zfs_do_receive(int argc, char **argv)
 			flags.dryrun = B_TRUE;
 			break;
 		case 'o':
-			if (parseprop(exprops, optarg)) {
+			if (parseprop(exprops, optarg) != 0) {
 				err = 1;
 				goto recverror;
 			}

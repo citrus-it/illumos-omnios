@@ -16,6 +16,8 @@ int dmu_krrp_arc_bypass(void *buf, int len, void *arg);
 int dmu_krrp_get_recv_cookie(const char *pool, const char *token, char *cookie,
     size_t len);
 int dmu_krrp_erase_recv_cookie(const char *pool, const char *token);
+int dmu_krrp_direct_arc_read(spa_t *spa, dmu_krrp_task_t *krrp_task,
+    zio_cksum_t *zc, const blkptr_t *bp);
 
 typedef int (*dmu_krrp_arc_bypass_cb)(void *, int, dmu_krrp_task_t *);
 typedef struct {

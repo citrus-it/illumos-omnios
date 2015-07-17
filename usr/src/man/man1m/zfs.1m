@@ -27,7 +27,7 @@
 .\" Copyright (c) 2014 by Adam Stevko. All rights reserved.
 .\" Copyright 2015 Nexenta Systems, Inc.  All Rights Reserved.
 .\"
-.Dd June 8, 2015
+.Dd September 21, 2015
 .Dt ZFS 1M
 .Os
 .Sh NAME
@@ -1473,6 +1473,15 @@ Controls whether regular files should be scanned for viruses when a file is
 opened and closed. In addition to enabling this property, the virus scan
 service must also be enabled for virus scanning to occur. The default value is
 .Sy off .
+.It Sy wrc_mode Ns = Ns Sy on Ns | Ns Sy off
+Controls the mode of write back cache. After the property has been set on a
+dataset all the child datasets inherit the property. Due to its recursive nature
+the property will conflict with any child dataset or any parent dataset having
+this property enabled as well. The property cannot be set if the target pool
+does not have special device
+.Pq special vdev .
+The default value is
+.Sy off .
 .It Sy xattr Ns = Ns Sy on Ns | Ns Sy off
 Controls whether extended attributes are enabled for this file system. The
 default value is
@@ -2766,6 +2775,10 @@ to
 during receive of the stream. Specifying multiple
 .Fl o
 options is allowed.
+.It Fl o Sy origin Ns = Ns Ar snapshot
+Forces the stream to be received as a clone of the given snapshot.
+This is only valid if the stream is an incremental stream whose source
+is the same as the provided origin.
 .It Fl u
 File system that is associated with the received stream is not mounted.
 .It Fl v
