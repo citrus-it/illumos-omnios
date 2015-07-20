@@ -358,22 +358,14 @@ vdev_mirror_io_start(zio_t *zio)
 				}
 
 				/*
-				 * check btxg against the window and choose an
-				 * approproate dva
+				 * Scrub of special BPs should take into
+				 * account the state of WRC-Window
 				 */
-				if (spec_case) {
-					boolean_t cont;
-					uint64_t stxg;
-
-					mutex_enter(&spa->spa_wrc.wrc_lock);
-
-					stxg = spa->spa_wrc.wrc_start_txg;
-					cont = BP_PHYSICAL_BIRTH(bp) < stxg &&
-					    c == 0 || c == 1;
-					mutex_exit(&spa->spa_wrc.wrc_lock);
-					if (cont)
+				if (spec_case &&
+				    wrc_select_dva(spa_get_wrc_data(spa),
+				    bp) != c)
 						continue;
-				}
+
 				zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
 				    mc->mc_vd, mc->mc_offset,
 				    zio_buf_alloc(zio->io_size), zio->io_size,
@@ -387,42 +379,11 @@ vdev_mirror_io_start(zio_t *zio)
 		 * For normal reads just pick one child.
 		 */
 
-		if (spec_case) {
-			/*
-			 * if birth_txg is less than windows, then block is on
-			 * normal device only otherwise it can be found on
-			 * special, because deletion goes under lock and until
-			 * deletion is done, the block is accessible on special
-			 */
-			wrc_data_t *wrc_data = &spa->spa_wrc;
-			uint64_t stxg;
-			uint64_t ftxg;
-
-			mutex_enter(&wrc_data->wrc_lock);
-
-			stxg = wrc_data->wrc_start_txg;
-			ftxg = wrc_data->wrc_finish_txg;
-
-			if (ftxg && BP_PHYSICAL_BIRTH(bp) > ftxg) {
-				DTRACE_PROBE(wrc_read_special);
-				c = WRC_SPECIAL_DVA;
-			} else if (BP_PHYSICAL_BIRTH(bp) >= stxg) {
-				if (!ftxg && wrc_data->wrc_delete) {
-					DTRACE_PROBE(wrc_read_normal);
-					c = WRC_NORMAL_DVA;
-				} else {
-					DTRACE_PROBE(wrc_read_special);
-					c = WRC_SPECIAL_DVA;
-				}
-			} else {
-				DTRACE_PROBE(wrc_read_normal);
-				c = WRC_NORMAL_DVA;
-			}
-
-			mutex_exit(&wrc_data->wrc_lock);
-		} else {
+		if (spec_case)
+			c = wrc_select_dva(spa_get_wrc_data(spa), bp);
+		else
 			c = vdev_mirror_child_select(zio);
-		}
+
 		children = (c >= 0);
 	} else {
 		ASSERT(zio->io_type == ZIO_TYPE_WRITE);

@@ -180,6 +180,8 @@ void wrc_reactivate(spa_t *);
 void wrc_deactivate(spa_t *spa);
 void wrc_enter_fault_state(spa_t *spa);
 
+int wrc_select_dva(wrc_data_t *wrc_data, blkptr_t *bp);
+
 wrc_data_t *spa_get_wrc_data(spa_t *spa);
 
 void wrc_add_bytes(spa_t *spa, uint64_t txg, uint64_t bytes);

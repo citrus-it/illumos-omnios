@@ -1574,3 +1574,42 @@ wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data)
 
 	return (zio_wait(zio));
 }
+
+/*
+ * if birth_txg is less than windows, then block is on
+ * normal device only otherwise it can be found on
+ * special, because deletion goes under lock and until
+ * deletion is done, the block is accessible on special
+ */
+int
+wrc_select_dva(wrc_data_t *wrc_data, blkptr_t *bp)
+{
+	uint64_t stxg;
+	uint64_t ftxg;
+	int c;
+
+	mutex_enter(&wrc_data->wrc_lock);
+
+	stxg = wrc_data->wrc_start_txg;
+	ftxg = wrc_data->wrc_finish_txg;
+
+	if (ftxg && BP_PHYSICAL_BIRTH(bp) > ftxg) {
+		DTRACE_PROBE(wrc_read_special);
+		c = WRC_SPECIAL_DVA;
+	} else if (BP_PHYSICAL_BIRTH(bp) >= stxg) {
+		if (!ftxg && wrc_data->wrc_delete) {
+			DTRACE_PROBE(wrc_read_normal);
+			c = WRC_NORMAL_DVA;
+		} else {
+			DTRACE_PROBE(wrc_read_special);
+			c = WRC_SPECIAL_DVA;
+		}
+	} else {
+		DTRACE_PROBE(wrc_read_normal);
+		c = WRC_NORMAL_DVA;
+	}
+
+	mutex_exit(&wrc_data->wrc_lock);
+
+	return (c);
+}
