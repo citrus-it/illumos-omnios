@@ -7254,7 +7254,7 @@ spa_trim(spa_t *spa, uint64_t rate)
 		vd->vdev_trim_prog = 0;
 		VERIFY3U(taskq_dispatch(system_taskq,
 		    (void (*)(void *))vdev_trim_all, vti,
-		    TQ_NOSLEEP | TQ_NOQUEUE), !=, 0);
+		    TQ_SLEEP | TQ_NOQUEUE), !=, 0);
 	}
 	mutex_exit(&spa->spa_trim_lock);
 	spa_config_exit(spa, SCL_TRIM_ALL, FTAG);
