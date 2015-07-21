@@ -801,8 +801,8 @@ smb_odir_save_fname(smb_odir_t *od, uint32_t cookie, const char *fname)
 /*
  * smb_odir_resume_at
  *
- * If SMB_ODIR_FLAG_WILDCARDS is not set the search is for a single
- * file and should not be resumed.
+ * If SMB_ODIR_FLAG_WILDCARDS is not set, and we're rewinding,
+ * assume we're no longer at EOF.
  *
  * Wildcard searching can be resumed from:
  * - the cookie saved at a specified index (SMBsearch, SMBfind).
@@ -818,12 +818,20 @@ smb_odir_save_fname(smb_odir_t *od, uint32_t cookie, const char *fname)
 void
 smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
 {
+	uint64_t save_offset;
+
 	ASSERT(od);
 	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
 	ASSERT(resume);
 
+	if ((od->d_flags & SMB_ODIR_FLAG_WILDCARDS) == 0) {
+		if (resume->or_type == SMB_ODIR_RESUME_COOKIE)
+			od->d_eof = B_FALSE;
+		return;
+	}
 	mutex_enter(&od->d_mutex);
 
+	save_offset = od->d_offset;
 	switch (resume->or_type) {
 
 	default:
@@ -866,9 +874,11 @@ smb_odir_resume_at(smb_odir_t *od, smb_odir_resume_t *resume)
 		break;
 	}
 
-	/* Force a vop_readdir to refresh d_buf */
-	od->d_bufptr = NULL;
-	od->d_eof = B_FALSE;
+	if (od->d_offset != save_offset) {
+		/* Force a vop_readdir to refresh d_buf */
+		od->d_bufptr = NULL;
+		od->d_eof = B_FALSE;
+	}
 
 	mutex_exit(&od->d_mutex);
 }
@@ -960,6 +970,10 @@ smb_odir_reopen(smb_odir_t *od, const char *pattern, uint16_t sattr)
 	mutex_enter(&od->d_mutex);
 	od->d_sattr = sattr;
 	(void) strlcpy(od->d_pattern, pattern, sizeof (od->d_pattern));
+	if (smb_contains_wildcards(od->d_pattern))
+		od->d_flags |= SMB_ODIR_FLAG_WILDCARDS;
+	else
+		od->d_flags &= ~SMB_ODIR_FLAG_WILDCARDS;
 
 	/* Internal smb_odir_resume_at */
 	od->d_offset = 0;

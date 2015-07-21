@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -491,11 +491,7 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 	} else {
 		odir_resume.or_type = SMB_ODIR_RESUME_FNAME;
 	}
-	if (od->d_flags & SMB_ODIR_FLAG_WILDCARDS) {
-		smb_odir_resume_at(od, &odir_resume);
-	} else {
-		od->d_eof = B_TRUE;
-	}
+	smb_odir_resume_at(od, &odir_resume);
 
 	count = smb_trans2_find_entries(sr, xa, od, &args);
 	if (count == -1) {
@@ -540,6 +536,7 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 	smb_odir_resume_t odir_resume;
 	uint16_t	count, maxcount;
 	int		rc = -1;
+	boolean_t	need_rewind = B_FALSE;
 
 	if ((maxcount = args->fa_maxcount) == 0)
 		maxcount = 1;
@@ -555,9 +552,11 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 
 		rc = smb_trans2_find_mbc_encode(sr, xa, &fileinfo, args);
 		if (rc == -1)
-			return (-1);
-		if (rc == 1)
-			break;
+			return (-1); /* fatal encoding error */
+		if (rc == 1) {
+			need_rewind = B_TRUE;
+			break; /* output space exhausted */
+		}
 
 		/*
 		 * Save the info about the last file returned.
@@ -579,8 +578,15 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 	 * and eos has not already been detected, check if there are
 	 * any more entries. eos will be set if there are no more.
 	 */
-	if ((rc == 0) && (args->fa_eos == 0))
-		(void) smb_odir_read_fileinfo(sr, od, &fileinfo, &args->fa_eos);
+	if ((rc == 0) && (args->fa_eos == 0)) {
+		rc = smb_odir_read_fileinfo(sr, od, &fileinfo, &args->fa_eos);
+		/*
+		 * If rc == ENOENT, we did not read any additional data.
+		 * if rc != 0, there's no need to rewind.
+		 */
+		if (rc == 0)
+			need_rewind = B_TRUE;
+	}
 
 	/*
 	 * When the last entry we read from the directory did not
@@ -589,10 +595,12 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 	 * check for EOS just above both can leave the directory
 	 * position incorrect for the next call.  Fix that now.
 	 */
-	bzero(&odir_resume, sizeof (odir_resume));
-	odir_resume.or_type = SMB_ODIR_RESUME_COOKIE;
-	odir_resume.or_cookie = args->fa_lastkey;
-	smb_odir_resume_at(od, &odir_resume);
+	if (need_rewind) {
+		bzero(&odir_resume, sizeof (odir_resume));
+		odir_resume.or_type = SMB_ODIR_RESUME_COOKIE;
+		odir_resume.or_cookie = args->fa_lastkey;
+		smb_odir_resume_at(od, &odir_resume);
+	}
 
 	return (count);
 }
