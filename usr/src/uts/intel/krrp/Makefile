@@ -41,6 +41,7 @@ LDFLAGS     += -r -dy -N fs/zfs -N misc/ksocket
 
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 INC_PATH	+= -I$(COMMONBASE)/krrp
+INC_PATH	+= -I$(COMMONBASE)/zfs
 
 CERRWARN    += -_gcc=-Wno-unused-variable
 
