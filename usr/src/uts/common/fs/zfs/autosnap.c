@@ -14,7 +14,7 @@
 /* AUTOSNAP-recollect routines */
 
 /* Collect orphaned snapshots after reboot */
-static int
+void
 autosnap_collect_orphaned_snapshots(spa_t *spa)
 {
 	zfs_autosnap_t *autosnap = spa_get_autosnap(spa);
@@ -36,7 +36,7 @@ autosnap_collect_orphaned_snapshots(spa_t *spa)
 
 	if (err) {
 		list_destroy(&ds_to_collect);
-		return (err);
+		return;
 	}
 
 	mutex_enter(&autosnap->autosnap_lock);
@@ -109,8 +109,6 @@ autosnap_collect_orphaned_snapshots(spa_t *spa)
 	dsl_pool_config_exit(dp, FTAG);
 	mutex_exit(&autosnap->autosnap_lock);
 	list_destroy(&ds_to_collect);
-
-	return (err);
 }
 
 /* Plan to destroy all orphaned snapshots */
@@ -1299,8 +1297,6 @@ autosnap_init(spa_t *spa)
 	autosnap->autosnap_global.delayed = B_FALSE;
 	autosnap->autosnap_global.flags = AUTOSNAP_GLOBAL;
 	autosnap->autosnap_global.autosnap = autosnap;
-
-	(void) autosnap_collect_orphaned_snapshots(spa);
 
 #ifdef _KERNEL
 	autosnap_destroyer_thread_start(spa);

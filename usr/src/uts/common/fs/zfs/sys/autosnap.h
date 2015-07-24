@@ -142,6 +142,8 @@ extern void autosnap_toggle_global_mode(spa_t *spa,
 int autosnap_lock(spa_t *spa);
 void autosnap_unlock(spa_t *spa);
 
+void autosnap_collect_orphaned_snapshots(spa_t *spa);
+
 boolean_t autosnap_is_autosnap(dsl_dataset_t *ds);
 boolean_t autosnap_check_name(const char *snap_name);
 
