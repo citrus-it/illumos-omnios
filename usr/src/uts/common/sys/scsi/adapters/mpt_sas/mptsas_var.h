@@ -105,6 +105,7 @@ typedef uint16_t		mptsas_phymask_t;
  */
 #define	MPTSAS_SMP_BUCKET_COUNT		23
 #define	MPTSAS_TARGET_BUCKET_COUNT	97
+#define	MPTSAS_TMP_TARGET_BUCKET_COUNT	13
 
 /*
  * MPT HW defines
@@ -562,6 +563,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(mptsas_topo_change_list_t::flags))
 #define	DEV_INFO_WRONG_DEVICE_TYPE	0x2
 #define	DEV_INFO_PHYS_DISK		0x3
 #define	DEV_INFO_FAIL_ALLOC		0x4
+#define	DEV_INFO_FAIL_GUID		0x5
 
 /*
  * mpt hotplug event defines
@@ -704,6 +706,7 @@ typedef struct mptsas {
 
 	refhash_t	*m_targets;
 	refhash_t	*m_smp_targets;
+	refhash_t	*m_tmp_targets;
 
 	m_raidconfig_t	m_raidconfig[MPTSAS_MAX_RAIDCONFIGS];
 	uint8_t		m_num_raid_configs;
