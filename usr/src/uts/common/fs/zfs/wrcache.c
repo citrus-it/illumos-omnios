@@ -737,10 +737,11 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 	wrc_parseblock_cb_t *cbd = arg;
-	wrc_block_t *block;
+	wrc_block_t *block, *found_block;
 	int ndvas;
-	avl_index_t where;
 	vdev_t *vd1, *vd2;
+	avl_index_t where = NULL;
+	boolean_t increment_counters = B_FALSE;
 
 	/* skip ZIL blocks */
 	if (bp == NULL || zb->zb_level == ZB_ZIL_LEVEL)
@@ -791,18 +792,56 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	}
 
 	/*
-	 * Add block to the tree of coolected blocks or drop it
-	 * if it already there (it is possible with deduplication,
-	 * for example)
+	 * Before add the block to the tree of planned tree need
+	 * to check that:
+	 *  - a block with the same DVA is not contained in one of
+	 *  out trees (planned of moved)
+	 *  - a block is contained in a tree, so need to check that:
+	 *		- DVA already freed: need to free the corresponding
+	 *		wrc_block and add new wrc_block to
+	 *		the tree of planned blocks. This is possible if
+	 *		DVA was freed and later allocated for another data.
+	 *
+	 *		- DVA still allocated: is not required to add
+	 *		the new block to the tree of planned blocks,
+	 *		so just free it. This is possible if deduplication
+	 *		is enabled
 	 */
-	if (avl_find(&wrc_data->wrc_blocks, block, &where) == NULL) {
-		avl_insert(&wrc_data->wrc_blocks, block, where);
-		cbd->bt_size += WRCBP_GET_PSIZE(block);
+	found_block = avl_find(&wrc_data->wrc_moved_blocks, block, NULL);
+	if (found_block != NULL) {
+		if (WRCBP_IS_DELETED(found_block)) {
+			avl_remove(&wrc_data->wrc_moved_blocks, found_block);
+			wrc_free_block(found_block);
+			goto insert;
+		} else {
+			wrc_free_block(block);
+			goto out;
+		}
+	}
+
+	found_block = avl_find(&wrc_data->wrc_blocks, block, &where);
+	if (found_block != NULL) {
+		if (WRCBP_IS_DELETED(found_block)) {
+			avl_remove(&wrc_data->wrc_blocks, found_block);
+			wrc_free_block(found_block);
+			goto insert;
+		} else {
+			wrc_free_block(block);
+			goto out;
+		}
+	}
+
+	increment_counters = B_TRUE;
+
+insert:
+	avl_insert(&wrc_data->wrc_blocks, block, where);
+	cbd->bt_size += WRCBP_GET_PSIZE(block);
+	if (increment_counters) {
 		wrc_data->wrc_block_count++;
 		wrc_data->wrc_blocks_in++;
-	} else {
-		wrc_free_block(block);
 	}
+
+out:
 	mutex_exit(&wrc_data->wrc_lock);
 
 	return (0);

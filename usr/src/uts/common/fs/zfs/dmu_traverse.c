@@ -680,39 +680,6 @@ traverse_pool(spa_t *spa, uint64_t txg_start, uint64_t txg_finish, int flags,
 				break;
 			}
 			ctxg = dsl_dataset_phys(ds)->ds_creation_txg;
-			if (max_txg != UINT64_MAX) {
-				dsl_dataset_t *nds;
-				objset_t *nos;
-				boolean_t nos_is_snapshot = B_FALSE;
-
-				dsl_pool_config_enter(dp, FTAG);
-				err = dsl_dataset_hold_obj(dp,
-				    dsl_dataset_phys(ds)->ds_next_snap_obj,
-				    FTAG, &nds);
-				if (!err) {
-					err = dmu_objset_from_ds(nds, &nos);
-					if (err)
-						dsl_dataset_rele(nds, FTAG);
-					else {
-						nos_is_snapshot =
-						    dmu_objset_is_snapshot(nos);
-					}
-				}
-				dsl_pool_config_exit(dp, FTAG);
-				if (err == 0) {
-					dsl_dataset_phys_t *pnds =
-					    dsl_dataset_phys(nds);
-					uint64_t ntxg =
-					    pnds->ds_creation_txg;
-					if (nos_is_snapshot &&
-					    ntxg < max_txg) {
-						dsl_dataset_rele(ds, FTAG);
-						dsl_dataset_rele(nds, FTAG);
-						continue;
-					}
-					dsl_dataset_rele(nds, FTAG);
-				}
-			}
 
 			/* uplimited traverse walks over shapshots only */
 			if (max_txg != UINT64_MAX && !os_is_snapshot) {
