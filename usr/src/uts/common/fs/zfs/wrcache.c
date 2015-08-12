@@ -151,7 +151,8 @@ wrc_create_block(wrc_data_t *wrc_data, const blkptr_t *bp)
 	 * Fill information describing data we need to move
 	 */
 #ifdef _KERNEL
-	DTRACE_PROBE5(wrc_plan_block_data,
+	DTRACE_PROBE6(wrc_plan_block_data,
+	    uint64_t, BP_PHYSICAL_BIRTH(bp),
 	    uint64_t, DVA_GET_VDEV(&bp->blk_dva[0]),
 	    uint64_t, DVA_GET_OFFSET(&bp->blk_dva[0]),
 	    uint64_t, DVA_GET_VDEV(&bp->blk_dva[1]),
@@ -783,6 +784,16 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	if (wrc_should_pause_scanblocks(spa->spa_dsl_pool, cbd, zb)) {
 		mutex_exit(&wrc_data->wrc_lock);
 		return (ERESTART);
+	}
+
+	/*
+	 * If dedup is enabled then travesal gives us the original block,
+	 * that already moved as part of previous WRC-win.
+	 * So just skip it.
+	 */
+	if (BP_PHYSICAL_BIRTH(bp) < wrc_data->wrc_start_txg) {
+		mutex_exit(&wrc_data->wrc_lock);
+		return (0);
 	}
 
 	block = wrc_create_block(wrc_data, bp);
