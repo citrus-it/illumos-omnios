@@ -3544,8 +3544,19 @@ top:
 		 * valid. If not, go back to the start of the tree. We'll
 		 * skip any metaslabs which have 'ms_trimmed' set, so we
 		 * won't try to retrim them anymore.
+		 * We can't do spa_config_enter here, because if another
+		 * thread has called spa_trim_stop_wait() while holding the
+		 * locks in writer, we'd deadlock. So we do a sort of
+		 * compromise best effort delayed-busy-trylock.
 		 */
-		spa_config_enter(spa, SCL_TRIM_ALL, FTAG, RW_READER);
+		while (!spa_config_tryenter(spa, SCL_TRIM_ALL, FTAG,
+		    RW_READER)) {
+			if (spa->spa_trim_stop)
+				goto out;
+#ifdef	_KERNEL
+			delay(USEC_TO_TICK(10000));
+#endif
+		}
 		mutex_enter(&mg->mg_lock);
 		if (mg->mg_metaslab_tree_dirty) {
 			DTRACE_PROBE2(vdev_trim_all_restart, vdev_t *, vd,
@@ -3560,7 +3571,7 @@ top:
 	}
 	mutex_exit(&mg->mg_lock);
 	spa_config_exit(spa, SCL_TRIM_ALL, FTAG);
-
+out:
 	/*
 	 * Ensure we're marked as "completed" even if we've had to stop
 	 * before processing all metaslabs.
