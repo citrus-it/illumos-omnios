@@ -103,6 +103,7 @@ typedef struct wrc_data {
 	uint64_t	wrc_blocks_in;		/* collected */
 	uint64_t	wrc_blocks_out;		/* planned */
 	uint64_t	wrc_blocks_mv;		/* moved */
+	uint64_t	wrc_blocks_mv_last; /* latest number of moved blocks */
 
 	uint64_t	wrc_latest_window_time;
 
@@ -123,6 +124,7 @@ typedef struct wrc_data {
 	boolean_t	wrc_thr_exit;	/* exit flag */
 	boolean_t	wrc_isvalid;	/* wrc is inited */
 	boolean_t	wrc_isfault;	/* wrc is fault */
+	boolean_t	wrc_first_move; /* TRUE until the 1 WRC-win opened */
 
 	kcondvar_t	wrc_cv;
 } wrc_data_t;

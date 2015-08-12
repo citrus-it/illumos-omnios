@@ -882,22 +882,55 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 
 			err = 0;
 		} else if (wrc_data->wrc_blocks_in == wrc_data->wrc_blocks_mv) {
-
 			/* Everything is moved, close the window */
 			if (wrc_data->wrc_finish_txg)
 				wrc_close_window(spa);
 
-			/* Wait until a new window appears */
-			if (wrc_data->wrc_walk == B_FALSE) {
-				wrc_data->wrc_walking = B_FALSE;
-				cv_broadcast(&wrc_data->wrc_cv);
-				cv_wait(&wrc_data->wrc_cv, &wrc_data->wrc_lock);
+			/* Say to others that walking stopped */
+			wrc_data->wrc_walking = B_FALSE;
+			cv_broadcast(&wrc_data->wrc_cv);
+
+			/* and wait until a new window appears */
+			for (;;) {
+				uint64_t percentage;
+
+				(void) cv_timedwait(&wrc_data->wrc_cv,
+				    &wrc_data->wrc_lock,
+				    ddi_get_lbolt() + 1000);
+
+				if (wrc_data->wrc_thr_exit) {
+					mutex_exit(&wrc_data->wrc_lock);
+					return (EINTR);
+				}
+
+				/*
+				 * WRC-windowd has been opened automatically
+				 */
+				if (wrc_data->wrc_walk)
+					break;
+
+				/*
+				 * Wait-timeout has exceeded, there is no
+				 * Write-I/O.
+				 */
+				percentage = spa_class_alloc_percentage(
+				    spa_special_class(spa));
+				if (wrc_data->wrc_blocks_mv_last != 0 ||
+				    (percentage > 5 &&
+				    wrc_data->wrc_first_move)) {
+					/*
+					 * To be sure that special
+					 * does not contain non-moved
+					 * data we forcefully open WRC-window
+					 */
+					mutex_exit(&wrc_data->wrc_lock);
+					autosnap_force_snap(
+					    wrc_data->wrc_autosnap_hdl,
+					    B_FALSE);
+					mutex_enter(&wrc_data->wrc_lock);
+				}
 			}
 
-			if (wrc_data->wrc_thr_exit) {
-				mutex_exit(&wrc_data->wrc_lock);
-				return (EINTR);
-			}
 			mutex_exit(&wrc_data->wrc_lock);
 
 			dsl_sync_task(spa->spa_name, NULL,
@@ -1119,6 +1152,8 @@ wrc_close_window_impl(spa_t *spa, avl_tree_t *tree)
 	wrc_data->wrc_txg_to_rele = 0;
 	wrc_data->wrc_roll_threshold = wrc_mv_cancel_threshold_initial;
 	wrc_data->wrc_delete = B_FALSE;
+
+	wrc_data->wrc_blocks_mv_last = wrc_data->wrc_blocks_mv;
 
 	wrc_data->wrc_blocks_in = 0;
 	wrc_data->wrc_blocks_out = 0;
@@ -1364,6 +1399,7 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 		VERIFY0(wrc_data->wrc_block_count);
 		VERIFY(avl_is_empty(&wrc_data->wrc_blocks));
 		wrc_data->wrc_latest_window_time = ddi_get_lbolt();
+		wrc_data->wrc_first_move = B_FALSE;
 		wrc_data->wrc_walk = B_TRUE;
 		wrc_data->wrc_finish_txg = etxg;
 		wrc_data->wrc_txg_to_rele = txg;

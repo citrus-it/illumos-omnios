@@ -2837,7 +2837,7 @@ retry:
 	}
 
 	if (rv != 0)
-		autosnap_force_snap_by_name(dsname, B_FALSE);
+		autosnap_force_snap_by_name(dsname, NULL, B_FALSE);
 
 
 	return (rv);

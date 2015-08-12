@@ -96,7 +96,8 @@ extern autosnap_zone_t *autosnap_find_zone(spa_t *spa, const char *name,
     boolean_t recursive);
 extern boolean_t autosnap_has_children_zone(spa_t *spa, const char *name);
 extern void autosnap_exempt_snapshot(spa_t *spa, const char *name);
-extern void autosnap_force_snap_by_name(const char *dsname, boolean_t sync);
+extern void autosnap_force_snap_by_name(const char *dsname,
+    autosnap_zone_t *zone, boolean_t sync);
 extern void autosnap_force_snap(void *opaque, boolean_t sync);
 extern boolean_t autosnap_confirm_snap(const char *name, uint64_t txg,
     autosnap_zone_t *zone);

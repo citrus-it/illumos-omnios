@@ -783,13 +783,13 @@ autosnap_exempt_snapshot(spa_t *spa, const char *name)
 }
 
 void
-autosnap_force_snap_by_name(const char *dsname, boolean_t sync)
+autosnap_force_snap_by_name(const char *dsname, autosnap_zone_t *zone,
+    boolean_t sync)
 {
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds;
 	objset_t *os;
 	uint64_t txg = 0;
-	autosnap_zone_t *zone;
 	zfs_autosnap_t *autosnap;
 	int error;
 
@@ -804,11 +804,13 @@ autosnap_force_snap_by_name(const char *dsname, boolean_t sync)
 	}
 
 	mutex_enter(&autosnap->autosnap_lock);
-	zone = autosnap_find_zone(dp->dp_spa, dsname, B_TRUE);
 	if (zone == NULL) {
-		mutex_exit(&autosnap->autosnap_lock);
-		dsl_pool_rele(dp, FTAG);
-		return;
+		zone = autosnap_find_zone(dp->dp_spa, dsname, B_TRUE);
+		if (zone == NULL) {
+			mutex_exit(&autosnap->autosnap_lock);
+			dsl_pool_rele(dp, FTAG);
+			return;
+		}
 	}
 
 	error = dsl_dataset_hold(dp, dsname, FTAG, &ds);
@@ -870,7 +872,7 @@ autosnap_force_snap(void *opaque, boolean_t sync)
 	hdl = opaque;
 	zone = hdl->zone;
 
-	autosnap_force_snap_by_name(zone->dataset, sync);
+	autosnap_force_snap_by_name(zone->dataset, zone, sync);
 }
 
 /* AUTOSNAP-NOTIFIER routines */
