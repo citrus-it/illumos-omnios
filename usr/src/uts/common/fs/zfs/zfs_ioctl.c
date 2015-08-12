@@ -4602,6 +4602,7 @@ dmu_recv_impl(int fd, char *tofs, char *tosnap, char *origin,
 		fnvlist_add_string(event, "origin", tofs);
 		fnvlist_add_string(event, "tosnap", val);
 		fnvlist_add_uint64(event, "bytes", *sz);
+		fnvlist_add_boolean_value(event, "newds", drc.drc_newfs);
 		zfs_event_post(ZFS_EC_STATUS, "recv", event);
 	}
 
