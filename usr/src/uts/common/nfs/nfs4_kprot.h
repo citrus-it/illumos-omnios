@@ -18,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1453,6 +1458,9 @@ struct nfs_argop4 {
 		WRITE4args opwrite;
 		RELEASE_LOCKOWNER4args oprelease_lockowner;
 	} nfs_argop4_u;
+	size_t opsize;		/* the number of bytes occupied by the */
+				/* particular operation in the XDR stream */
+				/* (set during the decode only) */
 };
 typedef struct nfs_argop4 nfs_argop4;
 
@@ -1499,6 +1507,12 @@ struct nfs_resop4 {
 		RELEASE_LOCKOWNER4res oprelease_lockowner;
 		ILLEGAL4res opillegal;
 	} nfs_resop4_u;
+	size_t opsize;		/* the number of bytes occupied by the */
+				/* particular operation in the XDR stream */
+				/* (set during the encode only) */
+	struct exportinfo *exi;	/* the exportinfo where the operation should */
+				/* be counted in (support for per-exportinfo */
+				/* kstats) */
 };
 typedef struct nfs_resop4 nfs_resop4;
 

@@ -18,12 +18,16 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -4310,16 +4314,29 @@ xdr_cnfs_argop4_wrap(XDR *xdrs, nfs_argop4 *objp)
 static bool_t
 xdr_snfs_argop4(XDR *xdrs, nfs_argop4 *objp)
 {
+	uint_t pos;
+	bool_t ret;
+
+	if (xdrs->x_op == XDR_DECODE)
+		pos = XDR_GETPOS(xdrs);
+
 	if (!xdr_int(xdrs, (int *)&objp->argop))
 		return (FALSE);
 
 	switch (objp->argop) {
 	case OP_PUTFH:
-		return (xdr_decode_nfs_fh4(xdrs,
-		    &objp->nfs_argop4_u.opputfh.object));
+		ret = xdr_decode_nfs_fh4(xdrs,
+		    &objp->nfs_argop4_u.opputfh.object);
+		break;
 	default:
-		return (xdr_nfs_argop4(xdrs, objp));
+		ret = xdr_nfs_argop4(xdrs, objp);
+		break;
 	}
+
+	if (ret && xdrs->x_op == XDR_DECODE)
+		objp->opsize = XDR_GETPOS(xdrs) - pos;
+
+	return (ret);
 }
 
 /*
@@ -4771,6 +4788,12 @@ xdr_nfs_resop4(XDR *xdrs, nfs_resop4 *objp)
 static bool_t
 xdr_snfs_resop4(XDR *xdrs, nfs_resop4 *objp)
 {
+	uint_t pos;
+	bool_t ret;
+
+	if (xdrs->x_op == XDR_ENCODE)
+		pos = XDR_GETPOS(xdrs);
+
 	if (!xdr_int(xdrs, (int *)&objp->resop))
 		return (FALSE);
 
@@ -4780,12 +4803,20 @@ xdr_snfs_resop4(XDR *xdrs, nfs_resop4 *objp)
 		    (int32_t *)&objp->nfs_resop4_u.opgetfh.status))
 			return (FALSE);
 		if (objp->nfs_resop4_u.opgetfh.status != NFS4_OK)
-			return (TRUE);
-		return (xdr_encode_nfs_fh4(xdrs,
-		    &objp->nfs_resop4_u.opgetfh.object));
+			ret = TRUE;
+		else
+			ret = xdr_encode_nfs_fh4(xdrs,
+			    &objp->nfs_resop4_u.opgetfh.object);
+		break;
 	default:
-		return (xdr_nfs_resop4(xdrs, objp));
+		ret = xdr_nfs_resop4(xdrs, objp);
+		break;
 	}
+
+	if (ret && xdrs->x_op == XDR_ENCODE)
+		objp->opsize = XDR_GETPOS(xdrs) - pos;
+
+	return (ret);
 }
 
 static bool_t
