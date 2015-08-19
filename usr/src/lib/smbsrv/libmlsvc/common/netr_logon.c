@@ -684,7 +684,14 @@ netr_setup_identity(ndr_heap_t *heap, smb_logon_t *user_info,
 
 	(void) mutex_unlock(&logon_id_mutex);
 
-	identity->parameter_control = 0;
+	/*
+	 * [MS-APDS] 3.1.5.2 "NTLM Network Logon" says to set
+	 * ParameterControl to the 'E' + 'K' bits.  Those are:
+	 * (1 << 5) | (1 << 11), a.k.a
+	 */
+	identity->parameter_control =
+	    MSV1_0_ALLOW_SERVER_TRUST_ACCOUNT |
+	    MSV1_0_ALLOW_WORKSTATION_TRUST_ACCOUNT;
 	identity->logon_id.LowPart = logon_id;
 	identity->logon_id.HighPart = 0;
 
