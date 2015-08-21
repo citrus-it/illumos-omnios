@@ -2169,7 +2169,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 				continue;
 
 			was_active = msp->ms_weight & METASLAB_ACTIVE_MASK;
-			if (flags & METASLAB_USE_SECONDARY) {
+			if (flags & METASLAB_USE_WEIGHT_SECONDARY) {
 				if (!pass_primary) {
 					DTRACE_PROBE(metaslab_use_secondary);
 					activation_weight =
@@ -2632,14 +2632,16 @@ metaslab_alloc(spa_t *spa, metaslab_class_t *mc, uint64_t psize, blkptr_t *bp,
 	    !(spa->spa_meta_policy.spa_small_data_to_special &&
 	    psize <= spa->spa_meta_policy.spa_small_data_to_special)) {
 		error = metaslab_alloc_dva(spa, spa_normal_class(spa),
-		    psize, dva+1, 0, NULL, txg, flags | METASLAB_USE_SECONDARY);
+		    psize, &dva[WRC_NORMAL_DVA], 0, NULL, txg,
+		    flags | METASLAB_USE_WEIGHT_SECONDARY);
 		if (!error) {
 			error = metaslab_alloc_dva(spa, mc, psize,
-			    dva, 0, NULL, txg, flags);
+			    &dva[WRC_SPECIAL_DVA], 0, NULL, txg, flags);
 			if (error) {
-				bcopy(dva + 1, dva, sizeof (dva_t));
-				bzero(dva + 1, sizeof (dva_t));
 				error = 0;
+				bcopy(&dva[WRC_NORMAL_DVA],
+				    &dva[WRC_SPECIAL_DVA], sizeof (dva_t));
+				bzero(&dva[WRC_SPECIAL_DVA], sizeof (dva_t));
 			}
 		} else {
 			spa_config_exit(spa, SCL_ALLOC, FTAG);
@@ -2670,110 +2672,39 @@ metaslab_alloc(spa_t *spa, metaslab_class_t *mc, uint64_t psize, blkptr_t *bp,
 	return (0);
 }
 
-/*
- * 3 cases can be here
- * 1st - birth_txg is less than window - only normal device should be free
- * 2nd - inside window both trees are checked and if both of the trees
- *	haven't this block and deletion in process, then block is already
- *	freed, otherwise both dva are freed
- * 3rd - birth_txg is higher than window - both dva must be freed
- */
-static int
-metaslab_first_valid_dva(const blkptr_t *bp,
-    wrc_data_t *wrc_data, boolean_t removal)
-{
-	int start_dva = 0;
-
-	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
-
-	if (BP_PHYSICAL_BIRTH(bp) < wrc_data->wrc_start_txg) {
-		start_dva = 1;
-	} else if (BP_PHYSICAL_BIRTH(bp) <= wrc_data->wrc_finish_txg) {
-		wrc_block_t search, *planned, *moved;
-
-		/* Only DVA[0] is required for search */
-		search.dva[0] = bp->blk_dva[0];
-
-		moved = avl_find(&wrc_data->wrc_moved_blocks,
-		    &search, NULL);
-		if (moved != NULL && removal) {
-			/*
-			 * later WRC will do free for this block
-			 */
-			mutex_enter(&moved->lock);
-			WRCBP_MARK_DELETED(moved);
-			mutex_exit(&moved->lock);
-		}
-
-		planned = avl_find(&wrc_data->wrc_blocks,
-		    &search, NULL);
-		if (planned != NULL && removal) {
-			avl_remove(&wrc_data->wrc_blocks, planned);
-			wrc_free_block(planned);
-		}
-
-		if (planned == NULL && moved == NULL && wrc_data->wrc_delete)
-			start_dva = 1;
-	}
-
-	return (start_dva);
-}
-
-/* check whether the block is a wrc one */
-static boolean_t
-metaslab_is_block_special(spa_t *spa, const blkptr_t *bp)
-{
-	const dva_t *dva = bp->blk_dva;
-
-	/*
-	 * wrc is persistent and can not be turned off so if it is disabled
-	 * there are no special blocks for sure
-	 */
-	if (!spa_wrc_present(spa))
-		return (B_FALSE);
-
-	if (BP_GET_NDVAS(bp) >= 2) {
-		vdev_t *v1 = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[0]));
-		vdev_t *v2 = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[1]));
-
-		if (vdev_is_special(v1) && !vdev_is_special(v2))
-			return (B_TRUE);
-	}
-
-	return (B_FALSE);
-}
-
 void
 metaslab_free(spa_t *spa, const blkptr_t *bp, uint64_t txg, boolean_t now)
 {
 	const dva_t *dva = bp->blk_dva;
 	int ndvas = BP_GET_NDVAS(bp);
-	boolean_t spec_free = B_FALSE;
-	wrc_data_t *wrc_data = &spa->spa_wrc;
-	int start_dva = 0;
 
 	ASSERT(!BP_IS_HOLE(bp));
 	ASSERT(!now || bp->blk_birth >= spa_syncing_txg(spa));
 
 	spa_config_enter(spa, SCL_FREE, FTAG, RW_READER);
 
-	spec_free = metaslab_is_block_special(spa, bp);
+	if (wrc_is_block_special(spa, bp)) {
+		int start_dva;
+		wrc_data_t *wrc_data = spa_get_wrc_data(spa);
 
-	/* always false if wrc is not present */
-	if (spec_free) {
 		mutex_enter(&wrc_data->wrc_lock);
-		/* if block is moved than DVA[0] isn't valid */
-		start_dva = metaslab_first_valid_dva(bp, wrc_data, B_TRUE);
+		start_dva = wrc_first_valid_dva(bp, wrc_data, B_TRUE);
 		mutex_exit(&wrc_data->wrc_lock);
-	}
 
-	/*
-	 * Actual freeing should not be locked as
-	 * the block is already exempted from wrc
-	 * trees, and thus will not be moved
-	 */
-	for (int d = start_dva; d < ndvas; d++)
-		metaslab_free_dva(spa, &dva[d], txg, now);
+		/*
+		 * Actual freeing should not be locked as
+		 * the block is already exempted from wrc
+		 * trees, and thus will not be moved
+		 */
+		metaslab_free_dva(spa, &dva[WRC_NORMAL_DVA], txg, now);
+		if (start_dva == 0) {
+			metaslab_free_dva(spa, &dva[WRC_SPECIAL_DVA],
+			    txg, now);
+		}
+	} else {
+		for (int d = 0; d < ndvas; d++)
+			metaslab_free_dva(spa, &dva[d], txg, now);
+	}
 
 	spa_config_exit(spa, SCL_FREE, FTAG);
 }
@@ -2783,9 +2714,6 @@ metaslab_claim(spa_t *spa, const blkptr_t *bp, uint64_t txg)
 {
 	const dva_t *dva = bp->blk_dva;
 	int ndvas = BP_GET_NDVAS(bp);
-	wrc_data_t *wrc_data = &spa->spa_wrc;
-	int start_dva = 0;
-	boolean_t spec_claim = B_FALSE;
 	int error = 0;
 
 	ASSERT(!BP_IS_HOLE(bp));
@@ -2801,27 +2729,33 @@ metaslab_claim(spa_t *spa, const blkptr_t *bp, uint64_t txg)
 
 	spa_config_enter(spa, SCL_ALLOC, FTAG, RW_READER);
 
-	spec_claim = metaslab_is_block_special(spa, bp);
+	if (wrc_is_block_special(spa, bp)) {
+		int start_dva;
+		wrc_data_t *wrc_data = spa_get_wrc_data(spa);
 
-	/* always false if wrc is not present */
-	if (spec_claim) {
 		mutex_enter(&wrc_data->wrc_lock);
-		/* if block is moved than DVA[0] isn't valid */
-		start_dva = metaslab_first_valid_dva(bp, wrc_data, B_FALSE);
-	}
+		start_dva = wrc_first_valid_dva(bp, wrc_data, B_FALSE);
 
-	/*
-	 * Actual claiming should be under lock for wrc blocks. It must
-	 * be done to ensure zdb will not fail. The only other user of
-	 * the claiming is ZIL whose blocks can not be WRC ones, and
-	 * thus the lock will not be held for them.
-	 */
-	for (int d = start_dva; d < ndvas; d++)
-		if ((error = metaslab_claim_dva(spa, &dva[d], txg)) != 0)
-			break;
+		/*
+		 * Actual claiming should be under lock for wrc blocks. It must
+		 * be done to ensure zdb will not fail. The only other user of
+		 * the claiming is ZIL whose blocks can not be WRC ones, and
+		 * thus the lock will not be held for them.
+		 */
+		error = metaslab_claim_dva(spa,
+		    &dva[WRC_NORMAL_DVA], txg);
+		if (error == 0 && start_dva == 0) {
+			error = metaslab_claim_dva(spa,
+			    &dva[WRC_SPECIAL_DVA], txg);
+		}
 
-	if (spec_claim)
 		mutex_exit(&wrc_data->wrc_lock);
+	} else {
+		for (int d = 0; d < ndvas; d++)
+			if ((error = metaslab_claim_dva(spa,
+			    &dva[d], txg)) != 0)
+				break;
+	}
 
 	spa_config_exit(spa, SCL_ALLOC, FTAG);
 
@@ -2833,7 +2767,6 @@ metaslab_claim(spa_t *spa, const blkptr_t *bp, uint64_t txg)
 void
 metaslab_check_free(spa_t *spa, const blkptr_t *bp)
 {
-	boolean_t spec_vd = B_FALSE;
 	if ((zfs_flags & ZFS_DEBUG_ZIO_FREE) == 0)
 		return;
 
@@ -2843,20 +2776,10 @@ metaslab_check_free(spa_t *spa, const blkptr_t *bp)
 	 * wrc is persistent and can not be turned off so if it is disabled
 	 * there are no special blocks for sure
 	 */
-	if (spa_wrc_present(spa)) {
+	if (wrc_is_block_special(spa, bp)) {
 		/* Do not check frees for wrc blocks */
-		for (int i = 0; i < BP_GET_NDVAS(bp); i++) {
-			uint64_t vdev = DVA_GET_VDEV(&bp->blk_dva[i]);
-			vdev_t *vd = vdev_lookup_top(spa, vdev);
-			if (i == 0) {
-				spec_vd = vdev_is_special(vd);
-			} else if (spec_vd) {
-				if (!vdev_is_special(vd)) {
-					spa_config_exit(spa, SCL_VDEV, FTAG);
-					return;
-				}
-			}
-		}
+		spa_config_exit(spa, SCL_VDEV, FTAG);
+		return;
 	}
 
 	for (int i = 0; i < BP_GET_NDVAS(bp); i++) {

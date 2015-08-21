@@ -309,10 +309,8 @@ vdev_mirror_io_start(zio_t *zio)
 	mirror_map_t *mm;
 	mirror_child_t *mc;
 	int c, children;
-	boolean_t spec_stop = B_FALSE;
 	boolean_t spec_case = B_FALSE;
 	spa_t *spa = zio->io_spa;
-	blkptr_t *bp = zio->io_bp;
 
 	mm = vdev_mirror_map_alloc(zio);
 
@@ -325,21 +323,25 @@ vdev_mirror_io_start(zio_t *zio)
 	 * wrc is persistent and can not be turned off so if it is disabled
 	 * there are no special blocks for sure
 	 */
-	if (spa_wrc_present(spa) && zio->io_child_type != ZIO_CHILD_VDEV) {
-		if (BP_GET_NDVAS(zio->io_bp) >= 2) {
-			vdev_t *v1 = vdev_lookup_top(spa,
-			    DVA_GET_VDEV(&bp->blk_dva[0]));
-			vdev_t *v2 = vdev_lookup_top(spa,
-			    DVA_GET_VDEV(&bp->blk_dva[1]));
+	if (zio->io_child_type != ZIO_CHILD_VDEV)
+		spec_case = wrc_is_block_special(spa, zio->io_bp);
 
-			if (vdev_is_special(v1) && !vdev_is_special(v2))
-				spec_case = B_TRUE;
-		}
-	}
 	spa_config_exit(spa, SCL_VDEV, FTAG);
 
 	if (zio->io_type == ZIO_TYPE_READ) {
 		if ((zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_replacing) {
+			int target = 0;
+
+			/*
+			 * Scrub of special BPs should take into
+			 * account the state of WRC-Window
+			 */
+			if (spec_case) {
+				target = wrc_select_dva(
+				    spa_get_wrc_data(spa), zio);
+			}
+
+
 			/*
 			 * For scrubbing reads we need to allocate a read
 			 * buffer for each child and issue reads to all
@@ -357,14 +359,8 @@ vdev_mirror_io_start(zio_t *zio)
 					continue;
 				}
 
-				/*
-				 * Scrub of special BPs should take into
-				 * account the state of WRC-Window
-				 */
-				if (spec_case &&
-				    wrc_select_dva(spa_get_wrc_data(spa),
-				    bp) != c)
-						continue;
+				if (spec_case && c != target)
+					continue;
 
 				zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
 				    mc->mc_vd, mc->mc_offset,
@@ -380,7 +376,7 @@ vdev_mirror_io_start(zio_t *zio)
 		 */
 
 		if (spec_case)
-			c = wrc_select_dva(spa_get_wrc_data(spa), bp);
+			c = wrc_select_dva(spa_get_wrc_data(spa), zio);
 		else
 			c = vdev_mirror_child_select(zio);
 
@@ -395,7 +391,7 @@ vdev_mirror_io_start(zio_t *zio)
 		children = mm->mm_children;
 	}
 
-	for (; children-- && !spec_stop; ++c) {
+	for (; children--; c++) {
 		mc = &mm->mm_child[c];
 		if (mc->mc_vd == NULL) {
 			/*
@@ -404,17 +400,19 @@ vdev_mirror_io_start(zio_t *zio)
 			 */
 			continue;
 		}
-		/*
-		 * we need to stop after spawning first child if
-		 * wrcache write or wrcache move is performed
-		 */
-		if (zio->io_child_type != ZIO_CHILD_VDEV) {
-			if (c == 0 && vdev_is_special(mc->mc_vd) && spec_case)
-				spec_stop = B_TRUE;
+
+		if (spec_case) {
+			if (zio->io_type == ZIO_TYPE_WRITE &&
+			    !vdev_is_special(mc->mc_vd))
+				continue;
 		}
+
 		zio_nowait(zio_vdev_child_io(zio, zio->io_bp, mc->mc_vd,
 		    mc->mc_offset, zio->io_data, zio->io_size, zio->io_type,
 		    zio->io_priority, 0, vdev_mirror_child_done, mc));
+
+		if (spec_case)
+			break;
 	}
 
 	zio_execute(zio);

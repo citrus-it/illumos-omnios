@@ -97,6 +97,7 @@ static boolean_t dsl_pool_wrcio_limit(dsl_pool_t *dp, uint64_t txg);
 
 static int wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data);
 static int wrc_blocks_compare(const void *arg1, const void *arg2);
+static boolean_t wrc_is_block_special_impl(spa_t *spa, const blkptr_t *bp);
 
 void
 wrc_init(wrc_data_t *wrc_data, spa_t *spa)
@@ -739,8 +740,6 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 	wrc_parseblock_cb_t *cbd = arg;
 	wrc_block_t *block, *found_block;
-	int ndvas;
-	vdev_t *vd1, *vd2;
 	avl_index_t where = NULL;
 	boolean_t increment_counters = B_FALSE;
 
@@ -756,14 +755,11 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		return (0);
 
 	/*  Skip blocks which are not placed on both classes */
-	ndvas = BP_GET_NDVAS(bp);
-	if (ndvas == 1)
+	if (BP_GET_NDVAS(bp) == 1)
 		return (0);
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
-	vd1 = vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[0]));
-	vd2 = vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[1]));
-	if (!vdev_is_special(vd1) || vdev_is_special(vd2)) {
+	if (!wrc_is_block_special_impl(spa, bp)) {
 		spa_config_exit(spa, SCL_VDEV, FTAG);
 		return (0);
 	}
@@ -1188,7 +1184,7 @@ wrc_close_window_impl(spa_t *spa, avl_tree_t *tree)
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 	while ((node = avl_destroy_nodes(tree, &cookie)) != NULL) {
 		if (!WRCBP_IS_DELETED(node)) {
-			metaslab_free_dva(spa, &node->dva[0],
+			metaslab_free_dva(spa, &node->dva[WRC_SPECIAL_DVA],
 			    tx->tx_txg, B_FALSE);
 		}
 
@@ -1283,6 +1279,7 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 	 * Wait until all queued blocks are processed.
 	 */
 	wrc_data->wrc_purge = B_TRUE;
+
 	while (wrc_data->wrc_blocks_out !=
 	    wrc_data->wrc_blocks_mv &&
 	    !wrc_data->wrc_thr_exit) {
@@ -1290,6 +1287,7 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 		    &wrc_data->wrc_lock,
 		    ddi_get_lbolt() + 1000);
 	}
+
 	wrc_data->wrc_purge = B_FALSE;
 
 	/*
@@ -1675,10 +1673,10 @@ wrc_blocks_compare(const void *arg1, const void *arg2)
 	wrc_block_t *b1 = (wrc_block_t *)arg1;
 	wrc_block_t *b2 = (wrc_block_t *)arg2;
 
-	uint64_t d11 = b1->dva[0].dva_word[0];
-	uint64_t d12 = b1->dva[0].dva_word[1];
-	uint64_t d21 = b2->dva[0].dva_word[0];
-	uint64_t d22 = b2->dva[0].dva_word[1];
+	uint64_t d11 = b1->dva[WRC_SPECIAL_DVA].dva_word[0];
+	uint64_t d12 = b1->dva[WRC_SPECIAL_DVA].dva_word[1];
+	uint64_t d21 = b2->dva[WRC_SPECIAL_DVA].dva_word[0];
+	uint64_t d22 = b2->dva[WRC_SPECIAL_DVA].dva_word[1];
 	int cmp1 = (d11 < d21) ? (-1) : (d11 == d21 ? 0 : 1);
 	int cmp2 = (d12 < d22) ? (-1) : (d12 == d22 ? 0 : 1);
 	int cmp = (cmp1 == 0) ? cmp2 : cmp1;
@@ -1697,11 +1695,11 @@ wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data)
 
 	if (type == WRC_READ_FROM_SPECIAL) {
 		zio_type = ZIO_TYPE_READ;
-		dva_num = 0;
+		dva_num = WRC_SPECIAL_DVA;
 	} else {
 		ASSERT(type == WRC_WRITE_TO_NORMAL);
 		zio_type = ZIO_TYPE_WRITE;
-		dva_num = 1;
+		dva_num = WRC_NORMAL_DVA;
 	}
 
 	vd = vdev_lookup_top(block->data->wrc_spa,
@@ -1720,26 +1718,28 @@ wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data)
  * deletion is done, the block is accessible on special
  */
 int
-wrc_select_dva(wrc_data_t *wrc_data, blkptr_t *bp)
+wrc_select_dva(wrc_data_t *wrc_data, zio_t *zio)
 {
 	uint64_t stxg;
 	uint64_t ftxg;
+	uint64_t btxg;
 	int c;
 
 	mutex_enter(&wrc_data->wrc_lock);
 
 	stxg = wrc_data->wrc_start_txg;
 	ftxg = wrc_data->wrc_finish_txg;
+	btxg = BP_PHYSICAL_BIRTH(zio->io_bp);
 
-	if (ftxg && BP_PHYSICAL_BIRTH(bp) > ftxg) {
-		DTRACE_PROBE(wrc_read_special);
+	if (ftxg && btxg > ftxg) {
+		DTRACE_PROBE(wrc_read_special_after);
 		c = WRC_SPECIAL_DVA;
-	} else if (BP_PHYSICAL_BIRTH(bp) >= stxg) {
+	} else if (btxg >= stxg) {
 		if (!ftxg && wrc_data->wrc_delete) {
 			DTRACE_PROBE(wrc_read_normal);
 			c = WRC_NORMAL_DVA;
 		} else {
-			DTRACE_PROBE(wrc_read_special);
+			DTRACE_PROBE(wrc_read_special_inside);
 			c = WRC_SPECIAL_DVA;
 		}
 	} else {
@@ -1750,4 +1750,85 @@ wrc_select_dva(wrc_data_t *wrc_data, blkptr_t *bp)
 	mutex_exit(&wrc_data->wrc_lock);
 
 	return (c);
+}
+
+static boolean_t
+wrc_is_block_special_impl(spa_t *spa, const blkptr_t *bp)
+{
+	const dva_t *dva = bp->blk_dva;
+	vdev_t *v1, *v2;
+
+	v1 = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[WRC_SPECIAL_DVA]));
+	v2 = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[WRC_NORMAL_DVA]));
+
+	if (vdev_is_special(v1) && !vdev_is_special(v2))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+
+boolean_t
+wrc_is_block_special(spa_t *spa, const blkptr_t *bp)
+{
+	/*
+	 * wrc is persistent and can not be turned off so if it is disabled
+	 * there are no special blocks for sure
+	 */
+	if (!spa_wrc_present(spa))
+		return (B_FALSE);
+
+	if (BP_GET_NDVAS(bp) >= 2)
+		return (wrc_is_block_special_impl(spa, bp));
+
+	return (B_FALSE);
+}
+
+/*
+ * 3 cases can be here
+ * 1st - birth_txg is less than window - only normal device should be free
+ * 2nd - inside window both trees are checked and if both of the trees
+ *	haven't this block and deletion in process, then block is already
+ *	freed, otherwise both dva are freed
+ * 3rd - birth_txg is higher than window - both dva must be freed
+ */
+int
+wrc_first_valid_dva(const blkptr_t *bp,
+    wrc_data_t *wrc_data, boolean_t removal)
+{
+	int start_dva = 0;
+
+	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
+
+	if (BP_PHYSICAL_BIRTH(bp) < wrc_data->wrc_start_txg) {
+		start_dva = 1;
+	} else if (BP_PHYSICAL_BIRTH(bp) <= wrc_data->wrc_finish_txg) {
+		wrc_block_t search, *planned, *moved;
+
+		/* Only DVA[0] is required for search */
+		search.dva[WRC_SPECIAL_DVA] = bp->blk_dva[WRC_SPECIAL_DVA];
+
+		moved = avl_find(&wrc_data->wrc_moved_blocks,
+		    &search, NULL);
+		if (moved != NULL && removal) {
+			/*
+			 * later WRC will do free for this block
+			 */
+			mutex_enter(&moved->lock);
+			WRCBP_MARK_DELETED(moved);
+			mutex_exit(&moved->lock);
+		}
+
+		planned = avl_find(&wrc_data->wrc_blocks,
+		    &search, NULL);
+		if (planned != NULL && removal) {
+			avl_remove(&wrc_data->wrc_blocks, planned);
+			wrc_free_block(planned);
+		}
+
+		if (planned == NULL && moved == NULL && wrc_data->wrc_delete)
+			start_dva = 1;
+	}
+
+	return (start_dva);
 }

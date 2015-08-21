@@ -129,9 +129,9 @@ typedef struct wrc_data {
 	kcondvar_t	wrc_cv;
 } wrc_data_t;
 
+/* !!! Do not change these constants !!! */
 #define	WRC_SPECIAL_DVA 0
 #define	WRC_NORMAL_DVA 1
-#define	MAX_WRC_DVA 2
 
 /*
  * In-core representation of a block which will be moved
@@ -185,7 +185,10 @@ void wrc_deactivate(spa_t *spa);
 void wrc_enter_fault_state(spa_t *spa);
 void wrc_switch_mode(spa_t *spa);
 
-int wrc_select_dva(wrc_data_t *wrc_data, blkptr_t *bp);
+int wrc_select_dva(wrc_data_t *wrc_data, zio_t *zio);
+boolean_t wrc_is_block_special(spa_t *spa, const blkptr_t *bp);
+int wrc_first_valid_dva(const blkptr_t *bp,
+    wrc_data_t *wrc_data, boolean_t removal);
 
 wrc_data_t *spa_get_wrc_data(spa_t *spa);
 

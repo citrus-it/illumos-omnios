@@ -61,7 +61,7 @@ uint64_t metaslab_block_maxsize(metaslab_t *);
 #define	METASLAB_GANG_HEADER	0x02
 #define	METASLAB_GANG_CHILD	0x04
 #define	METASLAB_GANG_AVOID	0x08
-#define	METASLAB_USE_SECONDARY	0x10
+#define	METASLAB_USE_WEIGHT_SECONDARY	0x10
 
 int metaslab_alloc(spa_t *, metaslab_class_t *, uint64_t,
     blkptr_t *, int, uint64_t, blkptr_t *, int);

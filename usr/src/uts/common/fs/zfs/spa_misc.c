@@ -1897,15 +1897,13 @@ uint64_t
 bp_get_dsize_sync(spa_t *spa, const blkptr_t *bp)
 {
 	uint64_t dsize = 0;
-	boolean_t spec_case = B_FALSE;
+	boolean_t spec_bp;
 
+	spec_bp = wrc_is_block_special(spa, bp);
 	for (int d = 0; d < BP_GET_NDVAS(bp); d++) {
-		vdev_t *vd = vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[d]));
-		if (d == 0 && vdev_is_special(vd))
-			spec_case = B_TRUE;
-		if (d == 1 && spec_case && !vdev_is_special(vd))
-			break;
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
+		if (spec_bp)
+			break;
 	}
 
 	return (dsize);
@@ -1915,17 +1913,15 @@ uint64_t
 bp_get_dsize(spa_t *spa, const blkptr_t *bp)
 {
 	uint64_t dsize = 0;
-	boolean_t spec_case = B_FALSE;
+	boolean_t spec_bp;
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
+	spec_bp = wrc_is_block_special(spa, bp);
 	for (int d = 0; d < BP_GET_NDVAS(bp); d++) {
-		vdev_t *vd = vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[d]));
-		if (d == 0 && vdev_is_special(vd))
-			spec_case = B_TRUE;
-		if (d == 1 && spec_case && !vdev_is_special(vd))
-			break;
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
+		if (spec_bp)
+			break;
 	}
 
 	spa_config_exit(spa, SCL_VDEV, FTAG);
