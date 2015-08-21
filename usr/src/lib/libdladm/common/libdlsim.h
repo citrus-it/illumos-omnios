@@ -21,13 +21,13 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _LIBDLSIM_H
 #define	_LIBDLSIM_H
 
 #include <sys/mac.h>
-#include <libdladm_impl.h>
 #include <net/simnet.h>
 
 #ifdef	__cplusplus

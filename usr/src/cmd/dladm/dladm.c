@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -83,6 +84,7 @@
 #define	SMF_UPGRADEDATALINK_FILE	"/var/svc/profile/upgrade_datalink"
 #define	SMF_DLADM_UPGRADE_MSG		" # added by dladm(1M)"
 #define	DLADM_DEFAULT_COL	80
+#define	FFORCE			"force"	/* boolean_t */
 
 /*
  * used by the wifi show-* commands to set up ofmt_field_t structures.

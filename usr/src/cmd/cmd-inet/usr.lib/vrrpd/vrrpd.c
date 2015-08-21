@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -83,6 +84,8 @@
 #define	skip_whitespace(p)	while (isspace(*(p))) ++(p)
 
 #define	BUFFSIZE	65536
+
+#define	MAXLINELEN	1024
 
 #define	VRRPCONF	"/etc/inet/vrrp.conf"
 

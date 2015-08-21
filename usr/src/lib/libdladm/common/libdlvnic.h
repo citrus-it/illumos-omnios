@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _LIBDLVNIC_H
@@ -29,7 +30,6 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <libdladm.h>
-#include <libdladm_impl.h>
 #include <sys/mac_flow.h>
 #include <sys/vnic.h>
 
