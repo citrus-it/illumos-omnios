@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 2008, 2011, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 . /usr/lib/brand/ipkg/common.ksh
@@ -161,6 +162,7 @@ gather_zone_publisher_details() {
 	typeset mirror=
 	typeset origin=
 	typeset opublisher=
+	typeset first_preferred="true"
 
 	#
 	# Store publisher, origin and security details. It is assumed
@@ -199,6 +201,12 @@ gather_zone_publisher_details() {
 			get_publisher_attrs ${publisher.name} origin | \
 			    IFS=" " read publisher.sticky publisher.preferred \
 			    publisher.enabled
+			# get_publisher_attrs doesn't actually set "preferred"
+			# anymore, as there is no "preferred" apart from the
+			# first one in the list.
+			publisher.preferred=$first_preferred
+			# From here on out, reset 'first_preferred' to false.
+			first_preferred="false"
 			if [[ -n "$origin" ]]; then
 				get_pub_secinfo ${publisher.name} | \
 				    read publisher.keyfile publisher.certfile
@@ -501,7 +509,8 @@ echo $variant | IFS=" " read variantname variantval
 [[ $? -ne 0 ]] && fatal "$f_sanity_variant"
 
 # Check that we got the output we expect...
-[[ $variantname = "$VARIANT" ]] || fatal "$f_sanity_variant" $VARIANT
+# XXX new pkg5 output is slightly different, ignore this check for now
+#[[ $variantname = "$VARIANT"  ]] || fatal "$f_sanity_variant" $VARIANT
 
 # Check that the variant is non-global, else fail
 [[ $variantval = "nonglobal" ]] || fatal "$f_sanity_global" $VARIANT $variantval
@@ -655,7 +664,7 @@ fi
 
 if [[ $allow_update == 0 ]]; then
 	LC_ALL=C $PKG install --accept --no-refresh -n $incorp_list
-	if [[ $? == 4 ]]; then
+	if [[ $? == 0 ]]; then
 		log "\n$m_complete"
 		EXIT_CODE=$ZONE_SUBPROC_OK
 		exit $EXIT_CODE

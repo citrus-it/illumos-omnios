@@ -23,11 +23,12 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 PROGS=		attach clone detach fmri_compare image_install p2v \
-		pkgcreatezone poststate prestate support uninstall
+		pkgcreatezone poststate prestate support system-unconfigure \
+		uninstall
 XMLDOCS=	config.xml platform.xml smf_disable.lst pkgrm.lst common.ksh
 USERFILES=	smf_disable.conf pkgrm.conf
 TEMPLATES=	SUNWipkg.xml
