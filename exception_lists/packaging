@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
@@ -73,9 +73,7 @@ usr/include/sys/sunos_dhcp_class.h
 #
 usr/include/inet/iptun.h
 usr/include/sys/aggr_impl.h
-usr/include/sys/aggr.h
 usr/include/sys/dld_impl.h
-usr/include/sys/dld_ioc.h
 usr/include/sys/dls_impl.h
 usr/include/sys/dls.h
 usr/include/sys/mac_client_impl.h
@@ -88,28 +86,23 @@ usr/include/sys/mac_stat.h
 # Private GLDv3 userland libraries and headers
 #
 usr/include/libdladm_impl.h
-usr/include/libdlaggr.h
 usr/include/libdlether.h
 usr/include/libdlflow_impl.h
 usr/include/libdlflow.h
 usr/include/libdliptun.h
 usr/include/libdlmgmt.h
 usr/include/libdlsim.h
-usr/include/libdlstat.h
-usr/include/libdlvnic.h
 usr/include/libdlwlan_impl.h
 usr/include/libdlwlan.h
 #
 # Virtual Network Interface Card (VNIC)
 #
-usr/include/sys/vnic.h
 usr/include/sys/vnic_impl.h
 #
 # Private libipadm lint library and header files
 #
 usr/include/ipadm_ipmgmt.h
 usr/include/ipadm_ndpd.h
-usr/include/libipadm.h
 lib/llib-lipadm
 lib/llib-lipadm.ln
 lib/libipadm.so
@@ -492,10 +485,6 @@ usr/lib/llib-lcmdutils
 usr/lib/llib-lcmdutils.ln
 usr/lib/amd64/llib-lcmdutils.ln		i386
 usr/lib/sparcv9/llib-lcmdutils.ln	sparc
-#
-# Private interfaces in libsec
-#
-usr/include/aclutils.h
 #
 # USB skeleton driver stays in sync with the rest of USB but doesn't ship.
 #

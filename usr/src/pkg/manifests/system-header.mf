@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
@@ -192,6 +192,7 @@ dir path=usr/xpg4/include
 $(i386_ONLY)file path=usr/include/$(ARCH64)/sys/kdi_regs.h
 $(i386_ONLY)file path=usr/include/$(ARCH64)/sys/privmregs.h
 $(i386_ONLY)file path=usr/include/$(ARCH64)/sys/privregs.h
+file path=usr/include/aclutils.h
 file path=usr/include/ads/dsgetdc.h
 file path=usr/include/aio.h
 file path=usr/include/alloca.h
@@ -479,11 +480,14 @@ file path=usr/include/libctf.h
 file path=usr/include/libdevice.h
 file path=usr/include/libdevinfo.h
 file path=usr/include/libdladm.h
+file path=usr/include/libdlaggr.h
 file path=usr/include/libdlbridge.h
 file path=usr/include/libdlib.h
 file path=usr/include/libdllink.h
 file path=usr/include/libdlpi.h
+file path=usr/include/libdlstat.h
 file path=usr/include/libdlvlan.h
+file path=usr/include/libdlvnic.h
 file path=usr/include/libelf.h
 $(i386_ONLY)file path=usr/include/libfdisk.h
 file path=usr/include/libfstyp.h
@@ -491,6 +495,7 @@ file path=usr/include/libfstyp_module.h
 file path=usr/include/libgen.h
 file path=usr/include/libgrubmgmt.h
 file path=usr/include/libintl.h
+file path=usr/include/libipadm.h
 file path=usr/include/libipmi.h
 file path=usr/include/libipp.h
 file path=usr/include/libnvpair.h
@@ -792,6 +797,7 @@ file path=usr/include/sys/acctctl.h
 file path=usr/include/sys/acl.h
 file path=usr/include/sys/acl_impl.h
 file path=usr/include/sys/acpi_drv.h
+file path=usr/include/sys/aggr.h
 file path=usr/include/sys/aio.h
 file path=usr/include/sys/aio_impl.h
 file path=usr/include/sys/aio_req.h
@@ -934,6 +940,7 @@ file path=usr/include/sys/dktp/dadkio.h
 file path=usr/include/sys/dktp/fdisk.h
 file path=usr/include/sys/dl.h
 file path=usr/include/sys/dld.h
+file path=usr/include/sys/dld_ioc.h
 file path=usr/include/sys/dlpi.h
 file path=usr/include/sys/dls_mgmt.h
 $(i386_ONLY)file path=usr/include/sys/dma_engine.h
@@ -1586,6 +1593,7 @@ file path=usr/include/sys/vmem_impl.h
 file path=usr/include/sys/vmem_impl_user.h
 file path=usr/include/sys/vmparam.h
 file path=usr/include/sys/vmsystm.h
+file path=usr/include/sys/vnic.h
 file path=usr/include/sys/vnode.h
 file path=usr/include/sys/vt.h
 file path=usr/include/sys/vtdaemon.h
