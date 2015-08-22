@@ -11,10 +11,8 @@
 #
 
 #
-# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
 # Copyright 2015, Nexenta Systems Inc. All rights reserved.
-# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
-# Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2015 by Delphix. All rights reserved.
 #
 
 .PARALLEL: $(SUBDIRS)
@@ -24,6 +22,7 @@ SUBDIRS = acl \
 	bootfs \
 	cache \
 	cachefile \
+	checksum \
 	clean_mirror \
 	cli_root \
 	cli_user \

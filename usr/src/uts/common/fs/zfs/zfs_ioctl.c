@@ -187,6 +187,7 @@
 #include <sys/zfeature.h>
 #include <sys/sysevent.h>
 #include <sys/sysevent_impl.h>
+#include <sys/zio_checksum.h>
 
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
@@ -4230,11 +4231,6 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 			return (SET_ERROR(ENOTSUP));
 		break;
 
-	case ZFS_PROP_DEDUP:
-		if (zfs_earlier_version(dsname, SPA_VERSION_DEDUP))
-			return (SET_ERROR(ENOTSUP));
-		break;
-
 	case ZFS_PROP_RECORDSIZE:
 		/* Record sizes above 128k need the feature to be enabled */
 		if (nvpair_value_uint64(pair, &intval) == 0 &&
@@ -4303,6 +4299,45 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 				return (SET_ERROR(EOPNOTSUPP));
 		}
 		break;
+
+	case ZFS_PROP_CHECKSUM:
+	case ZFS_PROP_DEDUP:
+	{
+		spa_feature_t feature;
+		spa_t *spa;
+
+		/* dedup feature version checks */
+		if (prop == ZFS_PROP_DEDUP &&
+		    zfs_earlier_version(dsname, SPA_VERSION_DEDUP))
+			return (SET_ERROR(ENOTSUP));
+
+		if (nvpair_value_uint64(pair, &intval) != 0)
+			return (SET_ERROR(EINVAL));
+
+		/* check prop value is enabled in features */
+		feature = zio_checksum_to_feature(intval);
+		if (feature == SPA_FEATURE_NONE)
+			break;
+
+		if ((err = spa_open(dsname, &spa, FTAG)) != 0)
+			return (err);
+		/*
+		 * Salted checksums are not supported on root pools.
+		 */
+		if (spa_bootfs(spa) != 0 &&
+		    intval < ZIO_CHECKSUM_FUNCTIONS &&
+		    (zio_checksum_table[intval].ci_flags &
+		    ZCHECKSUM_FLAG_SALTED)) {
+			spa_close(spa, FTAG);
+			return (SET_ERROR(ERANGE));
+		}
+		if (!spa_feature_is_enabled(spa, feature)) {
+			spa_close(spa, FTAG);
+			return (SET_ERROR(ENOTSUP));
+		}
+		spa_close(spa, FTAG);
+		break;
+	}
 	}
 
 	return (zfs_secpolicy_setprop(dsname, prop, pair, CRED()));
@@ -5786,19 +5821,6 @@ zfs_ioc_vdev_set_props(zfs_cmd_t *zc)
 	return (error);
 }
 
-/*
- * Determine approximately how large a zfs send stream will be -- the number
- * of bytes that will be written to the fd supplied to zfs_ioc_send_new().
- *
- * innvl: {
- *     (optional) "from" -> full snap or bookmark name to send an incremental
- *                          from
- * }
- *
- * outnvl: {
- *     "space" -> bytes of space (uint64)
- * }
- */
 static int
 zfs_ioc_vdev_get_props(zfs_cmd_t *zc)
 {
@@ -6032,7 +6054,8 @@ zfs_ioc_send_new(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
  * of bytes that will be written to the fd supplied to zfs_ioc_send_new().
  *
  * innvl: {
- *     (optional) "from" -> full snap or bookmark name to send an incremental from
+ *     (optional) "from" -> full snap or bookmark name to send an incremental
+ *			    from
  * }
  *
  * outnvl: {
@@ -6097,7 +6120,7 @@ zfs_ioc_send_space(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 	} else {
 		// If estimating the size of a full send, use dmu_send_estimate
 		error = dmu_send_estimate(tosnap, NULL, &space);
-	}
+	} 
 
 	fnvlist_add_uint64(outnvl, "space", space);
 
@@ -6224,8 +6247,8 @@ dmu_objset_find_dp_cursor(dsl_pool_t *dp, uint64_t ddobj,
 
 			for (i = 0; i < cb->skip; i++) {
 				zap_cursor_advance(&zc);
-				if ((zap_cursor_retrieve(&zc,
-				    attr) != 0)) {
+					if ((zap_cursor_retrieve(&zc,
+					    attr) != 0)) {
 					error = ENOENT;
 					goto out;
 				}
@@ -6284,6 +6307,7 @@ out:
 static int
 zfs_ioc_list_from_cursor(const char *name, nvlist_t *innvl, nvlist_t *outnvl)
 {
+
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds;
 
@@ -6318,6 +6342,7 @@ zfs_ioc_list_from_cursor(const char *name, nvlist_t *innvl, nvlist_t *outnvl)
 
 	return (error);
 }
+
 
 static zfs_ioc_vec_t zfs_ioc_vec[ZFS_IOC_LAST - ZFS_IOC_FIRST];
 
