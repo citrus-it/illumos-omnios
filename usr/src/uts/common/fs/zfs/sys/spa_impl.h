@@ -369,6 +369,9 @@ struct spa {
 	/* total space on all L2ARC devices used for DDT (l2arc_ddt=on) */
 	uint64_t spa_l2arc_ddt_devs_size;
 
+	/* if 1 this means we have stopped DDT growth for this pool */
+	uint8_t spa_ddt_capped;
+
 	/* specialclass support */
 	boolean_t	spa_usesc;		/* enable special class */
 	spa_specialclass_t spa_specialclass;	/* class of special device */

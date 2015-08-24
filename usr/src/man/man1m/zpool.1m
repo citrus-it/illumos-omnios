@@ -14,7 +14,7 @@
 .\" CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your
 .\" own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
-.TH ZPOOL 1M "Mar 6, 2014"
+.TH ZPOOL 1M "Aug 24, 2015"
 .SH NAME
 zpool \- configures ZFS storage pools
 .SH SYNOPSIS
@@ -787,6 +787,18 @@ Threshold for the number of block ditto copies. If the reference count for a
 deduplicated block increases above this number, a new ditto copy of this block
 is automatically stored. The default setting is 0 which causes no ditto copies
 to be created for deduplicated blocks. The miniumum legal nonzero setting is 100.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBddt_capped\fR=\fBon\fR | \fBoff\fR\fR
+.ad
+.sp .6
+.RS 4n
+When the ddt_capped is 'on' this indicates DDT growth has been stopped.
+New unique writes will not be deduped to prevent further DDT growth.
+This property is read-only.
 .RE
 
 .sp

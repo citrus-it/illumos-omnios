@@ -113,6 +113,9 @@ zpool_prop_init(void)
 	zprop_register_number(ZPOOL_PROP_DEDUPRATIO, "dedupratio", 0,
 	    PROP_READONLY, ZFS_TYPE_POOL, "<1.00x or higher if deduped>",
 	    "DEDUP");
+	zprop_register_index(ZPOOL_PROP_DDTCAPPED, "ddt_capped", 0,
+	    PROP_READONLY, ZFS_TYPE_POOL, "off | on", "DDT_CAPPED",
+	    boolean_table);
 
 	/* default number properties */
 	zprop_register_number(ZPOOL_PROP_VERSION, "version", SPA_VERSION,

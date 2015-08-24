@@ -2488,8 +2488,8 @@ zio_ddt_write(zio_t *zio)
 			BP_ZERO(bp);
 			dde_exit(dde);
 			/* notify that dedup is off */
-			if (spa->spa_dedup_percentage == 100) {
-				spa->spa_dedup_percentage = 0;
+			if (spa->spa_ddt_capped == 0) {
+				spa->spa_ddt_capped = 1;
 				spa_event_notify(spa, NULL, ESC_ZFS_DEDUP_OFF);
 			}
 
@@ -2500,8 +2500,8 @@ zio_ddt_write(zio_t *zio)
 		 * dedup is still on:
 		 * check if we need to notify that it's back on
 		 */
-		if (spa->spa_dedup_percentage == 0) {
-			spa->spa_dedup_percentage = 100;
+		if (spa->spa_ddt_capped == 1) {
+			spa->spa_ddt_capped = 0;
 			spa_event_notify(spa, NULL, ESC_ZFS_DEDUP_ON);
 		}
 	}
