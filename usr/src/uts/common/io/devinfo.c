@@ -558,26 +558,27 @@ di_close(dev_t dev, int flag, int otype, cred_t *cred_p)
 	struct di_state	*st;
 	int		m = (int)getminor(dev) - DI_NODE_SPECIES;
 
-	if (m < 0) {
+	if (m < 0 || m >= di_max_opens) {
 		cmn_err(CE_WARN, "closing non-existent devinfo minor %d",
 		    m + DI_NODE_SPECIES);
 		return (ENXIO);
 	}
 
-	st = di_states[m];
-	ASSERT(m < di_max_opens && st != NULL);
-
-	di_freemem(st);
-	kmem_free(st, sizeof (struct di_state));
-
 	/*
 	 * empty slot in state table
 	 */
 	mutex_enter(&di_lock);
+	st = di_states[m];
 	di_states[m] = NULL;
+	mutex_exit(&di_lock);
+
+	if (st != NULL) {
+		di_freemem(st);
+		kmem_free(st, sizeof (struct di_state));
+	}
+
 	dcmn_err((CE_CONT, "di_close: thread = %p, assigned minor = %d\n",
 	    (void *)curthread, m + DI_NODE_SPECIES));
-	mutex_exit(&di_lock);
 
 	return (0);
 }
@@ -603,7 +604,9 @@ di_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	}
 
 	st = di_states[m];
-	ASSERT(st != NULL);
+	if(st == NULL) {
+		return (ENXIO);
+	}
 
 	dcmn_err2((CE_CONT, "di_ioctl: mode = %x, cmd = %x\n", mode, cmd));
 
