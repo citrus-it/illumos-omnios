@@ -66,6 +66,11 @@ zpool \- configures ZFS storage pools
 
 .LP
 .nf
+\fBzpool vdev-get\fR "\fIall\fR" | \fIproperty\fR[,...] \fIpool\fR \fIvdev-name | vdev-guid\fR
+.fi
+
+.LP
+.nf
 \fBzpool history\fR [\fB-il\fR] [\fIpool\fR] ...
 .fi
 
@@ -139,6 +144,11 @@ zpool \- configures ZFS storage pools
 .LP
 .nf
 \fBzpool set\fR \fIproperty\fR=\fIvalue\fR \fIpool\fR
+.fi
+
+.LP
+.nf
+\fBzpool vdev-set\fR \fIproperty\fR=\fIvalue\fR \fIpool\fR \fIvdev-name | vdev-guid\fR
 .fi
 
 .LP
@@ -475,6 +485,10 @@ An in-progress spare replacement can be cancelled by detaching the hot spare.
 If the original faulted device is detached, then the hot spare assumes its
 place in the configuration, and is removed from the spare list of all active
 pools.
+.sp
+.LP
+See \fBsparegroup\fR vdev property from "Device properties" section for
+info on how to control spare selection.
 .sp
 .LP
 Spares cannot replace log devices.
@@ -937,6 +951,87 @@ is needed for backwards compatibility. Once feature flags is enabled on a
 pool this property will no longer have a value.
 .RE
 
+.SS "Device properties"
+.sp
+.LP
+Each device can have several properties associated with it. These properites
+override global tunables and are designed to provide more control over the
+operational parameters of this specific device, as well as to help manage
+this device.
+
+The "cos" device property can reference a CoS property descriptor
+by name, in which case, the values of device properties are
+determined according to the following rule: the device settings override
+CoS settings, which in turn, override the global tunables.
+
+The following device properties are available:
+
+.sp
+.ne 2
+.na
+\fBprefread\fR=1..100
+.ad
+.sp .6
+.RS 4n
+This property is meaningful for devices that belong to a mirror. The property
+determines the preference that is given to the device when reading from the
+mirror. The ratio of the value to the sum of the values of this property for
+all the devices in the mirror determines the relative frequency (which also
+be considered "probability") of reading from this specific device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBcos\fR=cos-name
+.ad
+.sp .6
+.RS 4n
+This property indicates whether the device is associated with a CoS property
+descriptor object. If so, the properties from the CoS descriptor that are
+not explicitly overridden by the device properties are in effect
+for this device.
+.RE
+
+.sp
+.ne 2
+.na
+\fBsparegroup\fR=group-name
+.ad
+.sp .6
+.RS 4n
+This property indicates whether the device is a part of a spare device group.
+Devices in the pool (including spares) can be labeled with strings that are
+meaningful in the context of the management workflow in effect. When a failed
+device is automatically replaced by spares, the spares whose "sparegroup"
+labels match the failed device's label, are used first.
+.RE
+
+.sp
+.ne 2
+.na
+\fB[read | aread | write | awrite | scrub]_[minactive | maxactive]\fR=1..1000
+.ad
+.sp .6
+.RS 4n
+These properties define the minimim/maximum number of outstanding active
+requests for the "queueable" classes of I/O requests as define by the
+\fBZFS\fR I/O scheduler. The classes include "read", "asynchronous read",
+"write", "asynchronous write", and "scrub" classes.
+.RE
+
+.sp
+.ne 2
+.na
+\fBl2arc_ddt\fR=\fBon\fR | \fBoff\fR
+.ad
+.sp .6
+.RS 4n
+This property is meaningful for L2ARC devices. If this property is turned
+\fBon\fR ZFS will dedicate the L2ARC device to cache deduplication table (DDT)
+buffers only.
+.RE
+
 .SS "Subcommands"
 .sp
 .LP
@@ -1300,6 +1395,20 @@ Display numbers in parsable (exact) values.
 A comma-separated list of columns to display. \fBname,property,value,source\fR
 is the default value.
 .RE
+.RE
+
+.sp
+.ne 2
+.na
+\fBzpool vdev-get\fR "\fIall\fR" | \fIproperty\fR[,...] \fIpool\fR \fIvdev-name | vdev-guid\fR
+.ad
+.sp .6
+.RS 4n
+Retrieves the given list of vdev properties (or all properties if "\fBall\fR" is
+used) for the specified vdev of the specified storage pool. These properties
+are displayed in the same manner as the zpool properties. The operation is
+supported for leaf-level vdevs only. See the "Device properties" section for
+more information on the available properties.
 .RE
 
 .sp
@@ -2005,6 +2114,19 @@ moment, this does nothing and the command returns success.
 .RS 4n
 Sets the given property on the specified pool. See the "Pool properties" section for
 more information on what properties can be set and acceptable values.
+.RE
+
+.sp
+.ne 2
+.na
+\fBzpool vdev-set\fR \fIproperty\fR=\fIvalue\fR \fIpool\fR \fIvdev-name | vdev-guid\fR
+.ad
+.sp .6
+.RS 4n
+Sets the given property on the specified device of the specified pool.
+If top-level vdev is specified, sets the property on all the child devices.
+See the "Device properties" section for more information on what properties
+can be set and acceptable values.
 .RE
 
 .sp
