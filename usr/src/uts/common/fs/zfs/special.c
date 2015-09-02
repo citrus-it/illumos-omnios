@@ -945,8 +945,13 @@ spa_special_dedup_adjust(spa_t *spa)
 	spa->spa_dedup_percentage = percentage;
 }
 
-/* Tunable: period (~10ms per tick) for updating spa vdev stats */
-clock_t spa_special_stat_update_ticks = 10;
+/*
+ * Tunable: period (~10ms per tick) for updating spa vdev stats
+ *
+ * For most recent cases "75" is optimal value.
+ * The recommended range is: 50...200
+ */
+clock_t spa_special_stat_update_ticks = 75;
 
 /* Performance monitor thread */
 static void
