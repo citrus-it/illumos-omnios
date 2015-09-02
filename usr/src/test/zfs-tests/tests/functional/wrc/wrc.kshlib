@@ -1,0 +1,333 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+#
+
+. $STF_SUITE/include/libtest.shlib
+
+function cleanup
+{
+	if poolexists $TESTPOOL ; then
+		destroy_pool $TESTPOOL
+	fi
+
+	if poolexists $TESTPOOL2 ; then
+		destroy_pool $TESTPOOL2
+	fi
+}
+
+function disk_vendor
+{
+	typeset disk=$1
+
+	if $(is_physical_device $disk) ; then
+		$ECHO inquiry | $FORMAT $disk | $NAWK  '/Vendor:/{print $NF}'
+	else
+		$ECHO UNKNOWN
+	fi
+}
+
+function disk_model
+{
+	typeset disk=$1
+
+	if $(is_physical_device $disk) ; then
+		$ECHO inquiry | $FORMAT $disk | $NAWK  '/Product:/{print $NF}'
+	else
+		$ECHO UNKNOWN
+	fi
+}
+
+function disk_info
+{
+	typeset disk=$1
+	typeset vendor=$(disk_vendor $disk)
+	typeset model=$(disk_model $disk)
+
+	$ECHO "$vendor-$model"
+}
+
+function disk_is_ssd
+{
+	typeset disk=$1
+
+	if $(is_physical_device $disk) ; then
+		if disk_info $disk | $EGREP -i "$SSD_MODELS" >/dev/null 2>&1 ; then
+			return 0
+		fi
+	fi
+
+	return 1
+}
+
+function set_disks
+{
+	MIN_DSK_COUNT=$(( $MIN_SSD_COUNT + $MIN_HDD_COUNT ))
+	SSD_COUNT=0
+	HDD_COUNT=0
+
+	typeset disk
+	for disk in $DISKS ; do
+		if $(disk_is_ssd $disk) ; then
+			(( SSD_COUNT = SSD_COUNT + 1 ))
+			eval "SSD_DISK$SSD_COUNT=$disk"
+		else
+			(( HDD_COUNT = HDD_COUNT + 1 ))
+			eval "HDD_DISK$HDD_COUNT=$disk"
+		fi
+	done
+
+	# HDD only setup
+	if [[ $SSD_COUNT -lt $MIN_SSD_COUNT && $HDD_COUNT -ge $MIN_DSK_COUNT ]] ; then
+		for SSD_COUNT in {1..$MIN_SSD_COUNT} ; do
+			eval "SSD_DISK$SSD_COUNT=\$HDD_DISK$HDD_COUNT"
+			unset HDD_DISK$HDD_COUNT
+			(( HDD_COUNT = HDD_COUNT - 1 ))
+		done
+	fi
+
+	# SSD only setup
+	if [[ $HDD_COUNT -lt $MIN_HDD_COUNT && $SSD_COUNT -ge $MIN_DSK_COUNT ]] ; then
+		for HDD_COUNT in {1..$MIN_HDD_COUNT} ; do
+			eval "HDD_DISK$HDD_COUNT=\$SSD_DISK$SSD_COUNT"
+			unset SSD_DISK$SSD_COUNT
+			(( SSD_COUNT = SSD_COUNT - 1 ))
+		done
+	fi
+
+	# diskless setup
+	if [[ $HDD_COUNT -lt $MIN_HDD_COUNT || $SSD_COUNT -lt $MIN_SSD_COUNT ]] ; then
+		$MKDIR -p $VDEV_DIR
+
+		for HDD_COUNT in {1..$MIN_HDD_COUNT} ; do
+			eval "HDD_DISK$HDD_COUNT=\"$VDEV_DIR/hdd$HDD_COUNT\""
+		done
+
+		for SSD_COUNT in {1..$MIN_SSD_COUNT} ; do
+			eval "SSD_DISK$SSD_COUNT=\"$VDEV_DIR/ssd$SSD_COUNT\""
+		done
+	fi
+
+	typeset -i item=0
+
+	for item in {1..$HDD_COUNT} ; do
+		eval "HDD_DISKS=\"$HDD_DISKS \$HDD_DISK$item\""
+		export HDD_DISK$item
+	done
+
+	export HDD_COUNT HDD_DISKS
+
+	for item in {1..$SSD_COUNT} ; do
+		eval "SSD_DISKS=\"$SSD_DISKS \$SSD_DISK$item\""
+		export SSD_DISK$item
+	done
+
+	export SSD_COUNT SSD_DISKS 
+}
+
+function test_disks
+{
+	$ECHO "SSD_COUNT=$SSD_COUNT"
+	$ECHO "HDD_COUNT=$HDD_COUNT"
+
+	$ECHO "SSD_DISKS = $SSD_DISKS"
+	$ECHO "HDD_DISKS = $HDD_DISKS"
+}
+
+function create_disks
+{
+	typeset -i ret=0
+	test -d "$VDEV_DIR" || return $ret
+
+	typeset -i item
+	typeset disk
+
+	for item in {1..$HDD_COUNT} ; do
+		eval "disk=\$HDD_DISK$item"
+		echo $MKFILE $VDEV_SIZE $disk
+		$MKFILE $VDEV_SIZE $disk
+		((ret |= $?))
+	done
+
+	for item in {1..$SSD_COUNT} ; do
+		eval "disk=\$SSD_DISK$item"
+		echo $MKFILE $VDEV_SIZE $disk
+		$MKFILE $VDEV_SIZE $disk
+		((ret |= $?))
+	done
+
+	return $ret
+}
+
+#
+# Enable krrp debug
+#
+function enable_krrp_debug
+{
+	$ECHO krrp_debug/W 1 | $MDB -kw
+}
+
+#
+# Disable krrp debug
+#
+function disable_krrp_debug
+{
+	$ECHO krrp_debug/W 0 | $MDB -kw
+}
+
+#
+# Try zpool status/iostat for given pool
+#
+# $1 pool
+#
+function display_status
+{
+	typeset pool=$1
+	typeset -i ret=0
+
+	$ZPOOL status -xv $pool >/dev/null 2>&1
+	ret=$?
+
+	$ZPOOL iostat >/dev/null 2>&1
+	((ret |= $?))
+
+	typeset mntpnt=$(get_prop mountpoint $pool)
+	$DD if=/dev/urandom of=$mntpnt/testfile.$$ &
+	typeset pid=$!
+
+	$ZPOOL iostat -v 1 60 > /dev/null
+	((ret |= $?))
+
+	$KILL -9 $pid
+
+	$SLEEP 60
+
+	return $ret
+}
+
+
+# Return 0 if create successfully or the pool exists; $? otherwise
+# Note: In local zones, this function should return 0 silently.
+#
+# $1 - pool name
+# $2 - wrc mode
+
+function create_pool_wrc #pool_name wrc_mode
+{
+	typeset pool_name=${1%%/*}
+	typeset wrc_mode=$2
+	typeset -i ret=0
+
+	if [[ -z $pool_name ]]; then
+		log_note "Missing pool name."
+		return 1
+	fi
+
+	if is_global_zone ; then
+		if poolexists $pool_name ; then
+			destroy_pool $pool_name
+		fi
+
+		if [[ -d /$pool_name ]] ; then
+			$RM -rf /$pool_name
+		fi
+
+		typeset -r pool_type=$(random_get "" "mirror" "raidz" "raidz2" "raidz3")
+		typeset -r wrc_type=$(random_get "" "mirror")
+		typeset -r record_size=$(random_get "4k" "8k" "16k" "32k" "64k" "128k")
+		typeset -r compression=$(random_get "off" "on" "lz4" "lzjb")
+
+		$ZPOOL create -f \
+			-O compression=$compression \
+			-O recordsize=$record_size \
+			$pool_name $pool_type $HDD_DISKS \
+			special $wrc_type $SSD_DISKS
+		((ret |= $?))
+
+		$ZPOOL set wrc_mode=$wrc_mode $pool_name
+		((ret |= $?))
+	fi
+
+	return $ret
+}
+
+function check_pool_errors # <pool> [<vdev>]
+{
+	typeset pool=$1
+	shift
+
+	if [[ $# -gt 0 ]] ; then
+		typeset checkvdev=$1
+	else
+		typeset checkvdev=""
+	fi
+
+	typeset -i errnum=0
+	typeset c_read=0
+	typeset c_write=0
+	typeset c_cksum=0
+	typeset tmpfile=/var/tmp/file.$$
+	typeset healthstr="pool '$pool' is healthy"
+	typeset output=$($ZPOOL status -x $pool)
+
+	if [[ "$output" == "$healthstr" ]] ; then
+		return $errnum
+	fi
+
+	$ZPOOL status -x $pool | $EGREP -v "^$" | \
+		$EGREP -v "special|pool:|state:|config:|errors:" >$tmpfile
+
+	typeset line
+	typeset -i fetchbegin=1
+
+	while read line; do
+		if [[ $fetchbegin -ne 0 ]] ; then
+			$ECHO $line | $GREP "NAME" >/dev/null 2>&1
+			if [[ $? -eq 0 ]] ; then
+				fetchbegin=0
+				continue
+			fi
+		fi
+
+		if [[ -n $checkvdev ]] ; then
+			$ECHO $line | $GREP $checkvdev >/dev/null 2>&1
+			if [[ $? -ne 0 ]] ; then
+				continue
+			fi
+
+			c_read=`$ECHO $line | $AWK '{print $3}'`
+			c_write=`$ECHO $line | $AWK '{print $4}'`
+			c_cksum=`$ECHO $line | $AWK '{print $5}'`
+
+			if [[ $c_read != 0 || $c_write != 0 || $c_cksum != 0 ]] ; then
+				(( errnum = errnum + 1 ))
+			fi
+
+			break
+		fi
+
+		c_read=`$ECHO $line | $AWK '{print $3}'`
+		c_write=`$ECHO $line | $AWK '{print $4}'`
+		c_cksum=`$ECHO $line | $AWK '{print $5}'`
+
+		if [[ $c_read != 0 || $c_write != 0 || $c_cksum != 0 ]] ; then
+			(( errnum = errnum + 1 ))
+		fi
+
+	done <$tmpfile
+
+	$RM -f $tmpfile
+
+	return $errnum
+}
+

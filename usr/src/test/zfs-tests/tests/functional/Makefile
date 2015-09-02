@@ -69,6 +69,7 @@ SUBDIRS = acl \
 	truncate \
 	userquota \
 	utils_test \
+	wrc \
 	write_dirs \
 	xattr \
 	zvol
