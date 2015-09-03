@@ -244,6 +244,7 @@ int sd_qfull_throttle_enable		= TRUE;
 
 int sd_retry_on_reservation_conflict	= 1;
 int sd_reinstate_resv_delay		= SD_REINSTATE_RESV_DELAY;
+int sd_enable_lun_reset			= FALSE;
 
 /*
  * Default safe I/O delay threshold of 2s for all devices.
@@ -7673,6 +7674,7 @@ sdattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	un->un_reserve_release_time = 5;
 
 	un->un_slow_io_threshold = sd_g_slow_io_threshold;
+	un->un_f_lun_reset_enabled = sd_enable_lun_reset;
 
 	/*
 	 * Set up the default maximum transfer size. Note that this may
