@@ -626,7 +626,6 @@ smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
 	uint32_t next_offset;
 	uint32_t stream_nlen;
 	uint32_t pad;
-	u_offset_t datasz, allocsz;
 	smb_streaminfo_t *sinfo, *sinfo_next;
 	int rc = 0;
 	boolean_t done = B_FALSE;
@@ -635,7 +634,6 @@ smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
 	uint32_t status = 0;
 
 	smb_node_t *fnode = qinfo->qi_node;
-	smb_attr_t *attr = &qinfo->qi_attr;
 
 	ASSERT(fnode);
 	if (SMB_IS_STREAM(fnode)) {
@@ -647,8 +645,6 @@ smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
 
 	sinfo = kmem_alloc(sizeof (smb_streaminfo_t), KM_SLEEP);
 	sinfo_next = kmem_alloc(sizeof (smb_streaminfo_t), KM_SLEEP);
-	datasz = attr->sa_vattr.va_size;
-	allocsz = attr->sa_allocsz;
 
 	status = smb_odir_openat(sr, fnode, &od);
 	switch (status) {
