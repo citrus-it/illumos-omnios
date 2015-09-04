@@ -37,6 +37,7 @@
 #include <sys/strsubr.h>
 #include <sys/note.h>
 #include <sys/sdt.h>
+#include <sys/kstat.h>
 
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>
@@ -211,6 +212,7 @@ iscsit_sess_unref(void *ist_void)
 {
 	iscsit_sess_t *ist = ist_void;
 	stmf_scsi_session_t *iss;
+	char prop_buf[KSTAT_STRLEN + 1];
 
 	/*
 	 * State machine has run to completion, destroy session
@@ -225,6 +227,9 @@ iscsit_sess_unref(void *ist_void)
 	ASSERT(ist->ist_conn_count == 0);
 	iss = ist->ist_stmf_sess;
 	if (iss != NULL) {
+		(void) snprintf(prop_buf, sizeof (prop_buf),
+		    "peername_%"PRIxPTR"", (uintptr_t)ist);
+		stmf_remove_rport_info(iss, prop_buf);
 		stmf_deregister_scsi_session(ist->ist_lport, iss);
 		kmem_free(iss->ss_rport_id, sizeof (scsi_devid_desc_t) +
 		    strlen(ist->ist_initiator_name) + 1);

@@ -166,6 +166,18 @@ typedef struct stmf_i_remote_port {
 	int			irport_refcnt;
 	id_t			irport_instance;
 	avl_node_t		irport_ln;
+	/* number of active read tasks */
+	uint32_t		irport_nread_tasks;
+	/* number of active write tasks */
+	uint32_t		irport_nwrite_tasks;
+	hrtime_t		irport_rdstart_timestamp;
+	hrtime_t		irport_rddone_timestamp;
+	hrtime_t		irport_wrstart_timestamp;
+	hrtime_t		irport_wrdone_timestamp;
+	kstat_t			*irport_kstat_info;
+	kstat_t			*irport_kstat_io;
+	kstat_t			*irport_kstat_estat;	/* extended statistics */
+	boolean_t		irport_info_dirty;
 } stmf_i_remote_port_t;
 
 /*
@@ -261,6 +273,7 @@ typedef struct stmf_i_scsi_task {
 	/* Task profile data */
 	hrtime_t		itask_start_timestamp;
 	hrtime_t		itask_done_timestamp;
+	hrtime_t		itask_xfer_done_timestamp;
 	hrtime_t		itask_waitq_enter_timestamp;
 	hrtime_t		itask_waitq_time;
 	hrtime_t		itask_lu_read_time;

@@ -166,9 +166,17 @@ static void stmf_update_kstat_lu_q(scsi_task_t *, void());
 static void stmf_update_kstat_lport_q(scsi_task_t *, void());
 static void stmf_update_kstat_lu_io(scsi_task_t *, stmf_data_buf_t *);
 static void stmf_update_kstat_lport_io(scsi_task_t *, stmf_data_buf_t *);
+static void stmf_update_kstat_rport_io(scsi_task_t *, stmf_data_buf_t *);
+static void stmf_update_kstat_rport_estat(scsi_task_t *);
+
+static hrtime_t stmf_update_rport_timestamps(hrtime_t *start_tstamp,
+    hrtime_t *done_tstamp, stmf_i_scsi_task_t *itask);
 
 static int stmf_irport_compare(const void *void_irport1,
     const void *void_irport2);
+
+static void stmf_create_kstat_rport(stmf_i_remote_port_t *irport);
+static void stmf_destroy_kstat_rport(stmf_i_remote_port_t *irport);
 static stmf_i_remote_port_t *stmf_irport_create(scsi_devid_desc_t *rport_devid);
 static void stmf_irport_destroy(stmf_i_remote_port_t *irport);
 static stmf_i_remote_port_t *stmf_irport_register(
@@ -176,6 +184,7 @@ static stmf_i_remote_port_t *stmf_irport_register(
 static stmf_i_remote_port_t *stmf_irport_lookup_locked(
     scsi_devid_desc_t *rport_devid);
 static void stmf_irport_deregister(stmf_i_remote_port_t *irport);
+static int stmf_kstat_rport_update(kstat_t *ksp, int rw);
 
 extern struct mod_ops mod_driverops;
 
@@ -2713,8 +2722,10 @@ stmf_delete_all_ppds()
  * 16 is the max string length of a protocol_ident, increase
  * the size if needed.
  */
-#define	STMF_KSTAT_LU_SZ	(STMF_GUID_INPUT + 1 + 256)
-#define	STMF_KSTAT_TGT_SZ	(256 * 2 + 16)
+#define	STMF_KSTAT_LU_SZ		(STMF_GUID_INPUT + 1 + 256)
+#define	STMF_KSTAT_TGT_SZ		(256 * 2 + 16)
+#define	STMF_KSTAT_RPORT_DATAMAX	(sizeof (stmf_kstat_rport_info_t) / \
+					    sizeof (kstat_named_t))
 
 /*
  * This array matches the Protocol Identifier in stmf_ioctl.h
@@ -2789,6 +2800,96 @@ stmf_update_kstat_lport_io(scsi_task_t *task, stmf_data_buf_t *dbuf)
 			mutex_exit(ilp->ilport_kstat_io->ks_lock);
 		}
 	}
+}
+
+static void
+stmf_update_kstat_rport_io(scsi_task_t *task, stmf_data_buf_t *dbuf)
+{
+	stmf_i_scsi_session_t	*iss;
+	stmf_i_remote_port_t	*irport;
+	kstat_io_t		*kip;
+
+	iss = task->task_session->ss_stmf_private;
+	irport = iss->iss_irport;
+	if (irport->irport_kstat_io != NULL) {
+		kip = KSTAT_IO_PTR(irport->irport_kstat_io);
+		mutex_enter(irport->irport_kstat_io->ks_lock);
+		STMF_UPDATE_KSTAT_IO(kip, dbuf);
+		mutex_exit(irport->irport_kstat_io->ks_lock);
+	}
+}
+
+static void
+stmf_update_kstat_rport_estat(scsi_task_t *task)
+{
+	stmf_i_scsi_task_t		*itask;
+	stmf_i_scsi_session_t		*iss;
+	stmf_i_remote_port_t		*irport;
+	stmf_kstat_rport_estat_t	*ks_estat;
+	hrtime_t			lat = 0;
+	uint32_t			n = 0;
+
+	itask = task->task_stmf_private;
+	iss = task->task_session->ss_stmf_private;
+	irport = iss->iss_irport;
+
+	if (irport->irport_kstat_estat == NULL)
+		return;
+
+	ks_estat = (stmf_kstat_rport_estat_t *)KSTAT_NAMED_PTR(
+	    irport->irport_kstat_estat);
+
+	mutex_enter(irport->irport_kstat_estat->ks_lock);
+
+	if (task->task_flags & TF_READ_DATA)
+		n = atomic_dec_32_nv(&irport->irport_nread_tasks);
+	else if (task->task_flags & TF_WRITE_DATA)
+		n = atomic_dec_32_nv(&irport->irport_nwrite_tasks);
+
+	if (itask->itask_read_xfer > 0) {
+		ks_estat->i_nread_tasks.value.ui64++;
+		lat = stmf_update_rport_timestamps(
+		    &irport->irport_rdstart_timestamp,
+		    &irport->irport_rddone_timestamp, itask);
+		if (n == 0)
+			ks_estat->i_rport_read_latency.value.ui64 += lat;
+	} else if ((itask->itask_write_xfer > 0) ||
+	    (task->task_flags & TF_INITIAL_BURST)) {
+		ks_estat->i_nwrite_tasks.value.ui64++;
+		lat = stmf_update_rport_timestamps(
+		    &irport->irport_wrstart_timestamp,
+		    &irport->irport_wrdone_timestamp, itask);
+		if (n == 0)
+			ks_estat->i_rport_write_latency.value.ui64 += lat;
+	}
+
+	if (n == 0) {
+		if (task->task_flags & TF_READ_DATA) {
+			irport->irport_rdstart_timestamp = LLONG_MAX;
+			irport->irport_rddone_timestamp = 0;
+		} else if (task->task_flags & TF_WRITE_DATA) {
+			irport->irport_wrstart_timestamp = LLONG_MAX;
+			irport->irport_wrdone_timestamp = 0;
+		}
+	}
+
+	mutex_exit(irport->irport_kstat_estat->ks_lock);
+}
+
+static hrtime_t
+stmf_update_rport_timestamps(hrtime_t *start_tstamp, hrtime_t *done_tstamp,
+    stmf_i_scsi_task_t *itask)
+{
+	*start_tstamp = MIN(*start_tstamp, itask->itask_start_timestamp);
+	if ((*done_tstamp == 0) &&
+	    (itask->itask_xfer_done_timestamp == 0)) {
+		*done_tstamp = *start_tstamp;
+	} else {
+		*done_tstamp = MAX(*done_tstamp,
+		    itask->itask_xfer_done_timestamp);
+	}
+
+	return (*done_tstamp - *start_tstamp);
 }
 
 static void
@@ -3453,6 +3554,8 @@ stmf_irport_create(scsi_devid_desc_t *rport_devid)
 	    sizeof (scsi_devid_desc_t) + rport_devid->ident_length - 1);
 	irport->irport_refcnt = 1;
 	mutex_init(&irport->irport_mutex, NULL, MUTEX_DEFAULT, NULL);
+	irport->irport_rdstart_timestamp = LLONG_MAX;
+	irport->irport_wrstart_timestamp = LLONG_MAX;
 
 	return (irport);
 }
@@ -3460,10 +3563,127 @@ stmf_irport_create(scsi_devid_desc_t *rport_devid)
 static void
 stmf_irport_destroy(stmf_i_remote_port_t *irport)
 {
+	stmf_destroy_kstat_rport(irport);
 	id_free(stmf_state.stmf_irport_inst_space, irport->irport_instance);
 	mutex_destroy(&irport->irport_mutex);
 	kmem_free(irport, sizeof (*irport) + sizeof (scsi_devid_desc_t) +
 	    irport->irport_id->ident_length - 1);
+}
+
+static void
+stmf_create_kstat_rport(stmf_i_remote_port_t *irport)
+{
+	scsi_devid_desc_t *id = irport->irport_id;
+	char ks_nm[KSTAT_STRLEN];
+	stmf_kstat_rport_info_t *ks_info;
+	stmf_kstat_rport_estat_t *ks_estat;
+	char *ident = NULL;
+
+	ks_info = kmem_zalloc(sizeof (*ks_info), KM_NOSLEEP);
+	if (ks_info == NULL)
+		goto err_out;
+
+	(void) snprintf(ks_nm, KSTAT_STRLEN, "stmf_rport_%"PRIxPTR"",
+	    (uintptr_t)irport);
+	irport->irport_kstat_info = kstat_create(STMF_MODULE_NAME, 0,
+	    ks_nm, "misc", KSTAT_TYPE_NAMED,
+	    STMF_KSTAT_RPORT_DATAMAX - STMF_RPORT_INFO_LIMIT,
+	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE);
+	if (irport->irport_kstat_info == NULL) {
+		kmem_free(ks_info, sizeof (*ks_info));
+		goto err_out;
+	}
+
+	irport->irport_kstat_info->ks_data = ks_info;
+	irport->irport_kstat_info->ks_private = irport;
+	irport->irport_kstat_info->ks_update = stmf_kstat_rport_update;
+	ident = kmem_alloc(id->ident_length + 1, KM_NOSLEEP);
+	if (ident == NULL) {
+		kstat_delete(irport->irport_kstat_info);
+		irport->irport_kstat_info = NULL;
+		kmem_free(ks_info, sizeof (*ks_info));
+		goto err_out;
+	}
+
+	(void) memcpy(ident, id->ident, id->ident_length);
+	ident[id->ident_length] = '\0';
+	kstat_named_init(&ks_info->i_rport_name, "name", KSTAT_DATA_STRING);
+	kstat_named_init(&ks_info->i_protocol, "protocol",
+	    KSTAT_DATA_STRING);
+
+	kstat_named_setstr(&ks_info->i_rport_name, ident);
+	kstat_named_setstr(&ks_info->i_protocol,
+	    protocol_ident[irport->irport_id->protocol_id]);
+	irport->irport_kstat_info->ks_lock = &irport->irport_mutex;
+	irport->irport_info_dirty = B_TRUE;
+	kstat_install(irport->irport_kstat_info);
+
+	(void) snprintf(ks_nm, KSTAT_STRLEN, "stmf_rport_io_%"PRIxPTR"",
+	    (uintptr_t)irport);
+	irport->irport_kstat_io = kstat_create(STMF_MODULE_NAME, 0, ks_nm,
+	    "io", KSTAT_TYPE_IO, 1, 0);
+	if (irport->irport_kstat_io == NULL)
+		goto err_out;
+
+	irport->irport_kstat_io->ks_lock = &irport->irport_mutex;
+	kstat_install(irport->irport_kstat_io);
+
+	(void) snprintf(ks_nm, KSTAT_STRLEN, "stmf_rport_st_%"PRIxPTR"",
+	    (uintptr_t)irport);
+	irport->irport_kstat_estat = kstat_create(STMF_MODULE_NAME, 0, ks_nm,
+	    "misc", KSTAT_TYPE_NAMED,
+	    sizeof (*ks_estat) / sizeof (kstat_named_t), 0);
+	if (irport->irport_kstat_estat == NULL)
+		goto err_out;
+
+	ks_estat = (stmf_kstat_rport_estat_t *)KSTAT_NAMED_PTR(
+	    irport->irport_kstat_estat);
+	kstat_named_init(&ks_estat->i_rport_read_latency,
+	    "rlatency", KSTAT_DATA_UINT64);
+	kstat_named_init(&ks_estat->i_rport_write_latency,
+	    "wlatency", KSTAT_DATA_UINT64);
+	kstat_named_init(&ks_estat->i_nread_tasks, "rntasks",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ks_estat->i_nwrite_tasks, "wntasks",
+	    KSTAT_DATA_UINT64);
+	irport->irport_kstat_estat->ks_lock = &irport->irport_mutex;
+	kstat_install(irport->irport_kstat_estat);
+
+	return;
+
+err_out:
+	(void) memcpy(ks_nm, id->ident, MAX(KSTAT_STRLEN - 1,
+	    id->ident_length));
+	ks_nm[id->ident_length] = '\0';
+	cmn_err(CE_WARN, "STMF: remote port kstat creation failed: %s", ks_nm);
+}
+
+static void
+stmf_destroy_kstat_rport(stmf_i_remote_port_t *irport)
+{
+	if (irport->irport_kstat_io != NULL) {
+		kstat_delete(irport->irport_kstat_io);
+	}
+	if (irport->irport_kstat_info != NULL) {
+		stmf_kstat_rport_info_t *ks_info;
+		kstat_named_t *knp;
+		void *ptr;
+		int i;
+
+		ks_info = (stmf_kstat_rport_info_t *)KSTAT_NAMED_PTR(
+		    irport->irport_kstat_info);
+		kstat_delete(irport->irport_kstat_info);
+		ptr = KSTAT_NAMED_STR_PTR(&ks_info->i_rport_name);
+		kmem_free(ptr, KSTAT_NAMED_STR_BUFLEN(&ks_info->i_rport_name));
+
+		for (i = 0, knp = ks_info->i_rport_uinfo;
+		    i < STMF_RPORT_INFO_LIMIT; i++, knp++) {
+			ptr = KSTAT_NAMED_STR_PTR(knp);
+			if (ptr != NULL)
+				kmem_free(ptr, KSTAT_NAMED_STR_BUFLEN(knp));
+		}
+		kmem_free(ks_info, sizeof (*ks_info));
+	}
 }
 
 static stmf_i_remote_port_t *
@@ -3488,6 +3708,7 @@ stmf_irport_register(scsi_devid_desc_t *rport_devid)
 		return (NULL);
 	}
 
+	stmf_create_kstat_rport(irport);
 	avl_add(&stmf_state.stmf_irportlist, irport);
 	mutex_exit(&stmf_state.stmf_lock);
 
@@ -3609,6 +3830,117 @@ stmf_register_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 	DTRACE_PROBE2(session__online, stmf_local_port_t *, lport,
 	    stmf_scsi_session_t *, ss);
 	return (STMF_SUCCESS);
+}
+
+stmf_status_t
+stmf_add_rport_info(stmf_scsi_session_t *ss,
+    const char *prop_name, const char *prop_value)
+{
+	stmf_i_scsi_session_t *iss = ss->ss_stmf_private;
+	stmf_i_remote_port_t *irport = iss->iss_irport;
+	kstat_named_t *knp;
+	char *s;
+	int i;
+
+	s = strdup(prop_value);
+
+	mutex_enter(irport->irport_kstat_info->ks_lock);
+	/* Make sure the caller doesn't try to add already existing property */
+	knp = KSTAT_NAMED_PTR(irport->irport_kstat_info);
+	for (i = 0; i < STMF_KSTAT_RPORT_DATAMAX; i++, knp++) {
+		if (KSTAT_NAMED_STR_PTR(knp) == NULL)
+			break;
+
+		ASSERT(strcmp(knp->name, prop_name) != 0);
+	}
+
+	if (i == STMF_KSTAT_RPORT_DATAMAX) {
+		stmf_kstat_rport_info_t *ks_info;
+
+		mutex_exit(irport->irport_kstat_info->ks_lock);
+		kmem_free(s, strlen(s) + 1);
+		ks_info = (stmf_kstat_rport_info_t *)KSTAT_NAMED_PTR(
+		    irport->irport_kstat_info);
+		cmn_err(CE_WARN, "STMF: info limit is reached for rport %s",
+		    KSTAT_NAMED_STR_PTR(&ks_info->i_rport_name));
+
+		return (STMF_FAILURE);
+	}
+
+	irport->irport_info_dirty = B_TRUE;
+	kstat_named_init(knp, prop_name, KSTAT_DATA_STRING);
+	kstat_named_setstr(knp, s);
+	mutex_exit(irport->irport_kstat_info->ks_lock);
+
+	return (STMF_SUCCESS);
+}
+
+void
+stmf_remove_rport_info(stmf_scsi_session_t *ss,
+    const char *prop_name)
+{
+	stmf_i_scsi_session_t *iss = ss->ss_stmf_private;
+	stmf_i_remote_port_t *irport = iss->iss_irport;
+	kstat_named_t *knp;
+	char *s;
+	int i;
+	uint32_t len;
+
+	mutex_enter(irport->irport_kstat_info->ks_lock);
+	knp = KSTAT_NAMED_PTR(irport->irport_kstat_info);
+	for (i = 0; i < STMF_KSTAT_RPORT_DATAMAX; i++, knp++) {
+		if ((knp->name != NULL) && (strcmp(knp->name, prop_name) == 0))
+			break;
+	}
+
+	if (i == STMF_KSTAT_RPORT_DATAMAX) {
+		mutex_exit(irport->irport_kstat_info->ks_lock);
+		return;
+	}
+
+	s = KSTAT_NAMED_STR_PTR(knp);
+	len = KSTAT_NAMED_STR_BUFLEN(knp);
+
+	for (; i < STMF_KSTAT_RPORT_DATAMAX - 1; i++, knp++) {
+		kstat_named_init(knp, knp[1].name, KSTAT_DATA_STRING);
+		kstat_named_setstr(knp, KSTAT_NAMED_STR_PTR(&knp[1]));
+	}
+	kstat_named_init(knp, "", KSTAT_DATA_STRING);
+
+	irport->irport_info_dirty = B_TRUE;
+	mutex_exit(irport->irport_kstat_info->ks_lock);
+	kmem_free(s, len);
+}
+
+static int
+stmf_kstat_rport_update(kstat_t *ksp, int rw)
+{
+	stmf_i_remote_port_t *irport = ksp->ks_private;
+	kstat_named_t *knp;
+	uint_t ndata = 0;
+	size_t dsize = 0;
+	int i;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	if (!irport->irport_info_dirty)
+		return (0);
+
+	knp = KSTAT_NAMED_PTR(ksp);
+	for (i = 0; i < STMF_KSTAT_RPORT_DATAMAX; i++, knp++) {
+		if (KSTAT_NAMED_STR_PTR(knp) == NULL)
+			break;
+
+		ndata++;
+		dsize += KSTAT_NAMED_STR_BUFLEN(knp);
+	}
+
+	ksp->ks_ndata = ndata;
+	ksp->ks_data_size = sizeof (kstat_named_t) * ndata + dsize;
+	irport->irport_info_dirty = B_FALSE;
+
+	return (0);
 }
 
 void
@@ -4560,6 +4892,13 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 	stmf_itl_task_start(itask);
 
+	if ((task->task_flags & TF_INITIAL_BURST) &&
+	    !(curthread->t_flag & T_INTR_THREAD)) {
+		stmf_update_kstat_lu_io(task, dbuf);
+		stmf_update_kstat_lport_io(task, dbuf);
+		stmf_update_kstat_rport_io(task, dbuf);
+	}
+
 	STMF_ENQUEUE_ITASK(w, itask);
 	atomic_inc_32(&w->worker_ref_count);
 
@@ -4657,7 +4996,10 @@ stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 
 	stmf_update_kstat_lu_io(task, dbuf);
 	stmf_update_kstat_lport_io(task, dbuf);
+	stmf_update_kstat_rport_io(task, dbuf);
+
 	stmf_lport_xfer_start(itask, dbuf);
+
 	if (ioflags & STMF_IOF_STATS_ONLY) {
 		stmf_lport_xfer_done(itask, dbuf);
 		return (STMF_SUCCESS);
@@ -7133,18 +7475,29 @@ stmf_generate_lport_event(stmf_i_local_port_t *ilport, int eventid, void *arg,
 void
 stmf_itl_task_start(stmf_i_scsi_task_t *itask)
 {
-	stmf_itl_data_t	*itl = itask->itask_itl_datap;
-	scsi_task_t	*task = itask->itask_task;
-	stmf_i_lu_t	*ilu;
+	stmf_itl_data_t		*itl = itask->itask_itl_datap;
+	scsi_task_t		*task = itask->itask_task;
+	stmf_i_lu_t		*ilu;
+	stmf_i_scsi_session_t	*iss =
+	    itask->itask_task->task_session->ss_stmf_private;
+	stmf_i_remote_port_t	*irport = iss->iss_irport;
 
 	if (itl == NULL || task->task_lu == dlun0)
 		return;
 	ilu = (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
 	itask->itask_start_timestamp = gethrtime();
+	itask->itask_xfer_done_timestamp = 0;
 	if (ilu->ilu_kstat_io != NULL) {
 		mutex_enter(ilu->ilu_kstat_io->ks_lock);
 		stmf_update_kstat_lu_q(itask->itask_task, kstat_waitq_enter);
 		mutex_exit(ilu->ilu_kstat_io->ks_lock);
+	}
+
+	if (irport->irport_kstat_estat != NULL) {
+		if (task->task_flags & TF_READ_DATA)
+			atomic_inc_32(&irport->irport_nread_tasks);
+		else if (task->task_flags & TF_WRITE_DATA)
+			atomic_inc_32(&irport->irport_nwrite_tasks);
 	}
 
 	stmf_update_kstat_lport_q(itask->itask_task, kstat_waitq_enter);
@@ -7184,6 +7537,8 @@ stmf_itl_task_done(stmf_i_scsi_task_t *itask)
 
 	if (ilu->ilu_kstat_io == NULL)
 		return;
+
+	stmf_update_kstat_rport_estat(task);
 
 	mutex_enter(ilu->ilu_kstat_io->ks_lock);
 
@@ -7242,7 +7597,9 @@ stmf_lport_xfer_done(stmf_i_scsi_task_t *itask, stmf_data_buf_t *dbuf)
 	xfer_size = (dbuf->db_xfer_status == STMF_SUCCESS) ?
 	    dbuf->db_data_size : 0;
 
-	elapsed_time = gethrtime() - dbuf->db_xfer_start_timestamp;
+	itask->itask_xfer_done_timestamp = gethrtime();
+	elapsed_time = itask->itask_xfer_done_timestamp -
+	    dbuf->db_xfer_start_timestamp;
 	if (dbuf->db_flags & DB_DIRECTION_TO_RPORT) {
 		atomic_add_64((uint64_t *)&itask->itask_lport_read_time,
 		    elapsed_time);

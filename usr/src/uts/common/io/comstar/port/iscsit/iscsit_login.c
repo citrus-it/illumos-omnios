@@ -38,12 +38,14 @@
 #include <sys/sysmacros.h>
 #include <sys/note.h>
 #include <sys/sdt.h>
+#include <sys/kstat.h>
 
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_text.h>
+#include <sys/idm/idm_so.h>
 
 #define	ISCSIT_LOGIN_SM_STRINGS
 #include "iscsit.h"
@@ -1730,6 +1732,8 @@ login_sm_session_register(iscsit_conn_t *ict)
 	stmf_scsi_session_t	*ss;
 	iscsi_transport_id_t	*iscsi_tptid;
 	uint16_t		ident_len, adn_len, tptid_sz;
+	char			prop_buf[KSTAT_STRLEN + 1];
+	char			peer_buf[IDM_SA_NTOP_BUFSIZ];
 
 	/*
 	 * Hold target mutex until we have finished registering with STMF
@@ -1790,6 +1794,11 @@ login_sm_session_register(iscsit_conn_t *ict)
 	ss->ss_port_private = ict->ict_sess;
 	ict->ict_sess->ist_stmf_sess = ss;
 	mutex_exit(&ist->ist_tgt->target_mutex);
+	(void) snprintf(prop_buf, sizeof (prop_buf), "peername_%"PRIxPTR"",
+	    (uintptr_t)ict->ict_sess);
+	(void) idm_sa_ntop(&ict->ict_ic->ic_raddr, peer_buf,
+	    sizeof (peer_buf));
+	(void) stmf_add_rport_info(ss, prop_buf, peer_buf);
 
 	return (IDM_STATUS_SUCCESS);
 }
