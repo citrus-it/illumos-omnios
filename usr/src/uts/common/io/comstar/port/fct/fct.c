@@ -2906,6 +2906,37 @@ fct_fill_abts_acc(fct_cmd_t *cmd)
 	p[10] = p[11] = 0xff;
 }
 
+/*
+ * fct_cmd_unlink_els -- remove icmd from ELS queue
+ *
+ * The commands are found via the slot array of active commands and will be
+ * terminated shortly after being removed.
+ */
+void
+fct_cmd_unlink_els(fct_i_remote_port_t *irp, fct_i_cmd_t *icmd)
+{
+	ASSERT(rw_write_held(&irp->irp_lock));
+	/*
+	 * If the command found is linked into a chain it is the ELS queue.
+	 * Decrement the appropriate ELS counter, clear the IRP in queue
+	 * flag, and remove it from the linked list.
+	 */
+	if (icmd->icmd_node.list_next) {
+		if (icmd->icmd_flags & ICMD_IN_IRP_QUEUE) {
+			if (icmd->icmd_flags & ICMD_SESSION_AFFECTING)
+				atomic_dec_16(&irp->irp_sa_elses_count);
+			else
+				atomic_dec_16(&irp->irp_nsa_elses_count);
+			atomic_and_32(&icmd->icmd_flags, ~ICMD_IN_IRP_QUEUE);
+			list_remove(&irp->irp_els_list, icmd);
+		} else {
+			cmn_err(CE_NOTE, "%s: icmd on non-ELS chain: icmd=%p",
+			    __func__, (void *)icmd);
+			ASSERT(0);
+		}
+	}
+}
+
 void
 fct_handle_rcvd_abts(fct_cmd_t *cmd)
 {
@@ -2915,10 +2946,12 @@ fct_handle_rcvd_abts(fct_cmd_t *cmd)
 	    (fct_i_local_port_t *)port->port_fct_private;
 	fct_i_cmd_t		*icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 	fct_i_remote_port_t	*irp;
-	fct_cmd_t		*c = NULL;
+	fct_cmd_t		*c = NULL,
+				*term_cmd;
 	fct_i_cmd_t		*ic = NULL;
 	int			found = 0;
 	int			i;
+	fct_status_t		term_val;
 
 	icmd->icmd_start_time = ddi_get_lbolt();
 	icmd->icmd_flags |= ICMD_KNOWN_TO_FCA;
@@ -3001,23 +3034,23 @@ fct_handle_rcvd_abts(fct_cmd_t *cmd)
 		return;
 	}
 
+	fct_cmd_unlink_els(irp, ic);
+
 	/* Check if this an abts retry */
 	if (c->cmd_link && (ic->icmd_flags & ICMD_ABTS_RECEIVED)) {
 		/* Kill this abts. */
-		fct_q_for_termination_lock_held(iport, icmd, FCT_ABORTED);
-		if (IS_WORKER_SLEEPING(iport))
-			cv_signal(&iport->iport_worker_cv);
-		mutex_exit(&iport->iport_worker_lock);
-		rw_exit(&irp->irp_lock);
-		rw_exit(&iport->iport_lock);
-		return;
+		term_cmd = icmd->icmd_cmd;
+		term_val = FCT_ABORTED;
+	} else {
+		c->cmd_link = cmd;
+		atomic_or_32(&ic->icmd_flags, ICMD_ABTS_RECEIVED);
+		cmd->cmd_link = c;
+		term_cmd = c;
+		term_val = FCT_ABTS_RECEIVED;
 	}
-	c->cmd_link = cmd;
-	atomic_or_32(&ic->icmd_flags, ICMD_ABTS_RECEIVED);
-	cmd->cmd_link = c;
 	mutex_exit(&iport->iport_worker_lock);
 	rw_exit(&irp->irp_lock);
-	fct_queue_cmd_for_termination(c, FCT_ABTS_RECEIVED);
+	fct_queue_cmd_for_termination(term_cmd, term_val);
 	rw_exit(&iport->iport_lock);
 }
 

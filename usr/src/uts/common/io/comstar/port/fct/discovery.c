@@ -1060,12 +1060,14 @@ fct_trigger_rport_cleanup(fct_i_remote_port_t *irp, int ttc)
 			continue;
 		}
 		if (cmd->cmd_type & ttc) {
-			if (cmd->cmd_type == FCT_CMD_FCP_XCHG)
+			if (cmd->cmd_type == FCT_CMD_FCP_XCHG) {
 				fct_queue_scsi_task_for_termination(cmd,
 				    FCT_ABORTED);
-			else
+			} else {
+				fct_cmd_unlink_els(irp, icmd);
 				fct_q_for_termination_lock_held(iport, icmd,
 				    FCT_ABORTED);
+			}
 			cleaned++;
 		} else {
 			skipped++;
