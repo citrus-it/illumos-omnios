@@ -66,21 +66,25 @@ typedef enum arc_flags
 	ARC_FLAG_CACHED			= 1 << 4,	/* I/O was in cache */
 	ARC_FLAG_L2CACHE		= 1 << 5,	/* cache in L2ARC */
 	ARC_FLAG_L2COMPRESS		= 1 << 6,	/* compress in L2ARC */
+	ARC_FLAG_PREDICTIVE_PREFETCH	= 1 << 7,	/* I/O from zfetch */
 
 	/*
 	 * Private ARC flags.  These flags are private ARC only flags that
 	 * will show up in b_flags in the arc_hdr_buf_t. These flags should
 	 * only be set by ARC code.
 	 */
-	ARC_FLAG_IN_HASH_TABLE		= 1 << 7,	/* buffer is hashed */
-	ARC_FLAG_IO_IN_PROGRESS		= 1 << 8,	/* I/O in progress */
-	ARC_FLAG_IO_ERROR		= 1 << 9,	/* I/O failed for buf */
-	ARC_FLAG_FREED_IN_READ		= 1 << 10,	/* freed during read */
-	ARC_FLAG_BUF_AVAILABLE		= 1 << 11,	/* block not in use */
-	ARC_FLAG_INDIRECT		= 1 << 12,	/* indirect block */
-	ARC_FLAG_L2_WRITING		= 1 << 13,	/* write in progress */
-	ARC_FLAG_L2_EVICTED		= 1 << 14,	/* evicted during I/O */
-	ARC_FLAG_L2_WRITE_HEAD		= 1 << 15,	/* head of write list */
+	ARC_FLAG_IN_HASH_TABLE		= 1 << 8,	/* buffer is hashed */
+	ARC_FLAG_IO_IN_PROGRESS		= 1 << 9,	/* I/O in progress */
+	ARC_FLAG_IO_ERROR		= 1 << 10,	/* I/O failed for buf */
+	ARC_FLAG_FREED_IN_READ		= 1 << 11,	/* freed during read */
+	ARC_FLAG_BUF_AVAILABLE		= 1 << 12,	/* block not in use */
+	ARC_FLAG_INDIRECT		= 1 << 13,	/* indirect block */
+	/* Indicates that block was read with ASYNC priority. */
+	ARC_FLAG_PRIO_ASYNC_READ	= 1 << 14,
+	ARC_FLAG_L2_WRITING		= 1 << 15,	/* write in progress */
+	ARC_FLAG_L2_EVICTED		= 1 << 16,	/* evicted during I/O */
+	ARC_FLAG_L2_WRITE_HEAD		= 1 << 17,	/* head of write list */
+
 	/*
 	 * Below BUFC flags indicate that either the buffer contains
 	 * metadata or DDT metadata. If both of these are not set then the
@@ -89,12 +93,12 @@ typedef enum arc_flags
 	 * If this tunable is zero ARC_FLAG_BUFC_METADATA is used for both DDT
 	 * and regular metadata.
 	 */
-	ARC_FLAG_BUFC_METADATA		= 1 << 16,	/* metadata buf */
-	ARC_FLAG_BUFC_DDT		= 1 << 17,	/* DDT buf */
+	ARC_FLAG_BUFC_METADATA		= 1 << 18,	/* metadata buf */
+	ARC_FLAG_BUFC_DDT		= 1 << 19,	/* DDT buf */
 
 	/* Flags specifying whether optional hdr struct fields are defined */
-	ARC_FLAG_HAS_L1HDR		= 1 << 18,
-	ARC_FLAG_HAS_L2HDR		= 1 << 19,
+	ARC_FLAG_HAS_L1HDR		= 1 << 20,
+	ARC_FLAG_HAS_L2HDR		= 1 << 21,
 } arc_flags_t;
 
 struct arc_buf {
