@@ -84,7 +84,6 @@ typedef enum arc_flags
 	ARC_FLAG_L2_WRITING		= 1 << 15,	/* write in progress */
 	ARC_FLAG_L2_EVICTED		= 1 << 16,	/* evicted during I/O */
 	ARC_FLAG_L2_WRITE_HEAD		= 1 << 17,	/* head of write list */
-
 	/*
 	 * Below BUFC flags indicate that either the buffer contains
 	 * metadata or DDT metadata. If both of these are not set then the
@@ -93,12 +92,13 @@ typedef enum arc_flags
 	 * If this tunable is zero ARC_FLAG_BUFC_METADATA is used for both DDT
 	 * and regular metadata.
 	 */
-	ARC_FLAG_BUFC_METADATA		= 1 << 18,	/* metadata buf */
+	ARC_FLAG_BUFC_METADATA		= 1 << 18,
 	ARC_FLAG_BUFC_DDT		= 1 << 19,	/* DDT buf */
 
 	/* Flags specifying whether optional hdr struct fields are defined */
 	ARC_FLAG_HAS_L1HDR		= 1 << 20,
 	ARC_FLAG_HAS_L2HDR		= 1 << 21,
+
 } arc_flags_t;
 
 struct arc_buf {
