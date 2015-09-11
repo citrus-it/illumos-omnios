@@ -8707,7 +8707,6 @@ setlock(vnode_t *vp, struct flock64 *flock, int flag, cred_t *cred)
 	int cmd;
 
 	cmd = nbl_need_check(vp) ? F_SETLK_NBMAND : F_SETLK;
-retry:
 	delaytime = MSEC_TO_TICK_ROUNDUP(rfs4_lock_delay);
 
 	for (i = 0; i < rfs4_maxlock_tries; i++) {
@@ -8728,12 +8727,8 @@ retry:
 		/* Get the owner of the lock */
 		flk = *flock;
 		LOCK_PRINT(rfs4_debug, "setlock", F_GETLK, &flk);
-		if (VOP_FRLOCK(vp, F_GETLK, &flk, flag,
-		    (u_offset_t)0, NULL, cred, NULL) == 0) {
-			if (flk.l_type == F_UNLCK) {
-				/* No longer locked, retry */
-				goto retry;
-			}
+		if (VOP_FRLOCK(vp, F_GETLK, &flk, flag, 0, NULL, cred,
+		    NULL) == 0 && flk.l_type != F_UNLCK) {
 			*flock = flk;
 			LOCK_PRINT(rfs4_debug, "setlock(blocking lock)",
 			    F_GETLK, &flk);
