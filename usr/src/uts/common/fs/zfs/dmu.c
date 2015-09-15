@@ -659,6 +659,7 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 		length = object_size - offset;
 
 	while (length != 0) {
+		uint8_t dirty_pct, dirty_total, last_txg;
 		uint64_t chunk_end, chunk_begin;
 
 		chunk_end = chunk_begin = offset + length;
@@ -685,9 +686,24 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 			return (err);
 		}
 		dnode_free_range(dn, chunk_begin, chunk_end - chunk_begin, tx);
+		dirty_total = dmu_tx_pool(tx)->dp_dirty_total;
+		last_txg = dmu_tx_get_txg(tx);
 		dmu_tx_commit(tx);
 
 		length -= chunk_end - chunk_begin;
+
+		dirty_pct = dirty_total * 100 / zfs_dirty_data_max;
+		DTRACE_PROBE3(free__long__range, uint64_t, last_txg,
+		    uint64_t, dirty_pct,
+		    uint64_t, zfs_delay_min_dirty_percent);
+		/*
+		 * To avoid filling up a TXG with just frees wait for
+		 * the next TXG to open before freeing more chunks if
+		 * write throttle is going to start introducing delays
+		 * due to too much dirty data in the pool
+		 */
+		if (dirty_pct >= zfs_delay_min_dirty_percent)
+			txg_wait_open(dmu_objset_pool(os), last_txg + 1);
 	}
 	return (0);
 }
