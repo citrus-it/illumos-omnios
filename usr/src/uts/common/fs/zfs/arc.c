@@ -2281,7 +2281,7 @@ arc_buf_alloc_l2only(uint64_t load_guid, int size, arc_buf_contents_t type,
 	hdr->b_freeze_cksum = kmem_alloc(sizeof (zio_cksum_t), KM_SLEEP);
 	bcopy(&cksum, hdr->b_freeze_cksum, sizeof (cksum));
 	hdr->b_flags = arc_bufc_to_flags(type);
-	HDR_SET_COMPRESS(hdr, compress);
+	hdr->b_l2hdr.b_compress = compress;
 	hdr->b_flags |= ARC_FLAG_HAS_L2HDR;
 	hdr->b_size = size;
 	hdr->b_spa = load_guid;
@@ -8288,9 +8288,9 @@ l2arc_log_blk_insert(l2arc_dev_t *dev, const arc_buf_hdr_t *ab)
 	le->le_daddr = ab->b_l2hdr.b_daddr;
 	LE_SET_LSIZE(le, ab->b_size);
 	LE_SET_PSIZE(le, ab->b_l2hdr.b_asize);
-	LE_SET_COMPRESS(le, HDR_GET_COMPRESS(ab));
-	if (HDR_GET_COMPRESS(ab) != ZIO_COMPRESS_OFF) {
-		ASSERT(L2ARC_IS_VALID_COMPRESS(HDR_GET_COMPRESS(ab)));
+	LE_SET_COMPRESS(le, ab->b_l2hdr.b_compress);
+	if (ab->b_l2hdr.b_compress != ZIO_COMPRESS_OFF) {
+		ASSERT(L2ARC_IS_VALID_COMPRESS(ab->b_l2hdr.b_compress));
 		ASSERT(L2ARC_IS_VALID_COMPRESS(LE_GET_COMPRESS(le)));
 	}
 	le->le_freeze_cksum = *ab->b_freeze_cksum;
