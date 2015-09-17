@@ -50,8 +50,8 @@
 #include <sys/sa.h>
 #include <sys/zfs_onexit.h>
 #include <sys/dsl_destroy.h>
-#include <sys/wrcache.h>
 #include <sys/vdev.h>
+#include <sys/wrcache.h>
 
 /*
  * Needed to close a window in dnode_move() that allows the objset to be freed
@@ -719,47 +719,8 @@ dmu_objset_evict(objset_t *os)
 	for (int t = 0; t < TXG_SIZE; t++)
 		ASSERT(!dmu_objset_is_dirty(os, t));
 
-	if (ds) {
-		if (!ds->ds_is_snapshot) {
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_CHECKSUM),
-			    checksum_changed_cb, os));
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_COMPRESSION),
-			    compression_changed_cb, os));
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_COPIES),
-			    copies_changed_cb, os));
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_DEDUP),
-			    dedup_changed_cb, os));
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_LOGBIAS),
-			    logbias_changed_cb, os));
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_SYNC),
-			    sync_changed_cb, os));
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_REDUNDANT_METADATA),
-			    redundant_metadata_changed_cb, os));
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_RECORDSIZE),
-			    recordsize_changed_cb, os));
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_WRC_MODE),
-			    wrc_mode_changed, os));
-		}
-		VERIFY0(dsl_prop_unregister(ds,
-		    zfs_prop_to_name(ZFS_PROP_PRIMARYCACHE),
-		    primary_cache_changed_cb, os));
-		VERIFY0(dsl_prop_unregister(ds,
-		    zfs_prop_to_name(ZFS_PROP_SECONDARYCACHE),
-		    secondary_cache_changed_cb, os));
-		VERIFY(0 == dsl_prop_unregister(ds, "specialclass",
-		    special_class_changed_cb, os));
-		VERIFY(0 == dsl_prop_unregister(ds, "zpl_to_metadev",
-		    zpl_placement_changed_cb, os));
-	}
+	if (ds)
+		dsl_prop_unregister_all(ds, os);
 
 	if (os->os_sa)
 		sa_tear_down(os);
