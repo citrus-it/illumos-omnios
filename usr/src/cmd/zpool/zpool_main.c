@@ -293,10 +293,10 @@ get_usage(zpool_help_t idx) {
 	case HELP_REGUID:
 		return (gettext("\treguid <pool>\n"));
 	case HELP_VDEV_GET:
-		return (gettext("\tvdev-get <property | all> <pool>"
+		return (gettext("\tvdev-get <property | all> <pool> "
 		    "<vdev name | GUID>\n"));
 	case HELP_VDEV_SET:
-		return (gettext("\tvdev-set <property=value> <pool>"
+		return (gettext("\tvdev-set <property=value> <pool> "
 		    "<vdev name | GUID>\n"));
 	case HELP_COS_ALLOC:
 		return (gettext("\tcos-alloc <pool> <cos name | GUID>\n"));
@@ -5771,7 +5771,7 @@ zpool_do_vdev_get(int argc, char **argv)
 	cb->cb_columns[3] = GET_COL_VALUE;
 	cb->cb_type = ZFS_TYPE_VDEV;
 
-	if (vdev_get_proplist(g_zfs, argv[1],  &cb->cb_proplist) != 0)
+	if (vdev_get_proplist(g_zfs, argv[1], &cb->cb_proplist) != 0)
 		usage(B_FALSE);
 
 	vcb.vcb_vdev = argv[3];

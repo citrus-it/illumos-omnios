@@ -1649,6 +1649,16 @@ vdev_get_proplist(libzfs_handle_t *hdl, char *props, zprop_list_t **listp)
 		c = props[len];
 		props[len] = '\0';
 
+		/*
+		 * Make sure we're looking at a valid prop.
+		 */
+		if (vdev_name_to_prop(props) == ZPROP_INVAL) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "invalid property '%s'"), props);
+			return (zfs_error(hdl, EZFS_BADPROP,
+			    dgettext(TEXT_DOMAIN, "bad property list")));
+		}
+
 		if (addlist(hdl, props, listp, ZFS_TYPE_VDEV))
 			return (-1);
 		listp = &(*listp)->pl_next;
