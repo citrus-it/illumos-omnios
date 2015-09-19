@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sid.h>
@@ -1605,10 +1605,6 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	ASSERT(snode);
 	ASSERT(snode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(snode->n_state != SMB_NODE_STATE_DESTROYING);
-
-	/* Requests for no access should be denied. */
-	if (faccess == 0)
-		return (NT_STATUS_ACCESS_DENIED);
 
 	if (SMB_TREE_IS_READONLY(sr)) {
 		if (faccess & (FILE_WRITE_DATA|FILE_APPEND_DATA|
