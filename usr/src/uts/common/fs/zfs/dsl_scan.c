@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  */
 
 #include <sys/dsl_scan.h>
@@ -80,6 +80,11 @@ uint64_t zfs_free_max_blocks = UINT64_MAX;
 	(scn)->scn_phys.scn_func == POOL_SCAN_META)
 
 extern int zfs_txg_timeout;
+
+/*
+ * Enable/disable the processing of the free_bpobj object.
+ */
+boolean_t zfs_free_bpobj_enabled = B_TRUE;
 
 /* the order has to match pool_scan_type */
 static scan_cb_t *scan_funcs[POOL_SCAN_FUNCS] = {
@@ -1436,7 +1441,8 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 	 * have to worry about traversing it.  It is also faster to free the
 	 * blocks than to scrub them.
 	 */
-	if (spa_version(dp->dp_spa) >= SPA_VERSION_DEADLISTS) {
+	if (zfs_free_bpobj_enabled &&
+	    spa_version(dp->dp_spa) >= SPA_VERSION_DEADLISTS) {
 		scn->scn_is_bptree = B_FALSE;
 		scn->scn_zio_root = zio_root(dp->dp_spa, NULL,
 		    NULL, ZIO_FLAG_MUSTSUCCEED);
