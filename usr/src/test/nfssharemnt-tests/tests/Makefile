@@ -8,25 +8,35 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
+include $(SRC)/Makefile.master
 
-.PARALLEL:	$(SUBDIRS)
+ROOTOPTPKG = $(ROOT)/opt/nfssharemnt-tests
+ROOTTEST = $(ROOTOPTPKG)/tests
 
-SUBDIRS=	comstar-tests	\
-		libc-tests	\
-		lofi-tests	\
-		os-tests	\
-		ndmp-tests	\
-		nfssharemnt-tests \
-		sharefs-tests	\
-		smbclient-tests	\
-		test-runner	\
-		util-tests	\
-		zfs-tests
+DESC = stf_description
+STFDESC = $(DESC:%=$(ROOTTEST)/%)
 
-include		Makefile.com
+$(STFDESC) := FILEMODE = 0444
+
+all lint clean clobber:
+
+install: $(STFDESC)
+
+$(STFDESC) : $(ROOTTEST)
+
+$(ROOTTEST):
+	$(INS.dir)
+
+$(ROOTTEST)/% : %
+	$(INS.file)
+
+.PARALLEL: $(SUBDIRS)
+
+SUBDIRS = basic accesslist sharetab shmnt_file misc_opts \
+	stress nfslogd
+
+include $(SRC)/test/Makefile.com

@@ -1,0 +1,345 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
+DESCRIPTION:
+===========
+  This is the 'sharemnt' test suite which consists of tests for
+  share_nfs(1M), mount_nfs(1M), sharemgr(1M) and "zfs set sharenfs".
+
+
+INSTALLATION:
+============
+  You can install the suite package, or install the suite source and
+  build by yourself.
+
+  1. Installing from Packages
+
+    o In the majority of cases, the test suite can be installed from
+      packages. To do that, you need to be as root. The package is
+      called pkg:/system/test/nfssharemnt and installs into "/opt" by default.
+      Installation is via the standard Solaris package installation
+      tool pkg(1M). To install it simply enter the
+      following command line:
+
+        # pkg install pkg:/system/test/nfssharemnt@<version>
+
+      It is recommended that you install the packages from scratch,
+      rather than on top of an existing installation.  Thus, if an
+      old version of the tests is installed:
+
+        # pkg uninstall pkg:/system/test/nfssharemnt@<version>
+
+  2. Installing the Test Suite Source
+
+     You can install the suite source locally as any user.
+
+
+UNINSTALLATION:
+==============
+  Prior to uninstalling the test suite, you may want to run
+  stf_unconfigure first. For more detail see UNCONFIGURATION.
+
+  1. Uninstalling the Test Suite Package
+
+     Use the standard Solaris package installation tool pkg(1M) to
+     uninstall the package as root:
+
+     # pkg uninstall pkg:/system/test/nfssharemnt@<version>
+
+  2. Uninstalling the Test Suite Source
+
+     You can remove the corresponding directory.
+
+
+BUILDING:
+========
+  The test suite is built as part of kernel nightly build.
+
+PREREQUISITES:
+=============
+  The suite runs in remote networking mode. You need to prepare
+  two systems to run all tests. One is the local host where the
+  tests are run and the other one is the remote system acting as
+  the NFS SERVER.
+
+  Also, please do the followings before running the tests:
+
+  Make sure STF and STC genutils Tools be in your PATH.
+
+     You can use either a local installation of the SUNWstc-stf and
+     SUNWstc-genutils packages:
+
+     $ PATH=$PATH:/opt/SUNWstc-stf/bin/$(isainfo -n)
+     $ PATH=$PATH:/opt/SUNWstc-genutils/bin
+     $ export PATH
+
+     or the tools you build in your own workspace, for example:
+
+     $ PATH=$PATH:<WS_ROOT>/proto/tools/stf/bin/$(isainfo -n)
+     $ PATH=$PATH:<WS_ROOT>/proto/tools/genutils/bin
+     $ export PATH
+
+     Please note that if the STC genutils tool could not be accessed by
+     NFS path, it is required to install SUNWstc-genutils package to the
+     same path on all systems participating in test.
+
+  2. MUST define environment variable "SERVER".
+
+     SERVER is for your server's hostname.
+
+  3. The suite requires the "root" password to setup the server.
+     Run 'stf_configure' as a non-root user and enter the root
+     password when prompted for it.
+
+  4. All systems under testing (including the local system) must
+     enable r* service (i.e. run the command "netservices open")
+     and be able to do rcp/rsh to each other as root; (i.e. add
+     "local_host_name root" to ~root/.rhosts on server).
+
+  5. You can define the following optional variables, if not set,
+     the default value (see config.vars file) will be used.
+
+        NFSSHRDIR - the direcotry exported in server
+        NFSMNTDIR - path for localhost to mount
+        SHAREMNT_DEBUG - debug variable
+            There are two ways to turn debug on:
+            1) export SHAREMNT_DEBUG=<value>; stf_execute ...
+            2) stf_execute -c SHAREMNT_DEBUG=<value> ...
+
+            SHAREMNT_DEBUG can be set to the following <value>
+            1) "all" for the whole suite,
+            2) "RSH" for debug RSH and all scripts executed on server,
+            3) the name of the case file you want to debug (e.g. runtests),
+            4) name of function in tools/genutils/include (e.g. wait_now),
+            5) name of function in include/sharemnt.kshlib (e.g. share_check),
+            6) combination of 2-5, separated by ":".
+
+            For example:
+            1) turn debug on for the whole suite at runtime
+               $ stf_execute -c SHAREMNT_DEBUG=all
+            2) turn debug on in function share_check() and RSH()
+               $ export SHAREMNT_DEBUG=share_check:RSH; stf_execute -m i386
+
+        TESTGRP - testing group used by sharemgr
+
+  6. Trusted Extensions over a CIPSO connection
+
+     If you want to test NFS in Trusted Extensions over a CIPSO
+     connection you MUST define the variable "ZONE_PATH" with
+     <non-global zone path>
+
+     Example:
+        $ stf_configure -c "SERVER=myserver" \
+                        -c "ZONE_PATH=/zone/public"
+
+     This will produce the resultant NFSSHRDIR default of:
+             /zone/public/TESTDIR_shmnt
+     And will produce the resultant NFSMNTDIR default of:
+             /zone/public/MNTDIR_shmnt
+
+     The default for ZONE_PATH is NULL.
+
+     NOTE: Only NFSv3 and NFSv4 are supported under Trusted Extensions.
+
+  7. For stress test, by default, we only share 2000 entries on
+     the server.  You can reset the number with the variable
+     "NUM_SHARES".
+
+     If the expected time of sharing $NUM_SHARES entries exceeds
+     2 hours, you SHOULD reset the variable "STRESS_TIMEOUT"
+     with your expected time. Eg. if you want to share 40000
+     entries, and expected time is less than 3 hours, you can set
+     with following configuration:
+
+        $ stf_configure -c "SERVER=myserver" -c "NUM_SHARES=40000"\
+                        -c "STRESS_TIMEOUT=10800"
+
+     For sharemgr group stress test, by default, we create 100 groups,
+     with 5 entries in each group.  You can reset the number
+     with the variables "NUM_GROUPS" and "NUM_ENTRYS". Eg.
+     if you want to create 200 groups, with 10 entries in each
+     group, and expected time is less than 3 hours, you can set
+     with following configuration:
+
+        $ stf_configure -c "SERVER=myserver" -c "NUM_GROUPS=200"\
+                        -c "NUM_ENTRYS=10" -c "STRESS_TIMEOUT=10800"
+
+  8. For multiple clients tests. If you want to run this suite on
+     multiple clients with the same SERVER simultaneously, please
+     note the followings:
+     - stress test does not support it.
+     - krb5 test does not support it.
+     - ZFS test does not support it.
+     - NFSSHRDIR, NFSMNTDIR, ZONE_PATH MUST be set as same for
+       nfslogd test.
+
+  9. For krb5 tests. STC krb5tools are required, they can be found in the
+     STC genutils tool, see more details in its README.
+
+     For using krb5tools, please make sure these packages are installed
+     or the related commands are available on your test systems:
+     - SUNWkdcr: Kerberos V5 KDC (root)
+     - SUNWkdcu: Kerberos V5 Master KDC (user)
+     - SUNWkrbr: Kerberos version 5 support (Root)
+     - SUNWkrbu: Kerberos version 5 support (Usr)
+
+     The krb5 tests also use three other env variables: DNS_DOMAIN,
+     SRV_DNS_DOMAIN, DNS_SERVER:
+
+     DNS_DOMAIN     - client dns domain. Default value is
+                      sfbay.sun.com.
+     SRV_DNS_DOMAIN - server dns domain. By default it has
+                      the same value as DNS_DOMAIN. User need
+                      to set it if server has a different
+                      DNS domain than client.
+     DNS_SERVER     - a dns server that can resolve client
+                      and server's dns names.
+
+     Notes: DNS_DOMAIN and SRV_DNS_DOMAIN is used to construct
+     full qualified domain name for client and server, so they
+     cannot be, for example, "sun.com", instead they should
+     be "sfbay.sun.com", "ireland.sun.com", etc. BTW, although
+     test scripts can get client and server's full qualified
+     domain name automatially from dns sever, that requires
+     reverse dns lookup has been set up for machines being
+     queried, which is not always true for lab machines.
+
+ 10. For sharetab tests. One case needs reboot the server, to run
+     it, please set env variable SHRTAB_REBOOT as TRUE. The
+     default value is FALSE, this case will be UNTEST.
+
+ 11. If both client and server are setup with RDMA connection and you
+     want to run the tests with NFS/RDMA, set the following variable
+     before configuration:
+        $ export TESTRDMA=yes     (default TESTRDMA=no)
+
+     The "proto=rdma" option will be added to the mount options of the
+     "basic" and "krb5/basic" subdirs, if TESTRMDA=yes.
+
+ 12. With more share/mount options are added to basic subdir, its test
+     assertion list becomes bigger, so it takes more time to run basic
+     tests. If time is in pressure, user can choose what to run by picking
+     the option combinations from the default selectable lists(please
+     see SHROPTS_LIST, MNTOPTS_LIST and VEROPTS_LIST defined in
+     basic/basic.vars). Note: other options beyond the relative list
+     are not allowed.
+
+     For example, set the following variables before configuration:
+
+        $ export SHROPTS="rw public"      (default SHROPTS=SHROPTS_LIST)
+        $ export MNTOPTS="ro proto=tcp"   (default MNTOPTS=MNTOPTS_LIST)
+        $ export VEROPTS="vers=4 vers=2"  (default VEROPTS=VEROPTS_LIST)
+
+     In addition, for saving the time of execution, it is strongly
+     suggested to install and use STF tools locally.
+
+ 13. By default, krb5/basic will not test public option, if you want
+     to run krb5 tests with public option, set the following variable
+     before configuration:
+
+        $ export KRB5_PUBLIC=yes          (default KRB5_PUBLIC=no)
+
+     And if you want to limit the NFS version tests to default, v4,
+     v3, or v2 or combination of these, set the following variable
+     before configuration, e.g. to default and v3, do:
+
+        $ export KRB5_VERS="null 3"       (default KRB5_VERS="null 4 3 2")
+
+     Both variables must be set BEFORE or at "stf_configure" to generate
+     the correct set of tests, for example:
+
+	$ export KRB5_VERS="null" ; stf_configure
+     or $ stf_configure -c KRB5_VERS=4 -c KRB5_PUBLIC=yes
+
+ 14. To test options quota/noquota of mount_nfs(1M) in misc_opts, if NFSSHRDIR
+     is based on UFS, they will be setup using LOFI (but NOTE that the LOFI
+     setup will be lost if you reboot the SERVER). Tests covered quota/noquota
+     options may fail expectedly if LOFI setup is gone.
+
+
+CONFIGURATION:
+=============
+  You can choose one of the following ways to define the variables
+  and configure your suite from the top level directory.
+
+        1) define environment variables
+           $ export SERVER=myserver
+           $ stf_configure
+
+        2) use '-c" option
+           $ stf_configure -c "SERVER=myserver" \
+                -c "SHAREMNT_DEBUG=configure"
+
+        3) use '-f' option
+           $ echo "export SERVER=myserver" > /tmp/varfile
+           $ stf_configure -f /tmp/varfile
+
+
+EXECUTION:
+=========
+  At execution phase, you can run 'stf_execute' by itself, or run
+  'stf_execute -c' specifying optional variables which will override
+  those specified in the configure phase.
+
+  All results will be saved in journal files under the 'STF_RESULTS'
+  directory; this directory defaults to
+        /var/tmp/nfssharemnt-tests/results
+  when the test suite is executed from /opt/SUNWstc-nfs-sharemnt
+
+
+UNCONFIGURATION:
+===============
+  You can run 'stf_unconfigure' from the top level directory.
+     $ stf_unconfigure
+
+  Please note that in order to run tests after unconfiguration,
+  'stf_configure' must first be invoked to reconfigure the test
+  suite before running 'stf_execute'.
+
+
+TEST STRUCTURE:
+==============
+  STF_TEST_SUITE--include
+                |-tests-----basic
+                          |-krb5
+                          |-nfslogd
+                          |-others
+                          |-sharetab
+                          |-stress
+
+ - ksh script libs are put into STF_TEST_SUITE/include
+ - test cases are grouped into 6 directories so far, more will
+   be added in the later phases as needed:
+        - basic: the basic share_nfs/mount_nfs options
+        - krb5: share and mount with sec=krb5* options
+        - nfslogd: tests include log option with different tag
+        - others: tests require specific system configuration
+                  and regression tests for the bugs found/fixed
+                  sharemgr
+        - sharetab: in-kernel sharetab test
+        - stress: stress test

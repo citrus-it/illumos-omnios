@@ -1,0 +1,81 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+
+DESCRIPTION:
+
+The tests in this subdirectory verify nfslogd action with
+different log tag. test_nfslog.ksh is run on server to do the
+verification, optionally, it can do the following checks:
+    - the location of the private file handle to path mapping
+      database files.
+    - the location of the private work buffer file.
+    - the location of nfs log file and operations on test file
+      are logged correctly in log file
+
+
+HOW TO ADD NEW TEST:
+
+The tests use dynamic assertion generation in STF, so it's very
+simple if you want to add new tests with other tags. Only need
+two steps:
+    - add tag definition in nfslog.conf you want to test,
+      specially, each tag is limited to one line as "awk" is used
+      to do pattern match.
+    - add corresponding log option to variable "Log_opts" in
+      nfslogd.var.
+
+
+NOTES:
+    - According to different tag definition, three files for
+      verification described above are located in different
+      subdirs under /var/nfs/smtest/.
+    - All test cases are named by prefix "NFSLOGD" combining
+      with different log tag option and nfs version option.
+    - Currently, nfslogd only supports nfsv2/v3. In the future,
+      we might have nfs server logging for version 4, in
+      addition to adding "vers=4" to variable "VEROPTS",
+      possibly we need to call test_nfslogd with different
+      arguments if work buffer and file handle file are not
+      needed. See the comments in test_nfslogd.ksh.
+    - According to nfslogd test strategy, multiple tests can not
+      run at the same time, so the suite creates three lock
+      files to serialize all cases in all clients to run one by
+      one. The lock files exist under /var/tmp/sharemnt_lock on
+      server. The content of these lock files as follows:
+
+    .stf_configure
+        1 : First client is doing setup on server
+        0 : The setup on server is finished, other clients
+            needn't do it.
+    .stf_execute
+        0 : No case is running, any case can get the lock.
+        pid : One case is running, other cases aren't allowed to
+              run at same time.
+    .stf_unconfigure
+        referent count for clients, increase 1 per client. Only
+        last client does cleanup when the value is 1.
+

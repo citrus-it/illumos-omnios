@@ -1,0 +1,1015 @@
+#! /usr/bin/ksh -p
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+. $STF_TOOLS/include/stf.kshlib
+
+# Include common STC utility functions
+if [[ -s $STC_NFSUTILS/include/nfs-util.kshlib ]]; then
+	. $STC_NFSUTILS/include/nfs-util.kshlib
+else
+	. $STF_TMPDIR/nfs-util.kshlib
+fi
+
+NAME=$(basename $0)
+PATH=/usr/bin:/usr/sbin:$PATH; export PATH
+
+# Function to cleanup and exit
+#   Usage: cleanup exit_code
+#
+function cleanup {
+	typeset Fname=cleanup
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	rm -f $STF_TMPDIR/*.out.$$
+	exit ${1}
+}
+
+# Function to generate option list with unique combination
+#   Usage: gen_opt_list the_option_array
+#   Return: the generated list
+#
+function gen_opt_list {
+	typeset Fname=gen_opt_list
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	typeset OPTLIST=${1}
+	typeset GENERATE_LIST=""
+	typeset -i length=$(echo $OPTLIST | wc -w)
+	if (( length <= 1 )); then
+		GENERATE_LIST=$OPTLIST
+	else
+		set - $OPTLIST
+		typeset item=$1 entry list
+		shift
+		list=$(gen_opt_list "$*")
+		for entry in $list; do
+			GENERATE_LIST="$GENERATE_LIST $item,$entry"
+		done
+		GENERATE_LIST="$GENERATE_LIST $item $list"
+	fi
+	echo $GENERATE_LIST
+}
+
+# Function to convert the form of options, currently including
+# ro, rw, and root, combining them with :
+#   Usage: convert_form the_option_array
+#   Return: the converted list
+#
+function convert_form {
+	typeset Fname=convert_form
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	typeset rolist rwlist rootlist optlist
+	typeset opt
+	for opt in $(echo $1 | sed 's/,/ /g'); do
+		[[ $opt == ro=* ]] && rolist=$rolist:${opt##ro=}
+		[[ $opt == rw=* ]] && rwlist=$rwlist:${opt##rw=}
+		[[ $opt == root=* ]] && rootlist=$rootlist:${opt##root=}
+	done
+	[[ -n $rolist ]] && rolist="ro=${rolist#:}"
+	[[ -n $rwlist ]] && rwlist="rw=${rwlist#:}"
+	[[ -n $rootlist ]] && rootlist="root=${rootlist#:}"
+	for opt in $rolist $rwlist $rootlist; do
+		optlist=$optlist,$opt
+	done
+	echo ${optlist#,}
+}
+
+# Function to get all sec options from share/mount option string
+# Usage: get_sec_str [option_str]
+#
+function get_sec_str {
+	typeset Fname=get_sec_str
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+	
+	typeset opts=$1
+	typeset secopts=""
+	opts=$(echo $opts | tr "," " ")
+	for o in $opts; do
+		if [[ $o == "sec="* ]]; then
+			o=${o#sec=}
+			o=$(echo $o | tr ":" " ")
+			secopts="$secopts $o"
+		fi
+	done
+	echo $secopts
+}
+
+# Function to get matched sec option used between client and server.
+# Usage: get_sec_opt [mntopt] [shropt]
+#
+function get_sec_opt {
+	typeset Fname=get_sec_opt
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+                || :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	mntopt=$1
+	shropt=$2
+
+        typeset sec_opt=""
+        sec_shr=$(get_sec_str $shropt)
+        # default sec flavour is "sys" when sharing
+        [[ -z $sec_shr ]] && sec_shr="sys"
+        sec_mnt=$(get_sec_str $mntopt)
+
+        if [[ -z $sec_mnt ]]; then
+                # if clients doesn't sepcify sec flavour when mounting,
+                # use the first one specified when sharing on server
+                sec_opt=$(echo $sec_shr | cut -d" " -f1)
+        else
+                if echo $sec_mnt | grep " " >/dev/null; then
+                        # client can't specify multiple sec flavours when
+                        # calling mount. Since domount_check() is called
+                        # only in positive test cases, this shouldn't happen.
+                        echo "\n$Fname: multiple sec options when mounting"
+                        echo "*** mntopt=<$mntopt>, shropt=<$shropt>"
+                        return 1
+                fi
+
+                # look for if $sec_shr contains the one specified by
+                # client
+                for o in $sec_shr; do
+                        [[ $o == $sec_mnt ]] && sec_opt=$o && break
+                done
+        fi
+
+        if [[ -z $sec_opt ]]; then
+                # couldn't find matched sec option. This shouldn't happen
+                # because domount_check() is called only in positive test
+                echo "\n$Fname: didn't find matched sec flavor"
+                echo "*** mntopt=<$mntopt>, shropt=<$shropt>"
+                return 1
+        fi
+
+	echo "sec=$sec_opt"
+}
+
+# Function to do an NFS share with option provided at SERVER;
+#   then verify filesystem is shared correctly with the option
+#   SERVER, SHRDIR, MNTDIR and STF_TMPDIR are global variables
+#   Usage: share_check shropt [shared_filesystem]
+#
+function share_check {
+	typeset Fname=share_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	typeset shropt=${1}	# options to use in share and check
+	[[ -n ${2} ]] && typeset SHRDIR=${2}
+
+	# provide the new share options to server
+	# and reshare SHRDIR with these options
+	echo "$shropt" > $STF_TMPDIR/shropt.out.$$
+
+	scp $STF_TMPDIR/shropt.out.$$ \
+		root@$SERVER:$SRV_TMPDIR/ShrOpts.sharemnt \
+		> $STF_TMPDIR/rcp.out.$$ 2>&1
+	if [[ $? != 0 ]]; then
+		echo "$Fname: failed to copy <shropt.out.$$> to <$SERVER>"
+		cat $STF_TMPDIR/rcp.out.$$
+		cleanup $STF_UNRESOLVED
+	fi
+
+	echo "Resharing $SHRDIR with <$shropt> options ... \c"
+	typeset SRVDEBUG=$STC_GENUTILS_DEBUG:$SHAREMNT_DEBUG
+	[[ :$SRVDEBUG: == *:RSH:* ]] && SRVDEBUG=all
+	RSH root $SERVER \
+		"export SHAREMNT_DEBUG=$SRVDEBUG; \
+		$SRV_TMPDIR/srv_setup -r $SHRDIR" \
+		> $STF_TMPDIR/rsh.out.$$ 2>&1
+	rc=$?
+	[[ :$SRVDEBUG: == *:all:* ]] && cat $STF_TMPDIR/rsh.out.$$ 1>&2
+	grep "Done" $STF_TMPDIR/rsh.out.$$ > /dev/null 2>&1
+	if [[ $? != 0 || $rc != 0 ]]; then
+		echo "$Fname: run $SRV_TMPDIR/srv_setup in $SERVER failed"
+		cat $STF_TMPDIR/rsh.out.$$
+		cleanup $STF_FAIL
+	fi
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to do an NFS mount;
+#   then verify filesystem is mounted correctly with provided option
+#   SERVER, SHRDIR, MNTDIR and STF_TMPDIR are global variables
+#   Usage: domount_check [URL] mntopt [shropt] [shared_filesystem]
+#
+function domount_check {
+	typeset Fname=domount_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	typeset -i isURL=0
+	if [[ $1 == URL ]]; then
+		isURL=1
+		shift
+	fi
+	typeset mntopt=${1}	# options to use in mount and check
+	typeset shropt=${2}	# options to use in share and check
+	typeset opt_flg
+	[[ -n ${3} ]] && typeset SHRDIR=${3}
+	[[ -n $mntopt ]] && opt_flg="-o"
+
+	echo $mntopt | grep -i remount > /dev/null 2>&1
+	if (( $? != 0 )); then
+		# make sure MNTDIR is not mounted at this point
+		umount -f $MNTDIR > /dev/null 2>&1
+	fi
+
+	typeset resource="$SERVER:${SHRDIR}${SHRDIR_OFFSET}"
+	(( isURL == 1 )) && resource="nfs://$SERVER${SHRDIR}${SHRDIR_OFFSET}"
+	echo "Mounting $resource at $MNTDIR with MNTOPT=<$mntopt> ... \c"
+	mount -F nfs $opt_flg $mntopt $resource $MNTDIR \
+		> $STF_TMPDIR/mnt.out.$$ 2>&1
+	if (( $? != 0 )); then
+		echo "\n$Fname: mount failed"
+		cat $STF_TMPDIR/mnt.out.$$
+		cleanup $STF_FAIL
+	fi
+	echo "OK"
+
+	echo "Checking $MNTDIR with MNTOPT=$mntopt ... \c"
+	nfsstat -m $MNTDIR > $STF_TMPDIR/nstat.out.$$ 2>&1
+	if (( $? != 0 )); then
+		echo "\n$Fname: nfsstat failed"
+		cat $STF_TMPDIR/nstat.out.$$
+		cleanup $STF_UNRESOLVED
+	fi
+	mount | grep "^$MNTDIR on" > $STF_TMPDIR/opt.out.$$
+
+	typeset sec_opt=""
+	if [[ -n $shropt ]]; then
+	    sec_opt=$(get_sec_opt "$mntopt" $shropt) || cleanup $STF_UNRESOLVED
+	fi
+
+	typeset OPTs=$(echo $mntopt | sed 's/,/ /g')
+	if ! echo $OPTs || grep "sec=" >/dev/null; then
+		OPTs="$OPTs $sec_opt"
+	fi
+	for opt in $OPTs; do
+		case $opt in
+		rw|remount) grep -w "read" $STF_TMPDIR/opt.out.$$ | \
+				grep -w "write" > /dev/null 2>&1
+			rc=$?
+			;;
+		ro) grep "read only" $STF_TMPDIR/opt.out.$$ > /dev/null 2>&1
+			rc=$?
+			;;
+		sec=krb5*) grep "Flags:" $STF_TMPDIR/nstat.out.$$ | \
+				grep "$opt," > /dev/null 2>&1
+			rc=$?
+			;;
+		*) grep "Flags:" $STF_TMPDIR/nstat.out.$$ | \
+				grep -w "$opt" > /dev/null 2>&1
+			rc=$?
+			if (( $rc != 0 )); then
+				grep -w "$opt" $STF_TMPDIR/opt.out.$$ \
+					> /dev/null 2>&1
+				rc=$?
+			fi
+			;;
+		esac
+		if (( $rc != 0 )); then
+			echo "\n$Fname: didn't get correct <$opt> \c"
+			echo "in mntopt<$mntopt>"
+			echo "*** opt=<$opt>, shropt=<$shropt>"
+			cat $STF_TMPDIR/opt.out.$$
+			cat $STF_TMPDIR/nstat.out.$$
+			cleanup $STF_FAIL
+		fi
+	done
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to unmount an NFS mount point;
+#   then verify filesystem is unmounted successfully
+#   SERVER, SHRDIR, MNTDIR and STF_TMPDIR are global variables
+#   Usage: unmount_check
+#
+function unmount_check {
+	typeset Fname=unmount_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	echo "Unmounting current mount point $MNTDIR ... \c"
+
+	wait_now 10 "umount $MNTDIR > $STF_TMPDIR/umnt.out.$$ 2>&1"
+	if [[ $? != 0 ]]; then
+		echo "\n$Fname: umount failed"
+		cat $STF_TMPDIR/umnt.out.$$
+		cleanup $STF_FAIL
+	fi
+	nfsstat -m $MNTDIR | grep "$MNTDIR" > /dev/null 2>&1
+	if [[ $? == 0 ]]; then
+		echo "\n$Fname: umount didn't unmount $MNTDIR successfully"
+		echo "... $MNTDIR is still mounted"
+		nfsstat -m $MNTDIR
+		cleanup $STF_FAIL
+	fi
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to do an NFS automount;
+#   then verify filesystem is mounted correctly with provided option
+#   SERVER, SHRDIR, MNTDIR and STF_TMPDIR are global variables
+#   Usage: automount_check [URL] mntopt [shropt] [tag] [shared_filesystem]
+#
+function automount_check {
+	typeset Fname=automount_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	typeset -i isURL=0
+	if [[ $1 == URL ]]; then
+		isURL=1
+		shift
+	fi
+	typeset mntopt=${1}	# options to use in mount and check
+	typeset shropt=${2}	# options to use in share and check
+	typeset tn="${3}_$$_"	# short unique name for auto entry name
+	[[ -n ${4} ]] && typeset SHRDIR=${4}
+
+	# Insert the entry of these options to the map
+	typeset resource="$SERVER:${SHRDIR}${SHRDIR_OFFSET}"
+	(( isURL == 1 )) && resource="nfs://$SERVER${SHRDIR}${SHRDIR_OFFSET}"
+	an=$(echo "$mntopt" | sed -e 's/sec=//g' -e 's/://g')
+	an="$tn$an"
+	echo "SM_$an -${mntopt} $resource" \
+		> $STF_TMPDIR/auto_indirect.shmnt
+
+	echo "Auto-Mounting (indirectly) $AUTOIND/SM_$an ..."
+	echo "\t with MNTOPT=<$mntopt> ... \c"
+	# If resource is a file, use "ls" instead of "cd" to mount
+	ckFILE=$(basename $SHRDIR)
+	if [[ $ckFILE == *file ]]; then
+		# first time automount tries to check for ISDIR, ignore
+		ckCMD="ls -lv"
+		$ckCMD $AUTOIND/SM_$an > /dev/null 2>&1
+	else
+		ckCMD="cd"
+	fi
+	$ckCMD $AUTOIND/SM_$an > $STF_TMPDIR/amnt.out.$$ 2>&1
+	if (( $? != 0 )); then
+		echo "\n$Fname: automount ($ckCMD $AUTOIND/SM_$an) failed"
+		cat $STF_TMPDIR/amnt.out.$$
+		nfsstat -m $AUTOIND/SM_$an
+		cleanup $STF_FAIL
+	fi
+	echo "OK"
+
+	echo "Checking $AUTOIND/SM_$an with MNTOPT=$mntopt ... \c"
+	nfsstat -m $AUTOIND/SM_$an > $STF_TMPDIR/nstat.out.$$ 2>&1
+	if (( $? != 0 )); then
+		echo "\n$Fname: nfsstat failed"
+		cat $STF_TMPDIR/nstat.out.$$
+		cleanup $STF_UNRESOLVED
+	fi
+	mount | grep "$AUTOIND/SM_$an" > $STF_TMPDIR/opt.out.$$
+
+	typeset sec_opt=""
+	if [[ -n $shropt ]]; then
+	    sec_opt=$(get_sec_opt "$mntopt" $shropt) || cleanup $STF_UNRESOLVED
+	fi
+
+	typeset OPTs=$(echo $mntopt | sed 's/,/ /g')
+	if ! echo $OPTs || grep "sec=" >/dev/null; then
+		OPTs="$OPTs $sec_opt"
+	fi
+	for opt in $OPTs; do
+		case $opt in
+		rw) grep -w "read" $STF_TMPDIR/opt.out.$$ | \
+				grep -w "write" > /dev/null 2>&1
+			rc=$?
+			;;
+		ro) grep "read only" $STF_TMPDIR/opt.out.$$ > /dev/null 2>&1
+			rc=$?
+			;;
+		sec=krb5*) grep "Flags:" $STF_TMPDIR/nstat.out.$$ | \
+				grep "$opt," > /dev/null 2>&1
+			rc=$?
+			;;
+		*) grep "Flags:" $STF_TMPDIR/nstat.out.$$ | \
+				grep -w "$opt" > /dev/null 2>&1
+			rc=$?
+			if (( $rc != 0 )); then
+				grep -w "$opt" $STF_TMPDIR/opt.out.$$ \
+					> /dev/null 2>&1
+				rc=$?
+			fi
+			;;
+		esac
+		if (( $rc != 0 )); then
+			echo "\n$Fname: didn't get correct <$opt> \c"
+			echo "in mntopt<$mntopt>"
+			echo "*** opt=<$opt>, shropt=<$shropt>"
+			cat $STF_TMPDIR/opt.out.$$
+			cat $STF_TMPDIR/nstat.out.$$
+			cleanup $STF_FAIL
+		fi
+	done
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to check the unknown users map
+#   Usage: do_anon_check <anon_uid> <file>
+#
+function do_anon_check {
+	typeset Fname=do_anon_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	typeset anon_uid=$1
+	typeset real_uid=$(ls -ln $2 | awk '{print $3}')
+	if [[ $real_uid == $anon_uid ]]; then
+		return 0
+	else
+		echo "\tthe file owner is $real_uid instead of $anon_uid"
+		return 1
+	fi
+}
+
+# Function to do read/write testing in the NFS mount point
+#   SERVER, SHRDIR, MNTDIR and STF_TMPDIR are global variables
+#   Usage: do_rw_test [test_file_name]
+#               test_file_name - the name of log file. If this
+#               isn't specified, a default name will be used.
+#
+#          do_rw_test <directive> <args>
+#          1. directive = OWNER
+#             args - the expected owner of the file created
+#                       in the test.
+#          2. directive = ANON
+#             args - share options
+#          3. directive = WRITER
+#             args - user name
+#
+function do_rw_test {
+	typeset Fname=do_rw_test
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	typeset Tfile=tfile.$$
+	typeset expected_owner=""
+	typeset anon_uid=""
+	typeset write_user=""
+	if (( $# == 1 )); then
+		Tfile=${1}
+	elif (( $# > 1 )); then
+		case $1 in
+		ANON)
+			if [[ -n $2 && $2 == *anon=* ]]; then
+			    anon_uid=$(echo $2 | sed -e 's/.*anon=//;s/,.*//')
+			else
+			    anon_uid=$(id nobody | \
+				sed 's/uid=\(.*\)(nobody) gid=.*/\1/')
+			fi
+		;;
+		OWNER)
+			expected_owner=$2
+		;;
+		WRITER)
+			write_user=$2
+			expected_owner=$2
+		;;
+		*) echo "\n$Fname: Unknown keyword"
+		exit $STF_UNRESOLVED
+		;;
+		esac
+	fi
+
+	echo "Doing READ/WRITE testing at $MNTDIR ... \c"
+	typeset TData="READ/WRITE tests at $MNTDIR"
+
+	if [[ -n $write_user ]]; then
+		su $write_user -c "echo $TData > $MNTDIR/$Tfile" \
+			2> $STF_TMPDIR/wr.out.$$
+	else
+		echo "$TData" 1> $MNTDIR/$Tfile 2> $STF_TMPDIR/wr.out.$$
+	fi
+	if (( $? != 0 )); then
+		echo "\n$Fname: WRITE to $MNTDIR failed"
+		cat $STF_TMPDIR/wr.out.$$
+		cleanup $STF_FAIL
+	fi
+	if [[ -n $anon_uid ]]; then
+		do_anon_check $anon_uid $MNTDIR/$Tfile \
+			> $STF_TMPDIR/anon.out.$$ 2>&1
+		if (( $? != 0 )); then
+			echo "\n$Fname: the file owner is not expected"
+			cat $STF_TMPDIR/anon.out.$$
+			cleanup $STF_FAIL
+		fi
+	fi
+	if [[ -n $write_user ]]; then
+	    su $write_user -c "ls -lv $MNTDIR/$Tfile" \
+		2> $STF_TMPDIR/ls.out.$$ | grep "$Tfile" > /dev/null 2>&1
+	else
+	    ls -lv $MNTDIR/$Tfile 2> $STF_TMPDIR/ls.out.$$ | \
+		grep "$Tfile" > /dev/null 2>&1
+	fi
+	if (( $? != 0 )); then
+		echo "\n$Fname: READDIR of <$Tfile> in $MNTDIR failed"
+		cat $STF_TMPDIR/ls.out.$$
+		cleanup $STF_FAIL
+	fi
+	if [[ -n $expected_owner ]]; then
+		if [[ -n $write_user ]]; then
+		    typeset ck_line=$(su $write_user -c "ls -l $MNTDIR/$Tfile")
+		else
+		    typeset ck_line=$(ls -l $MNTDIR/$Tfile)
+		fi
+		echo $ck_line | awk '{print $3}' | grep -w $expected_owner \
+			> /dev/null 2>&1
+		if (( $? != 0 )); then
+			echo "\n$Fname: <$Tfile> has incorrected owner"
+			echo $ck_line
+			cleanup $STF_FAIL
+		fi
+	fi
+	if [[ -n $write_user ]]; then
+		typeset fdata=$(su $write_user -c "cat $MNTDIR/$Tfile" \
+					2> $STF_TMPDIR/cat.out.$$)
+	else
+		typeset fdata=$(cat $MNTDIR/$Tfile 2> $STF_TMPDIR/cat.out.$$)
+	fi
+	if [[ "$fdata" != "$TData" ]]; then
+		echo "\n$Fname: READ file in $MNTDIR failed"
+		cat $STF_TMPDIR/cat.out.$$
+		cleanup $STF_FAIL
+	fi
+	if [[ -n $write_user ]]; then
+		su $write_user -c "rm $MNTDIR/$Tfile" 2> $STF_TMPDIR/rm.out.$$
+	else
+		rm $MNTDIR/$Tfile 2> $STF_TMPDIR/rm.out.$$
+	fi
+	if (( $? != 0 )); then
+		echo "\n$Fname: Remove $MNTDIR/$Tfile failed"
+		cat $STF_TMPDIR/rm.out.$$
+		cleanup $STF_FAIL
+	fi
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to do read only testing in the NFS mount point
+#   SERVER, SHRDIR, MNTDIR and STF_TMPDIR are global variables
+#   Usage: do_ro_test
+#
+function do_ro_test {
+	typeset Fname=do_ro_test
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	echo "Doing READ ONLY testing at $MNTDIR ... \c"
+	typeset TData="This is a rofile for sharemnt Testing"
+	ls -lv $MNTDIR/rofile 2> $STF_TMPDIR/ls.out.$$ | \
+		grep "rofile" > /dev/null 2>&1
+	if [[ $? != 0 ]]; then
+		echo "\n$Fname: READDIR of <rofile> in $MNTDIR failed"
+		cat $STF_TMPDIR/ls.out.$$
+		cleanup $STF_FAIL
+	fi
+	typeset fdata=$(head -1 $MNTDIR/rofile 2> $STF_TMPDIR/head.out.$$)
+	if [[ "$fdata" != "$TData" ]]; then
+		echo "\n$Fname: READ rofile in $MNTDIR failed"
+		cat $STF_TMPDIR/head.out.$$
+		cleanup $STF_FAIL
+	fi
+	echo "New Line" >> $MNTDIR/rofile 2> /dev/null
+	if [[ $? == 0 ]]; then
+		echo "\n$Fname: Unexpected successful to write into rofile"
+		cat $MNTDIR/rofile
+		cleanup $STF_FAIL
+	fi
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to do negative read testing in the NFS mount point
+#   SERVER, SHRDIR, MNTDIR and STF_TMPDIR are global variables
+#   Usage: do_neg_ro_test
+#
+function do_neg_ro_test {
+	typeset Fname=do_neg_ro_test
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	echo "Doing NEGATIVE READ testing at $MNTDIR ... \c"
+	ls -lv $MNTDIR >$STF_TMPDIR/*.out.$$ 2>&1
+	if [[ $? == 0 ]]; then
+		echo "\n$Fname: READDIR in $MNTDIR succeeded, but it shouldn't"
+		cat $STF_TMPDIR/*.out.$$
+		cleanup $STF_FAIL
+	fi
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to do an NFS share;
+#   then verify filesystem can not be shared with provided options
+#   Usage: do_neg_share_check shropt [shared_filesystem]
+#
+function do_neg_share_check {
+	typeset Fname=do_neg_share_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+	typeset shropt=${1}	# options to use in share
+	[[ -n ${2} ]] && typeset SHRDIR=${2}
+
+	# provide the new share options to server
+	# and reshare SHRDIR with these options
+	echo "$shropt" > $STF_TMPDIR/shropt.out.$$
+
+	scp $stf_tmpdir/Shropt.out.$$ \
+		root@$SERVER:$SRV_TMPDIR/ShrOpts.sharemnt \
+		> $STF_TMPDIR/rcp.out.$$ 2>&1
+	if [[ $? != 0 ]]; then
+		echo "$Fname: failed to copy <shropt.out.$$> to <$SERVER>"
+		cat $STF_TMPDIR/rcp.out.$$
+		cleanup $STF_UNRESOLVED
+	fi
+
+	echo "Resharing $SHRDIR with <$shropt> options ... \c"
+	typeset SRVDEBUG=$STC_GENUTILS_DEBUG:$SHAREMNT_DEBUG
+	[[ :$SRVDEBUG: == *:RSH:* ]] && SRVDEBUG=all
+	RSH root $SERVER \
+		"export SHAREMNT_DEBUG=$SRVDEBUG; \
+		$SRV_TMPDIR/srv_setup -r $SHRDIR" \
+		> $STF_TMPDIR/rsh.out.$$ 2>&1
+	[[ :$SRVDEBUG: == *:all:* ]] && cat $STF_TMPDIR/rsh.out.$$ 1>&2
+	grep "Done" $STF_TMPDIR/rsh.out.$$ > /dev/null 2>&1
+	if [[ $? == 0 ]]; then
+		echo "\n$Fname: run $SRV_TMPDIR/srv_setup in $SERVER succeeded"
+		echo "$Fname: share succeeded, but it should fail for"
+		echo "\t the invalid SHROPT=<$shropt>"
+		cat $STF_TMPDIR/rsh.out.$$
+		cleanup $STF_FAIL
+	fi
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to do an NFS mount;
+#   then verify filesystem can not be mounted with provided options
+#   Usage: do_neg_mount_check mntopt
+#
+function do_neg_mount_check {
+	typeset Fname=do_neg_mount_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+	typeset mntopt=${1}	# options to use in mount
+	typeset opts=""
+	[[ -n $mntopt ]] && opts="-o $mntopt"
+
+	echo $mntopt | grep -i remount > /dev/null 2>&1
+	if (( $? != 0 )); then
+		# make sure MNTDIR is not mounted at this point
+		umount -f $MNTDIR > /dev/null 2>&1
+	fi
+
+	echo "Mounting $SERVER:${SHRDIR}${SHRDIR_OFFSET} at $MNTDIR"
+	echo "\t with MNTOPT=<$mntopt> ... \c"
+	mount -F nfs $opts "$SERVER":${SHRDIR}${SHRDIR_OFFSET} $MNTDIR \
+		> $STF_TMPDIR/mnt.out.$$ 2>&1
+	if [[ $? == 0 && ,$mntopt, == @(*,vers=2,*|*,vers=3,*) ]]; then
+		echo "\n$Fname: mount succeeded, but it should fail"
+		cat $STF_TMPDIR/mnt.out.$$
+		umount -f $MNTDIR > /dev/null 2>&1
+		cleanup $STF_FAIL
+	fi
+	echo "OK"
+	echo $mntopt | grep -i remount > /dev/null 2>&1
+	if (( $? == 0 )); then
+		rm -f $STF_TMPDIR/*.out.$$
+		return
+	fi
+
+	echo "Checking $MNTDIR with MNTOPT=$mntopt ... \c"
+	nfsstat -m $MNTDIR > $STF_TMPDIR/nstat.out.$$ 2>&1
+	if (( $? != 0 )); then
+		echo "\n$Fname: nfsstat failed"
+		cat $STF_TMPDIR/nstat.out.$$
+		cleanup $STF_UNRESOLVED
+	elif [[ -s $STF_TMPDIR/nstat.out.$$ && \
+	    ,$mntopt, == @(*,vers=2,*|*,vers=3,*) ]]; then
+		echo "\n$Fname: it is wrong for nfsstat to display some info."
+		cat $STF_TMPDIR/nstat.out.$$
+		umount -f $MNTDIR > /dev/null 2>&1
+		cleanup $STF_FAIL
+	fi
+
+	mount | grep "^$MNTDIR on" > $STF_TMPDIR/opt.out.$$
+	if [[ $? == 0 && ,$mntopt, == @(*,vers=2,*|*,vers=3,*) ]]; then
+		echo "\n$Fname: it is wrong to be found via mount."
+		cat $STF_TMPDIR/opt.out.$$
+		umount -f $MNTDIR > /dev/null 2>&1
+		cleanup $STF_FAIL
+	fi
+
+	ls -l $MNTDIR/rofile > $STF_TMPDIR/ls.out.$$ 2>/dev/null
+	if [[ $? == 0 && ,$mntopt, != @(*,vers=2,*|*,vers=3,*) ]]; then
+		echo "\n$Fname: it is wrong to find rofile:"
+		cat $STF_TMPDIR/ls.out.$$
+		umount -f $MNTDIR > /dev/null 2>&1
+		cleanup $STF_FAIL
+	fi
+
+	rm -f $STF_TMPDIR/*.out.$$
+	echo "OK"
+}
+
+# Function to do an NFS automount;
+#   then verify filesystem can not be mounted with provided options
+#   Usage: do_neg_automount_check mntopt [tag]
+#
+function do_neg_automount_check {
+	typeset Fname=do_neg_automount_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+	typeset mntopt=${1}	# options to use in mount
+	typeset tn="${2}_$$_"	# short unique name for auto entry name
+
+	# Insert the entry of these options to the map
+	an=$(echo "$mntopt" | sed -e 's/sec=//g' -e 's/://g')
+	an="$tn$an"
+	echo  "SM_$an -${mntopt} ${SERVER}:${SHRDIR}${SHRDIR_OFFSET}" \
+		> $STF_TMPDIR/auto_indirect.shmnt
+
+	echo "Auto-Mounting (indirectly) $AUTOIND/SM_$an ..."
+	echo "\t with MNTOPT=<$mntopt> ..."
+	cd "$AUTOIND/SM_$an" > $STF_TMPDIR/amnt.out.$$ 2>&1
+	if [[ $? == 0 && ,$mntopt, == @(*,vers=2,*|*,vers=3,*) ]]; then
+		echo "$Fname: automount (cd $AUTOIND/SM_$an) succeeded, \c"
+		echo "but it should fail"
+		cat $STF_TMPDIR/amnt.out.$$
+		umount -f $AUTOIND/SM_$an > /dev/null 2>&1
+		cleanup $STF_FAIL
+	fi
+
+	echo "Checking $AUTOIND/SM_$an with MNTOPT=$mntopt ..."
+	nfsstat -m "$AUTOIND/SM_$an" > $STF_TMPDIR/nstat.out.$$ 2>&1
+	if (( $? != 0 )); then
+		echo "\n$Fname: nfsstat failed"
+		cat $STF_TMPDIR/nstat.out.$$
+		cleanup $STF_UNRESOLVED
+	elif [[ -s $STF_TMPDIR/nstat.out.$$ && \
+	    ,$mntopt, == @(*,vers=2,*|*,vers=3,*) ]]; then
+		echo "\n$Fname: it is wrong for nfsstat to display some info."
+		cat $STF_TMPDIR/nstat.out.$$
+		umount -f $AUTOIND/SM_$an > /dev/null 2>&1
+		cleanup $STF_FAIL
+	fi
+
+	mount | grep "^$AUTOIND/SM_$an on" > $STF_TMPDIR/opt.out.$$
+	if [[ $? == 0 && ,$mntopt, == @(*,vers=2,*|*,vers=3,*) ]]; then
+		echo "\n$Fname: it is wrong to be found via mount."
+		cat $STF_TMPDIR/opt.out.$$
+		umount -f $AUTOIND/SM_$an > /dev/null 2>&1
+		cleanup $STF_FAIL
+	fi
+
+	ls -l $AUTOIND/SM_$an/rofile > $STF_TMPDIR/ls.out.$$ 2>/dev/null
+	if [[ $? == 0 && ,$mntopt, != @(*,vers=2,*|*,vers=3,*) ]]; then
+		echo "\n$Fname: it is wrong to find rofile:"
+		cat $STF_TMPDIR/ls.out.$$
+		umount -f $AUTOIND/SM_$an > /dev/null 2>&1
+		cleanup $STF_FAIL
+	fi
+
+	rm -f $STF_TMPDIR/*.out.$$
+	echo "OK"
+}
+
+# Function to modify default_tgs_enctypes and default_tkt_enctypes
+#   in krb5.conf and create nfs principal with specified enctype.
+#   Usage: setup_enctype enctype_for_cfgfile enctype_for_nfs
+#
+function setup_enctype {
+        typeset Fname=setup_enctype
+        [[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+                || :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+        typeset logfile=$STF_TMPDIR/$Fname.$$
+
+        if (( $# < 2 )); then
+                echo "Usage: setup_enctype enctype_in_cfgfile enctype_of_nfssrv"
+                exit $STF_UNINITIATED
+        fi
+
+        typeset enctype_in_cfgfile=$1
+        typeset enctype_of_nfssrv=$2
+
+        # remove existing entries in krb5.conf if there are any
+        egrep -v "default_tgs_enctypes|default_tkt_enctypes" \
+            /etc/krb5/krb5.conf > /etc/krb5/krb5.tmp
+
+        # add user specified enctype values in krb5.conf
+        if [[ $enctype_in_cfgfile != "DEFAULT" ]]; then
+                awk '/^\[libdefaults\]$/ {
+                        print $0;
+                        printf "\tdefault_tgs_enctypes=%s\n",enc;
+                        printf "\tdefault_tkt_enctypes=%s\n",enc;
+                        continue } {print $0}' \
+                    enc=$enctype_in_cfgfile /etc/krb5/krb5.tmp \
+                    > /etc/krb5/krb5.conf
+        else
+                mv /etc/krb5/krb5.tmp /etc/krb5/krb5.conf
+        fi
+
+        # remove nfs principal on the server
+        princadm -c -p nfs/$SRV_FQDN $SRV_FQDN. 2>$logfile
+        ckresult $? "princadm failed" $logfile || exit $STF_UNINITIATED
+
+        # create nfs principal using user specified enctypes
+        typeset enctype_opt=""
+        [[ $enctype_of_nfssrv != DEFAULT ]] \
+            && enctype_opt=",enctype=$enctype_of_nfssrv"
+        princadm -s -p nfs/$SRV_FQDN"$enctype_opt" $SRV_FQDN. 2>$logfile
+        ckresult $? "princadm failed" $logfile || exit $STF_UNINITIATED
+}
+
+# Function to restore changes made by setup_enctype(). It removes
+#   default_tgs_enctypes and default_tkt_enctypes from krb5.conf and
+#   create nfs principals with default enctypes.
+#
+function cleanup_enctype {
+        setup_enctype DEFAULT DEFAULT
+}
+
+# Function to rcp the dfstab file to SERVER if provided and
+#   run shareall to share all entries in /etc/dfs/dfstab and
+#   verify all entries are shared with needed options
+#   Usage: do_shareall_check dfstab_file
+#
+function do_shareall_check {
+	typeset Fname=do_shareall_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	typeset shrfile=$1
+
+	# provide the new dfstab file to server
+	# and make those share entries effective by shareall
+	scp $shrfile root@$SERVER:/etc/dfs/dfstab \
+		> $STF_TMPDIR/rcp.out.$$ 2>&1
+	if (( $? != 0 )); then
+		echo "$Fname: failed to copy <$shrfile> to <$SERVER>"
+		cat $STF_TMPDIR/rcp.out.$$
+		cleanup $STF_UNRESOLVED
+	fi
+
+	echo "Sharing all entries in $SERVER:/etc/dfs/dfstab ... \c"
+	typeset SRVDEBUG=$STC_GENUTILS_DEBUG:$SHAREMNT_DEBUG
+	[[ :$SRVDEBUG: == *:RSH:* ]] && SRVDEBUG=all
+	RSH root $SERVER \
+		"export SHAREMNT_DEBUG=$SRVDEBUG; \
+		$SRV_TMPDIR/sharemnt.others -S" \
+		> $STF_TMPDIR/rsh.out.$$ 2>&1
+	rc=$?
+	[[ :$SRVDEBUG: == *:all:* ]] && cat $STF_TMPDIR/rsh.out.$$ 1>&2
+	grep "Done" $STF_TMPDIR/rsh.out.$$ > /dev/null 2>&1
+	if (( $? != 0 || $rc != 0 )); then
+		echo "$Fname: run <$SRV_TMPDIR/sharemnt.others -S> \
+			in <$SERVER> failed:"
+		cat $STF_TMPDIR/rsh.out.$$
+		cleanup $STF_FAIL
+	fi
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to unshare all entries by unshareall in server
+#   and delete the dfstab test file in client if provided
+#   Usage: do_unshareall_check dfstab_file
+#
+function do_unshareall_check {
+	typeset Fname=do_unshareall_check
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	# delete the given test dfstab file
+	rm -f $1
+
+	# unshare all test filesystems in server
+	typeset SRVDEBUG=$STC_GENUTILS_DEBUG:$SHAREMNT_DEBUG
+	[[ :$SRVDEBUG: == *:RSH:* ]] && SRVDEBUG=all
+	RSH root $SERVER \
+		"export SHAREMNT_DEBUG=$SRVDEBUG; \
+		$SRV_TMPDIR/sharemnt.others -U" \
+		> $STF_TMPDIR/rsh.out.$$ 2>&1
+	rc=$?
+	[[ :$SRVDEBUG: == *:all:* ]] && cat $STF_TMPDIR/rsh.out.$$ 1>&2
+	grep "Done" $STF_TMPDIR/rsh.out.$$ > /dev/null 2>&1
+	if (( $? != 0 || $rc != 0 )); then
+		echo "$Fname: run <$SRV_TMPDIR/sharemnt.others \c"
+		echo "-C in <$SERVER> failed:"
+		cat $STF_TMPDIR/rsh.out.$$
+		cleanup $STF_FAIL
+	fi
+
+	echo "OK"
+	rm -f $STF_TMPDIR/*.out.$$
+}
+
+# Function to get the number of clients configured on server
+# Notice:
+# stress tests will call this function as it does not support mutilple clients
+#
+function get_clients_num {
+	typeset Fname=get_clients_num
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	RSH root $SERVER \
+		"/bin/ls -l $(dirname $SRV_TMPDIR)" \
+		> $STF_TMPDIR/rsh.out.$$ 2> $STF_TMPDIR/rsh.err.$$
+	typeset -i ret=$?
+
+	#
+	# Once a client is configured on server, we created a tmp dir named
+	# SRV_TMPDIR which looks like: /var/tmp/TMPDIR_shmnt_client01
+	# Notice: If SRV_TMPDIR changes, this function should be changed too.
+	#
+	typeset name_tag=$(basename $SRV_TMPDIR | awk -F_ '{print $1"_"$2"_"}')
+	typeset client_num=$(sed '1d' $STF_TMPDIR/rsh.out.$$ | \
+		awk '{print $NF}' | egrep "^$name_tag" | wc -l 2>&1)
+	if (( $ret != 0 )); then
+		print -u2 "$Fname: RSH to SERVER<SERVER> failed"
+		cat $STF_TMPDIR/rsh.*.$$
+		client_num=0
+	fi
+	rm -f $STF_TMPDIR/rsh.*.$$
+
+	echo $client_num
+	return $ret
+}
+
+# Function to delete users via its specific tag
+# Usage: del_users <tag>
+#
+function del_users {
+	typeset Fname=del_users
+	[[ :$SHAREMNT_DEBUG: == *:$Fname:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && set -x
+
+	typeset ctag=$1
+	typeset -i ret=0
+
+	grep ":${ctag}:" /etc/passwd > $STF_TMPDIR/$NAME.users.$$ 2>/dev/null
+	while read line; do
+		user=$(echo $line | awk -F: '{print $1}')
+		userdel $user
+		(( $? != 0 )) && (( ret += 1 ))
+	done < $STF_TMPDIR/$NAME.users.$$
+
+	rm -f $STF_TMPDIR/$NAME.users.$$
+	return $ret
+}
+
+# Function to print debug info from a file to stderr
+# Usage: print_debug <file>
+#
+function print_debug {
+	[[ :$SHAREMNT_DEBUG: == *:$NAME:* \
+		|| :$SHAREMNT_DEBUG: == *:RSH:* \
+		|| :$SHAREMNT_DEBUG: == *:all:* ]] && cat $1 1>&2
+}

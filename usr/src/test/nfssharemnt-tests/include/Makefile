@@ -11,22 +11,27 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-.PARALLEL:	$(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS=	comstar-tests	\
-		libc-tests	\
-		lofi-tests	\
-		os-tests	\
-		ndmp-tests	\
-		nfssharemnt-tests \
-		sharefs-tests	\
-		smbclient-tests	\
-		test-runner	\
-		util-tests	\
-		zfs-tests
+ROOTOPTPKG = $(ROOT)/opt/nfssharemnt-tests
+NFSSHRINC = $(ROOTOPTPKG)/include
 
-include		Makefile.com
+FILES = sharemnt.kshlib nfs-util.kshlib
+
+SHRLIB = $(FILES:%=$(NFSSHRINC)/%)
+$(SHRLIB) := FILEMODE = 0444
+
+all clean lint clobber:
+
+install: $(SHRLIB)
+
+$(SHRLIB): $(NFSSHRINC)
+
+$(NFSSHRINC):
+	$(INS.dir)
+
+$(NFSSHRINC)/%: %
+	$(INS.file)

@@ -1,0 +1,104 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2015, Nexenta Systems Inc. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/test/nfssharemnt@$(PKGVERS)
+set name=pkg.description value="NFS Test Suite"
+set name=pkg.summary value="Share Mount Functional Tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir path=opt/nfssharemnt-tests
+dir path=opt/nfssharemnt-tests/bin
+dir path=opt/nfssharemnt-tests/include
+dir path=opt/nfssharemnt-tests/tests
+dir path=opt/nfssharemnt-tests/tests/accesslist
+dir path=opt/nfssharemnt-tests/tests/basic
+dir path=opt/nfssharemnt-tests/tests/misc_opts
+dir path=opt/nfssharemnt-tests/tests/nfslogd
+dir path=opt/nfssharemnt-tests/tests/sharetab
+dir path=opt/nfssharemnt-tests/tests/shmnt_file
+dir path=opt/nfssharemnt-tests/tests/stress
+file path=opt/nfssharemnt-tests/README mode=0444
+file path=opt/nfssharemnt-tests/STC.INFO mode=0444
+file path=opt/nfssharemnt-tests/STF.INFO mode=0444
+file path=opt/nfssharemnt-tests/bin/checkenv_def mode=0555
+file path=opt/nfssharemnt-tests/bin/cleanup mode=0555
+file path=opt/nfssharemnt-tests/bin/config.vars mode=0555
+file path=opt/nfssharemnt-tests/bin/configure mode=0555
+file path=opt/nfssharemnt-tests/bin/miscshare mode=0555
+file path=opt/nfssharemnt-tests/bin/setup mode=0555
+file path=opt/nfssharemnt-tests/bin/srv_setup mode=0555
+file path=opt/nfssharemnt-tests/bin/stf_description mode=0444
+file path=opt/nfssharemnt-tests/bin/unconfigure mode=0555
+file path=opt/nfssharemnt-tests/include/nfs-util.kshlib mode=0444
+file path=opt/nfssharemnt-tests/include/sharemnt.kshlib mode=0444
+file path=opt/nfssharemnt-tests/tests/accesslist/access_test mode=0555
+file path=opt/nfssharemnt-tests/tests/accesslist/accesslist.vars mode=0555
+file path=opt/nfssharemnt-tests/tests/accesslist/checkenv_def mode=0555
+file path=opt/nfssharemnt-tests/tests/accesslist/mkassert mode=0555
+file path=opt/nfssharemnt-tests/tests/accesslist/neg_access mode=0555
+file path=opt/nfssharemnt-tests/tests/accesslist/runtests mode=0555
+file path=opt/nfssharemnt-tests/tests/accesslist/stf_description mode=0444
+file path=opt/nfssharemnt-tests/tests/basic/basic.vars mode=0555
+file path=opt/nfssharemnt-tests/tests/basic/checkenv_def mode=0555
+file path=opt/nfssharemnt-tests/tests/basic/mkassert mode=0555
+file path=opt/nfssharemnt-tests/tests/basic/neg_test mode=0555
+file path=opt/nfssharemnt-tests/tests/basic/runtests mode=0555
+file path=opt/nfssharemnt-tests/tests/basic/setup mode=0555
+file path=opt/nfssharemnt-tests/tests/basic/stf_description mode=0444
+file path=opt/nfssharemnt-tests/tests/misc_opts/checkenv_def mode=0555
+file path=opt/nfssharemnt-tests/tests/misc_opts/configure mode=0555
+file path=opt/nfssharemnt-tests/tests/misc_opts/misc_opts.vars mode=0555
+file path=opt/nfssharemnt-tests/tests/misc_opts/mkassert mode=0555
+file path=opt/nfssharemnt-tests/tests/misc_opts/neg_test mode=0555
+file path=opt/nfssharemnt-tests/tests/misc_opts/nosub_test mode=0555
+file path=opt/nfssharemnt-tests/tests/misc_opts/runtests mode=0555
+file path=opt/nfssharemnt-tests/tests/misc_opts/shrmnt_optchk mode=0555
+file path=opt/nfssharemnt-tests/tests/misc_opts/srv_setup mode=0555
+file path=opt/nfssharemnt-tests/tests/misc_opts/stf_description mode=0444
+file path=opt/nfssharemnt-tests/tests/misc_opts/unconfigure mode=0555
+file path=opt/nfssharemnt-tests/tests/nfslogd/configure mode=0555
+file path=opt/nfssharemnt-tests/tests/nfslogd/mkassert mode=0555
+file path=opt/nfssharemnt-tests/tests/nfslogd/nfslog.conf mode=0444
+file path=opt/nfssharemnt-tests/tests/nfslogd/nfslogd mode=0444
+file path=opt/nfssharemnt-tests/tests/nfslogd/nfslogd.vars mode=0444
+file path=opt/nfssharemnt-tests/tests/nfslogd/runtests mode=0555
+file path=opt/nfssharemnt-tests/tests/nfslogd/srv_setup mode=0555
+file path=opt/nfssharemnt-tests/tests/nfslogd/stf_description mode=0444
+file path=opt/nfssharemnt-tests/tests/nfslogd/test_nfslogd mode=0555
+file path=opt/nfssharemnt-tests/tests/nfslogd/unconfigure mode=0555
+file path=opt/nfssharemnt-tests/tests/sharetab/configure mode=0555
+file path=opt/nfssharemnt-tests/tests/sharetab/mkassert mode=0555
+file path=opt/nfssharemnt-tests/tests/sharetab/runtests mode=0555
+file path=opt/nfssharemnt-tests/tests/sharetab/sharetab.vars mode=0555
+file path=opt/nfssharemnt-tests/tests/sharetab/srv_setup mode=0555
+file path=opt/nfssharemnt-tests/tests/sharetab/stf_description mode=0444
+file path=opt/nfssharemnt-tests/tests/sharetab/unconfigure mode=0555
+file path=opt/nfssharemnt-tests/tests/shmnt_file/checkenv_def mode=0555
+file path=opt/nfssharemnt-tests/tests/shmnt_file/cleanup mode=0555
+file path=opt/nfssharemnt-tests/tests/shmnt_file/mkassert mode=0555
+file path=opt/nfssharemnt-tests/tests/shmnt_file/runtests mode=0555
+file path=opt/nfssharemnt-tests/tests/shmnt_file/shmnt_file.vars mode=0555
+file path=opt/nfssharemnt-tests/tests/shmnt_file/stf_description mode=0444
+file path=opt/nfssharemnt-tests/tests/stf_description mode=0444
+file path=opt/nfssharemnt-tests/tests/stress/configure mode=0555
+file path=opt/nfssharemnt-tests/tests/stress/mkassert mode=0555
+file path=opt/nfssharemnt-tests/tests/stress/runtests mode=0555
+file path=opt/nfssharemnt-tests/tests/stress/srv_setup mode=0555
+file path=opt/nfssharemnt-tests/tests/stress/stf_description mode=0444
+file path=opt/nfssharemnt-tests/tests/stress/stress.vars mode=0555
+file path=opt/nfssharemnt-tests/tests/stress/unconfigure mode=0555
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
