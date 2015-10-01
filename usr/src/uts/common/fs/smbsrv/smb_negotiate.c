@@ -232,8 +232,31 @@ static uint32_t	smb_nt_tcp_rcvbuf = 1048560;	/* scale factor of 4 */
 
 static int smb_xlate_dialect(const char *);
 
-int smb_cap_passthru = 1;
-int smb_cap_ext_sec = 1;
+/*
+ * "Capabilities" offered by SMB1 Negotiate Protocol.
+ * See smb.h for descriptions.
+ *
+ * CAP_RAW_MODE, CAP_MPX_MODE are obsolete.
+ * UNICODE support is required for long share names,
+ * long file names and streams.
+ *
+ * For testing, one can patch this, i.e. remove the high bit to
+ * temporarily disable extended security, etc.
+ */
+uint32_t smb1srv_capabilities =
+	CAP_UNICODE |
+	CAP_LARGE_FILES |
+	CAP_NT_SMBS |
+	CAP_RPC_REMOTE_APIS |
+	CAP_STATUS32 |
+	CAP_LEVEL_II_OPLOCKS |
+	CAP_LOCK_AND_READ |
+	CAP_NT_FIND |
+	CAP_DFS |
+	CAP_INFOLEVEL_PASSTHRU |
+	CAP_LARGE_READX |
+	CAP_LARGE_WRITEX |
+	CAP_EXTENDED_SECURITY;
 
 /*
  * SMB Negotiate gets special handling.  This is called directly by
@@ -417,30 +440,7 @@ smb_com_negotiate(smb_request_t *sr)
 	bcopy(&session->challenge_key, negprot->ni_key, SMB_CHALLENGE_SZ);
 	nbdomain = sr->sr_cfg->skc_nbdomain;
 
-	/*
-	 * UNICODE support is required for long share names,
-	 * long file names and streams.  Note: CAP_RAW_MODE
-	 * is not supported because it does nothing to help
-	 * modern clients and causes nasty complications.
-	 */
-	negprot->ni_capabilities = CAP_LARGE_FILES
-	    | CAP_UNICODE
-	    | CAP_NT_SMBS
-	    | CAP_STATUS32
-	    | CAP_NT_FIND
-	    | CAP_LEVEL_II_OPLOCKS
-	    | CAP_LOCK_AND_READ
-	    | CAP_RPC_REMOTE_APIS
-	    | CAP_LARGE_READX
-	    | CAP_LARGE_WRITEX
-	    | CAP_DFS;
-
-	if (smb_cap_passthru)
-		negprot->ni_capabilities |= CAP_INFOLEVEL_PASSTHRU;
-	else
-		cmn_err(CE_NOTE, "smbsrv: cap passthru is %s",
-		    (negprot->ni_capabilities & CAP_INFOLEVEL_PASSTHRU) ?
-		    "enabled" : "disabled");
+	negprot->ni_capabilities = smb1srv_capabilities;
 
 	switch (negprot->ni_dialect) {
 	case PC_NETWORK_PROGRAM_1_0:	/* core */
@@ -530,9 +530,13 @@ smb_com_negotiate(smb_request_t *sr)
 		 * (and if we have it enabled)
 		 * If so, handle as if a different dialect.
 		 */
-		if ((sr->smb_flg2 & SMB_FLAGS2_EXT_SEC) && smb_cap_ext_sec)
+		if ((sr->smb_flg2 & SMB_FLAGS2_EXT_SEC) != 0 &&
+		    (negprot->ni_capabilities & CAP_EXTENDED_SECURITY) != 0)
 			goto NT_LM_0_12_ext_sec;
+
+		/* Else deny knowledge of extended security. */
 		sr->smb_flg2 &= ~SMB_FLAGS2_EXT_SEC;
+		negprot->ni_capabilities &= ~CAP_EXTENDED_SECURITY;
 
 		/*
 		 * nbdomain is not expected to be aligned.
@@ -575,8 +579,6 @@ NT_LM_0_12_ext_sec:
 		 * This is the "Extended Security" variant of
 		 * dialect NT_LM_0_12.
 		 */
-		negprot->ni_capabilities |= CAP_EXTENDED_SECURITY;
-
 		rc = smbsr_encode_result(sr, 17, VAR_BCC,
 		    "bwbwwllllTwbw#c#c",
 		    17,				/* wct */
