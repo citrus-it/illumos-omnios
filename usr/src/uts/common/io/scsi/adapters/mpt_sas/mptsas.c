@@ -9452,8 +9452,10 @@ mptsas_flush_hba(mptsas_t *mpt)
 	 * Drain the taskqs prior to reallocating resources.
 	 */
 	mutex_exit(&mpt->m_mutex);
-	ddi_taskq_wait(mpt->m_event_taskq);
-	ddi_taskq_wait(mpt->m_dr_taskq);
+	if (!taskq_member((taskq_t *)mpt->m_event_taskq, curthread))
+		ddi_taskq_wait(mpt->m_event_taskq);
+	if (!taskq_member((taskq_t *)mpt->m_dr_taskq, curthread))
+		ddi_taskq_wait(mpt->m_dr_taskq);
 	mutex_enter(&mpt->m_mutex);
 }
 
