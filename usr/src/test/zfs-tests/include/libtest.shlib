@@ -1118,38 +1118,24 @@ function do_destroy_pool #pool <-f>
 	if is_global_zone ; then
 		if poolexists "$pool" ; then
 			mtpt=$(get_prop mountpoint "$pool")
-			# Checking to see if the device is busy. If so, we'll
-			# retry the destroy a few times with a sleep between tries. 
-			errmsg='device is busy'
-			retry_num=$NUM_RETRIES
-			TMPFILE=`mktemp`
-			if [ -z "$TMPFILE" ] ; then
-				log_note "Unable to create temporary file $TMPFILE"
-				return 1
-			fi 
-			until [ $retry_num == 0 ] ; do
-				$ZPOOL destroy $force $pool 2>$TMPFILE
-				# If the destroy failed, see if it's due to a 
-				# device is busy issue and retry if it is.
-				if (( $? != 0 )); then
-					# if this is busy then we want to retry
-					if [ "`grep "$errmsg" $TMPFILE`" != "" ]; then
-						retry_num-=1
-						log_note "Device is busy, retry zpool destroy"
-						$SLEEP $DESTROY_SLEEP_TIME 
-					else # return here if error is something else
-						$RM $TMPFILE 
-						return 1
-					fi
-				else
-					# destroy succeeded.
-					$RM $TMPFILE
-					[[ -d $mtpt ]] && log_must $RM -rf $mtpt
-					return 0
-				fi
+
+			# At times, syseventd activity can cause attempts to
+			# destroy a pool to fail with EBUSY. We retry a few
+			# times allowing failures before requiring the destroy
+			# to succeed.
+			typeset -i wait_time=$DESTROY_SLEEP_TIME ret=1 count=0
+			must=""
+			while [[ $ret -ne 0 ]]; do
+				$must $ZPOOL destroy $force $pool
+				ret=$?
+				[[ $ret -eq 0 ]] && break
+				log_note "zpool destroy failed with $ret"
+				[[ count++ -ge $NUM_RETRIES ]] && must=log_must
+				$SLEEP $wait_time
 			done
-			log_must $ZPOOL destroy $force $pool
-			[[ -d $mtpt ]] && log_must $RM -rf $mtpt
+
+			[[ -d $mtpt ]] && \
+				log_must $RM -rf $mtpt
 		else
 			log_note "Pool does not exist. ($pool)"
 			return 1
