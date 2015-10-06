@@ -56,6 +56,7 @@ typedef enum spa_feature {
 	SPA_FEATURE_META_DEVICES,
 	SPA_FEATURE_VDEV_PROPS,
 	SPA_FEATURE_COS_PROPS,
+	SPA_FEATURE_WRC,
 	SPA_FEATURES
 } spa_feature_t;
 

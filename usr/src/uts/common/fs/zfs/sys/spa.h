@@ -865,8 +865,6 @@ extern boolean_t spa_has_pending_synctask(spa_t *spa);
 extern boolean_t spa_has_special(spa_t *spa);
 extern int spa_maxblocksize(spa_t *spa);
 extern void zfs_blkptr_verify(spa_t *spa, const blkptr_t *bp);
-extern boolean_t spa_wrc_present(spa_t *spa);
-extern boolean_t spa_wrc_active(spa_t *spa);
 extern struct zfs_autosnap *spa_get_autosnap(spa_t *spa);
 extern void wrc_purge_window(spa_t *spa, dmu_tx_t *tx);
 
@@ -931,13 +929,6 @@ extern void spa_event_notify(spa_t *spa, vdev_t *vdev, const char *name);
 /* krrp */
 extern taskqid_t spa_dispatch_krrp_task(const char *dataset,
     task_func_t func, void *args);
-extern int spa_wrc_mode(const char *name);
-
-typedef enum spa_wrc_mode {
-	WRC_MODE_OFF,
-	WRC_MODE_ACTIVE,
-	WRC_MODE_PASSIVE
-} spa_wrc_mode_t;
 
 #ifdef ZFS_DEBUG
 #define	dprintf_bp(bp, fmt, ...) do {				\

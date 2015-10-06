@@ -384,8 +384,7 @@ struct spa {
 	spa_watermark_t	spa_watermark;
 	boolean_t	spa_enable_specialclass;
 
-	/* wrcache thread. */
-	uint64_t	spa_wrc_mode;
+	/* wrcache */
 	wrc_data_t	spa_wrc;
 
 	/* cos list */
