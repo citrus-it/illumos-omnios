@@ -6985,7 +6985,15 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz,
 				continue;
 			}
 
-			if (write_asize + buf_asize > target_sz) {
+			/*
+			 * Assume that the buffer is not going to be compressed
+			 * and could take more space on disk because of a larger
+			 * disk block size.
+			 */
+			buf_size = hdr->b_size;
+			buf_asize = vdev_psize_to_asize(dev->l2ad_vdev, buf_size);
+
+			if ((write_asize + buf_asize) > target_sz) {
 				full = B_TRUE;
 				mutex_exit(hash_lock);
 				break;
@@ -7095,6 +7103,18 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz,
 	}
 
 	mutex_enter(&dev->l2ad_mtx);
+
+	/*
+	 * Note that elsewhere in this file arcstat_l2_asize
+	 * and the used space on l2ad_vdev are updated using b_asize,
+	 * which is not necessarily rounded up to the device block size.
+	 * Too keep accounting consistent we do the same here as well:
+	 * stats_size accumulates the sum of b_asize of the written buffers,
+	 * while write_asize accumulates the sum of b_asize rounded up
+	 * to the device block size.
+	 * The latter sum is used only to validate the corectness of the code.
+	 */
+	write_asize = 0;
 
 	/*
 	 * Now start writing the buffers. We're starting at the write head
