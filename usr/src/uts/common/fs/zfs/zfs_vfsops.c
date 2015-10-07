@@ -983,6 +983,8 @@ zfsvfs_create(const char *osname, zfsvfs_t **zfvp)
 	rw_init(&zfsvfs->z_fuid_lock, NULL, RW_DEFAULT, NULL);
 	for (i = 0; i != ZFS_OBJ_MTX_SZ; i++)
 		mutex_init(&zfsvfs->z_hold_mtx[i], NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&zfsvfs->z_drain_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&zfsvfs->z_drain_cv, NULL, CV_DEFAULT, NULL);
 
 	*zfvp = zfsvfs;
 	return (0);
@@ -1028,8 +1030,7 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 		if (readonly != 0)
 			zfsvfs->z_vfs->vfs_flag &= ~VFS_RDONLY;
 		else {
-			/* zfs_unlinked_drain will VN_RELE when done */
-			VFS_HOLD(zfsvfs->z_vfs);
+			zfs_unlinked_drain_prepare(zfsvfs);
 			if (taskq_dispatch(dsl_pool_vnrele_taskq(
 			    spa_get_dsl(zfsvfs->z_os->os_spa)),
 			    (void (*)(void *))zfs_unlinked_drain, zfsvfs,
@@ -1100,6 +1101,8 @@ zfsvfs_free(zfsvfs_t *zfsvfs)
 
 	zfs_fuid_destroy(zfsvfs);
 
+	cv_destroy(&zfsvfs->z_drain_cv);
+	mutex_destroy(&zfsvfs->z_drain_lock);
 	mutex_destroy(&zfsvfs->z_znodes_lock);
 	mutex_destroy(&zfsvfs->z_lock);
 	list_destroy(&zfsvfs->z_all_znodes);
@@ -1740,6 +1743,7 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 {
 	znode_t	*zp;
 
+	zfs_unlinked_drain_stop_wait(zfsvfs);
 	rrm_enter(&zfsvfs->z_teardown_lock, RW_WRITER, FTAG);
 
 	if (!unmounting) {

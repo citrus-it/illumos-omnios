@@ -41,6 +41,15 @@ extern "C" {
 typedef struct zfsvfs zfsvfs_t;
 struct znode;
 
+/*
+ * Status of the zfs_unlinked_drain thread.
+ */
+typedef enum drain_state {
+	ZFS_DRAIN_SHUTDOWN = 0,
+	ZFS_DRAIN_RUNNING,
+	ZFS_DRAIN_SHUTDOWN_REQ
+} drain_state_t;
+
 struct zfsvfs {
 	vfs_t		*z_vfs;		/* generic fs struct */
 	zfsvfs_t	*z_parent;	/* parent fs */
@@ -87,6 +96,10 @@ struct zfsvfs {
 	boolean_t	z_busy;
 #define	ZFS_OBJ_MTX_SZ	64
 	kmutex_t	z_hold_mtx[ZFS_OBJ_MTX_SZ];	/* znode hold locks */
+	/* for controlling async zfs_unlinked_drain */
+	kmutex_t	z_drain_lock;
+	kcondvar_t	z_drain_cv;
+	drain_state_t	z_drain_state;
 };
 
 /*

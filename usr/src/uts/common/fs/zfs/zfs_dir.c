@@ -470,7 +470,7 @@ zfs_unlinked_add(znode_t *zp, dmu_tx_t *tx)
 /*
  * Clean up any znodes that had no links when we either crashed or
  * (force) umounted the file system. Caller or invoking thread must
- * VN_HOLD the vfs_t to correctly handle async operation.
+ * first call zfs_unlinked_drain_prepare to set up proper holds.
  */
 void
 zfs_unlinked_drain(zfsvfs_t *zfsvfs)
@@ -481,11 +481,14 @@ zfs_unlinked_drain(zfsvfs_t *zfsvfs)
 	znode_t		*zp;
 	int		error;
 
+	ASSERT(zfsvfs->z_drain_state != ZFS_DRAIN_SHUTDOWN);
 	/*
 	 * Interate over the contents of the unlinked set.
 	 */
 	for (zap_cursor_init(&zc, zfsvfs->z_os, zfsvfs->z_unlinkedobj);
-	    zap_cursor_retrieve(&zc, &zap) == 0;
+	    zap_cursor_retrieve(&zc, &zap) == 0 &&
+	    /* Only checking for a shutdown request, so no locking reqd. */
+	    zfsvfs->z_drain_state == ZFS_DRAIN_RUNNING;
 	    zap_cursor_advance(&zc)) {
 
 		/*
@@ -516,10 +519,59 @@ zfs_unlinked_drain(zfsvfs_t *zfsvfs)
 
 		zp->z_unlinked = B_TRUE;
 		VN_RELE(ZTOV(zp));
+
+		ASSERT(!zfsvfs->z_unmounted);
 	}
 	zap_cursor_fini(&zc);
 
 	VFS_RELE(zfsvfs->z_vfs);
+
+	mutex_enter(&zfsvfs->z_drain_lock);
+	zfsvfs->z_drain_state = ZFS_DRAIN_SHUTDOWN;
+	cv_broadcast(&zfsvfs->z_drain_cv);
+	mutex_exit(&zfsvfs->z_drain_lock);
+}
+
+/*
+ * Sets up holds on crucial structures for an asynchronous zfs_unlinked_drain
+ * call. Must be called prior to zfs_unlinked_drain.
+ */
+void
+zfs_unlinked_drain_prepare(zfsvfs_t *zfsvfs)
+{
+	ASSERT(!zfsvfs->z_unmounted);
+	/*
+	 * N.B. VFS_HOLD only prevents a "soft unmount" with EBUSY.
+	 * A forcible unmount will still try to unmount and detach the
+	 * underlying dataset from the vfs_t. To prevent this, before
+	 * destroying the the zfsvfs_t, zfsvfs_teardown calls
+	 * zfs_unlinked_drain_stop_wait to make sure that the unlinked
+	 * drain thread has exited. This also allows for interrupting
+	 * the drain in case an early export is desired.
+	 */
+	VFS_HOLD(zfsvfs->z_vfs);
+
+	mutex_enter(&zfsvfs->z_drain_lock);
+	ASSERT(zfsvfs->z_drain_state == ZFS_DRAIN_SHUTDOWN);
+	zfsvfs->z_drain_state = ZFS_DRAIN_RUNNING;
+	mutex_exit(&zfsvfs->z_drain_lock);
+}
+
+/*
+ * Stops an asynchronous zfs_unlinked_drain. This must be called prior to
+ * destroying the zfsvfs_t, as the drain doesn't hold the z_teardown_lock.
+ */
+void
+zfs_unlinked_drain_stop_wait(zfsvfs_t *zfsvfs)
+{
+	ASSERT(!zfsvfs->z_unmounted);
+
+	mutex_enter(&zfsvfs->z_drain_lock);
+	while (zfsvfs->z_drain_state != ZFS_DRAIN_SHUTDOWN) {
+		zfsvfs->z_drain_state = ZFS_DRAIN_SHUTDOWN_REQ;
+		cv_wait(&zfsvfs->z_drain_cv, &zfsvfs->z_drain_lock);
+	}
+	mutex_exit(&zfsvfs->z_drain_lock);
 }
 
 /*
