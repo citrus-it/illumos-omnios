@@ -790,9 +790,6 @@ dsl_destroy_head_sync_impl(dsl_dataset_t *ds, dmu_tx_t *tx)
 	objset_t *os;
 	VERIFY0(dmu_objset_from_ds(ds, &os));
 
-	if (spa_feature_is_active(dp->dp_spa, SPA_FEATURE_WRC))
-		wrc_process_objset(spa_get_wrc_data(dp->dp_spa), os, B_TRUE);
-
 	if (!spa_feature_is_enabled(dp->dp_spa, SPA_FEATURE_ASYNC_DESTROY)) {
 		old_synchronous_dataset_destroy(ds, tx);
 	} else {
@@ -1014,29 +1011,6 @@ dsl_destroy_atomically_sync(void *arg, dmu_tx_t *tx)
 
 	if (!spa_feature_is_enabled(dp->dp_spa, SPA_FEATURE_ASYNC_DESTROY))
 		return (SET_ERROR(ENOTSUP));
-
-	/* It is possible than autosnap watches the DS */
-	if (spa_feature_is_active(dp->dp_spa, SPA_FEATURE_WRC)) {
-		objset_t *os = NULL;
-		dsl_dataset_t *ds = NULL;
-
-		err = dsl_dataset_hold(dp, ddaa->from_ds, FTAG, &ds);
-		if (err)
-			return (err);
-
-		err = dmu_objset_from_ds(ds, &os);
-		if (err) {
-			dsl_dataset_rele(ds, FTAG);
-			return (err);
-		}
-
-		if (!dmu_objset_is_snapshot(os)) {
-			wrc_process_objset(spa_get_wrc_data(dp->dp_spa),
-			    os, B_TRUE);
-		}
-
-		dsl_dataset_rele(ds, FTAG);
-	}
 
 	/* initialize the stack of datasets */
 	list_create(&namestack, sizeof (zfs_ds_collector_entry_t),

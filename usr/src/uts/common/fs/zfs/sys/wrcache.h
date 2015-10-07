@@ -75,32 +75,15 @@ _NOTE(CONSTCOND) } while (0)
 #define	WRCBP_IS_DELETED(wrcbp)		BF64_GET((wrcbp)->blk_prop, 39, 1)
 #define	WRCBP_MARK_DELETED(wrcbp)	BF64_SET((wrcbp)->blk_prop, 39, 1, 1)
 
-typedef struct wrc_data wrc_data_t;
-
 /*
- * WRC Instance is a dataset (DS) and
- * all the children DSs of that DS.
- */
-typedef struct wrc_instance {
-	avl_node_t	node;
-
-	wrc_data_t	*wrc_data;
-	uint64_t	ds_object;
-	uint64_t	txg_to_rele;
-	void		*wrc_autosnap_hdl;
-} wrc_instance_t;
-
-/*
- * wrc_data is a global per ZFS pool structure contains all
- * information associated with write cache and
+ * wrc_data structure contains all information associated with write cache and
  * is attached to spa structure.
  */
-struct wrc_data {
+typedef struct wrc_data {
 	kthread_t	*wrc_thread;		/* move thread */
 	kthread_t	*wrc_walk_thread;	/* collector thread */
 
 	kmutex_t	wrc_lock;
-	kcondvar_t	wrc_cv;
 
 	avl_tree_t	wrc_blocks;		/* collected blocks */
 	avl_tree_t	wrc_moved_blocks;	/* moved blocks */
@@ -124,9 +107,7 @@ struct wrc_data {
 
 	uint64_t	wrc_latest_window_time;
 
-	/* Tree of watched datasets and corresponding data */
-	avl_tree_t	wrc_instances;
-	boolean_t	wrc_ready_to_use;
+	void		*wrc_autosnap_hdl;
 
 	spa_t		*wrc_spa;
 
@@ -144,7 +125,9 @@ struct wrc_data {
 	boolean_t	wrc_isvalid;	/* wrc is inited */
 	boolean_t	wrc_isfault;	/* wrc is fault */
 	boolean_t	wrc_first_move; /* TRUE until the 1 WRC-win opened */
-};
+
+	kcondvar_t	wrc_cv;
+} wrc_data_t;
 
 /* !!! Do not change these constants !!! */
 #define	WRC_SPECIAL_DVA 0
@@ -154,8 +137,6 @@ struct wrc_data {
  * In-core representation of a block which will be moved
  */
 typedef struct wrc_block {
-	avl_node_t	node;
-
 	/* associated wrc */
 	wrc_data_t	*data;
 
@@ -171,6 +152,8 @@ typedef struct wrc_block {
 	dva_t		dva[2];
 
 	kmutex_t	lock;
+
+	avl_node_t	node;
 } wrc_block_t;
 
 typedef struct wrc_parseblock_cb {
@@ -197,9 +180,10 @@ typedef struct wrc_parseblock_cb {
 void wrc_init(wrc_data_t *wrc_data, spa_t *spa);
 void wrc_fini(wrc_data_t *wrc_data);
 
-void wrc_activate(spa_t *spa);
+boolean_t wrc_activate(spa_t *spa);
 void wrc_deactivate(spa_t *spa);
 void wrc_enter_fault_state(spa_t *spa);
+void wrc_switch_mode(spa_t *spa);
 
 int wrc_select_dva(wrc_data_t *wrc_data, zio_t *zio);
 boolean_t wrc_is_block_special(spa_t *spa, const blkptr_t *bp);
@@ -232,12 +216,6 @@ void wrc_walk_unlock(spa_t *);
 void wrc_free_block(wrc_block_t *block);
 void wrc_clean_plan_tree(spa_t *spa);
 void wrc_clean_moved_tree(spa_t *spa);
-
-void wrc_process_objset(wrc_data_t *wrc_data, objset_t *os, boolean_t destroy);
-void wrc_mode_changed(void *arg, uint64_t newval);
-uint64_t wrc_pack_wrc_mode(uint64_t value, uint64_t objset_num);
-uint64_t wrc_unpack_wrc_mode(uint64_t value);
-int wrc_check_dataset(const char *ds_name);
 
 #ifdef	__cplusplus
 }

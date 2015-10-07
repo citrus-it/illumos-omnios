@@ -3766,10 +3766,15 @@ zfs_destroy_check_autosnap(spa_t *spa, const char *name)
 		return (EINVAL);
 
 	if (autosnap_check_name(snap)) {
-		int err = autosnap_check_for_destroy(
-		    spa_get_autosnap(spa), name);
+		autosnap_zone_t *rzone;
+		zfs_autosnap_t *autosnap;
 
-		if (err != 0)
+		autosnap = spa_get_autosnap(spa);
+		mutex_enter(&autosnap->autosnap_lock);
+		rzone = autosnap_find_zone(spa,
+		    name, B_TRUE);
+		mutex_exit(&autosnap->autosnap_lock);
+		if (rzone)
 			return (EBUSY);
 	}
 
@@ -4283,24 +4288,6 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 			    zfs_earlier_version(dsname,
 			    SPA_VERSION_PASSTHROUGH_X))
 				return (SET_ERROR(ENOTSUP));
-		}
-		break;
-
-	case ZFS_PROP_WRC_MODE:
-		{
-			spa_t *spa;
-			boolean_t wrc_feature_enabled;
-
-			if ((err = spa_open(dsname, &spa, FTAG)) != 0)
-				return (err);
-
-			wrc_feature_enabled =
-			    spa_feature_is_enabled(spa, SPA_FEATURE_WRC);
-			spa_close(spa, FTAG);
-
-			/* WRC cannot be used without special-vdev */
-			if (!wrc_feature_enabled || !spa_has_special(spa))
-				return (SET_ERROR(EOPNOTSUPP));
 		}
 		break;
 	}
@@ -6702,8 +6689,11 @@ zfs_ioc_pool_get_props_nvl(const char *poolname, nvlist_t *innvl,
 static int
 zfs_ioc_check_krrp(const char *dataset, nvlist_t *innvl, nvlist_t *outnvl)
 {
+	autosnap_zone_t *rzone, *zone, *gzone;
+	boolean_t children_zone, gzone_active;
+	zfs_autosnap_t *autosnap;
 	spa_t *spa;
-	int err;
+	int err = 0;
 
 	/*
 	 * Here we use different way to open spa for the given pool,
@@ -6720,9 +6710,30 @@ zfs_ioc_check_krrp(const char *dataset, nvlist_t *innvl, nvlist_t *outnvl)
 	spa_open_ref(spa, FTAG);
 	mutex_exit(&spa_namespace_lock);
 
-	err = autosnap_check_for_destroy(spa_get_autosnap(spa), dataset);
-	if (err == 0)
+	autosnap = spa_get_autosnap(spa);
+
+	mutex_enter(&autosnap->autosnap_lock);
+
+	rzone = autosnap_find_zone(spa, dataset, B_TRUE);
+	zone = autosnap_find_zone(spa, dataset, B_FALSE);
+	children_zone = autosnap_has_children_zone(spa, dataset);
+	gzone = &autosnap->autosnap_global;
+	gzone_active = rzone || (list_head(&gzone->listeners) != NULL &&
+	    (gzone->flags & AUTOSNAP_CREATOR));
+
+	if (zone) {
+		err = EBUSY;
+	} else if (children_zone) {
+		err = ECHILD;
+	} else if (rzone) {
+		err = EUSERS;
+	} else if (gzone_active) {
+		err = 0;
+	} else {
 		err = ENOTSUP;
+	}
+
+	mutex_exit(&autosnap->autosnap_lock);
 
 	mutex_enter(&spa_namespace_lock);
 	spa_close(spa, FTAG);

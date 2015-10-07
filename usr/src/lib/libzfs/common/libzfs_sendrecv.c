@@ -666,13 +666,6 @@ send_iterate_prop(zfs_handle_t *zhp, nvlist_t *nv)
 		zfs_prop_t prop = zfs_name_to_prop(propname);
 		nvlist_t *propnv;
 
-		/*
-		 * This property make sense only to this dataset,
-		 * so no reasons to include it into stream
-		 */
-		if (prop == ZFS_PROP_WRC_MODE)
-			continue;
-
 		if (!zfs_prop_user(propname)) {
 			/*
 			 * Realistically, this should never happen.  However,

@@ -28,7 +28,7 @@
 /* #define	KRRP_STREAM_DEBUG 1 */
 
 /* These extern functions are part of ZFS sources */
-extern int wrc_check_dataset(const char *name);
+extern int spa_wrc_mode(const char *name);
 extern uint64_t dsl_dataset_creation_txg(const char *name);
 extern int dmu_krrp_get_recv_cookie(const char *pool,
     const char *token, char *cookie, size_t len);
@@ -57,6 +57,7 @@ static int krrp_stream_validate_run(krrp_stream_t *stream,
 
 static uint64_t krrp_stream_get_snap_txg(krrp_stream_t *stream,
     const char *short_snap_name);
+static int krrp_stream_check_wrc(krrp_stream_t *, krrp_error_t *);
 
 #if 0
 static void krrp_stream_debug(const char *, void *, void *, void *, void *);
@@ -452,16 +453,7 @@ krrp_stream_validate_run(krrp_stream_t *stream, krrp_error_t *error)
 		}
 	}
 
-	rc = 0;
-	if (stream->mode == KRRP_STRMM_READ && !stream->non_continuous) {
-		rc = wrc_check_dataset(stream->dataset);
-		if (rc == 0 || rc == ENOTACTIVE)
-			rc = 0;
-		else if (rc == ENOTSUP)
-			krrp_error_set(error, KRRP_ERRNO_ZFSWRCBADUSE, 0);
-		else
-			krrp_error_set(error, KRRP_ERRNO_STREAM, rc);
-	}
+	rc = krrp_stream_check_wrc(stream, error);
 
 out:
 	return (rc);
@@ -557,6 +549,48 @@ krrp_stream_autosnap_restore_cb(void *void_stream,
 
 	(void) strlcpy(stream->incr_snap_name, snap_name,
 	    sizeof (stream->incr_snap_name));
+}
+
+/*
+ * This function does the following checks:
+ *
+ * - enabled WRC and non pool-to-pool replication: FAIL
+ * - enabled active-WRC and stream recv-mode: FAIL
+ * - enabled passive-WRC and stream send-mode: FAIL
+ * - other cases: OK
+ */
+static int
+krrp_stream_check_wrc(krrp_stream_t *stream, krrp_error_t *error)
+{
+	int wrc_mode;
+
+	wrc_mode = spa_wrc_mode(stream->dataset);
+	if (wrc_mode == WRC_MODE_OFF)
+		return (0);
+
+	/* WRC enabled so only pool to pool */
+	if (strchr(stream->dataset, '/') != NULL) {
+		krrp_error_set(error, KRRP_ERRNO_ZFSWRCBADUSE, 0);
+		return (-1);
+	}
+
+	if (wrc_mode == WRC_MODE_ACTIVE &&
+	    stream->mode == KRRP_STRMM_WRITE) {
+		krrp_error_set(error, KRRP_ERRNO_ZFSWRCBADMODE, 0);
+		cmn_err(CE_WARN, "Active-mode WRC cannot "
+		    "be used at receive side");
+		return (-1);
+	}
+
+	if (wrc_mode == WRC_MODE_PASSIVE &&
+	    stream->mode == KRRP_STRMM_READ) {
+		krrp_error_set(error, KRRP_ERRNO_ZFSWRCBADMODE, 0);
+		cmn_err(CE_WARN, "Passive-mode WRC cannot "
+		    "be used at send side");
+		return (-1);
+	}
+
+	return (0);
 }
 
 #if 0

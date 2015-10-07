@@ -39,12 +39,13 @@ typedef struct zfs_autosnap zfs_autosnap_t;
 /* Pools are distinguished by dataset and prefix */
 typedef struct autosnap_zone {
 	list_node_t node;
-	char dataset[MAXPATHLEN]; /* The name of top-level dataset */
-	uint64_t flags; /* see below: autosnap_flags_t */
+	char dataset[MAXPATHLEN];
+	uint64_t flags;
 	list_t listeners;
 	zfs_autosnap_t *autosnap;
-	boolean_t created; /* Snap already created */
-	boolean_t delayed; /* Snap delayed for some reasons */
+	boolean_t created;
+	boolean_t delayed;
+	boolean_t globalized;
 } autosnap_zone_t;
 
 struct zfs_autosnap {
@@ -53,6 +54,7 @@ struct zfs_autosnap {
 	kcondvar_t autosnap_cv;
 	list_t autosnap_zones;
 	list_t autosnap_destroy_queue;
+	autosnap_zone_t autosnap_global;
 	kthread_t *destroyer;
 	boolean_t need_stop;
 	boolean_t initialized;
@@ -85,26 +87,29 @@ typedef struct autosnap_handler {
 	autosnap_zone_t *zone;
 } autosnap_handler_t;
 
-void *autosnap_register_handler(const char *name, uint64_t flags,
+extern void *autosnap_register_handler(const char *name, uint64_t flags,
     autosnap_confirm_cb confirm_cb,
     autosnap_notify_created_cb nc_cb,
     autosnap_error_cb, void *cb_arg);
-void autosnap_unregister_handler(void *opaque);
-autosnap_zone_t *autosnap_find_zone(zfs_autosnap_t *autosnap,
-    const char *name, boolean_t recursive);
-boolean_t autosnap_has_children_zone(zfs_autosnap_t *autosnap,
-    const char *name, boolean_t krrp_only);
-void autosnap_exempt_snapshot(spa_t *spa, const char *name);
-void autosnap_force_snap_by_name(const char *dsname,
+extern void autosnap_unregister_handler(void *opaque);
+extern autosnap_zone_t *autosnap_find_zone(spa_t *spa, const char *name,
+    boolean_t recursive);
+extern boolean_t autosnap_has_children_zone(spa_t *spa, const char *name);
+extern void autosnap_exempt_snapshot(spa_t *spa, const char *name);
+extern void autosnap_force_snap_by_name(const char *dsname,
     autosnap_zone_t *zone, boolean_t sync);
-void autosnap_force_snap(void *opaque, boolean_t sync);
-boolean_t autosnap_confirm_snap(autosnap_zone_t *zone, uint64_t txg);
-void autosnap_error_snap(autosnap_zone_t *zone, uint64_t txg, int err);
-
-void autosnap_create_cb(zfs_autosnap_t *autosnap,
-    dsl_dataset_t *ds, const char *snapname, uint64_t txg);
-int autosnap_check_for_destroy(zfs_autosnap_t *autosnap,
-    const char *name);
+extern void autosnap_force_snap(void *opaque, boolean_t sync);
+extern boolean_t autosnap_confirm_snap(const char *name, uint64_t txg,
+    autosnap_zone_t *zone);
+extern void autosnap_error_snap(const char *name, int err, uint64_t txg,
+    autosnap_zone_t *zone);
+extern void autosnap_notify_created(const char *name, uint64_t txg,
+    autosnap_zone_t *zone);
+extern void autosnap_notify_created_globalized(const char *snapname,
+    uint64_t ftxg, uint64_t ttxg, zfs_autosnap_t *autosnap);
+extern void autosnap_notify_received(const char *name);
+extern void autosnap_reject_snap(const char *name, uint64_t txg,
+    zfs_autosnap_t *autosnap);
 
 #define	AUTOSNAP_PREFIX ".autosnap_"
 #define	AUTOSNAP_PREFIX_LEN (sizeof (AUTOSNAP_PREFIX) - 1)
@@ -116,7 +121,7 @@ typedef enum autosnap_flags {
 	AUTOSNAP_RECURSIVE	= 1 << 0,
 	AUTOSNAP_CREATOR	= 1 << 1,
 	AUTOSNAP_DESTROYER	= 1 << 2,
-	AUTOSNAP_KRRP		= 1 << 3,
+	AUTOSNAP_GLOBAL		= 1 << 3,
 	AUTOSNAP_OWNER		= 1 << 4
 } autosnap_flags_t;
 
@@ -124,13 +129,16 @@ typedef enum autosnap_flags {
  * No lock version should be called if and only if a
  * snapshot should be released in nc_cb context
  */
-void autosnap_release_snapshots_by_txg(void *opaque,
+extern void autosnap_release_snapshots_by_txg(void *opaque,
     uint64_t from_txg, uint64_t to_txg);
-void autosnap_release_snapshots_by_txg_no_lock(void *opaque,
+extern void autosnap_release_snapshots_by_txg_no_lock(void *opaque,
     uint64_t from_txg, uint64_t to_txg);
 
-nvlist_t *autosnap_get_owned_snapshots(void *opaque);
-void autosnap_reap_orphaned_snaps(spa_t *spa);
+extern nvlist_t *autosnap_get_owned_snapshots(void *opaque);
+extern void autosnap_reap_orphaned_snaps(spa_t *spa);
+
+extern void autosnap_toggle_global_mode(spa_t *spa,
+    boolean_t toggle_on);
 
 int autosnap_lock(spa_t *spa);
 void autosnap_unlock(spa_t *spa);
@@ -140,10 +148,10 @@ void autosnap_collect_orphaned_snapshots(spa_t *spa);
 boolean_t autosnap_is_autosnap(dsl_dataset_t *ds);
 boolean_t autosnap_check_name(const char *snap_name);
 
-void autosnap_destroyer_thread_start(spa_t *spa);
-void autosnap_destroyer_thread_stop(spa_t *spa);
-void autosnap_init(spa_t *spa);
-void autosnap_fini(spa_t *spa);
+extern void autosnap_destroyer_thread_start(spa_t *spa);
+extern void autosnap_destroyer_thread_stop(spa_t *spa);
+extern void autosnap_init(spa_t *spa);
+extern void autosnap_fini(spa_t *spa);
 
 #ifdef	__cplusplus
 }

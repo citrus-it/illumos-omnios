@@ -85,7 +85,7 @@ uint64_t wrc_mv_cancel_threshold_initial = 20;
 uint64_t wrc_mv_cancel_threshold_step = 0;
 uint64_t wrc_mv_cancel_threshold_cap = 50;
 
-static void wrc_activate_impl(spa_t *spa);
+static boolean_t wrc_activate_impl(spa_t *spa);
 static wrc_block_t *wrc_create_block(wrc_data_t *wrc_data,
     const blkptr_t *bp);
 static void wrc_move_block(void *arg);
@@ -97,18 +97,7 @@ static boolean_t dsl_pool_wrcio_limit(dsl_pool_t *dp, uint64_t txg);
 
 static int wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data);
 static int wrc_blocks_compare(const void *arg1, const void *arg2);
-static int wrc_instances_compare(const void *arg1, const void *arg2);
 static boolean_t wrc_is_block_special_impl(spa_t *spa, const blkptr_t *bp);
-
-static void wrc_unregister_instance_impl(wrc_instance_t *wrc_instance,
-    boolean_t rele_autosnap);
-static void wrc_unregister_instances(wrc_data_t *wrc_data);
-static void wrc_register_instance(wrc_data_t *wrc_data, objset_t *os);
-static void wrc_unregister_instance(wrc_data_t *wrc_data, objset_t *os,
-    boolean_t rele_autosnap);
-static wrc_instance_t *wrc_lookup_instance(wrc_data_t *wrc_data,
-    uint64_t ds_object, avl_index_t *where);
-static void wrc_rele_autosnaps(wrc_data_t *wrc_data, uint64_t txg_to_rele);
 
 void
 wrc_init(wrc_data_t *wrc_data, spa_t *spa)
@@ -124,8 +113,6 @@ wrc_init(wrc_data_t *wrc_data, spa_t *spa)
 	    sizeof (wrc_block_t), offsetof(wrc_block_t, node));
 	avl_create(&wrc_data->wrc_moved_blocks, wrc_blocks_compare,
 	    sizeof (wrc_block_t), offsetof(wrc_block_t, node));
-	avl_create(&wrc_data->wrc_instances, wrc_instances_compare,
-	    sizeof (wrc_instance_t), offsetof(wrc_instance_t, node));
 }
 
 void
@@ -136,7 +123,6 @@ wrc_fini(wrc_data_t *wrc_data)
 
 	avl_destroy(&wrc_data->wrc_blocks);
 	avl_destroy(&wrc_data->wrc_moved_blocks);
-	avl_destroy(&wrc_data->wrc_instances);
 
 	cv_destroy(&wrc_data->wrc_cv);
 	mutex_destroy(&wrc_data->wrc_lock);
@@ -265,15 +251,13 @@ spa_wrc_thread(spa_t *spa)
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 	wrc_block_t	*block = 0;
 	uint64_t	actv_txg = 0;
-	char name[MAXPATHLEN];
+	char		name[MAXNAMELEN];
 
 	DTRACE_PROBE1(wrc_thread_start, char *, spa->spa_name);
 
-	/* Prepare move queue and make the wrc active */
-	(void) strcpy(name, spa->spa_name);
-	(void) strcat(name, "_wrc_move");
-	wrc_data->wrc_move_taskq = taskq_create(name, 10, maxclsyspri,
-	    50, INT_MAX, TASKQ_PREPOPULATE);
+	(void) strcpy(name, "wrc_zio_buf_");
+	(void) strncat(name, spa->spa_name, MAXNAMELEN - strlen(name) - 1);
+	name[MAXNAMELEN - 1] = '\0';
 
 	for (;;) {
 		uint64_t count = 0;
@@ -373,9 +357,6 @@ spa_wrc_thread(spa_t *spa)
 
 out:
 	taskq_wait(wrc_data->wrc_move_taskq);
-	taskq_destroy(wrc_data->wrc_move_taskq);
-
-	wrc_clean_plan_tree(spa);
 	wrc_clean_moved_tree(spa);
 	wrc_data->wrc_thread = NULL;
 
@@ -634,13 +615,12 @@ wrc_walk_unlock(spa_t *spa)
 static void
 spa_wrc_walk_thread(spa_t *spa)
 {
-	wrc_data_t *wrc_data = spa_get_wrc_data(spa);
+	wrc_data_t *wrc_data = &spa->spa_wrc;
 	int		err = 0;
 
 	DTRACE_PROBE1(wrc_walk_thread_start, char *, spa->spa_name);
 
 	for (;;) {
-		err = 0;
 		mutex_enter(&wrc_data->wrc_lock);
 
 		wrc_data->wrc_walking = B_FALSE;
@@ -658,7 +638,7 @@ spa_wrc_walk_thread(spa_t *spa)
 
 		if (wrc_data->wrc_thr_exit || !spa->spa_dsl_pool) {
 			mutex_exit(&wrc_data->wrc_lock);
-			break;
+			goto out;
 		}
 
 		wrc_data->wrc_walking = B_TRUE;
@@ -675,11 +655,11 @@ spa_wrc_walk_thread(spa_t *spa)
 			break;
 		}
 	}
-
 out:
 	if (err)
 		wrc_enter_fault_state(spa);
-
+	taskq_wait(wrc_data->wrc_move_taskq);
+	wrc_clean_plan_tree(spa);
 	wrc_data->wrc_walk_thread = NULL;
 
 	DTRACE_PROBE1(wrc_walk_thread_done, char *, spa->spa_name);
@@ -949,7 +929,7 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 			err = 0;
 		} else if (wrc_data->wrc_blocks_in == wrc_data->wrc_blocks_mv) {
 			/* Everything is moved, close the window */
-			if (wrc_data->wrc_finish_txg != 0)
+			if (wrc_data->wrc_finish_txg)
 				wrc_close_window(spa);
 
 			/* Say to others that walking stopped */
@@ -957,14 +937,44 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 			cv_broadcast(&wrc_data->wrc_cv);
 
 			/* and wait until a new window appears */
-			while (!wrc_data->wrc_walk && !wrc_data->wrc_thr_exit) {
-				cv_wait(&wrc_data->wrc_cv,
-				    &wrc_data->wrc_lock);
-			}
+			for (;;) {
+				uint64_t percentage;
 
-			if (wrc_data->wrc_thr_exit) {
-				mutex_exit(&wrc_data->wrc_lock);
-				return (EINTR);
+				(void) cv_timedwait(&wrc_data->wrc_cv,
+				    &wrc_data->wrc_lock,
+				    ddi_get_lbolt() + 1000);
+
+				if (wrc_data->wrc_thr_exit) {
+					mutex_exit(&wrc_data->wrc_lock);
+					return (EINTR);
+				}
+
+				/*
+				 * WRC-windowd has been opened automatically
+				 */
+				if (wrc_data->wrc_walk)
+					break;
+
+				/*
+				 * Wait-timeout has exceeded, there is no
+				 * Write-I/O.
+				 */
+				percentage = spa_class_alloc_percentage(
+				    spa_special_class(spa));
+				if (wrc_data->wrc_blocks_mv_last != 0 ||
+				    (percentage > 5 &&
+				    wrc_data->wrc_first_move)) {
+					/*
+					 * To be sure that special
+					 * does not contain non-moved
+					 * data we forcefully open WRC-window
+					 */
+					mutex_exit(&wrc_data->wrc_lock);
+					autosnap_force_snap(
+					    wrc_data->wrc_autosnap_hdl,
+					    B_FALSE);
+					mutex_enter(&wrc_data->wrc_lock);
+				}
 			}
 
 			mutex_exit(&wrc_data->wrc_lock);
@@ -1043,7 +1053,6 @@ wrc_start_thread(spa_t *spa)
 		spa_start_perfmon_thread(spa);
 #endif
 	}
-
 	mutex_exit(&wrc_data->wrc_lock);
 }
 
@@ -1216,7 +1225,7 @@ static void
 wrc_close_window(spa_t *spa)
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
-	uint64_t txg_to_rele = wrc_data->wrc_txg_to_rele;
+	uint64_t tmp = wrc_data->wrc_txg_to_rele;
 
 	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
 
@@ -1237,28 +1246,8 @@ wrc_close_window(spa_t *spa)
 
 	wrc_close_window_impl(spa, &wrc_data->wrc_moved_blocks);
 
-	wrc_rele_autosnaps(wrc_data, txg_to_rele);
-}
-
-static void
-wrc_rele_autosnaps(wrc_data_t *wrc_data, uint64_t txg_to_rele)
-{
-	wrc_instance_t *wrc_instance;
-
-	wrc_instance = avl_first(&wrc_data->wrc_instances);
-	while (wrc_instance != NULL) {
-		if (wrc_instance->txg_to_rele != 0) {
-			VERIFY3U(wrc_instance->txg_to_rele,
-			    ==, txg_to_rele);
-			autosnap_release_snapshots_by_txg(
-			    wrc_instance->wrc_autosnap_hdl,
-			    txg_to_rele, AUTOSNAP_NO_SNAP);
-			wrc_instance->txg_to_rele = 0;
-		}
-
-		wrc_instance = AVL_NEXT(&wrc_data->wrc_instances,
-		    wrc_instance);
-	}
+	autosnap_release_snapshots_by_txg(
+	    wrc_data->wrc_autosnap_hdl, tmp, AUTOSNAP_NO_SNAP);
 }
 
 /*
@@ -1359,7 +1348,10 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 		mutex_enter(&wrc_data->wrc_lock);
 	}
 
-	wrc_rele_autosnaps(wrc_data, snap_txg);
+	if (wrc_data->wrc_isvalid)
+		autosnap_release_snapshots_by_txg(
+		    wrc_data->wrc_autosnap_hdl, snap_txg,
+		    AUTOSNAP_NO_SNAP);
 }
 
 /* Finalize interrupted with power cycle window */
@@ -1401,11 +1393,10 @@ wrc_free_restore(spa_t *spa)
 /* Autosnap confirmation callback */
 /*ARGSUSED*/
 static boolean_t
-wrc_confirm_cb(const char *name, boolean_t recursive, uint64_t txg, void *arg)
+wrc_confirm_cv(const char *name, boolean_t recursive, uint64_t txg, void *arg)
 {
-	wrc_instance_t *wrc_instance = arg;
-	wrc_data_t *wrc_data = wrc_instance->wrc_data;
-
+	spa_t *spa = arg;
+	wrc_data_t *wrc_data = &spa->spa_wrc;
 	return (wrc_data->wrc_finish_txg == 0);
 }
 
@@ -1415,9 +1406,6 @@ static boolean_t
 wrc_check_time(wrc_data_t *wrc_data)
 {
 #ifdef _KERNEL
-	if (wrc_window_roll_delay == 0)
-		return (B_FALSE);
-
 	uint64_t time_spent =
 	    ddi_get_lbolt() - wrc_data->wrc_latest_window_time;
 	return (time_spent < drv_usectohz(wrc_window_roll_delay));
@@ -1441,33 +1429,21 @@ static boolean_t
 wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
     uint64_t txg, uint64_t etxg, void *arg)
 {
-	boolean_t result = B_FALSE;
-	wrc_instance_t *wrc_instance = arg;
-	wrc_data_t *wrc_data = wrc_instance->wrc_data;
+	spa_t *spa = arg;
+	wrc_data_t *wrc_data = &spa->spa_wrc;
 
-	mutex_enter(&wrc_data->wrc_lock);
-	if (wrc_data->wrc_finish_txg != 0) {
-		if (wrc_data->wrc_isvalid &&
-		    !wrc_data->wrc_isfault &&
-		    wrc_data->wrc_finish_txg == etxg) {
-			/* Same window-snapshot for another WRC-Instance */
-			wrc_instance->txg_to_rele = txg;
-			result = B_TRUE;
-		}
-
-		mutex_exit(&wrc_data->wrc_lock);
-		return (result);
-	}
-
-	if (wrc_check_time(wrc_data) &&
-	    wrc_check_space(wrc_data->wrc_spa)) {
+	if (wrc_data->wrc_finish_txg != 0 ||
+	    !wrc_data->wrc_isvalid || wrc_data->wrc_isfault) {
+		/* Either wrc has an active window or is faulted */
+		return (B_FALSE);
+	} else if (wrc_window_roll_delay &&
+	    wrc_check_time(wrc_data) &&
+	    wrc_check_space(spa)) {
 		/* To soon to start a new window */
-		result = B_FALSE;
-	} else if (wrc_data->wrc_walking) {
-		/* Current window already done, but is not closed yet */
-		result = B_FALSE;
+		return (B_FALSE);
 	} else {
 		/* Accept new windows */
+		mutex_enter(&wrc_data->wrc_lock);
 		VERIFY0(wrc_data->wrc_block_count);
 		VERIFY(avl_is_empty(&wrc_data->wrc_blocks));
 		wrc_data->wrc_latest_window_time = ddi_get_lbolt();
@@ -1479,24 +1455,19 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 		wrc_data->wrc_altered_bytes = 0;
 		wrc_data->wrc_window_bytes = 0;
 		cv_broadcast(&wrc_data->wrc_cv);
-		result = B_TRUE;
-		wrc_instance->txg_to_rele = txg;
+		mutex_exit(&wrc_data->wrc_lock);
 	}
-
-	mutex_exit(&wrc_data->wrc_lock);
-	return (result);
+	return (B_TRUE);
 }
 
 static void
 wrc_err_cb(const char *name, int err, uint64_t txg, void *arg)
 {
-	wrc_instance_t *wrc_instance = arg;
-	wrc_data_t *wrc_data = wrc_instance->wrc_data;
+	spa_t *spa = arg;
 
-	/* FIXME: ??? error on one wrc_instance will stop whole WRC ??? */
 	cmn_err(CE_WARN, "Autosnap can not create a snapshot for writecache at "
 	    "txg %llu [%d] of pool '%s'\n", (unsigned long long)txg, err, name);
-	wrc_enter_fault_state(wrc_data->wrc_spa);
+	wrc_enter_fault_state(spa);
 }
 
 void
@@ -1522,33 +1493,50 @@ wrc_add_bytes(spa_t *spa, uint64_t txg, uint64_t bytes)
 
 /* WRC-INIT routines */
 
-void
+boolean_t
 wrc_activate(spa_t *spa)
 {
-	if (spa_feature_is_enabled(spa, SPA_FEATURE_WRC))
-		wrc_activate_impl(spa);
+	boolean_t result = B_FALSE;
+
+	if (spa_has_special(spa) && spa->spa_wrc_mode != WRC_MODE_OFF) {
+		if (wrc_activate_impl(spa)) {
+			wrc_start_thread(spa);
+			result = B_TRUE;
+		}
+	}
+
+	return (result);
 }
 
+#define	ZFS_PROP_WRC_PASSIVE_MODE_DS "syskrrp:wrc_passive_mode_ds"
 /*
  * Initialize wrc properties for the given pool.
  */
-static void
+static boolean_t
 wrc_activate_impl(spa_t *spa)
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 	int err = 0;
+	char name[MAXPATHLEN];
 	boolean_t hold = B_FALSE;
 
-	mutex_enter(&wrc_data->wrc_lock);
+	mutex_enter(&spa->spa_wrc.wrc_lock);
+
 	if (wrc_data->wrc_thr_exit) {
-		mutex_exit(&wrc_data->wrc_lock);
-		return;
+		mutex_exit(&spa->spa_wrc.wrc_lock);
+		return (B_FALSE);
 	}
 
 	if (wrc_data->wrc_isvalid) {
-		mutex_exit(&wrc_data->wrc_lock);
-		return;
+		mutex_exit(&spa->spa_wrc.wrc_lock);
+		return (B_TRUE);
 	}
+
+	(void) strcpy(name, spa->spa_name);
+	(void) strcat(name, "_wrc_move");
+
+	DTRACE_PROBE2(wrc_spa_add, char *, spa->spa_name,
+	    spa_t *, spa);
 
 	/* Reset bookmerk */
 	bzero(&spa->spa_lszb, sizeof (spa->spa_lszb));
@@ -1557,6 +1545,28 @@ wrc_activate_impl(spa_t *spa)
 	wrc_data->wrc_altered_limit = 0;
 	wrc_data->wrc_altered_bytes = 0;
 	wrc_data->wrc_window_bytes = 0;
+
+	/* Set up autosnap handler */
+#ifdef _KERNEL
+	if (spa->spa_wrc_mode == WRC_MODE_ACTIVE) {
+		wrc_data->wrc_autosnap_hdl =
+		    autosnap_register_handler(spa->spa_name,
+		    AUTOSNAP_CREATOR | AUTOSNAP_DESTROYER |
+		    AUTOSNAP_GLOBAL,
+		    wrc_confirm_cv, wrc_nc_cb, wrc_err_cb, spa);
+	} else {
+		wrc_data->wrc_autosnap_hdl =
+		    autosnap_register_handler(spa->spa_name,
+		    AUTOSNAP_DESTROYER | AUTOSNAP_GLOBAL,
+		    wrc_confirm_cv, wrc_nc_cb, wrc_err_cb, spa);
+	}
+
+	if (wrc_data->wrc_autosnap_hdl == NULL) {
+		mutex_exit(&spa->spa_wrc.wrc_lock);
+		return (B_FALSE);
+	}
+
+#endif
 
 	/*
 	 * Read wrc parameters to restore
@@ -1568,14 +1578,12 @@ wrc_activate_impl(spa_t *spa)
 		    RW_READER, FTAG);
 		hold = B_TRUE;
 	}
-
 	err = zap_lookup(spa->spa_dsl_pool->dp_meta_objset,
 	    DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_WRC_START_TXG, sizeof (uint64_t), 1,
 	    &wrc_data->wrc_start_txg);
 	if (err)
 		wrc_data->wrc_start_txg = 4;
-
 	err = zap_lookup(spa->spa_dsl_pool->dp_meta_objset,
 	    DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_WRC_FINISH_TXG, sizeof (uint64_t), 1,
@@ -1586,31 +1594,36 @@ wrc_activate_impl(spa_t *spa)
 		    DMU_POOL_WRC_TO_RELE_TXG, sizeof (uint64_t), 1,
 		    &wrc_data->wrc_txg_to_rele);
 	}
-
 	if (hold)
 		rrw_exit(&spa->spa_dsl_pool->dp_config_rwlock, FTAG);
-
 	if (err) {
 		wrc_data->wrc_finish_txg = 0;
 		wrc_data->wrc_txg_to_rele = 0;
 	}
-
 	wrc_data->wrc_latest_window_time = ddi_get_lbolt();
+
+	/* Prepare move queue and make the wrc active */
+	wrc_data->wrc_move_taskq = taskq_create(name, 10, maxclsyspri,
+	    50, INT_MAX, TASKQ_PREPOPULATE);
 
 	wrc_data->wrc_purge = B_FALSE;
 	wrc_data->wrc_walk = B_TRUE;
 	wrc_data->wrc_spa = spa;
 	wrc_data->wrc_isvalid = B_TRUE;
 
-	/* SELECTIVE WRC */
 	/* Finalize window interrupted with power cycle */
-	/* wrc_free_restore(spa); */
+	wrc_free_restore(spa);
 
-	wrc_data->wrc_ready_to_use = B_TRUE;
-	mutex_exit(&wrc_data->wrc_lock);
+	mutex_exit(&spa->spa_wrc.wrc_lock);
 
-	DTRACE_PROBE2(wrc_spa_add, char *, spa->spa_name,
-	    spa_t *, spa);
+	return (B_TRUE);
+}
+
+void
+wrc_switch_mode(spa_t *spa)
+{
+	autosnap_toggle_global_mode(spa,
+	    (spa->spa_wrc_mode == WRC_MODE_ACTIVE));
 }
 
 /*
@@ -1621,18 +1634,30 @@ wrc_deactivate(spa_t *spa)
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 
-	mutex_enter(&wrc_data->wrc_lock);
+	mutex_enter(&spa->spa_wrc.wrc_lock);
 
 	if (!spa_has_special(spa) || !wrc_data->wrc_isvalid) {
-		mutex_exit(&wrc_data->wrc_lock);
+		mutex_exit(&spa->spa_wrc.wrc_lock);
 		return;
 	}
 
 	DTRACE_PROBE1(wrc_deactiv_start, char *, spa->spa_name);
 
-	wrc_unregister_instances(wrc_data);
-
+#ifdef _KERNEL
+	autosnap_unregister_handler(wrc_data->wrc_autosnap_hdl);
+#endif
 	wrc_data->wrc_isvalid = B_FALSE;
+
+	/*
+	 * There can be active queue threads performing actions
+	 * taskq_destroy is a blocking function, so we need to drop
+	 * the lock to prevent deadlock. It is safe as the queued
+	 * tasks do not alter global state and there are no more
+	 * other users but the current thread at the time
+	 */
+	mutex_exit(&wrc_data->wrc_lock);
+	taskq_destroy(wrc_data->wrc_move_taskq);
+	mutex_enter(&wrc_data->wrc_lock);
 
 	VERIFY(avl_is_empty(&wrc_data->wrc_blocks));
 	VERIFY(avl_is_empty(&wrc_data->wrc_moved_blocks));
@@ -1657,21 +1682,6 @@ wrc_blocks_compare(const void *arg1, const void *arg2)
 	int cmp = (cmp1 == 0) ? cmp2 : cmp1;
 
 	return (cmp);
-}
-
-static int
-wrc_instances_compare(const void *arg1, const void *arg2)
-{
-	const wrc_instance_t *instance1 = arg1;
-	const wrc_instance_t *instance2 = arg2;
-
-	if (instance1->ds_object > instance2->ds_object)
-		return (1);
-
-	if (instance1->ds_object < instance2->ds_object)
-		return (-1);
-
-	return (0);
 }
 
 static int
@@ -1765,7 +1775,7 @@ wrc_is_block_special(spa_t *spa, const blkptr_t *bp)
 	 * wrc is persistent and can not be turned off so if it is disabled
 	 * there are no special blocks for sure
 	 */
-	if (!spa_feature_is_active(spa, SPA_FEATURE_WRC))
+	if (!spa_wrc_present(spa))
 		return (B_FALSE);
 
 	if (BP_GET_NDVAS(bp) >= 2)
@@ -1821,261 +1831,4 @@ wrc_first_valid_dva(const blkptr_t *bp,
 	}
 
 	return (start_dva);
-}
-
-/*
- * This function is called from dsl_prop_set_sync_impl()
- * during changing of wrc_mode property on the corresponding
- * dataset.
- */
-void
-wrc_mode_changed(void *arg, uint64_t newval)
-{
-	objset_t *os = arg;
-	wrc_data_t *wrc_data = spa_get_wrc_data(os->os_spa);
-
-	if (newval == 0) {
-		if (os->os_wrc_mode == ZFS_WRC_MODE_OFF)
-			return;
-
-		os->os_wrc_mode = ZFS_WRC_MODE_OFF;
-	} else {
-		os->os_wrc_mode = ZFS_WRC_MODE_ON;
-		os->os_wrc_root_ds_obj = newval >> 1;
-	}
-
-	DTRACE_PROBE4(wrc_mc,
-	    boolean_t, wrc_data->wrc_ready_to_use,
-	    uint64_t, os->os_dsl_dataset->ds_object,
-	    uint64_t, os->os_wrc_mode,
-	    uint64_t, os->os_wrc_root_ds_obj);
-
-	wrc_process_objset(wrc_data, os, B_FALSE);
-
-	if (os->os_wrc_mode == ZFS_WRC_MODE_OFF)
-		os->os_wrc_root_ds_obj = 0;
-}
-
-void
-wrc_process_objset(wrc_data_t *wrc_data,
-    objset_t *os, boolean_t destroy)
-{
-	/* Process only top-level datasets */
-	if (os->os_dsl_dataset->ds_object == os->os_wrc_root_ds_obj) {
-		size_t num_nodes_before, num_nodes_after;
-
-		mutex_enter(&wrc_data->wrc_lock);
-
-		num_nodes_before = avl_numnodes(&wrc_data->wrc_instances);
-
-		if (os->os_wrc_mode == ZFS_WRC_MODE_OFF || destroy) {
-			wrc_unregister_instance(wrc_data, os, !destroy);
-			if (os->os_wrc_mode == ZFS_WRC_MODE_OFF)
-				os->os_wrc_root_ds_obj = 0;
-		} else {
-			wrc_register_instance(wrc_data, os);
-		}
-
-		num_nodes_after = avl_numnodes(&wrc_data->wrc_instances);
-
-		mutex_exit(&wrc_data->wrc_lock);
-
-		/*
-		 * The first instance, so need to
-		 * start the collector and the mover
-		 */
-		if ((num_nodes_after > num_nodes_before) &&
-		    (num_nodes_before == 0)) {
-			wrc_start_thread(wrc_data->wrc_spa);
-		}
-
-		/*
-		 * The last instance, so need to
-		 * stop the collector and the mover
-		 */
-		if ((num_nodes_after < num_nodes_before) &&
-		    (num_nodes_after == 0)) {
-			(void) wrc_stop_thread(wrc_data->wrc_spa);
-		}
-	}
-}
-
-static void
-wrc_register_instance(wrc_data_t *wrc_data, objset_t *os)
-{
-	char ds_name[MAXNAMELEN];
-	dsl_dataset_t *ds = os->os_dsl_dataset;
-	wrc_instance_t *wrc_instance;
-	avl_index_t where = NULL;
-
-	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
-
-	/* Do not register instances too early */
-	if (!wrc_data->wrc_ready_to_use) {
-		return;
-	}
-
-	/* Is it already registered? */
-	wrc_instance = wrc_lookup_instance(wrc_data,
-	    ds->ds_object, &where);
-	if (wrc_instance != NULL) {
-		return;
-	}
-
-	wrc_instance = kmem_zalloc(sizeof (wrc_instance_t), KM_SLEEP);
-	wrc_instance->ds_object = ds->ds_object;
-	wrc_instance->wrc_data = wrc_data;
-	dsl_dataset_name(ds, ds_name);
-	wrc_instance->wrc_autosnap_hdl =
-	    autosnap_register_handler(ds_name,
-	    AUTOSNAP_CREATOR | AUTOSNAP_DESTROYER |
-	    AUTOSNAP_RECURSIVE,
-	    wrc_confirm_cb, wrc_nc_cb, wrc_err_cb, wrc_instance);
-	if (wrc_instance->wrc_autosnap_hdl == NULL) {
-		cmn_err(CE_WARN, "Cannot register autosnap handler "
-		    "for WRC-Instance (%s)", ds_name);
-		kmem_free(wrc_instance, sizeof (wrc_instance_t));
-		return;
-	}
-
-	DTRACE_PROBE2(register_done,
-	    uint64_t, wrc_instance->ds_object,
-	    char *, ds_name);
-
-	avl_insert(&wrc_data->wrc_instances, wrc_instance, where);
-}
-
-static void
-wrc_unregister_instance(wrc_data_t *wrc_data, objset_t *os,
-    boolean_t rele_autosnap)
-{
-	dsl_dataset_t *ds = os->os_dsl_dataset;
-	wrc_instance_t *wrc_instance;
-
-	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
-
-	wrc_instance = wrc_lookup_instance(wrc_data, ds->ds_object, NULL);
-	if (wrc_instance != NULL) {
-		DTRACE_PROBE1(unregister_done,
-		    uint64_t, wrc_instance->ds_object);
-
-		avl_remove(&wrc_data->wrc_instances, wrc_instance);
-		wrc_unregister_instance_impl(wrc_instance,
-		    rele_autosnap && (wrc_instance->txg_to_rele != 0));
-	}
-}
-
-static void
-wrc_unregister_instances(wrc_data_t *wrc_data)
-{
-	void *cookie = NULL;
-	wrc_instance_t *wrc_instance;
-
-	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
-
-	while ((wrc_instance = avl_destroy_nodes(
-	    &wrc_data->wrc_instances, &cookie)) != NULL)
-		wrc_unregister_instance_impl(wrc_instance, B_FALSE);
-}
-
-static void
-wrc_unregister_instance_impl(wrc_instance_t *wrc_instance,
-    boolean_t rele_autosnap)
-{
-	if (rele_autosnap) {
-		autosnap_release_snapshots_by_txg(
-		    wrc_instance->wrc_autosnap_hdl,
-		    wrc_instance->txg_to_rele,
-		    AUTOSNAP_NO_SNAP);
-	}
-
-	autosnap_unregister_handler(wrc_instance->wrc_autosnap_hdl);
-	kmem_free(wrc_instance, sizeof (wrc_instance_t));
-}
-
-static wrc_instance_t *
-wrc_lookup_instance(wrc_data_t *wrc_data,
-    uint64_t ds_object, avl_index_t *where)
-{
-	wrc_instance_t wrc_instance;
-
-	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
-
-	wrc_instance.ds_object = ds_object;
-	return (avl_find(&wrc_data->wrc_instances,
-	    &wrc_instance, where));
-}
-
-/*
- * To be backward compatible with the next releases
- * Now WRC supports only one mode.
- * It is possible to extend WRC and add second mode,
- * so need to be ready.
- */
-/* ARGSUSED */
-uint64_t
-wrc_pack_wrc_mode(uint64_t value, uint64_t objset_num)
-{
-	uint64_t result;
-
-	ASSERT0(((objset_num >> 63) & 1));
-	result = (objset_num << 1);
-
-	return (result);
-}
-
-/*
- * To be backward compatible with the next releases
- */
-uint64_t
-wrc_unpack_wrc_mode(uint64_t value)
-{
-	ASSERT(value != 0);
-	return (ZFS_WRC_MODE_ON);
-}
-
-int
-wrc_check_dataset(const char *ds_name)
-{
-	int error;
-	spa_t *spa = NULL;
-	dsl_dataset_t *ds = NULL;
-	objset_t *os = NULL;
-	zfs_wrc_mode_t wrc_mode;
-	uint64_t wrc_root_object, ds_object;
-
-	error = spa_open(ds_name, &spa, FTAG);
-	if (error != 0)
-		return (error);
-
-	dsl_pool_config_enter(spa_get_dsl(spa), FTAG);
-	error = dsl_dataset_hold(spa_get_dsl(spa), ds_name, FTAG, &ds);
-	if (error) {
-		dsl_pool_config_exit(spa_get_dsl(spa), FTAG);
-		spa_close(spa, FTAG);
-		return (error);
-	}
-
-	error = dmu_objset_from_ds(ds, &os);
-	dsl_pool_config_exit(spa_get_dsl(spa), FTAG);
-	if (error) {
-		dsl_dataset_rele(ds, FTAG);
-		spa_close(spa, FTAG);
-		return (error);
-	}
-
-	wrc_mode = os->os_wrc_mode;
-	wrc_root_object = os->os_wrc_root_ds_obj;
-	ds_object = ds->ds_object;
-	dsl_dataset_rele(ds, FTAG);
-	spa_close(spa, FTAG);
-
-	if (wrc_mode != ZFS_WRC_MODE_OFF) {
-		if (wrc_root_object != ds_object)
-			return (EOPNOTSUPP);
-
-		return (0);
-	}
-
-	return (ENOTACTIVE);
 }

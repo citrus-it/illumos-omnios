@@ -72,6 +72,13 @@ zpool_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t wrcmode_table[] = {
+		{ "off", WRC_MODE_OFF },
+		{ "active", WRC_MODE_ACTIVE },
+		{ "passive", WRC_MODE_PASSIVE },
+		{ NULL }
+	};
+
 	/* string properties */
 	zprop_register_string(ZPOOL_PROP_ALTROOT, "altroot", NULL, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "<path>", "ALTROOT");
@@ -126,6 +133,9 @@ zpool_prop_init(void)
 	    "0-100", "DEDUP_HI_BEST_EFFORT");
 
 	/* default index (boolean) properties */
+	zprop_register_index(ZPOOL_PROP_WRC_MODE, "wrc_mode", WRC_MODE_OFF,
+	    PROP_DEFAULT, ZFS_TYPE_POOL, "off | active | passive",
+	    "WRC_MODE", wrcmode_table);
 	zprop_register_index(ZPOOL_PROP_DELEGATION, "delegation", 1,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "DELEGATION",
 	    boolean_table);

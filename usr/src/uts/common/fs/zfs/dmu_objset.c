@@ -49,7 +49,6 @@
 #include <sys/sa.h>
 #include <sys/zfs_onexit.h>
 #include <sys/dsl_destroy.h>
-#include <sys/wrcache.h>
 
 /*
  * Needed to close a window in dnode_move() that allows the objset to be freed
@@ -432,11 +431,6 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 				    zfs_prop_to_name(ZFS_PROP_RECORDSIZE),
 				    recordsize_changed_cb, os);
 			}
-			if (err == 0) {
-				err = dsl_prop_register(ds,
-				    zfs_prop_to_name(ZFS_PROP_WRC_MODE),
-				    wrc_mode_changed, os);
-			}
 		}
 		if (err != 0) {
 			VERIFY(arc_buf_remove_ref(os->os_phys_buf,
@@ -709,9 +703,6 @@ dmu_objset_evict(objset_t *os)
 			VERIFY0(dsl_prop_unregister(ds,
 			    zfs_prop_to_name(ZFS_PROP_RECORDSIZE),
 			    recordsize_changed_cb, os));
-			VERIFY0(dsl_prop_unregister(ds,
-			    zfs_prop_to_name(ZFS_PROP_WRC_MODE),
-			    wrc_mode_changed, os));
 		}
 		VERIFY0(dsl_prop_unregister(ds,
 		    zfs_prop_to_name(ZFS_PROP_PRIMARYCACHE),

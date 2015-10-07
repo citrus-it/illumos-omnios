@@ -179,12 +179,6 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
-	static zprop_index_t wrc_modes_table[] = {
-		{ "off",		ZFS_WRC_MODE_OFF },
-		{ "on",			ZFS_WRC_MODE_ON },
-		{ NULL }
-	};
-
 	static zprop_index_t canmount_table[] = {
 		{ "off",	ZFS_CANMOUNT_OFF },
 		{ "on",		ZFS_CANMOUNT_ON },
@@ -285,9 +279,6 @@ zfs_prop_init(void)
 	zprop_register_index(ZFS_PROP_LOGBIAS, "logbias", ZFS_LOGBIAS_LATENCY,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "latency | throughput", "LOGBIAS", logbias_table);
-	zprop_register_index(ZFS_PROP_WRC_MODE, "wrc_mode", ZFS_WRC_MODE_OFF,
-	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "off | on", "WRC_MODE", wrc_modes_table);
 
 #if 0
 	/* temporarily disable wrcache */

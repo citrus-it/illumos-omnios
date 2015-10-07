@@ -26,9 +26,9 @@
 .\" Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 .\" Copyright (c) 2014, Joyent, Inc. All rights reserved.
 .\" Copyright (c) 2014 by Adam Stevko. All rights reserved.
-.\" Copyright 2015 Nexenta Systems, Inc.  All Rights Reserved.
+.\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
 .\"
-.TH ZFS 1M "September 21, 2015"
+.TH ZFS 1M "November 11, 2014"
 .SH NAME
 zfs \- configures ZFS file systems
 .SH SYNOPSIS
@@ -1558,21 +1558,6 @@ reflected in the reservation.
 Controls whether regular files should be scanned for viruses when a file is
 opened and closed. In addition to enabling this property, the virus scan
 service must also be enabled for virus scanning to occur. The default value is
-\fBoff\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBwrc_mode\fR=\fBoff\fR | \fBon\fR\fR
-.ad
-.sp .6
-.RS 4n
-Controls the mode of write back cache. After the property has been set on a
-dataset all the child datasets inherit the property. Due to its recursive
-nature the property will conflict with any child dataset or any parent dataset
-having this property enabled as well. The property cannot be set if the target
-pool does not have special device (special vdev). The default value is
 \fBoff\fR.
 .RE
 

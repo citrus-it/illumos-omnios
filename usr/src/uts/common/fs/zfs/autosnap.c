@@ -11,11 +11,6 @@
 #include <sys/unique.h>
 #include <sys/ctype.h>
 
-static void autosnap_notify_created(const char *name, uint64_t txg,
-    autosnap_zone_t *zone);
-static void autosnap_reject_snap(const char *name, uint64_t txg,
-    zfs_autosnap_t *autosnap);
-
 /* AUTOSNAP-recollect routines */
 
 /* Collect orphaned snapshots after reboot */
@@ -176,7 +171,8 @@ autosnap_get_owned_snapshots(void *opaque)
 		(void) strcpy(ds_name, snap->name);
 		*(strchr(ds_name, '@')) = '\0';
 
-		if (strcmp(ds_name, hdl->zone->dataset) != 0)
+		if (strcmp(ds_name, hdl->zone->dataset) &&
+		    !(hdl->zone->flags & AUTOSNAP_GLOBAL))
 			continue;
 
 		data[0] = snap->txg;
@@ -247,6 +243,25 @@ autosnap_claim_orphaned_snaps(autosnap_handler_t *hdl)
 	}
 }
 
+/*
+ * Global mode switch is used by wrc to change mode
+ */
+void
+autosnap_toggle_global_mode(spa_t *spa, boolean_t toggle_on)
+{
+	zfs_autosnap_t *autosnap = spa_get_autosnap(spa);
+	autosnap_zone_t *zone = &autosnap->autosnap_global;
+
+	if (list_head(&zone->listeners) == NULL)
+		return;
+
+	if (toggle_on) {
+		zone->flags |= AUTOSNAP_CREATOR;
+	} else {
+		zone->flags &= ~AUTOSNAP_CREATOR;
+	}
+}
+
 /* AUTOSNAP_RELE routines */
 
 void
@@ -265,7 +280,16 @@ autosnap_release_snapshots_by_txg_no_lock_impl(void *opaque, uint64_t from_txg,
 	autosnap_snapshot_t *walker, *prev;
 
 	search.txg = from_txg;
-	(void) strcpy(search.name, zone->dataset);
+	if (zone->globalized) {
+		char *slash;
+
+		(void) strcpy(search.name, zone->dataset);
+		slash = strchr(search.name, '/');
+		if (slash)
+			*slash = '\0';
+	} else {
+		(void) strcpy(search.name, zone->dataset);
+	}
 	search_len = strlen(search.name);
 	walker = avl_find(&autosnap->snapshots, &search, &where);
 
@@ -432,8 +456,9 @@ autosnap_register_handler(const char *name, uint64_t flags,
 {
 	spa_t *spa;
 	autosnap_handler_t *hdl = NULL;
-	autosnap_zone_t *zone, *rzone;
-	boolean_t children_have_zone;
+	autosnap_zone_t *zone = NULL;
+	autosnap_zone_t *rzone = NULL;
+	boolean_t children_zone, has_gzone;
 	zfs_autosnap_t *autosnap;
 	boolean_t namespace_alteration = B_TRUE;
 
@@ -455,18 +480,30 @@ autosnap_register_handler(const char *name, uint64_t flags,
 
 	mutex_enter(&autosnap->autosnap_lock);
 
-	zone = autosnap_find_zone(autosnap, name, B_FALSE);
-	rzone = autosnap_find_zone(autosnap, name, B_TRUE);
+	has_gzone = list_head(&autosnap->autosnap_global.listeners) != NULL;
 
-	children_have_zone =
-	    autosnap_has_children_zone(autosnap, name, B_FALSE);
+	/* Look for zone */
+	if (flags & AUTOSNAP_GLOBAL) {
+		zone = &autosnap->autosnap_global;
+		children_zone = autosnap_has_children_zone(spa, name);
+	} else {
+		zone = autosnap_find_zone(spa, name, B_FALSE);
+		rzone = autosnap_find_zone(spa, name, B_TRUE);
+		children_zone = autosnap_has_children_zone(spa, name);
+	}
 
 	if (rzone && !zone) {
 		cmn_err(CE_WARN, "AUTOSNAP: the dataset is already under"
 		    " an autosnap zone [%s under %s]\n",
 		    name, rzone->dataset);
 		goto out;
-	} else if (children_have_zone && (flags & AUTOSNAP_RECURSIVE)) {
+	} else if (has_gzone && !zone && (strchr(name, '/') != NULL ||
+	    !(flags & AUTOSNAP_RECURSIVE))) {
+		cmn_err(CE_WARN, "AUTOSNAP: can't register non-root"
+		    " or non-recursive zone when wrc is present %s\n",
+		    name);
+		goto out;
+	} else if (children_zone && (flags & AUTOSNAP_RECURSIVE)) {
 		cmn_err(CE_WARN, "AUTOSNAP: can't register recursive zone"
 		    " when there is a child under autosnap%s\n",
 		    name);
@@ -482,7 +519,11 @@ autosnap_register_handler(const char *name, uint64_t flags,
 		    sizeof (autosnap_handler_t),
 		    offsetof(autosnap_handler_t, node));
 
+		zone->created = B_FALSE;
+		zone->flags = 0;
 		zone->autosnap = autosnap;
+		zone->delayed = B_FALSE;
+		zone->globalized = B_FALSE;
 		list_insert_tail(&autosnap->autosnap_zones, zone);
 	} else {
 		if ((list_head(&zone->listeners) != NULL) &&
@@ -564,36 +605,31 @@ autosnap_unregister_handler(void *opaque)
 free_hdl:
 
 	/*
-	 * Remove the client from zone. If it is a last client
-	 * then destroy the zone.
+	 * Remove the client from zone. If it is a last client then destroy the
+	 * zone. If some clients left but there are no owners among them, then
+	 * unset the flag from the zone.
 	 */
-	if (zone != NULL) {
+	if (zone) {
 		list_remove(&zone->listeners, hdl);
 
-		if (list_head(&zone->listeners) == NULL) {
+		if (list_head(&zone->listeners) == NULL &&
+		    !(zone->flags & AUTOSNAP_GLOBAL)) {
 			list_remove(&autosnap->autosnap_zones, zone);
 			list_destroy(&zone->listeners);
 			kmem_free(zone, sizeof (autosnap_zone_t));
+			zone = NULL;
 		} else {
 			autosnap_handler_t *walk;
-			boolean_t drop_owner_flag = B_TRUE;
-			boolean_t drop_krrp_flag = B_TRUE;
 
 			for (walk = list_head(&zone->listeners);
 			    walk != NULL;
 			    walk = list_next(&zone->listeners, walk)) {
-				if ((walk->flags & AUTOSNAP_OWNER) != 0)
-					drop_owner_flag = B_FALSE;
-
-				if ((walk->flags & AUTOSNAP_KRRP) != 0)
-					drop_krrp_flag = B_FALSE;
+				if (walk->flags & AUTOSNAP_OWNER)
+					break;
 			}
 
-			if (drop_owner_flag)
+			if (walk == NULL)
 				zone->flags &= ~AUTOSNAP_OWNER;
-
-			if (drop_krrp_flag)
-				zone->flags &= ~AUTOSNAP_KRRP;
 		}
 	}
 
@@ -607,96 +643,64 @@ out:
 		mutex_exit(&spa_namespace_lock);
 }
 
-int
-autosnap_check_for_destroy(zfs_autosnap_t *autosnap, const char *name)
-{
-	autosnap_zone_t *rzone, *zone;
-	boolean_t children_have_zone;
-
-	mutex_enter(&autosnap->autosnap_lock);
-	zone = autosnap_find_zone(autosnap, name, B_FALSE);
-	rzone = autosnap_find_zone(autosnap, name, B_TRUE);
-	children_have_zone =
-	    autosnap_has_children_zone(autosnap, name, B_TRUE);
-	mutex_exit(&autosnap->autosnap_lock);
-
-	if (zone != NULL && (zone->flags & AUTOSNAP_KRRP) != 0)
-		return (EBUSY);
-
-	if (children_have_zone)
-		return (ECHILD);
-
-	if (rzone != NULL && (rzone->flags & AUTOSNAP_KRRP) != 0)
-		return (EUSERS);
-
-	return (0);
-}
-
 boolean_t
-autosnap_has_children_zone(zfs_autosnap_t *autosnap,
-    const char *name, boolean_t krrp_only)
+autosnap_has_children_zone(spa_t *spa, const char *name)
 {
-	autosnap_zone_t *zone;
 	char dataset[MAXPATHLEN];
 	char *snapshot;
-	size_t ds_name_len;
+	autosnap_zone_t *zone;
+	zfs_autosnap_t *autosnap = spa_get_autosnap(spa);
 
 	ASSERT(MUTEX_HELD(&autosnap->autosnap_lock));
 
 	(void) strcpy(dataset, name);
-	if ((snapshot = strchr(dataset, '@')) != NULL)
+	snapshot = strchr(dataset, '@');
+	if (snapshot != NULL)
 		*snapshot++ = '\0';
 
-	ds_name_len = strlen(dataset);
-	zone = list_head(&autosnap->autosnap_zones);
-	while (zone != NULL) {
-		int cmp = strncmp(dataset,
-		    zone->dataset, ds_name_len);
-		boolean_t skip =
-		    krrp_only && ((zone->flags & AUTOSNAP_KRRP) == 0);
-		if (cmp == 0 && zone->dataset[ds_name_len] == '/' &&
-		    !skip)
+	for (zone = list_head(&autosnap->autosnap_zones);
+	    zone != NULL;
+	    zone = list_next(&autosnap->autosnap_zones, zone)) {
+		int cmp = strncmp(dataset, zone->dataset,
+		    strlen(dataset));
+		if (cmp == 0)
 			return (B_TRUE);
-
-		zone = list_next(&autosnap->autosnap_zones, zone);
 	}
+
 
 	return (B_FALSE);
 }
 
 autosnap_zone_t *
-autosnap_find_zone(zfs_autosnap_t *autosnap,
-    const char *name, boolean_t recursive)
+autosnap_find_zone(spa_t *spa, const char *name, boolean_t recursive)
 {
 	char dataset[MAXPATHLEN];
 	char *snapshot;
 	autosnap_zone_t *zone;
+	zfs_autosnap_t *autosnap = spa_get_autosnap(spa);
 
 	ASSERT(MUTEX_HELD(&autosnap->autosnap_lock));
 
 	(void) strcpy(dataset, name);
-	if ((snapshot = strchr(dataset, '@')) != NULL)
+	snapshot = strchr(dataset, '@');
+
+	if (snapshot != NULL)
 		*snapshot++ = '\0';
 
-	zone = list_head(&autosnap->autosnap_zones);
-	while (zone != NULL) {
-		if (strcmp(dataset, zone->dataset) == 0) {
-			return (zone);
-		} else if (recursive) {
-			size_t ds_name_len = strlen(zone->dataset);
-			int cmp = strncmp(dataset, zone->dataset,
-			    ds_name_len);
-			boolean_t zone_is_recursive =
-			    zone->flags & AUTOSNAP_RECURSIVE;
-			if (cmp == 0 && zone_is_recursive &&
-			    dataset[ds_name_len] == '/')
-				return (zone);
-		}
-
-		zone = list_next(&autosnap->autosnap_zones, zone);
+	for (zone = list_head(&autosnap->autosnap_zones);
+	    zone != NULL;
+	    zone = list_next(&autosnap->autosnap_zones, zone)) {
+		int cmp = strncmp(dataset, zone->dataset,
+		    strlen(zone->dataset));
+		if (strcmp(dataset, zone->dataset) == 0)
+			break;
+		if (recursive && cmp == 0 &&
+		    (zone->flags & AUTOSNAP_RECURSIVE))
+			break;
 	}
 
-	return (NULL);
+
+	return (zone);
 }
 
 /* AUTOSNAP-LOCK routines */
@@ -801,7 +805,7 @@ autosnap_force_snap_by_name(const char *dsname, autosnap_zone_t *zone,
 
 	mutex_enter(&autosnap->autosnap_lock);
 	if (zone == NULL) {
-		zone = autosnap_find_zone(autosnap, dsname, B_TRUE);
+		zone = autosnap_find_zone(dp->dp_spa, dsname, B_TRUE);
 		if (zone == NULL) {
 			mutex_exit(&autosnap->autosnap_lock);
 			dsl_pool_rele(dp, FTAG);
@@ -875,7 +879,7 @@ autosnap_force_snap(void *opaque, boolean_t sync)
 
 /* iterate through handlers and call its confirm callbacks */
 boolean_t
-autosnap_confirm_snap(autosnap_zone_t *zone, uint64_t txg)
+autosnap_confirm_snap(const char *name, uint64_t txg, autosnap_zone_t *zone)
 {
 	autosnap_handler_t *hdl;
 	boolean_t confirmation = B_FALSE;
@@ -888,8 +892,7 @@ autosnap_confirm_snap(autosnap_zone_t *zone, uint64_t txg)
 	    hdl = list_next(&zone->listeners, hdl)) {
 		confirmation |=
 		    hdl->confirm_cb == NULL ? B_TRUE :
-		    hdl->confirm_cb(zone->dataset,
-		    !!(zone->flags & AUTOSNAP_RECURSIVE),
+		    hdl->confirm_cb(name, !!(zone->flags & AUTOSNAP_RECURSIVE),
 		    txg, hdl->cb_arg);
 	}
 
@@ -898,7 +901,8 @@ autosnap_confirm_snap(autosnap_zone_t *zone, uint64_t txg)
 
 /* iterate through handlers and call its error callbacks */
 void
-autosnap_error_snap(autosnap_zone_t *zone, uint64_t txg, int err)
+autosnap_error_snap(const char *name, int err, uint64_t txg,
+    autosnap_zone_t *zone)
 {
 	autosnap_handler_t *hdl;
 
@@ -906,7 +910,7 @@ autosnap_error_snap(autosnap_zone_t *zone, uint64_t txg, int err)
 	    hdl != NULL;
 	    hdl = list_next(&zone->listeners, hdl)) {
 		if (hdl->err_cb)
-			hdl->err_cb(zone->dataset, err, txg, hdl->cb_arg);
+			hdl->err_cb(name, err, txg, hdl->cb_arg);
 	}
 }
 
@@ -928,10 +932,12 @@ autosnap_contains_handler(list_t *listeners, autosnap_handler_t *chdl)
 /* iterate through handlers and call its notify callbacks */
 static void
 autosnap_iterate_listeners(autosnap_zone_t *zone, autosnap_snapshot_t *snap,
-    boolean_t destruction)
+    boolean_t globalized, boolean_t destruction)
 {
 	autosnap_handler_t *hdl;
 
+	if (globalized)
+		zone->globalized = B_TRUE;
 	for (hdl = list_head(&zone->listeners);
 	    hdl != NULL;
 	    hdl = list_next(&zone->listeners, hdl)) {
@@ -947,47 +953,102 @@ autosnap_iterate_listeners(autosnap_zone_t *zone, autosnap_snapshot_t *snap,
 	}
 }
 
-/*
- * With no wrc and a dataset which is either a standalone or root of
- * recursion, just notify about creation
- * With no wrc and dataset not being a part of any zone, just reject it
- */
+/* Notify listeners about creation of a global autosnapshot */
 void
-autosnap_create_cb(zfs_autosnap_t *autosnap,
-    dsl_dataset_t *ds, const char *snapname, uint64_t txg)
+autosnap_notify_created_globalized(const char *snapname,
+    uint64_t ftxg, uint64_t ttxg, zfs_autosnap_t *autosnap)
 {
-	autosnap_zone_t *zone, *rzone;
-	char fullname[MAXNAMELEN];
+	autosnap_snapshot_t *snapshot, search;
+	autosnap_zone_t *zone;
+	boolean_t destruction;
+	boolean_t asnap = B_FALSE;
+	boolean_t resumed = B_FALSE;
 
-	dsl_dataset_name(ds, fullname);
+	ASSERT(MUTEX_HELD(&autosnap->autosnap_lock));
 
-	mutex_enter(&autosnap->autosnap_lock);
-	zone = autosnap_find_zone(autosnap, fullname, B_FALSE);
-	rzone = autosnap_find_zone(autosnap, fullname, B_TRUE);
+	(void) strcpy(search.name, snapname);
+	search.txg = ftxg;
+	search.etxg = ttxg;
 
-	(void) strcat(fullname, "@");
-	(void) strcat(fullname, snapname);
+	snapshot = avl_find(&autosnap->snapshots, &search, NULL);
 
-	if (zone != NULL) {
-		/*
-		 * Some listeners subscribed for this datasets.
-		 * So need to notify them about new snapshot
-		 */
-		autosnap_notify_created(fullname, txg, zone);
-	} else if (!rzone) {
-		/*
-		 * There are no listeners for this datasets
-		 * and its children. So this snapshot is not
-		 * needed anymore.
-		 */
-		autosnap_reject_snap(fullname, txg, autosnap);
+	if (snapshot) {
+		resumed = B_TRUE;
+	} else {
+		snapshot = kmem_zalloc(sizeof (autosnap_snapshot_t), KM_SLEEP);
+		(void) strcpy(snapshot->name, snapname);
+		snapshot->recursive = B_TRUE;
+		list_create(&snapshot->listeners, sizeof (autosnap_handler_t),
+		    offsetof(autosnap_handler_t, node));
+	}
+	snapshot->txg = ftxg;
+	snapshot->etxg = ttxg;
+
+	asnap = autosnap_check_name(strchr(snapname, '@'));
+
+	for (zone = list_head(&autosnap->autosnap_zones);
+	    zone != NULL;
+	    zone = list_next(&autosnap->autosnap_zones, zone)) {
+		destruction = asnap && !!(zone->flags & AUTOSNAP_DESTROYER);
+		autosnap_iterate_listeners(zone, snapshot, B_TRUE, destruction);
 	}
 
+	destruction = asnap &&
+	    !!(autosnap->autosnap_global.flags & AUTOSNAP_DESTROYER);
+	autosnap_iterate_listeners(&autosnap->autosnap_global, snapshot,
+	    B_TRUE, destruction);
+
+	if (asnap) {
+		if (list_head(&snapshot->listeners) != NULL) {
+			if (!resumed)
+				avl_add(&autosnap->snapshots, snapshot);
+		} else {
+			list_insert_tail(
+			    &autosnap->autosnap_destroy_queue, snapshot);
+			cv_broadcast(&autosnap->autosnap_cv);
+		}
+	} else {
+		kmem_free(snapshot, sizeof (autosnap_snapshot_t));
+	}
+}
+
+/* Notify listeners about a received snapshot */
+void
+autosnap_notify_received(const char *name)
+{
+	uint64_t ftxg;
+	uint64_t ttxg = dsl_dataset_creation_txg(name);
+	spa_t *spa;
+	zfs_autosnap_t *autosnap;
+	char *snap = strchr(name, '@');
+	char *slash;
+	char snapname[MAXPATHLEN];
+
+	if (!autosnap_check_name(snap))
+		return;
+
+	(void) strcpy(snapname, name);
+	slash = strchr(snapname, '/');
+	if (slash)
+		(void) strcpy(slash, snap);
+
+	mutex_enter(&spa_namespace_lock);
+	spa = spa_lookup(name);
+	mutex_exit(&spa_namespace_lock);
+
+	if (!spa)
+		return;
+
+	autosnap = spa_get_autosnap(spa);
+
+	ftxg = dsl_dataset_creation_txg(snapname);
+	mutex_enter(&autosnap->autosnap_lock);
+	autosnap_notify_created_globalized(snapname, ftxg, ttxg, autosnap);
 	mutex_exit(&autosnap->autosnap_lock);
 }
 
 /* Notify listeners about an autosnapshot */
-static void
+void
 autosnap_notify_created(const char *name, uint64_t txg,
     autosnap_zone_t *zone)
 {
@@ -1012,12 +1073,13 @@ autosnap_notify_created(const char *name, uint64_t txg,
 		(void) strcpy(snapshot->name, name);
 		snapshot->txg = txg;
 		snapshot->etxg = txg;
-		snapshot->recursive = !!(zone->flags & AUTOSNAP_RECURSIVE);
+		snapshot->recursive =
+		    !!(zone->flags & (AUTOSNAP_RECURSIVE | AUTOSNAP_GLOBAL));
 		list_create(&snapshot->listeners, sizeof (autosnap_handler_t),
 		    offsetof(autosnap_handler_t, node));
 	}
 
-	autosnap_iterate_listeners(zone, snapshot, destruction);
+	autosnap_iterate_listeners(zone, snapshot, B_FALSE, destruction);
 
 	if (destruction) {
 		if (list_head(&snapshot->listeners) != NULL) {
@@ -1034,7 +1096,7 @@ autosnap_notify_created(const char *name, uint64_t txg,
 }
 
 /* Reject a creation of an autosnapshot */
-static void
+void
 autosnap_reject_snap(const char *name, uint64_t txg, zfs_autosnap_t *autosnap)
 {
 	autosnap_snapshot_t *snapshot = NULL;
@@ -1227,6 +1289,17 @@ autosnap_init(spa_t *spa)
 	    sizeof (autosnap_snapshot_t),
 	    offsetof(autosnap_snapshot_t, node));
 
+	(void) strcpy(autosnap->autosnap_global.dataset, spa_name(spa));
+
+	list_create(&autosnap->autosnap_global.listeners,
+	    sizeof (autosnap_handler_t),
+	    offsetof(autosnap_handler_t, node));
+
+	autosnap->autosnap_global.created = B_FALSE;
+	autosnap->autosnap_global.delayed = B_FALSE;
+	autosnap->autosnap_global.flags = AUTOSNAP_GLOBAL;
+	autosnap->autosnap_global.autosnap = autosnap;
+
 #ifdef _KERNEL
 	autosnap_destroyer_thread_start(spa);
 #endif
@@ -1256,10 +1329,14 @@ autosnap_fini(spa_t *spa)
 			autosnap_unregister_handler(hdl);
 	}
 
+	while ((hdl = list_head(&autosnap->autosnap_global.listeners)) != NULL)
+		autosnap_unregister_handler(hdl);
+
 	while ((snap =
 	    avl_destroy_nodes(&autosnap->snapshots, &cookie)) != NULL)
 		kmem_free(snap, sizeof (*snap));
 
+	list_destroy(&autosnap->autosnap_global.listeners);
 	avl_destroy(&autosnap->snapshots);
 
 	while ((snap =

@@ -2,7 +2,6 @@
 .\" Copyright (c) 2013 by Delphix. All rights reserved.
 .\" Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 .\" Copyright (c) 2014, Joyent, Inc. All rights reserved.
-.\" Copyright (c) 2015, Nexenta Systems, Inc. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development
 .\" and Distribution License (the "License").  You may not use this file except
 .\" in compliance with the License. You can obtain a copy of the license at
@@ -15,7 +14,7 @@
 .\" CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your
 .\" own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
-.TH ZPOOL-FEATURES 5 "Sep 21, 2015"
+.TH ZPOOL-FEATURES 5 "Dec 16, 2013"
 .SH NAME
 zpool\-features \- ZFS pool feature descriptions
 .SH DESCRIPTION
@@ -483,27 +482,6 @@ support persistent Class of Storage (CoS) properties. Such properties can
 be associated with a collection of device that belong to a common class
 from storage management standpoint. This feature will be
 \fBactive\fR when the first CoS property is set.
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBwrcache\fR\fR
-.ad
-.RS 4n
-.TS
-l l .
-GUID	com.nexenta:wrcache
-READ\-ONLY COMPATIBLE	no
-DEPENDENCIES	none
-.TE
-
-This feature indicates that the pool includes on-disk format changes that
-support persistent Write Back Cache properties. This feature will be
-\fBactive\fR when the first \fBwrc_mode\fR property is set. This feature
-will be \fBdisabled\fR while the pool does not have special-vdev.
-This feature will never return from \fBactive\fR to \fBenabled\fR
 
 .RE
 

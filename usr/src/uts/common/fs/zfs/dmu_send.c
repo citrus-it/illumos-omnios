@@ -263,16 +263,16 @@ dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type, uint64_t object,
 		int error = arc_io_bypass(dsp->dsa_os->os_spa, bp,
 		    dmu_krrp_arc_bypass, &bypass);
 
-		if (error == 0) {
+		if (!error) {
 			DTRACE_PROBE(krrp_send_arc_bypass);
 			return (0);
 		}
-
-		if (error != ENODATA)
-			return (EINTR);
-
-		DTRACE_PROBE(krrp_send_disk_read);
-		error = 0;
+		if (error == ENODATA) {
+			DTRACE_PROBE(krrp_send_disk_read);
+			error = 0;
+		}
+		if (error)
+			return (error);
 	}
 
 	if (!dsp->sendsize) {
@@ -1135,22 +1135,6 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 	if (error == 0) {
 		/* target fs already exists; recv into temp clone */
 
-		if (spa_feature_is_active(dp->dp_spa, SPA_FEATURE_WRC)) {
-			objset_t *os = NULL;
-
-			error  = dmu_objset_from_ds(ds, &os);
-			if (error) {
-				dsl_dataset_rele(ds, FTAG);
-				return (error);
-			}
-
-			/* Recv is impossible into DS that uses WRC */
-			if (os->os_wrc_mode != ZFS_WRC_MODE_OFF) {
-				dsl_dataset_rele(ds, FTAG);
-				return (SET_ERROR(ENOTSUP));
-			}
-		}
-
 		/* Can't recv a clone into an existing fs */
 		if (flags & DRR_FLAG_CLONE) {
 			dsl_dataset_rele(ds, FTAG);
@@ -1176,22 +1160,6 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 		error = dsl_dataset_hold(dp, buf, FTAG, &ds);
 		if (error != 0)
 			return (error);
-
-		if (spa_feature_is_active(dp->dp_spa, SPA_FEATURE_WRC)) {
-			objset_t *os = NULL;
-
-			error  = dmu_objset_from_ds(ds, &os);
-			if (error) {
-				dsl_dataset_rele(ds, FTAG);
-				return (error);
-			}
-
-			/* Recv is impossible into DS that uses WRC */
-			if (os->os_wrc_mode != ZFS_WRC_MODE_OFF) {
-				dsl_dataset_rele(ds, FTAG);
-				return (SET_ERROR(ENOTSUP));
-			}
-		}
 
 		/*
 		 * Check filesystem and snapshot limits before receiving. We'll

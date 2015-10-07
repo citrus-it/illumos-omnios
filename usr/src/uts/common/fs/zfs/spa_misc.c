@@ -2187,6 +2187,36 @@ spa_maxblocksize(spa_t *spa)
 		return (SPA_OLD_MAXBLOCKSIZE);
 }
 
+boolean_t
+spa_wrc_present(spa_t *spa)
+{
+	return (spa->spa_wrc_mode != WRC_MODE_OFF);
+}
+
+boolean_t
+spa_wrc_active(spa_t *spa)
+{
+	return (spa->spa_wrc_mode == WRC_MODE_ACTIVE);
+}
+
+int
+spa_wrc_mode(const char *name)
+{
+	int ret = 0;
+	spa_t *spa;
+
+	mutex_enter(&spa_namespace_lock);
+	spa = spa_lookup(name);
+	if (!spa) {
+		mutex_exit(&spa_namespace_lock);
+		return (-1);
+	}
+
+	ret = (int)spa->spa_wrc_mode;
+	mutex_exit(&spa_namespace_lock);
+	return (ret);
+}
+
 struct zfs_autosnap *
 spa_get_autosnap(spa_t *spa)
 {

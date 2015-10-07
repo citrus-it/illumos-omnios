@@ -1247,7 +1247,7 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 	dsl_dataset_phys_t *dsphys;
 	uint64_t dsobj, crtxg;
 	objset_t *mos = dp->dp_meta_objset;
-	objset_t *os = NULL;
+	objset_t *os;
 	uint64_t unique_bytes = 0;
 
 	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
@@ -1367,15 +1367,39 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 
 	spa_history_log_internal_ds(ds->ds_prev, "snapshot", tx, "");
 
+	/*
+	 * With an active WRC all autosnapshot are globalized
+	 * With no wrc and a dataset which is either a standalone or root of
+	 * recursion, just notify about creation
+	 * With no wrc and dataset not being a part of any zone, just reject it
+	 */
 	if (autosnap_check_name(snapname)) {
-		autosnap_create_cb(spa_get_autosnap(dp->dp_spa),
-		    ds, snapname, tx->tx_txg);
+		autosnap_zone_t *zone = NULL;
+		autosnap_zone_t *rzone = NULL;
+		char fullname[MAXNAMELEN];
+
+		dsl_dataset_name(ds, fullname);
+		(void) strcat(fullname, "@");
+		(void) strcat(fullname, snapname);
+
+		mutex_enter(&dp->dp_spa->spa_autosnap.autosnap_lock);
+		zone = autosnap_find_zone(dp->dp_spa, fullname, B_FALSE);
+		rzone = autosnap_find_zone(dp->dp_spa, fullname, B_TRUE);
+
+		if (spa_wrc_active(dp->dp_spa) &&
+		    !strchr(fullname, '/')) {
+			autosnap_notify_created_globalized(fullname, tx->tx_txg,
+			    tx->tx_txg, spa_get_autosnap(dp->dp_spa));
+		} else if (!spa_wrc_present(dp->dp_spa) && zone) {
+			autosnap_notify_created(fullname, tx->tx_txg, zone);
+		} else if (!spa_wrc_present(dp->dp_spa) && !rzone) {
+			autosnap_reject_snap(fullname, tx->tx_txg,
+			    spa_get_autosnap(dp->dp_spa));
+		}
+		mutex_exit(&dp->dp_spa->spa_autosnap.autosnap_lock);
 	}
 
-	if (os == NULL)
-		VERIFY0(dmu_objset_from_ds(ds, &os));
-
-	if (os->os_wrc_mode != ZFS_WRC_MODE_OFF)
+	if (spa_wrc_present(dp->dp_spa))
 		wrc_add_bytes(dp->dp_spa, tx->tx_txg, unique_bytes);
 }
 
@@ -1406,11 +1430,11 @@ dsl_dataset_snapshot_sync(void *arg, dmu_tx_t *tx)
 		dsl_dataset_rele(ds, FTAG);
 	}
 
+	/*
+	 * in case of autosnap no one will take care about nvlist, so destroy
+	 * it here
+	 */
 	if (ddsa->ddsa_autosnap) {
-		/*
-		 * This sync-task was initiated by Autosnap,
-		 * so the structures are not required anymore.
-		 */
 		nvlist_free(ddsa->ddsa_snaps);
 		kmem_free(ddsa, sizeof (dsl_dataset_snapshot_arg_t));
 	}

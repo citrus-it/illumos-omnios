@@ -1456,8 +1456,7 @@ zfs_setprop_error(libzfs_handle_t *hdl, zfs_prop_t prop, int err,
 	case ERANGE:
 		if (prop == ZFS_PROP_COMPRESSION ||
 		    prop == ZFS_PROP_RECORDSIZE) {
-			(void) zfs_error_aux(hdl,
-			    dgettext(TEXT_DOMAIN,
+			(void) zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "property setting is not allowed on "
 			    "bootable datasets"));
 			(void) zfs_error(hdl, EZFS_NOTSUP, errbuf);
@@ -1486,32 +1485,7 @@ zfs_setprop_error(libzfs_handle_t *hdl, zfs_prop_t prop, int err,
 #endif
 		/* FALLTHROUGH */
 	default:
-		if (prop != ZFS_PROP_WRC_MODE) {
-			(void) zfs_standard_error(hdl, err, errbuf);
-			break;
-		}
-
-		switch (err) {
-		case EOPNOTSUPP:
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "feature flag 'wrcache' is not enabled or "
-			    "special device (special vdev) is not present"));
-			(void) zfs_error(hdl, EZFS_WRCNOTSUP, errbuf);
-			break;
-		case EAFNOSUPPORT:
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "a child dataset has this property enabled"));
-			(void) zfs_error(hdl, EZFS_WRCCHILD, errbuf);
-			break;
-		case EPFNOSUPPORT:
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "a parent dataset has this property enabled"));
-			(void) zfs_error(hdl, EZFS_WRCPARENT, errbuf);
-			break;
-		default:
-			(void) zfs_standard_error(hdl, err, errbuf);
-			break;
-		}
+		(void) zfs_standard_error(hdl, err, errbuf);
 	}
 }
 
@@ -1675,14 +1649,6 @@ zfs_prop_inherit(zfs_handle_t *zhp, const char *propname, boolean_t received)
 		return (zfs_error(hdl, EZFS_PROPREADONLY, errbuf));
 
 	if (!zfs_prop_inheritable(prop) && !received)
-		return (zfs_error(hdl, EZFS_PROPNONINHERIT, errbuf));
-
-	/*
-	 * This property is inheritable by nature,
-	 * but user can do only "set" operation,
-	 * because "inherit" does not make sence
-	 */
-	if (prop == ZFS_PROP_WRC_MODE)
 		return (zfs_error(hdl, EZFS_PROPNONINHERIT, errbuf));
 
 	/*

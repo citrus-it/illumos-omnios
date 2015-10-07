@@ -103,8 +103,6 @@ struct objset {
 	int os_recordsize;
 	spa_specialclass_t os_special_class;
 	uint64_t os_zpl_meta_to_special;
-	zfs_wrc_mode_t os_wrc_mode;
-	uint64_t os_wrc_root_ds_obj;
 
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */

@@ -132,9 +132,6 @@ typedef enum zfs_error {
 	EZFS_COSNOTFOUND,	/* no matching CoS descriptor found */
 	EZFS_COSEXIST,		/* CoS descriptor already exists */
 	EZFS_COSREF,		/* CoS descriptor still referenced */
-	EZFS_WRCNOTSUP,		/* wrcache feature flag is not enabled */
-	EZFS_WRCCHILD,		/* child ds has enabled wrc */
-	EZFS_WRCPARENT,		/* parent ds has enabled wrc */
 	EZFS_UNKNOWN
 } zfs_error_t;
 

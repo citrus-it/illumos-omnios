@@ -1393,12 +1393,12 @@ zfs_do_destroy(int argc, char **argv)
 			} else if (err == ECHILD) {
 				(void) fprintf(stderr,
 				    gettext("cannot destroy '%s': "
-				    "dataset has children under krrp\n"),
+				    "dataset has children under krrp"),
 				    zfs_get_name(zhp));
 			} else if (err == EBUSY) {
 				(void) fprintf(stderr,
 				    gettext("cannot destroy '%s': "
-				    "dataset is root of a krrp task\n"),
+				    "dataset is root of a krrp task"),
 				    zfs_get_name(zhp));
 			} else if (err && err != EUSERS) {
 				(void) fprintf(stderr,

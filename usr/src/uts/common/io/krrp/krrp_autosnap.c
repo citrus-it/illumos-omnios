@@ -51,8 +51,7 @@ int krrp_autosnap_rside_create(krrp_autosnap_t **result_autosnap,
 {
 	uint64_t flags;
 
-	flags = AUTOSNAP_CREATOR | AUTOSNAP_DESTROYER |
-	    AUTOSNAP_OWNER | AUTOSNAP_KRRP;
+	flags = AUTOSNAP_CREATOR | AUTOSNAP_DESTROYER | AUTOSNAP_OWNER;
 	if (recursive)
 		flags |= AUTOSNAP_RECURSIVE;
 
@@ -68,8 +67,7 @@ int krrp_autosnap_wside_create(krrp_autosnap_t **result_autosnap,
 {
 	uint64_t flags;
 
-	flags = AUTOSNAP_DESTROYER | AUTOSNAP_RECURSIVE |
-	    AUTOSNAP_OWNER | AUTOSNAP_KRRP;
+	flags = AUTOSNAP_DESTROYER | AUTOSNAP_RECURSIVE | AUTOSNAP_OWNER;
 
 	return (krrp_autosnap_common_create(result_autosnap, dataset, flags,
 	    incr_snap_txg, NULL, NULL, notify_cb, NULL, cb_arg, error));

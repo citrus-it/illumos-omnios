@@ -221,6 +221,8 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		    spa->spa_lowat, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_DEDUPMETA_DITTO, NULL,
 		    spa->spa_ddt_meta_copies, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_WRC_MODE, NULL,
+		    spa->spa_wrc_mode, src);
 
 		spa_prop_add_list(*nvp, ZPOOL_PROP_META_PLACEMENT, NULL,
 		    mp->spa_enable_meta_placement_selection, src);
@@ -452,7 +454,6 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 		char *strval, *slash, *check, *fname;
 		const char *propname = nvpair_name(elem);
 		zpool_prop_t prop = zpool_name_to_prop(propname);
-		spa_feature_t feature;
 
 		switch (prop) {
 		case ZPROP_INVAL:
@@ -480,13 +481,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 			}
 
 			fname = strchr(propname, '@') + 1;
-			if (zfeature_lookup_name(fname, &feature) != 0) {
-				error = SET_ERROR(EINVAL);
-				break;
-			}
-
-			if (feature == SPA_FEATURE_WRC &&
-			    !spa_has_special(spa)) {
+			if (zfeature_lookup_name(fname, NULL) != 0) {
 				error = SET_ERROR(EINVAL);
 				break;
 			}
@@ -699,6 +694,19 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && (intval > SPA_DVAS_PER_BP))
 				error = SET_ERROR(EINVAL);
+			break;
+		case ZPOOL_PROP_WRC_MODE:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && (intval > WRC_MODE_PASSIVE)) {
+				error = SET_ERROR(EINVAL);
+			} else if (!spa_has_special(spa)) {
+				error = SET_ERROR(ENOTSUP);
+			} else if (spa->spa_wrc_mode != WRC_MODE_OFF &&
+			    intval == WRC_MODE_OFF) {
+				/* WRC can NOT be turned off */
+				error = SET_ERROR(EINVAL);
+			}
+
 			break;
 		}
 
@@ -2761,6 +2769,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	mp = &spa->spa_meta_policy;
 
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
+	spa->spa_wrc_mode = zpool_prop_default_numeric(ZPOOL_PROP_WRC_MODE);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
 	spa->spa_dedup_lo_best_effort =
@@ -2799,6 +2808,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa_prop_find(spa, ZPOOL_PROP_FORCETRIM, &spa->spa_force_trim);
 		spa_prop_find(spa, ZPOOL_PROP_AUTOTRIM, &spa->spa_auto_trim);
 
+		spa_prop_find(spa, ZPOOL_PROP_WRC_MODE, &spa->spa_wrc_mode);
 		spa_prop_find(spa, ZPOOL_PROP_HIWATERMARK, &spa->spa_hiwat);
 		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
 		spa_prop_find(spa, ZPOOL_PROP_DEDUPMETA_DITTO,
@@ -3255,7 +3265,7 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t *nvpolicy,
 
 	if (open_with_activation) {
 		autosnap_collect_orphaned_snapshots(spa);
-		wrc_activate(spa);
+		(void) wrc_activate(spa);
 	}
 
 	*spapp = spa;
@@ -3707,7 +3717,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	nvlist_t **spares, **l2cache;
 	uint_t nspares, nl2cache;
 	uint64_t version, obj;
-	boolean_t has_features = B_FALSE, wrc_feature_exists = B_FALSE;
+	boolean_t has_features;
 	spa_meta_placement_t *mp;
 
 	/*
@@ -3719,6 +3729,13 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 		return (SET_ERROR(EEXIST));
 	}
 
+	/* WRC mode cannot be changed during creation of a pool */
+	if (nvlist_exists(props,
+	    zpool_prop_to_name(ZPOOL_PROP_WRC_MODE))) {
+		mutex_exit(&spa_namespace_lock);
+		return (SET_ERROR(ENOTSUP));
+	}
+
 	/*
 	 * Allocate a new spa_t structure.
 	 */
@@ -3727,45 +3744,19 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa = spa_add(pool, NULL, altroot);
 	spa_activate(spa, spa_mode_global);
 
-	if (props != NULL) {
-		nvpair_t *wrc_feature_nvp = NULL;
-
-		for (nvpair_t *elem = nvlist_next_nvpair(props, NULL);
-		    elem != NULL; elem = nvlist_next_nvpair(props, elem)) {
-			const char *propname = nvpair_name(elem);
-			if (zpool_prop_feature(propname)) {
-				spa_feature_t feature;
-				int err;
-				const char *fname = strchr(propname, '@') + 1;
-
-				err = zfeature_lookup_name(fname, &feature);
-				if (err == 0 && feature == SPA_FEATURE_WRC) {
-					wrc_feature_nvp = elem;
-					wrc_feature_exists = B_TRUE;
-				}
-
-				has_features = B_TRUE;
-			}
-		}
-
-		/*
-		 * We do not want to enabled feature@wrcache if
-		 * this pool does not have special vdev.
-		 * At this stage we remove this feature from common list,
-		 * but later after check that special vdev available this
-		 * feature will be enabled
-		 */
-		if (wrc_feature_nvp != NULL)
-			fnvlist_remove_nvpair(props, wrc_feature_nvp);
-
-		if ((error = spa_prop_validate(spa, props)) != 0) {
-			spa_deactivate(spa);
-			spa_remove(spa);
-			mutex_exit(&spa_namespace_lock);
-			return (error);
-		}
+	if (props && (error = spa_prop_validate(spa, props))) {
+		spa_deactivate(spa);
+		spa_remove(spa);
+		mutex_exit(&spa_namespace_lock);
+		return (error);
 	}
 
+	has_features = B_FALSE;
+	for (nvpair_t *elem = nvlist_next_nvpair(props, NULL);
+	    elem != NULL; elem = nvlist_next_nvpair(props, elem)) {
+		if (zpool_prop_feature(nvpair_name(elem)))
+			has_features = B_TRUE;
+	}
 
 	if (has_features || nvlist_lookup_uint64(props,
 	    zpool_prop_to_name(ZPOOL_PROP_VERSION), &version) != 0) {
@@ -3929,6 +3920,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 	spa->spa_failmode = zpool_prop_default_numeric(ZPOOL_PROP_FAILUREMODE);
 	spa->spa_autoexpand = zpool_prop_default_numeric(ZPOOL_PROP_AUTOEXPAND);
+	spa->spa_wrc_mode = zpool_prop_default_numeric(ZPOOL_PROP_WRC_MODE);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
 	spa->spa_ddt_meta_copies =
@@ -3963,9 +3955,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	if (spa_has_special(spa)) {
 		spa_feature_enable(spa, SPA_FEATURE_META_DEVICES, tx);
 		spa_feature_incr(spa, SPA_FEATURE_META_DEVICES, tx);
-
-		if (wrc_feature_exists)
-			spa_feature_enable(spa, SPA_FEATURE_WRC, tx);
 	}
 
 	dmu_tx_commit(tx);
@@ -3993,7 +3982,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	mutex_exit(&spa_namespace_lock);
 
-	wrc_activate(spa);
+	(void) wrc_activate(spa);
 
 	return (0);
 }
@@ -4039,8 +4028,6 @@ spa_special_feature_activate(void *arg, dmu_tx_t *tx)
 		if (!spa_feature_is_active(spa, SPA_FEATURE_META_DEVICES)) {
 			spa_feature_incr(spa, SPA_FEATURE_META_DEVICES, tx);
 		}
-
-		spa_feature_enable(spa, SPA_FEATURE_WRC, tx);
 	}
 }
 
@@ -4273,6 +4260,13 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 		return (SET_ERROR(EEXIST));
 	}
 
+	/* WRC mode cannot be changed during import of a pool */
+	if (nvlist_exists(props,
+	    zpool_prop_to_name(ZPOOL_PROP_WRC_MODE))) {
+		mutex_exit(&spa_namespace_lock);
+		return (SET_ERROR(ENOTSUP));
+	}
+
 	/*
 	 * Create and initialize the spa structure.
 	 */
@@ -4441,7 +4435,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 
 	autosnap_collect_orphaned_snapshots(spa);
 
-	wrc_activate(spa);
+	(void) wrc_activate(spa);
 
 	return (dsl_sync_task(spa->spa_name, NULL, spa_special_feature_activate,
 	    spa, 3, ZFS_SPACE_CHECK_RESERVED));
@@ -4579,8 +4573,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	autosnap = spa_get_autosnap(spa);
 	mutex_enter(&autosnap->autosnap_lock);
 
-	if (autosnap_has_children_zone(autosnap,
-	    spa_name(spa), B_TRUE)) {
+	if (autosnap_has_children_zone(spa, spa_name(spa))) {
 		mutex_exit(&autosnap->autosnap_lock);
 		spa_close(spa, FTAG);
 		return (EBUSY);
@@ -4826,8 +4819,6 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	    spa_last_synced_txg(spa) + 1);
 	spa_special_feature_activate(spa, tx);
 	dmu_tx_commit(tx);
-
-	wrc_activate(spa);
 
 	return (0);
 }
@@ -5326,7 +5317,7 @@ spa_vdev_split_mirror(spa_t *spa, char *newname, nvlist_t *config,
 	 * split for pools with activated WRC
 	 * will be implemented in the next release
 	 */
-	if (spa_feature_is_active(spa, SPA_FEATURE_WRC))
+	if (spa->spa_wrc_mode != WRC_MODE_OFF)
 		return (SET_ERROR(ENOTSUP));
 
 	txg = spa_vdev_enter(spa);
@@ -6577,6 +6568,39 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 			case ZPOOL_PROP_HIWATERMARK:
 				spa->spa_hiwat = intval;
 				break;
+			case ZPOOL_PROP_WRC_MODE:
+				if (intval != WRC_MODE_OFF &&
+				    intval != spa->spa_wrc_mode) {
+					boolean_t set = B_TRUE;
+					uint64_t old_mode = spa->spa_wrc_mode;
+					boolean_t reactivate =
+					    (old_mode != WRC_MODE_OFF);
+
+					/*
+					 * Set new val right away to let wrc
+					 * know the new state. Restore old
+					 * value in case of a failure
+					 */
+					spa->spa_wrc_mode = intval;
+
+					if (reactivate)
+						wrc_switch_mode(spa);
+					else
+						set = wrc_activate(spa);
+
+					/* rollback the zap-record */
+					if (!set) {
+						spa->spa_wrc_mode = old_mode;
+						VERIFY0(zap_update(mos,
+						    spa->spa_pool_props_object,
+						    propname, 8, 1, &old_mode,
+						    tx));
+						spa_history_log_internal(spa,
+						    "set", tx, "%s=%lld",
+						    nvpair_name(elem), intval);
+					}
+				}
+				break;
 			case ZPOOL_PROP_DEDUPMETA_DITTO:
 				spa->spa_ddt_meta_copies = intval;
 				break;
@@ -6746,13 +6770,14 @@ spa_sync(spa_t *spa, uint64_t txg)
 	 * Iterate to convergence.
 	 */
 
-	zfs_autosnap_t *autosnap = spa_get_autosnap(dp->dp_spa);
-	autosnap_zone_t *zone = list_head(&autosnap->autosnap_zones);
-	while (zone != NULL) {
-		zone->created = B_FALSE;
-		zone = list_next(&autosnap->autosnap_zones, zone);
+	autosnap_zone_t *apool;
+	for (apool = list_head(&dp->dp_spa->spa_autosnap.autosnap_zones);
+	    apool != NULL;
+	    apool = list_next(&dp->dp_spa->spa_autosnap.autosnap_zones,
+	    apool)) {
+		apool->created = B_FALSE;
 	}
-
+	dp->dp_spa->spa_autosnap.autosnap_global.created = B_FALSE;
 	do {
 		int pass = ++spa->spa_sync_pass;
 
