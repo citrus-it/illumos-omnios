@@ -13,6 +13,8 @@
 
 #define	RECV_BUFFER_SIZE (1 << 20)
 
+extern int wrc_check_dataset(const char *name);
+
 int zfs_send_timeout = 5;
 uint64_t krrp_debug = 0;
 
@@ -202,6 +204,18 @@ zfs_send_collect_properties(list_t *ds_list, nvlist_t *nvp)
 		/* walk over properties' zap */
 		while (zap_cursor_retrieve(&zc, &za) == 0) {
 			uint64_t cnt, el;
+			zfs_prop_t prop;
+
+			prop = zfs_name_to_prop(za.za_name);
+
+			/*
+			 * This property make sense only to this dataset,
+			 * so no reasons to include it into stream
+			 */
+			if (prop == ZFS_PROP_WRC_MODE) {
+				zap_cursor_advance(&zc);
+				continue;
+			}
 
 			(void) zap_length(mos,
 			    dsl_dir_phys(pds->ds_dir)->dd_props_zapobj,
@@ -618,12 +632,23 @@ zfs_send_thread(void *krrp_task_void)
 		goto out;
 	}
 
-	if (spa_wrc_present(spa)) {
-		if (strchr(krrp_task->buffer_args.from_ds, '/') != NULL ||
-		    krrp_task->buffer_args.recursive == B_FALSE) {
+	err = wrc_check_dataset(krrp_task->buffer_args.from_ds);
+
+	/*
+	 * err == 0 || err == ENOTACTIVE means
+	 * that the DS is root for WRC or WRC is not active it
+	 */
+	if (err != 0 && err != ENOTACTIVE) {
+		boolean_t from_snap_is_autosnap =
+		    autosnap_check_name(krrp_task->buffer_args.from_snap);
+		/*
+		 * EOPNOTSUPP means:
+		 * the DS is a child of a WRC-datasets tree
+		 */
+		if (err == EOPNOTSUPP && from_snap_is_autosnap)
 			err = ENOTDIR;
-			goto out;
-		}
+
+		goto out;
 	}
 
 	err = autosnap_lock(spa);
@@ -1073,6 +1098,7 @@ zfs_recv_thread(void *krrp_task_void)
 	boolean_t separate_thread;
 	spa_t *spa;
 	char latest_snap[MAXNAMELEN] = { 0 };
+	char to_ds[MAXNAMELEN];
 	dmu_krrp_token_check_t arg_tok = { 0 };
 
 	ASSERT(krrp_task != NULL);
@@ -1087,12 +1113,45 @@ zfs_recv_thread(void *krrp_task_void)
 		goto out;
 	}
 
-	if (spa_wrc_present(spa)) {
-		if (strchr(krrp_task->buffer_args.to_ds, '/') != NULL) {
-			err = ENOTDIR;
+	(void) strcpy(to_ds, krrp_task->buffer_args.to_ds);
+	if (dsl_dataset_creation_txg(to_ds) == UINT64_MAX) {
+		char *p;
+
+		/*
+		 * spa found, '/' must be, becase the above
+		 * check returns UINT64_MAX
+		 */
+		VERIFY((p = strrchr(to_ds, '/')) != NULL);
+		*p = '\0';
+
+		/*
+		 * It is OK that destination does not exist,
+		 * but its parent must be here
+		 */
+		if (dsl_dataset_creation_txg(to_ds) == UINT64_MAX) {
+			err = ENOENT;
 			goto out;
 		}
 	}
+
+	err = wrc_check_dataset(to_ds);
+
+	/*
+	 * err == 0 || err == EOPNOTSUPP means
+	 * that the DS is root for WRC or
+	 * a child of WRC-datasets tree
+	 */
+	if (err == 0 || err == EOPNOTSUPP) {
+		err = ENOTDIR;
+		goto out;
+	}
+
+	/*
+	 * ENOTACTIVE means WRC is not active for the DS
+	 * If some another error just return
+	 */
+	if (err != ENOTACTIVE)
+		goto out;
 
 	/* Read leading block */
 	err = dmu_krrp_buffer_read(&drr, sizeof (drr), krrp_task);
@@ -1141,10 +1200,6 @@ zfs_recv_thread(void *krrp_task_void)
 		/* recv a simple single snapshot */
 		char full_ds[MAXNAMELEN];
 
-		if (spa_wrc_present(spa)) {
-			err = ENOTDIR;
-			goto out;
-		}
 		(void) strcpy(full_ds, krrp_task->buffer_args.to_ds);
 		if (krrp_task->buffer_args.strip_head ||
 		    krrp_task->buffer_args.leave_tail) {
@@ -1259,8 +1314,7 @@ out_nvl:
 	/* Put final block */
 	if (!err) {
 		(void) dmu_krrp_put_buffer(krrp_task);
-		if (spa_wrc_present(spa) && latest_snap[0])
-			autosnap_notify_received(latest_snap);
+
 		err = dmu_krrp_erase_recv_cookie(
 		    krrp_task->buffer_args.to_ds,
 		    krrp_task->buffer_args.to_ds);

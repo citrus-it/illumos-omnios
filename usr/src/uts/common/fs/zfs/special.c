@@ -124,7 +124,7 @@ spa_write_data_to_special(spa_t *spa, objset_t *os)
 	return ((spa_has_special(spa)) &&
 	    (spa->spa_usesc) &&
 	    (spa->spa_watermark == SPA_WM_NONE) &&
-	    (spa->spa_wrc_mode != WRC_MODE_OFF));
+	    (os->os_wrc_mode != ZFS_WRC_MODE_OFF));
 }
 
 spa_specialclass_id_t
@@ -350,17 +350,21 @@ spa_refine_data_placement(spa_t *spa)
 static boolean_t
 spa_meta_to_special(spa_t *spa, objset_t *os, dmu_object_type_t ot)
 {
-	ASSERT(os);
+	boolean_t result = B_FALSE;
+
+	ASSERT(os != NULL);
 	/* some duplication of the spa_select_class() here */
-	if ((spa->spa_usesc == B_FALSE) || (spa_has_special(spa) == B_FALSE)) {
-		return (B_FALSE);
-	} else {
+	if (spa_has_special(spa) && spa->spa_usesc) {
 		uint64_t specflags = spa_specialclass_flags(os);
-		boolean_t match = (!!(SPECIAL_FLAG_DATAMETA & specflags)) ||
-		    spa_wrc_present(spa);
-		return (match && spa_refine_meta_placement(spa,
-		    os->os_zpl_meta_to_special, ot));
+		result = (!!(SPECIAL_FLAG_DATAMETA & specflags)) ||
+		    os->os_wrc_mode != ZFS_WRC_MODE_OFF;
+		if (result) {
+			result = spa_refine_meta_placement(spa,
+			    os->os_zpl_meta_to_special, ot);
+		}
 	}
+
+	return (result);
 }
 
 /*
@@ -409,7 +413,8 @@ dbuf_ddt_is_l2cacheable(dmu_buf_impl_t *db)
 		return (B_TRUE);
 
 	specflags = spa_specialclass_flags(db->db_objset);
-	match = (!!(SPECIAL_FLAG_DATAMETA & specflags)) || spa_wrc_present(spa);
+	match = (!!(SPECIAL_FLAG_DATAMETA & specflags)) ||
+	    db->db_objset->os_wrc_mode != ZFS_WRC_MODE_OFF;
 
 	DB_DNODE_ENTER(db);
 	ot = DB_DNODE(db)->dn_type;
@@ -432,26 +437,26 @@ spa_select_class(spa_t *spa, zio_t *zio)
 {
 	zio_prop_t *zp = &zio->io_prop;
 	spa_meta_placement_t *mp = &spa->spa_meta_policy;
+
 	if (zp->zp_usesc && spa_has_special(spa)) {
 		boolean_t match = B_FALSE;
 		uint64_t specflags = zp->zp_specflags;
 
 		if (zp->zp_metadata) {
 			match = (!!(SPECIAL_FLAG_DATAMETA & specflags)) ||
-			    spa_wrc_present(spa);
+			    zio->io_prop.zp_usewrc;
 			if (match && mp->spa_enable_meta_placement_selection)
 				match = spa_refine_meta_placement(spa,
 				    zp->zp_zpl_meta_to_special, zp->zp_type);
 		} else {
-			match = (spa->spa_wrc_mode != WRC_MODE_OFF);
+			match = zio->io_prop.zp_usewrc;
 			if (match) {
-				if (zio->io_priority ==
-				    ZIO_PRIORITY_SYNC_WRITE) {
-					match = B_TRUE;
-				} else {
+				if (zio->io_priority !=
+				    ZIO_PRIORITY_SYNC_WRITE)
 					match = spa_refine_data_placement(spa);
-				}
-				DTRACE_PROBE1(wrc_data_placement, int, match);
+
+				DTRACE_PROBE1(wrc_data_placement,
+				    boolean_t, match);
 			}
 			if (!match) {
 				match =

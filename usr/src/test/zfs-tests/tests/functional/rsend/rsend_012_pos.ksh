@@ -54,6 +54,11 @@ function rand_set_prop
 	log_must eval "$ZFS set $prop='$value' $dtst"
 }
 
+#
+# 'wrc_mode' is skipped, because the tested pools do not have 
+# 'special' vdev, so the setting of this property will cause
+# test-fail
+#
 function edited_prop
 {
 	typeset behaviour=$1
@@ -63,7 +68,7 @@ function edited_prop
 	case $behaviour in
 		"get")
 			typeset props=$($ZFS inherit 2>&1 | \
-				$AWK '$2=="YES" {print $1}' | \
+				$AWK '$2=="YES" {print $1}' | $EGREP -v "^wrc_mode" | \
 				$EGREP -v "^vol|\.\.\.$")
 			for item in $props ; do
 				if [[ $item == "mlslabel" ]] && \

@@ -1833,6 +1833,8 @@ dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
 	zp->zp_nopwrite = nopwrite;
 	zp->zp_specflags = spa_specialclass_flags(os);
 	zp->zp_zpl_meta_to_special = os->os_zpl_meta_to_special;
+	zp->zp_usewrc = (zp->zp_usesc &&
+	    os->os_wrc_mode != ZFS_WRC_MODE_OFF);
 
 	/* explicitly control the number for copies for DDT */
 	if (DMU_OT_IS_DDT_META(type) && (spa->spa_ddt_meta_copies > 0))

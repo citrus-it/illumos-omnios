@@ -23,7 +23,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef _ZFEATURE_COMMON_H
@@ -56,6 +56,7 @@ typedef enum spa_feature {
 	SPA_FEATURE_META_DEVICES,
 	SPA_FEATURE_VDEV_PROPS,
 	SPA_FEATURE_COS_PROPS,
+	SPA_FEATURE_WRC,
 	SPA_FEATURES
 } spa_feature_t;
 

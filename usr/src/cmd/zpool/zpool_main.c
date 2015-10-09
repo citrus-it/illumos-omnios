@@ -4842,10 +4842,19 @@ upgrade_enable_all(zpool_handle_t *zhp, int *countp)
 
 	count = 0;
 	for (i = 0; i < SPA_FEATURES; i++) {
-		const char *fname = spa_feature_table[i].fi_uname;
-		const char *fguid = spa_feature_table[i].fi_guid;
+		zfeature_info_t *finfo = &spa_feature_table[i];
+		const char *fname = finfo->fi_uname;
+		const char *fguid = finfo->fi_guid;
 		if (!nvlist_exists(enabled, fguid)) {
 			char *propname;
+
+			/*
+			 * SPA_FEATURE_WRC can be enabled only
+			 * if 'special' vdev available
+			 */
+			if (finfo->fi_feature == SPA_FEATURE_WRC)
+				continue;
+
 			verify(-1 != asprintf(&propname, "feature@%s", fname));
 			ret = zpool_set_prop(zhp, propname,
 			    ZFS_FEATURE_ENABLED);

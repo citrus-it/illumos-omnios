@@ -23,7 +23,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
- * Copyright (c) 2014, Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2015, Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifdef _KERNEL
@@ -244,4 +244,8 @@ zpool_feature_init(void)
 	    "com.nexenta:class_of_storage", "class_of_storage",
 	    "Properties for groups of vdevs.", B_TRUE, B_FALSE, B_FALSE,
 	    cos_deps);
+	zfeature_register(SPA_FEATURE_WRC,
+	    "com.nexenta:wrcache", "wrcache",
+	    "Write back cache support", B_FALSE, B_FALSE, B_FALSE, NULL);
+
 }

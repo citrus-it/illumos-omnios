@@ -156,6 +156,7 @@ typedef enum {
 	ZFS_PROP_LSTXG,
 	ZFS_PROP_SPECIALCLASS,
 	ZFS_PROP_ZPL_TO_METADEV,
+	ZFS_PROP_WRC_MODE,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -217,7 +218,6 @@ typedef enum {
 	ZPOOL_PROP_FORCETRIM,
 	ZPOOL_PROP_AUTOTRIM,
 	ZPOOL_PROP_SMALL_DATA_TO_METADEV,
-	ZPOOL_PROP_WRC_MODE,
 	ZPOOL_NUM_PROPS
 } zpool_prop_t;
 
@@ -458,6 +458,11 @@ typedef enum {
 	ZFS_REDUNDANT_METADATA_ALL,
 	ZFS_REDUNDANT_METADATA_MOST
 } zfs_redundant_metadata_type_t;
+
+typedef enum {
+	ZFS_WRC_MODE_OFF,
+	ZFS_WRC_MODE_ON
+} zfs_wrc_mode_t;
 
 /*
  * On-disk version number.
