@@ -73,7 +73,7 @@ static boolean_t krrp_stream_read_snap_notify_cb(const char *, boolean_t,
 
 int
 krrp_stream_read_create(krrp_stream_t **result_stream,
-    const char *dataset, const char *base_snap_name,
+    size_t keep_snaps, const char *dataset, const char *base_snap_name,
     const char *incr_snap_name, const char *zcookies,
     boolean_t include_all_snaps,
     boolean_t recursive, boolean_t send_props,
@@ -89,6 +89,7 @@ krrp_stream_read_create(krrp_stream_t **result_stream,
 
 	stream->mode = KRRP_STRMM_READ;
 	stream->recursive = recursive;
+	stream->keep_snaps = keep_snaps;
 
 	rc = copy_str(stream->dataset, dataset, sizeof (stream->dataset));
 	if (rc != 0 || is_str_empty(dataset)) {
@@ -155,7 +156,7 @@ err:
 
 int
 krrp_stream_write_create(krrp_stream_t **result_stream,
-    const char *dataset, const char *incr_snap_name,
+    size_t keep_snaps, const char *dataset, const char *incr_snap_name,
 	const char *zcookies, boolean_t force_receive,
     boolean_t enable_cksum, nvlist_t *ignore_props_list,
     nvlist_t *replace_props_list, krrp_error_t *error)
@@ -169,6 +170,7 @@ krrp_stream_write_create(krrp_stream_t **result_stream,
 	stream = krrp_stream_common_create();
 
 	stream->mode = KRRP_STRMM_WRITE;
+	stream->keep_snaps = keep_snaps;
 
 	rc = copy_str(stream->dataset, dataset, sizeof (stream->dataset));
 	if (rc != 0 || is_str_empty(dataset)) {
@@ -487,7 +489,8 @@ krrp_stream_activate_autosnap(krrp_stream_t *stream,
 	case KRRP_STRMM_READ:
 		if (!stream->non_continuous) {
 			rc = krrp_autosnap_rside_create(&stream->autosnap,
-			    stream->dataset, stream->recursive, incr_snap_txg,
+			    stream->keep_snaps, stream->dataset,
+			    stream->recursive, incr_snap_txg,
 			    &krrp_stream_autosnap_restore_cb,
 			    &krrp_stream_read_snap_confirm_cb,
 			    &krrp_stream_read_snap_notify_cb,
@@ -529,7 +532,7 @@ krrp_stream_activate_autosnap(krrp_stream_t *stream,
 		break;
 	case KRRP_STRMM_WRITE:
 		rc = krrp_autosnap_wside_create(&stream->autosnap,
-		    stream->dataset, incr_snap_txg,
+		    stream->keep_snaps, stream->dataset, incr_snap_txg,
 		    &krrp_stream_write_snap_notify_cb,
 		    stream, error);
 		if (rc != 0)

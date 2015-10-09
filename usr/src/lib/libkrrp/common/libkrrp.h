@@ -92,6 +92,7 @@ typedef struct libkrrp_event_s libkrrp_event_t;
 	X(THROTTLE)              \
 	X(AUTOSNAP)              \
 	X(ZCOOKIES)              \
+	X(KEEPSNAPS)             \
 
 #define	LIBKRRP_ERRNO_MAP(X)     \
 	X(IOCTLFAIL)             \
@@ -202,10 +203,10 @@ int krrp_sess_create_pdu_engine(libkrrp_handle_t *, uuid_t, const int,
 
 int krrp_sess_create_read_stream(libkrrp_handle_t *, uuid_t, const char *,
     const char *, const char *, uint64_t, krrp_sess_stream_flags_t,
-    const char *);
+    const char *, uint32_t);
 int krrp_sess_create_write_stream(libkrrp_handle_t *, uuid_t, const char *,
     const char *, krrp_sess_stream_flags_t, nvlist_t *ignore_props,
-    nvlist_t *replace_props, const char *);
+    nvlist_t *replace_props, const char *, uint32_t);
 
 int krrp_sess_run(libkrrp_handle_t *, uuid_t, boolean_t);
 int krrp_sess_send_stop(libkrrp_handle_t *, uuid_t);

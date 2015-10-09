@@ -19,6 +19,10 @@ extern "C" {
 #define	KRRP_MIN_SESS_PDU_DBLK_DATA_SZ 1 * 1024
 #define	KRRP_MAX_SESS_PDU_DBLK_DATA_SZ 128 * 1024
 
+/* Min and Max values of the number of snapshots kept for CDP-replications */
+#define	KRRP_MIN_KEEP_SNAPS 1
+#define	KRRP_MAX_KEEP_SNAPS 32
+
 /* Min and Max values of timeout for connect() call */
 #define	KRRP_MIN_CONN_TIMEOUT 5
 #define	KRRP_MAX_CONN_TIMEOUT 120

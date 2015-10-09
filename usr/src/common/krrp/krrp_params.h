@@ -74,6 +74,8 @@ extern "C" {
 	X(THROTTLE, UINT32) \
 \
 	X(SESS_PRIVATE_DATA, NVLIST) \
+\
+	X(STREAM_KEEP_SNAPS, UINT32) \
 
 typedef enum {
 	KRRP_PARAM_UNKNOWN = 0,

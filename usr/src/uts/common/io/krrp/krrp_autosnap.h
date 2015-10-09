@@ -45,16 +45,17 @@ typedef struct krrp_autonap_s {
 	size_t					ref_cnt;
 	void					*zfs_ctx;
 	krrp_queue_t			*txg_to_rele;
+	size_t					keep_snaps;
 } krrp_autosnap_t;
 
 int krrp_autosnap_rside_create(krrp_autosnap_t **result_autosnap,
-    const char *dataset, boolean_t recursive,
+    size_t keep_snaps, const char *dataset, boolean_t recursive,
     uint64_t incr_snap_txg, krrp_autosnap_restore_cb_t *restore_cb,
     autosnap_confirm_cb confirm_cb,
     autosnap_notify_created_cb notify_cb, autosnap_error_cb error_cb,
     void *cb_arg, krrp_error_t *error);
 int krrp_autosnap_wside_create(krrp_autosnap_t **result_autosnap,
-    const char *dataset, uint64_t incr_snap_txg,
+    size_t keep_snaps, const char *dataset, uint64_t incr_snap_txg,
     autosnap_notify_created_cb notify_cb, void *cb_arg, krrp_error_t *error);
 void krrp_autosnap_destroy(krrp_autosnap_t *autosnap);
 

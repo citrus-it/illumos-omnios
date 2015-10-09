@@ -538,6 +538,7 @@ krrp_ioctl_sess_create_read_stream(krrp_stream_t **result_stream,
 	boolean_t send_recursive = B_FALSE, send_props = B_FALSE,
 	    include_all_snaps = B_FALSE, enable_cksum = B_FALSE,
 	    embedded = B_FALSE;
+	uint32_t keep_snaps;
 
 	rc = krrp_param_get(KRRP_PARAM_SRC_DATASET,
 	    params, (void *) &dataset);
@@ -564,7 +565,18 @@ krrp_ioctl_sess_create_read_stream(krrp_stream_t **result_stream,
 	(void) krrp_param_get(KRRP_PARAM_STREAM_EMBEDDED_BLOCKS,
 	    params, (void *) &embedded);
 
-	return (krrp_stream_read_create(result_stream, dataset,
+	rc = krrp_param_get(KRRP_PARAM_STREAM_KEEP_SNAPS,
+	    params, (void *) &keep_snaps);
+	if (rc != 0) {
+		/* KRRP_PARAM_STREAM_KEEP_SNAPS not defined, so use the MIN */
+		keep_snaps = KRRP_MIN_KEEP_SNAPS;
+	} else if (keep_snaps < KRRP_MIN_KEEP_SNAPS ||
+	    keep_snaps > KRRP_MAX_KEEP_SNAPS) {
+		krrp_error_set(error, KRRP_ERRNO_KEEPSNAPS, EINVAL);
+		return (-1);
+	}
+
+	return (krrp_stream_read_create(result_stream, keep_snaps, dataset,
 	    base_snap_name, common_snap_name, zcookies, include_all_snaps,
 	    send_recursive, send_props, enable_cksum, embedded,
 	    error));
@@ -579,6 +591,7 @@ krrp_ioctl_sess_create_write_stream(krrp_stream_t **result_stream,
 	    *zcookies = NULL;
 	boolean_t force_receive = B_FALSE, enable_cksum = B_FALSE;
 	nvlist_t *ignore_props_list = NULL, *replace_props_list = NULL;
+	uint32_t keep_snaps;
 
 	rc = krrp_param_get(KRRP_PARAM_DST_DATASET,
 	    params, (void *) &dataset);
@@ -602,9 +615,20 @@ krrp_ioctl_sess_create_write_stream(krrp_stream_t **result_stream,
 	(void) krrp_param_get(KRRP_PARAM_ENABLE_STREAM_CHKSUM,
 	    params, (void *) &enable_cksum);
 
-	return (krrp_stream_write_create(result_stream, dataset,
-	    common_snap_name, zcookies, force_receive, enable_cksum,
-	    ignore_props_list, replace_props_list, error));
+	rc = krrp_param_get(KRRP_PARAM_STREAM_KEEP_SNAPS,
+	    params, (void *) &keep_snaps);
+	if (rc != 0) {
+		/* KRRP_PARAM_STREAM_KEEP_SNAPS not defined, so use the MIN */
+		keep_snaps = KRRP_MIN_KEEP_SNAPS;
+	} else if (keep_snaps < KRRP_MIN_KEEP_SNAPS ||
+	    keep_snaps > KRRP_MAX_KEEP_SNAPS) {
+		krrp_error_set(error, KRRP_ERRNO_KEEPSNAPS, EINVAL);
+		return (-1);
+	}
+
+	return (krrp_stream_write_create(result_stream, keep_snaps,
+	    dataset, common_snap_name, zcookies, force_receive,
+	    enable_cksum, ignore_props_list, replace_props_list, error));
 }
 
 static int

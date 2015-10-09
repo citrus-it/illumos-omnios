@@ -91,6 +91,8 @@ struct krrp_stream_s {
 	uint64_t				last_ack_txg;
 	uint64_t				last_full_ack_txg;
 
+	size_t					keep_snaps;
+
 	krrp_txg_rpo_t			avg_total_rpo;
 	krrp_txg_rpo_t			avg_rpo;
 
@@ -107,13 +109,13 @@ struct krrp_stream_s {
 };
 
 int krrp_stream_read_create(krrp_stream_t **result_stream,
-    const char *dataset, const char *base_snap_name,
+    size_t keep_snaps, const char *dataset, const char *base_snap_name,
     const char *incr_snap_name, const char *zcookies,
     boolean_t include_all_snaps,
     boolean_t recursive, boolean_t send_props,
     boolean_t enable_cksum, boolean_t embedded, krrp_error_t *error);
 int krrp_stream_write_create(krrp_stream_t **result_stream,
-    const char *dataset, const char *incr_snap_name,
+    size_t keep_snaps, const char *dataset, const char *incr_snap_name,
     const char *zcookies, boolean_t force_receive,
     boolean_t enable_cksum, nvlist_t *ignore_props_list,
     nvlist_t *replace_props_list, krrp_error_t *error);

@@ -30,7 +30,7 @@ typedef struct krrp_txg_s {
 
 
 static int krrp_autosnap_common_create(krrp_autosnap_t **result_autosnap,
-    const char *dataset, int flags,
+    size_t keep_snaps, const char *dataset, int flags,
     uint64_t incr_snap_txg, krrp_autosnap_restore_cb_t *restore_cb,
     autosnap_confirm_cb confirm_cb,
     autosnap_notify_created_cb notify_cb, autosnap_error_cb error_cb,
@@ -43,7 +43,7 @@ static boolean_t krrp_autosnap_try_hold_with_check_state(
     krrp_autosnap_t *autosnap, krrp_autosnap_state_t min_state);
 
 int krrp_autosnap_rside_create(krrp_autosnap_t **result_autosnap,
-    const char *dataset, boolean_t recursive,
+    size_t keep_snaps, const char *dataset, boolean_t recursive,
     uint64_t incr_snap_txg, krrp_autosnap_restore_cb_t *restore_cb,
     autosnap_confirm_cb confirm_cb,
     autosnap_notify_created_cb notify_cb, autosnap_error_cb error_cb,
@@ -56,13 +56,13 @@ int krrp_autosnap_rside_create(krrp_autosnap_t **result_autosnap,
 	if (recursive)
 		flags |= AUTOSNAP_RECURSIVE;
 
-	return (krrp_autosnap_common_create(result_autosnap, dataset, flags,
-	    incr_snap_txg, restore_cb, confirm_cb, notify_cb, error_cb,
-	    cb_arg, error));
+	return (krrp_autosnap_common_create(result_autosnap, keep_snaps,
+	    dataset, flags, incr_snap_txg, restore_cb, confirm_cb,
+	    notify_cb, error_cb, cb_arg, error));
 }
 
 int krrp_autosnap_wside_create(krrp_autosnap_t **result_autosnap,
-    const char *dataset, uint64_t incr_snap_txg,
+    size_t keep_snaps, const char *dataset, uint64_t incr_snap_txg,
     autosnap_notify_created_cb notify_cb, void *cb_arg,
     krrp_error_t *error)
 {
@@ -71,13 +71,14 @@ int krrp_autosnap_wside_create(krrp_autosnap_t **result_autosnap,
 	flags = AUTOSNAP_DESTROYER | AUTOSNAP_RECURSIVE |
 	    AUTOSNAP_OWNER | AUTOSNAP_KRRP;
 
-	return (krrp_autosnap_common_create(result_autosnap, dataset, flags,
-	    incr_snap_txg, NULL, NULL, notify_cb, NULL, cb_arg, error));
+	return (krrp_autosnap_common_create(result_autosnap, keep_snaps,
+	    dataset, flags, incr_snap_txg, NULL, NULL, notify_cb, NULL,
+	    cb_arg, error));
 }
 
 static int
 krrp_autosnap_common_create(krrp_autosnap_t **result_autosnap,
-    const char *dataset, int flags,
+    size_t keep_snaps, const char *dataset, int flags,
     uint64_t incr_snap_txg, krrp_autosnap_restore_cb_t *restore_cb,
     autosnap_confirm_cb confirm_cb,
     autosnap_notify_created_cb notify_cb, autosnap_error_cb error_cb,
@@ -110,6 +111,7 @@ krrp_autosnap_common_create(krrp_autosnap_t **result_autosnap,
 		return (-1);
 	}
 
+	autosnap->keep_snaps = keep_snaps;
 	autosnap->state = KRRP_AUTOSNAP_STATE_REGISTERED;
 
 	krrp_autosnap_activate(autosnap, (flags & AUTOSNAP_CREATOR),
@@ -172,8 +174,8 @@ krrp_autosnap_activate(krrp_autosnap_t *autosnap, boolean_t snap_creator,
 			 */
 			DTRACE_PROBE1(rele_old_snap, uint64_t, snap_txg);
 
-			autosnap_release_snapshots_by_txg(autosnap->zfs_ctx,
-			    snap_txg, AUTOSNAP_NO_SNAP);
+			krrp_autosnap_txg_rele(autosnap, snap_txg,
+			    AUTOSNAP_NO_SNAP);
 		}
 
 		if (incr_snap_txg == UINT64_MAX || snap_txg > incr_snap_txg) {
@@ -332,7 +334,8 @@ krrp_autosnap_txg_rele(krrp_autosnap_t *autosnap,
 	if (!krrp_autosnap_try_hold_to_snap_rele(autosnap))
 		return;
 
-	while (krrp_queue_length(autosnap->txg_to_rele) > 1) {
+	while (krrp_queue_length(autosnap->txg_to_rele) >
+	    autosnap->keep_snaps) {
 		txg_item = krrp_queue_get(autosnap->txg_to_rele);
 
 		autosnap_release_snapshots_by_txg(autosnap->zfs_ctx,

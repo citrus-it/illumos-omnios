@@ -260,13 +260,15 @@ krrp_usage_sess(int rc, krrp_cmd_t *cmd, boolean_t use_return)
 		fprintf_msg("Usage: %s sess-create-read-stream "
 		    "<-s sess_id> [-d <src dataset>] [-z <src snapshot>] "
 		    "[-c <common snapshot>] [-I] [-r] [-p] [-e] [-k] "
-		    "[-f <fake_data_sz>] [-t <zcookies>]\n", tool_name);
+		    "[-f <fake_data_sz>] [-t <zcookies>] "
+		    "[-n <keep snaps>]\n", tool_name);
 		break;
 	case KRRP_CMD_SESS_CREATE_WRITE_STREAM:
 		fprintf_msg("Usage: %s sess-create-write-stream "
 		    "<-s sess_id> [-d <dst dataset>] [-c <common snapshot>] "
 		    "[-F] [-e] [-k] [-i <prop_name>] "
-		    "[-o <prop_name=value>] [-t <zcookies>]\n", tool_name);
+		    "[-o <prop_name=value>] [-t <zcookies>] "
+		    "[-n <keep snaps>]\n", tool_name);
 		break;
 	case KRRP_CMD_SESS_CREATE_PDU_ENGINE:
 		fprintf_msg("Usage: %s sess-create-pdu-engine "
@@ -842,16 +844,17 @@ krrp_do_sess_create_conn(int argc, char **argv, krrp_cmd_t *cmd)
 static int
 krrp_do_sess_create_read_stream(int argc, char **argv, krrp_cmd_t *cmd)
 {
-	int c, rc = 0;
+	int c, i, rc = 0;
 	uuid_t sess_id;
 	uint64_t fake_data_sz = 0;
 	char *dataset = NULL, *common_snap = NULL, *src_snap = NULL,
 	    *zcookies = NULL;
 	krrp_sess_stream_flags_t flags = 0;
+	uint32_t keep_snaps = 0;
 
 	uuid_clear(sess_id);
 
-	while ((c = getopt(argc, argv, "hs:d:c:z:Irpekf:t:")) != -1) {
+	while ((c = getopt(argc, argv, "hs:d:c:z:Irpekf:t:n:")) != -1) {
 		switch (c) {
 		case 's':
 			if (krrp_parse_and_check_sess_id(optarg, sess_id) != 0)
@@ -943,6 +946,24 @@ krrp_do_sess_create_read_stream(int argc, char **argv, krrp_cmd_t *cmd)
 
 			zcookies = optarg;
 			break;
+		case 'n':
+			if (keep_snaps != 0) {
+				krrp_print_err_already_defined("n");
+				exit(1);
+			}
+
+			i = strtol(optarg, NULL, 0);
+			if (i < KRRP_MIN_KEEP_SNAPS ||
+			    i > KRRP_MAX_KEEP_SNAPS) {
+				fprintf_err("Maximum number of snapshots that "
+				    "will be kept must be an integer in range "
+				    "from %d to %d\n", KRRP_MIN_KEEP_SNAPS,
+				    KRRP_MAX_KEEP_SNAPS);
+				exit(1);
+			}
+
+			keep_snaps = i;
+			break;
 		case '?':
 			krrp_print_err_unknown_param(argv[optind - 1]);
 			cmd->usage_func(1, cmd, B_FALSE);
@@ -958,8 +979,12 @@ krrp_do_sess_create_read_stream(int argc, char **argv, krrp_cmd_t *cmd)
 		cmd->usage_func(1, cmd, B_FALSE);
 	}
 
+	if (keep_snaps == 0)
+		keep_snaps = UINT32_MAX;
+
 	rc = krrp_sess_create_read_stream(libkrrp_hdl, sess_id,
-	    dataset, common_snap, src_snap, fake_data_sz, flags, zcookies);
+	    dataset, common_snap, src_snap, fake_data_sz, flags,
+	    zcookies, keep_snaps);
 	if (rc != 0) {
 		fprintf_err("Failed to create read-stream\n");
 		krrp_print_libkrrp_error();
@@ -972,18 +997,19 @@ krrp_do_sess_create_read_stream(int argc, char **argv, krrp_cmd_t *cmd)
 static int
 krrp_do_sess_create_write_stream(int argc, char **argv, krrp_cmd_t *cmd)
 {
-	int c, rc = 0;
+	int c, i, rc = 0;
 	uuid_t sess_id;
 	nvlist_t *ignore_props_list, *replace_props_list;
 	char *dataset = NULL, *common_snap = NULL, *zcookies = NULL;
 	krrp_sess_stream_flags_t flags = 0;
+	uint32_t keep_snaps = 0;
 
 	ignore_props_list = fnvlist_alloc();
 	replace_props_list = fnvlist_alloc();
 
 	uuid_clear(sess_id);
 
-	while ((c = getopt(argc, argv, "hs:d:c:Feki:o:t:")) != -1) {
+	while ((c = getopt(argc, argv, "hs:d:c:Feki:o:t:n:")) != -1) {
 		switch (c) {
 		case 's':
 			if (krrp_parse_and_check_sess_id(optarg, sess_id) != 0)
@@ -1072,6 +1098,24 @@ krrp_do_sess_create_write_stream(int argc, char **argv, krrp_cmd_t *cmd)
 
 			zcookies = optarg;
 			break;
+		case 'n':
+			if (keep_snaps != 0) {
+				krrp_print_err_already_defined("n");
+				exit(1);
+			}
+
+			i = strtol(optarg, NULL, 0);
+			if (i < KRRP_MIN_KEEP_SNAPS ||
+			    i > KRRP_MAX_KEEP_SNAPS) {
+				fprintf_err("Maximum number of snapshots that "
+				    "will be kept must be an integer in range "
+				    "from %d to %d\n", KRRP_MIN_KEEP_SNAPS,
+				    KRRP_MAX_KEEP_SNAPS);
+				exit(1);
+			}
+
+			keep_snaps = i;
+			break;
 		case '?':
 			krrp_print_err_unknown_param(argv[optind - 1]);
 			cmd->usage_func(1, cmd, B_FALSE);
@@ -1097,9 +1141,12 @@ krrp_do_sess_create_write_stream(int argc, char **argv, krrp_cmd_t *cmd)
 		replace_props_list = NULL;
 	}
 
+	if (keep_snaps == 0)
+		keep_snaps = UINT32_MAX;
+
 	rc = krrp_sess_create_write_stream(libkrrp_hdl, sess_id,
 	    dataset, common_snap, flags, ignore_props_list,
-	    replace_props_list, zcookies);
+	    replace_props_list, zcookies, keep_snaps);
 	if (rc != 0) {
 		fprintf_err("Failed to create write stream\n");
 		krrp_print_libkrrp_error();

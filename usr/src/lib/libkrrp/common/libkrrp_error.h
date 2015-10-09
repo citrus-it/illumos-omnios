@@ -154,6 +154,8 @@ typedef enum {
 	    "dataset name too long"
 #define	LIBKRRP_EMSG_CANNOT_STOP_SESS "Cannot stop non-continuous session"
 #define	LIBKRRP_EMSG_SESS_CREATE_CONN_AUTH_INVAL "Invalid authentication digest"
+#define	LIBKRRP_EMSG_KEEPSNAPS_INVAL \
+	    "The number of keep snapshots must be in range (%d .. %d)"
 
 #define	libkrrp_error_init(error) (void) memset(error, 0, \
 	    sizeof (libkrrp_error_t));

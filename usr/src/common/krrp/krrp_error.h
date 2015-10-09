@@ -76,6 +76,7 @@ typedef enum {
 	X(THROTTLE)           \
 	X(AUTOSNAP)           \
 	X(ZCOOKIES)           \
+	X(KEEPSNAPS)          \
 
 
 #define	KRRP_ERRNO_EXPAND(enum_name) KRRP_ERRNO_##enum_name,
