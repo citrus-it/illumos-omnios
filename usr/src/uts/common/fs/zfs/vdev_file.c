@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -128,14 +129,22 @@ static void
 vdev_file_close(vdev_t *vd)
 {
 	vdev_file_t *vf = vd->vdev_tsd;
+	caller_context_t ct = {0};
 
 	if (vd->vdev_reopening || vf == NULL)
 		return;
 
 	if (vf->vf_vnode != NULL) {
 		(void) VOP_PUTPAGE(vf->vf_vnode, 0, 0, B_INVAL, kcred, NULL);
+		/*
+		 * We need to supply caller context with PID zero to fop_close
+		 * in order to clean properly a share reservation which might
+		 * have been created by vdev_file_open if nbmand was "on" for
+		 * underlaying filesystem. Mismatched PIDs in create and delete
+		 * reservation calls would lead to orphaned reservation.
+		 */
 		(void) VOP_CLOSE(vf->vf_vnode, spa_mode(vd->vdev_spa), 1, 0,
-		    kcred, NULL);
+		    kcred, &ct);
 		VN_RELE(vf->vf_vnode);
 	}
 

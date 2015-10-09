@@ -23,7 +23,7 @@
  * Portions Copyright 2007 Jeremy Teo
  * Portions Copyright 2010 Robert Milkowski
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -245,12 +245,13 @@ zfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 {
 	znode_t	*zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	pid_t caller_pid = (ct != NULL) ? ct->cc_pid : ddi_get_pid();
 
 	/*
 	 * Clean up any locks held by this process on the vp.
 	 */
-	cleanlocks(vp, ddi_get_pid(), 0);
-	cleanshares(vp, ddi_get_pid());
+	cleanlocks(vp, caller_pid, 0);
+	cleanshares(vp, caller_pid);
 
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);

@@ -20,9 +20,9 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_ZFS_CONTEXT_H
@@ -457,6 +457,13 @@ typedef struct vsecattr {
 #define	AT_NBLOCKS	0x02000
 #define	AT_SEQ		0x08000
 #define	AT_XVATTR	0x10000
+
+typedef struct caller_context {
+	pid_t		cc_pid;		/* Process ID of the caller */
+	int		cc_sysid;	/* System ID, used for remote calls */
+	u_longlong_t	cc_caller_id;	/* Identifier for (set of) caller(s) */
+	ulong_t		cc_flags;
+} caller_context_t;
 
 #define	CRCREAT		0
 
