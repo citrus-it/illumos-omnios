@@ -4527,9 +4527,9 @@ static boolean_t zfs_ioc_recv_inject_err;
 
 int
 dmu_recv_impl(int fd, char *tofs, char *tosnap, char *origin,
-    struct drr_begin *drrb, nvlist_t *props, nvlist_t *errors, uint64_t *errf,
-    int cfd, uint64_t *ahdl, uint64_t *sz, boolean_t force,
-    dmu_krrp_task_t *krrp_task)
+    dmu_replay_record_t *drr_begin, boolean_t is_resumable, nvlist_t *props,
+    nvlist_t *errors, uint64_t *errf, int cfd, uint64_t *ahdl, uint64_t *sz,
+    boolean_t force, dmu_krrp_task_t *krrp_task)
 {
 	file_t *fp = getf(fd);
 	dmu_recv_cookie_t drc;
@@ -4545,7 +4545,8 @@ dmu_recv_impl(int fd, char *tofs, char *tosnap, char *origin,
 	ASSERT(fp || krrp_task);
 
 	error = dmu_recv_begin(tofs, tosnap,
-	    drrb, force, force_cksum, origin, &drc);
+	    drr_begin, force, is_resumable, force_cksum, origin, &drc);
+
 	if (error != 0)
 		goto out;
 
@@ -4719,6 +4720,7 @@ out:
  * zc_guid		force flag
  * zc_cleanup_fd	cleanup-on-exit file descriptor
  * zc_action_handle	handle for this guid/ds mapping (or zero on first call)
+ * zc_resumable		if data is incomplete assume sender will resume
  *
  * outputs:
  * zc_cookie		number of bytes read
@@ -4755,10 +4757,10 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	    zc->zc_iflags, &props)) != 0)
 		return (err);
 
-	VERIFY(nvlist_alloc(&errors, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	errors = fnvlist_alloc();
 
 	err = dmu_recv_impl(fd, tofs, tosnap, origin,
-	    &zc->zc_begin_record, props, errors, &zc->zc_obj,
+	    &zc->zc_begin_record, zc->zc_resumable, props, errors, &zc->zc_obj,
 	    zc->zc_cleanup_fd, &zc->zc_action_handle, &zc->zc_cookie,
 	    force, NULL);
 
@@ -6011,6 +6013,8 @@ zfs_ioc_cos_get_props(zfs_cmd_t *zc)
  *         indicates that blocks > 128KB are permitted
  *     (optional) "embedok" -> (value ignored)
  *         presence indicates DRR_WRITE_EMBEDDED records are permitted
+ *     (optional) "resume_object" and "resume_offset" -> (uint64)
+ *	   if present, resume send stream from specified object and offset.
  * }
  *
  * outnvl is unused
@@ -6025,6 +6029,8 @@ zfs_ioc_send_new(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 	int fd;
 	boolean_t largeblockok;
 	boolean_t embedok;
+	uint64_t resumeobj = 0;
+	uint64_t resumeoff = 0;
 
 	error = nvlist_lookup_int32(innvl, "fd", &fd);
 	if (error != 0)
@@ -6035,13 +6041,16 @@ zfs_ioc_send_new(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 	largeblockok = nvlist_exists(innvl, "largeblockok");
 	embedok = nvlist_exists(innvl, "embedok");
 
+	(void) nvlist_lookup_uint64(innvl, "resume_object", &resumeobj);
+	(void) nvlist_lookup_uint64(innvl, "resume_offset", &resumeoff);
+
 	file_t *fp = getf(fd);
 	if (fp == NULL)
 		return (SET_ERROR(EBADF));
 
 	off = fp->f_offset;
-	error = dmu_send(snapname, fromname, embedok, largeblockok,
-	    fd, fp->f_vnode, &off);
+	error = dmu_send(snapname, fromname, embedok, largeblockok, fd,
+	    resumeobj, resumeoff, fp->f_vnode, &off);
 
 	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
 		fp->f_offset = off;

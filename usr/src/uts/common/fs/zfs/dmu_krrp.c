@@ -593,11 +593,11 @@ zfs_send_one_ds(const char *inc_ds, const char *from_ds,
 		dsl_dataset_rele(fromds, FTAG);
 		err = dmu_send_impl(FTAG, dp, ds, &zb,
 		    is_clone, embedok, B_FALSE,
-		    -1, NULL, &off, krrp_task);
+		    -1, 0, 0, NULL, &off, krrp_task);
 	} else {
 		err = dmu_send_impl(FTAG, dp, ds, NULL, B_FALSE,
 		    embedok, B_FALSE,
-		    -1, NULL, &off, krrp_task);
+		    -1, 0, 0, NULL, &off, krrp_task);
 	}
 
 	dsl_dataset_rele(ds, FTAG);
@@ -1047,7 +1047,7 @@ dmu_krrp_add_recv_cookie_sync(void *arg, dmu_tx_t *tx)
 
 /* Recv a single snapshot. It is a simplified version of recv */
 static int
-zfs_recv_one_ds(char *ds, struct drr_begin *drrb, nvlist_t *props,
+zfs_recv_one_ds(char *ds, dmu_replay_record_t *drr, nvlist_t *props,
     dmu_krrp_task_t *krrp_task)
 {
 	int err = 0;
@@ -1059,7 +1059,7 @@ zfs_recv_one_ds(char *ds, struct drr_begin *drrb, nvlist_t *props,
 	if (krrp_task->buffer_args.to_snap[0]) {
 		tosnap = krrp_task->buffer_args.to_snap;
 	} else {
-		tosnap = strchr(drrb->drr_toname, '@') + 1;
+		tosnap = strchr(drr->drr_u.drr_begin.drr_toname, '@') + 1;
 	}
 
 	err = zfs_recv_alter_props(props,
@@ -1072,13 +1072,13 @@ zfs_recv_one_ds(char *ds, struct drr_begin *drrb, nvlist_t *props,
 	if (krrp_debug) {
 		cmn_err(CE_NOTE, "KRRP RECV INC_BASE: %llu -- DS: "
 		    "%s -- TO_SNAP:%s",
-		    (unsigned long long)drrb->drr_fromguid, ds, tosnap);
+		    (unsigned long long)drr->drr_u.drr_begin.drr_fromguid, ds, tosnap);
 	}
 
 	/* hack to avoid adding the symnol to the libzpool export list */
 #ifdef _KERNEL
-	err = dmu_recv_impl(NULL, ds, tosnap, NULL, drrb, props, NULL,
-	    &errf, -1, &ahdl, &sz, krrp_task->buffer_args.force,
+	err = dmu_recv_impl(NULL, ds, tosnap, NULL, drr, B_FALSE, props,
+	    NULL, &errf, -1, &ahdl, &sz, krrp_task->buffer_args.force,
 	    krrp_task);
 #endif
 
@@ -1219,7 +1219,7 @@ zfs_recv_thread(void *krrp_task_void)
 		}
 		(void) strcpy(latest_snap, full_ds);
 		(void) strcat(latest_snap, strchr(drrb->drr_toname, '@'));
-		err = zfs_recv_one_ds(full_ds, drrb, NULL, krrp_task);
+		err = zfs_recv_one_ds(full_ds, &drr, NULL, krrp_task);
 	} else {
 		nvlist_t *nvl = NULL, *nvfs = NULL;
 
@@ -1303,7 +1303,7 @@ zfs_recv_thread(void *krrp_task_void)
 			at = strrchr(ds, '@');
 			*at = '\0';
 			(void) strcpy(krrp_task->cookie, drrb->drr_toname);
-			err = zfs_recv_one_ds(ds, drrb, prop, krrp_task);
+			err = zfs_recv_one_ds(ds, &drr, prop, krrp_task);
 		}
 
 out_nvl:
