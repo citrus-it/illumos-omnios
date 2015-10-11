@@ -431,6 +431,7 @@ dnode_evict_dbufs(dnode_t *dn, int level)
 			db_next = AVL_NEXT(&dn->dn_dbufs, &db_marker);
 			avl_remove(&dn->dn_dbufs, &db_marker);
 		} else {
+			db->db_pending_evict = TRUE;
 			mutex_exit(&db->db_mtx);
 			db_next = AVL_NEXT(&dn->dn_dbufs, db);
 		}
@@ -444,10 +445,14 @@ void
 dnode_evict_bonus(dnode_t *dn)
 {
 	rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
-	if (dn->dn_bonus && refcount_is_zero(&dn->dn_bonus->db_holds)) {
-		mutex_enter(&dn->dn_bonus->db_mtx);
-		dbuf_evict(dn->dn_bonus);
-		dn->dn_bonus = NULL;
+	if (dn->dn_bonus != NULL) {
+		if (refcount_is_zero(&dn->dn_bonus->db_holds)) {
+			mutex_enter(&dn->dn_bonus->db_mtx);
+			dbuf_evict(dn->dn_bonus);
+			dn->dn_bonus = NULL;
+		} else {
+			dn->dn_bonus->db_pending_evict = TRUE;
+		}
 	}
 	rw_exit(&dn->dn_struct_rwlock);
 }
