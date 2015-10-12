@@ -228,6 +228,7 @@ smbd_ntlmssp_negotiate(authsvc_context_t *ctx)
 	    (be->clnt_flags & NTLMSSP_NEGOTIATE_LM_KEY) != 0)
 		be->srv_flags |= NTLMSSP_NEGOTIATE_LM_KEY;
 
+	/* Get our "target name" */
 	if (secmode == SMB_SECMODE_DOMAIN) {
 		be->srv_flags |= NTLMSSP_TARGET_TYPE_DOMAIN;
 		rc = smb_getdomainname(tmp_name, NETBIOS_NAME_SZ);
@@ -283,6 +284,21 @@ smbd_ntlmssp_negotiate(authsvc_context_t *ctx)
 
 	/*
 	 * Target info (AvPairList)
+	 *
+	 * These AV pairs are like our name/value pairs, but have
+	 * numeric identifiers instead of names.  There are many
+	 * of these, but we put just the four most important:
+	 *	NetBIOS computer name
+	 *	NetBIOS domain name
+	 *	DNS computer name
+	 *	DNS domain name
+	 * Note that "domain" above (even "DNS domain") refers to
+	 * the AD domain of which we're a member, which may be
+	 * _different_ from the configured DNS domain.
+	 *
+	 * Also note that in "workgroup" mode (not a domain member)
+	 * all "domain" fields should be set to the same values as
+	 * the "computer" fields ("bare" host name, not FQDN).
 	 */
 	var_start = smb_msgbuf_used(&mb);
 
@@ -292,23 +308,45 @@ smbd_ntlmssp_negotiate(authsvc_context_t *ctx)
 	if (encode_avpair_str(&mb, MsvAvNbComputerName, tmp_name) < 0)
 		goto errout;
 
-	/* NetBIOS Domain Name */
-	if (smb_getdomainname(tmp_name, NETBIOS_NAME_SZ))
-		goto errout;
-	if (encode_avpair_str(&mb, MsvAvNbDomainName, tmp_name) < 0)
-		goto errout;
+	if (secmode != SMB_SECMODE_DOMAIN) {
+		/*
+		 * Workgroup mode.  Set all to hostname.
+		 * tmp_name = netbios hostname from above.
+		 */
+		if (encode_avpair_str(&mb, MsvAvNbDomainName, tmp_name) < 0)
+			goto errout;
+		/*
+		 * Want the bare computer name here (not FQDN).
+		 */
+		if (smb_gethostname(tmp_name, MAXHOSTNAMELEN, SMB_CASE_LOWER))
+			goto errout;
+		if (encode_avpair_str(&mb, MsvAvDnsComputerName, tmp_name) < 0)
+			goto errout;
+		if (encode_avpair_str(&mb, MsvAvDnsDomainName, tmp_name) < 0)
+			goto errout;
+	} else {
+		/*
+		 * Domain mode.  Use real host and domain values.
+		 */
 
-	/* DNS Computer Name */
-	if (smb_getfqhostname(tmp_name, MAXHOSTNAMELEN))
-		goto errout;
-	if (encode_avpair_str(&mb, MsvAvDnsComputerName, tmp_name) < 0)
-		goto errout;
+		/* NetBIOS Domain Name */
+		if (smb_getdomainname(tmp_name, NETBIOS_NAME_SZ))
+			goto errout;
+		if (encode_avpair_str(&mb, MsvAvNbDomainName, tmp_name) < 0)
+			goto errout;
 
-	/* DNS Domain Name */
-	if (smb_getfqdomainname(tmp_name, MAXHOSTNAMELEN))
-		goto errout;
-	if (encode_avpair_str(&mb, MsvAvDnsDomainName, tmp_name) < 0)
-		goto errout;
+		/* DNS Computer Name */
+		if (smb_getfqhostname(tmp_name, MAXHOSTNAMELEN))
+			goto errout;
+		if (encode_avpair_str(&mb, MsvAvDnsComputerName, tmp_name) < 0)
+			goto errout;
+
+		/* DNS Domain Name */
+		if (smb_getfqdomainname(tmp_name, MAXHOSTNAMELEN))
+			goto errout;
+		if (encode_avpair_str(&mb, MsvAvDnsDomainName, tmp_name) < 0)
+			goto errout;
+	}
 
 	/* End marker */
 	if (smb_msgbuf_encode(&mb, "ww", MsvAvEOL, 0) < 0)
