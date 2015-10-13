@@ -3005,7 +3005,7 @@ props_override(char *dsname, nvlist_t *props, nvlist_t *exprops,
 
 	/* convert override properties e.g. strings to native */
 	if ((vprops = zfs_valid_proplist(hdl, type, goprops, zoned, zhp,
-	    errbuf)) == NULL)
+	    zhp->zpool_hdl, errbuf)) == NULL)
 		goto error;
 
 	nvlist_free(goprops);
