@@ -7905,6 +7905,27 @@ sdattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	SD_TRACE(SD_LOG_ATTACH_DETACH, un,
 	    "sdattach: un:0x%p un_stats created\n", un);
 
+	un->un_unmapstats_ks = kstat_create(sd_label, instance, "unmapstats",
+	    "misc", KSTAT_TYPE_NAMED, sizeof (*un->un_unmapstats) /
+	    sizeof (kstat_named_t), 0);
+	if (un->un_unmapstats_ks) {
+		un->un_unmapstats = un->un_unmapstats_ks->ks_data;
+
+		kstat_named_init(&un->un_unmapstats->us_cmds,
+		    "commands", KSTAT_DATA_UINT64);
+		kstat_named_init(&un->un_unmapstats->us_errs,
+		    "errors", KSTAT_DATA_UINT64);
+		kstat_named_init(&un->un_unmapstats->us_extents,
+		    "extents", KSTAT_DATA_UINT64);
+		kstat_named_init(&un->un_unmapstats->us_bytes,
+		    "bytes", KSTAT_DATA_UINT64);
+
+		kstat_install(un->un_unmapstats_ks);
+	} else {
+		cmn_err(CE_NOTE, "!Cannot create unmap kstats for disk %d",
+		    instance);
+	}
+
 	un->un_lat_ksp = kstat_create(sd_label, instance, "io_latency",
 	    "io_latency", KSTAT_TYPE_RAW, sizeof (un_lat_stat_t),
 	    KSTAT_FLAG_PERSISTENT);
@@ -8238,6 +8259,12 @@ create_errstats_failed:
 	if (un->un_stats != NULL) {
 		kstat_delete(un->un_stats);
 		un->un_stats = NULL;
+	}
+
+	if (un->un_unmapstats != NULL) {
+		kstat_delete(un->un_unmapstats_ks);
+		un->un_unmapstats_ks = NULL;
+		un->un_unmapstats = NULL;
 	}
 
 	if (un->un_lat_ksp != NULL) {
@@ -9297,6 +9324,11 @@ no_attach_cleanup:
 	if (un->un_stats != NULL) {
 		kstat_delete(un->un_stats);
 		un->un_stats = NULL;
+	}
+	if (un->un_unmapstats != NULL) {
+		kstat_delete(un->un_unmapstats_ks);
+		un->un_unmapstats_ks = NULL;
+		un->un_unmapstats = NULL;
 	}
 	if (un->un_lat_ksp != NULL) {
 		kstat_delete(un->un_lat_ksp);
@@ -22120,7 +22152,7 @@ typedef struct unmap_blk_descr_s {
 
 static int
 sd_send_scsi_UNMAP_issue_one(sd_ssc_t *ssc, unmap_param_hdr_t *uph,
-    int num_exts)
+    int num_exts, uint64_t bytes)
 {
 	struct sd_lun		*un = ssc->ssc_un;
 	struct scsi_extended_sense	sense_buf;
@@ -22156,8 +22188,18 @@ sd_send_scsi_UNMAP_issue_one(sd_ssc_t *ssc, unmap_param_hdr_t *uph,
 	switch (status) {
 	case 0:
 		sd_ssc_assessment(ssc, SD_FMT_STANDARD);
+
+		if (un->un_unmapstats) {
+			atomic_inc_64(&un->un_unmapstats->us_cmds.value.ui64);
+			atomic_add_64(&un->un_unmapstats->us_extents.value.ui64,
+			    num_exts);
+			atomic_add_64(&un->un_unmapstats->us_bytes.value.ui64,
+			    bytes);
+		}
 		break;	/* Success! */
 	case EIO:
+		if (un->un_unmapstats)
+			atomic_inc_64(&un->un_unmapstats->us_errs.value.ui64);
 		switch (ucmd_buf.uscsi_status) {
 		case STATUS_RESERVATION_CONFLICT:
 			status = EACCES;
@@ -22167,6 +22209,8 @@ sd_send_scsi_UNMAP_issue_one(sd_ssc_t *ssc, unmap_param_hdr_t *uph,
 		}
 		break;
 	default:
+		if (un->un_unmapstats)
+			atomic_inc_64(&un->un_unmapstats->us_errs.value.ui64);
 		break;
 	}
 
@@ -22179,6 +22223,7 @@ sd_send_scsi_UNMAP_issue(dev_t dev, sd_ssc_t *ssc, const dkioc_free_list_t *dfl)
 	struct sd_lun *		un = ssc->ssc_un;
 	unmap_param_hdr_t	*uph;
 	size_t			num_exts = 0;
+	uint64_t		bytes = 0;
 	sd_blk_limits_t		*lim = &un->un_blk_lim;
 	int			rval = 0;
 
@@ -22239,20 +22284,22 @@ sd_send_scsi_UNMAP_issue(dev_t dev, sd_ssc_t *ssc, const dkioc_free_list_t *dfl)
 			/* Respect limit on number of block descriptors */
 			if (num_exts >= lim->lim_max_unmap_descr_cnt) {
 				rval = sd_send_scsi_UNMAP_issue_one(ssc, uph,
-				    num_exts);
+				    num_exts, bytes);
 				if (rval != 0)
 					goto out;
 				num_exts = 0;
+				bytes = 0;
 			}
 
 			ext_start += len;
 			ext_length -= len;
+			bytes += len;
 		}
 	}
 
 	if (num_exts > 0) {
 		/* issue last command */
-		rval = sd_send_scsi_UNMAP_issue_one(ssc, uph, num_exts);
+		rval = sd_send_scsi_UNMAP_issue_one(ssc, uph, num_exts, bytes);
 	}
 
 out:

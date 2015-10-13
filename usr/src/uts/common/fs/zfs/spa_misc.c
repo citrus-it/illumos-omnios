@@ -225,6 +225,13 @@
  * manipulation of the namespace.
  */
 
+struct spa_trimstats {
+	kstat_named_t	st_extents;
+	kstat_named_t	st_bytes;
+	kstat_named_t	st_extents_skipped;
+	kstat_named_t	st_bytes_skipped;
+};
+
 static avl_tree_t spa_namespace_avl;
 kmutex_t spa_namespace_lock;
 static kcondvar_t spa_namespace_cv;
@@ -350,6 +357,9 @@ int spa_asize_inflation = 24;
  * See also the comments in zfs_space_check_t.
  */
 int spa_slop_shift = 5;
+
+static void spa_trimstats_create(spa_t *spa);
+static void spa_trimstats_destroy(spa_t *spa);
 
 /*
  * ==========================================================================
@@ -664,6 +674,8 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 		kstat_install(spa->spa_iokstat);
 	}
 
+	spa_trimstats_create(spa);
+
 	spa->spa_debug = ((zfs_flags & ZFS_DEBUG_SPA) != 0);
 
 	autosnap_init(spa);
@@ -747,6 +759,8 @@ spa_remove(spa_t *spa)
 	refcount_destroy(&spa->spa_refcount);
 
 	spa_config_lock_destroy(spa);
+
+	spa_trimstats_destroy(spa);
 
 	kstat_delete(spa->spa_iokstat);
 	spa->spa_iokstat = NULL;
@@ -2234,4 +2248,65 @@ wrc_data_t *
 spa_get_wrc_data(spa_t *spa)
 {
 	return (&spa->spa_wrc);
+}
+
+static void
+spa_trimstats_create(spa_t *spa)
+{
+	/* truncate pool name to accomodate "_trimstats" suffix */
+	char short_spa_name[KSTAT_STRLEN - 10];
+	char name[KSTAT_STRLEN];
+
+	ASSERT3P(spa->spa_trimstats, ==, NULL);
+	ASSERT3P(spa->spa_trimstats_ks, ==, NULL);
+
+	(void) snprintf(short_spa_name, sizeof (short_spa_name), "%s",
+	    spa->spa_name);
+	(void) snprintf(name, sizeof (name), "%s_trimstats", short_spa_name);
+
+	spa->spa_trimstats_ks = kstat_create("zfs", 0, name, "misc",
+	    KSTAT_TYPE_NAMED, sizeof (*spa->spa_trimstats) /
+	    sizeof (kstat_named_t), 0);
+	if (spa->spa_trimstats_ks) {
+		spa->spa_trimstats = spa->spa_trimstats_ks->ks_data;
+
+		kstat_named_init(&spa->spa_trimstats->st_extents,
+		    "extents", KSTAT_DATA_UINT64);
+		kstat_named_init(&spa->spa_trimstats->st_bytes,
+		    "bytes", KSTAT_DATA_UINT64);
+		kstat_named_init(&spa->spa_trimstats->st_extents_skipped,
+		    "extents_skipped", KSTAT_DATA_UINT64);
+		kstat_named_init(&spa->spa_trimstats->st_bytes_skipped,
+		    "bytes_skipped", KSTAT_DATA_UINT64);
+
+		kstat_install(spa->spa_trimstats_ks);
+	} else {
+		cmn_err(CE_NOTE, "!Cannot create trim kstats for pool %s",
+		    spa->spa_name);
+	}
+}
+
+static void
+spa_trimstats_destroy(spa_t *spa)
+{
+	if (spa->spa_trimstats_ks) {
+		kstat_delete(spa->spa_trimstats_ks);
+		spa->spa_trimstats = NULL;
+		spa->spa_trimstats_ks = NULL;
+	}
+}
+
+void
+spa_trimstats_update(spa_t *spa, uint64_t extents, uint64_t bytes,
+    uint64_t extents_skipped, uint64_t bytes_skipped)
+{
+	spa_trimstats_t *st = spa->spa_trimstats;
+	if (st) {
+		atomic_add_64(&st->st_extents.value.ui64, extents);
+		atomic_add_64(&st->st_bytes.value.ui64, bytes);
+		atomic_add_64(&st->st_extents_skipped.value.ui64,
+		    extents_skipped);
+		atomic_add_64(&st->st_bytes_skipped.value.ui64,
+		    bytes_skipped);
+	}
 }

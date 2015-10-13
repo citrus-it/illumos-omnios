@@ -94,6 +94,9 @@ void metaslab_group_histogram_verify(metaslab_group_t *);
 uint64_t metaslab_group_fragmentation(metaslab_group_t *);
 void metaslab_group_histogram_remove(metaslab_group_t *, metaslab_t *);
 
+void metaslab_trimstats_create(spa_t *spa);
+void metaslab_trimstats_destroy(spa_t *spa);
+
 #ifdef	__cplusplus
 }
 #endif

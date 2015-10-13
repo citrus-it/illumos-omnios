@@ -205,6 +205,8 @@ typedef struct {
 	uint64_t vdev_guid;
 } spa_einfo_t;
 
+typedef struct spa_trimstats spa_trimstats_t;
+
 struct spa {
 	/*
 	 * Fields protected by spa_namespace_lock.
@@ -370,6 +372,10 @@ struct spa {
 		int spa_active;
 		int spa_queued;
 	} spa_queue_stats[ZIO_PRIORITY_NUM_QUEUEABLE];
+
+	/* TRIM/UNMAP kstats */
+	spa_trimstats_t	*spa_trimstats;		/* alloc'd by kstat_create */
+	struct kstat	*spa_trimstats_ks;
 
 	hrtime_t	spa_ccw_fail_time;	/* Conf cache write fail time */
 

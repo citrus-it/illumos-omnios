@@ -976,6 +976,7 @@ zio_trim(spa_t *spa, vdev_t *vd, struct range_tree *tree,
 	range_seg_t *rs;
 	uint64_t rs_idx;
 	uint64_t num_exts;
+	uint64_t bytes_issued = 0, bytes_skipped = 0, exts_skipped = 0;
 	/*
 	 * We need this to invoke the caller's `done' callback with the
 	 * correct io_private (not the dkioc_free_list_t, which is needed
@@ -1000,11 +1001,16 @@ zio_trim(spa_t *spa, vdev_t *vd, struct range_tree *tree,
 
 	for (rs = avl_first(&tree->rt_root), rs_idx = 0; rs != NULL;
 	    rs = AVL_NEXT(&tree->rt_root, rs)) {
-		if (rs->rs_end - rs->rs_start < zfs_trim_min_ext_sz)
+		uint64_t len = rs->rs_end - rs->rs_start;
+
+		if (len < zfs_trim_min_ext_sz) {
+			bytes_skipped += len;
+			exts_skipped++;
 			continue;
+		}
 
 		dfl->dfl_exts[rs_idx].dfle_start = rs->rs_start;
-		dfl->dfl_exts[rs_idx].dfle_length = rs->rs_end - rs->rs_start;
+		dfl->dfl_exts[rs_idx].dfle_length = len;
 
 		// check we're a multiple of the vdev ashift
 		ASSERT0(dfl->dfl_exts[rs_idx].dfle_start &
@@ -1013,7 +1019,11 @@ zio_trim(spa_t *spa, vdev_t *vd, struct range_tree *tree,
 		    ((1 << vd->vdev_ashift) - 1));
 
 		rs_idx++;
+		bytes_issued += len;
 	}
+
+	spa_trimstats_update(spa, rs_idx, bytes_issued, exts_skipped,
+	    bytes_skipped);
 
 	/* the zfs_trim_min_ext_sz filter may have shortened the list */
 	if (dfl->dfl_num_exts != rs_idx) {

@@ -256,6 +256,13 @@ typedef struct sd_blk_limits_s {
 	uint64_t	lim_max_write_same_len;
 } sd_blk_limits_t;
 
+typedef struct sd_unmapstats {
+	kstat_named_t	us_cmds;
+	kstat_named_t	us_errs;
+	kstat_named_t	us_extents;
+	kstat_named_t	us_bytes;
+} sd_unmapstats_t;
+
 /*
  * sd_lun: The main data structure for a scsi logical unit.
  * Stored as the softstate structure for each device.
@@ -397,6 +404,8 @@ struct sd_lun {
 	union	ocmap	un_ocmap;		/* open partition map */
 	struct	kstat	*un_pstats[NSDMAP];	/* partition statistics */
 	struct	kstat	*un_stats;		/* disk statistics */
+	sd_unmapstats_t	*un_unmapstats;		/* UNMAP stats structure */
+	struct	kstat	*un_unmapstats_ks;	/* UNMAP kstat */
 	kstat_t		*un_errstats;		/* for error statistics */
 	kstat_t 	*un_lat_ksp;		/* pointer to the raw kstat */
 	un_lat_stat_t	*un_lat_stats;		/* data from the above kstat */

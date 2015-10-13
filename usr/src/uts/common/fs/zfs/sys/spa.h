@@ -952,6 +952,10 @@ typedef enum spa_wrc_mode {
 	WRC_MODE_PASSIVE
 } spa_wrc_mode_t;
 
+/* TRIM/UNMAP kstat update */
+extern void spa_trimstats_update(spa_t *spa, uint64_t extents, uint64_t bytes,
+    uint64_t extents_skipped, uint64_t bytes_skipped);
+
 #ifdef ZFS_DEBUG
 #define	dprintf_bp(bp, fmt, ...) do {				\
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) {			\
