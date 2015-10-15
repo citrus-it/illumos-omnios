@@ -1201,10 +1201,24 @@ static int sd_pm_idletime = 1;
 
 #endif	/* #if (defined(__fibre)) */
 
-/* Max number of extents in UNMAP command */
-#define	SD_UNMAP_MAX_EXTENTS	(UINT16_MAX / 16)
-/* Max extent length in bytes */
-#define	SD_UNMAP_MAX_EXT_LEN	(UINT32_MAX * DEV_BSIZE)
+typedef struct unmap_param_hdr_s {
+	uint16_t	uph_data_len;
+	uint16_t	uph_descr_data_len;
+	uint32_t	uph_reserved;
+} unmap_param_hdr_t;
+
+typedef struct unmap_blk_descr_s {
+	uint64_t	ubd_lba;
+	uint32_t	ubd_lba_cnt;
+	uint32_t	ubd_reserved;
+} unmap_blk_descr_t;
+
+/* Max number of block descriptors in UNMAP command */
+#define	SD_UNMAP_MAX_DESCR \
+	((UINT16_MAX - sizeof (unmap_param_hdr_t)) / sizeof (unmap_blk_descr_t))
+/* Max size of the UNMAP parameter list in bytes */
+#define	SD_UNMAP_PARAM_LIST_MAXSZ	(sizeof (unmap_param_hdr_t) + \
+	SD_UNMAP_MAX_DESCR * sizeof (unmap_blk_descr_t))
 
 int _init(void);
 int _fini(void);
@@ -5508,12 +5522,12 @@ sd_parse_blk_limits_vpd(struct sd_lun *un, uchar_t *vpd_pg)
 	}
 	if (pg_len >= 0x3c) {
 		lim->lim_max_pfetch_len = BE_IN32(&vpd_pg[16]);
+		/*
+		 * A zero in either of the following two fields indicates lack
+		 * of UNMAP support.
+		 */
 		lim->lim_max_unmap_lba_cnt = BE_IN32(&vpd_pg[20]);
-		if (lim->lim_max_unmap_lba_cnt < 4)
-			lim->lim_max_unmap_lba_cnt = 4;
 		lim->lim_max_unmap_descr_cnt = BE_IN32(&vpd_pg[24]);
-		if (lim->lim_max_unmap_descr_cnt == 0)
-			lim->lim_max_unmap_descr_cnt = 1;
 		lim->lim_opt_unmap_gran = BE_IN32(&vpd_pg[28]);
 		if ((vpd_pg[32] >> 7) == 1) {
 			/* left-most bit on each byte is a flag */
@@ -5527,11 +5541,39 @@ sd_parse_blk_limits_vpd(struct sd_lun *un, uchar_t *vpd_pg)
 	} else {
 		lim->lim_max_pfetch_len = UINT32_MAX;
 		lim->lim_max_unmap_lba_cnt = UINT32_MAX;
-		lim->lim_max_unmap_descr_cnt = SD_UNMAP_MAX_EXTENTS;
+		lim->lim_max_unmap_descr_cnt = SD_UNMAP_MAX_DESCR;
 		lim->lim_opt_unmap_gran = 0;
 		lim->lim_unmap_gran_align = 0;
 		lim->lim_max_write_same_len = UINT64_MAX;
 	}
+}
+
+/*
+ * Collects VPD page B0 data if available (block limits). If the data is
+ * not available or querying the device failed, we revert to the defaults.
+ */
+static void
+sd_setup_blk_limits(sd_ssc_t *ssc)
+{
+	struct sd_lun	*un		= ssc->ssc_un;
+	uchar_t		*inqB0		= NULL;
+	size_t		inqB0_resid	= 0;
+	int		rval;
+
+	if (un->un_vpd_page_mask & SD_VPD_BLK_LIMITS_PG) {
+		inqB0 = kmem_zalloc(MAX_INQUIRY_SIZE, KM_SLEEP);
+		rval = sd_send_scsi_INQUIRY(ssc, inqB0, MAX_INQUIRY_SIZE, 0x01,
+		    0xB0, &inqB0_resid);
+		if (rval != 0) {
+			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+			kmem_free(inqB0, MAX_INQUIRY_SIZE);
+			inqB0 = NULL;
+		}
+	}
+	/* passing NULL inqB0 will reset to defaults */
+	sd_parse_blk_limits_vpd(ssc->ssc_un, inqB0);
+	if (inqB0)
+		kmem_free(inqB0, MAX_INQUIRY_SIZE);
 }
 
 #define	DEVID_IF_KNOWN(d) "devid", DATA_TYPE_STRING, (d) ? (d) : "unknown"
@@ -5560,9 +5602,6 @@ sd_register_devid(sd_ssc_t *ssc, dev_info_t *devi, int reservation_flag)
 	uchar_t		*inq83		= NULL;
 	size_t		inq83_len	= MAX_INQUIRY_SIZE;
 	size_t		inq83_resid	= 0;
-	uchar_t		*inqB0		= NULL;
-	size_t		inqB0_len	= MAX_INQUIRY_SIZE;
-	size_t		inqB0_resid	= 0;
 	int		dlen, len;
 	char		*sn;
 	struct sd_lun	*un;
@@ -5643,23 +5682,6 @@ sd_register_devid(sd_ssc_t *ssc, dev_info_t *devi, int reservation_flag)
 				kmem_free(inq83, inq83_len);
 				inq83 = NULL;
 				inq83_len = 0;
-			}
-			mutex_enter(SD_MUTEX(un));
-		}
-
-		/* collect page B0 data if available (block limits) */
-		if (un->un_vpd_page_mask & SD_VPD_BLK_LIMITS_PG) {
-			mutex_exit(SD_MUTEX(un));
-			inqB0 = kmem_zalloc(MAX_INQUIRY_SIZE, KM_SLEEP);
-
-			rval = sd_send_scsi_INQUIRY(ssc, inqB0, inqB0_len,
-			    0x01, 0xB0, &inqB0_resid);
-
-			if (rval != 0) {
-				sd_ssc_assessment(ssc, SD_FMT_IGNORE);
-				kmem_free(inqB0, inqB0_len);
-				inqB0 = NULL;
-				inqB0_len = 0;
 			}
 			mutex_enter(SD_MUTEX(un));
 		}
@@ -5746,9 +5768,6 @@ sd_register_devid(sd_ssc_t *ssc, dev_info_t *devi, int reservation_flag)
 		}
 	}
 
-	/* passing NULL inqB0 will reset to defaults */
-	sd_parse_blk_limits_vpd(ssc->ssc_un, inqB0);
-
 cleanup:
 	/* clean up resources */
 	if (inq80 != NULL) {
@@ -5756,9 +5775,6 @@ cleanup:
 	}
 	if (inq83 != NULL) {
 		kmem_free(inq83, inq83_len);
-	}
-	if (inqB0 != NULL) {
-		kmem_free(inqB0, inqB0_len);
 	}
 }
 
@@ -8835,6 +8851,7 @@ sd_unit_attach(void *arg)
 	SD_TRACE(SD_LOG_ATTACH_DETACH, un,
 	    "sd_unit_attach: un:0x%p errstats set\n", un);
 
+	sd_setup_blk_limits(ssc);
 
 	/*
 	 * After successfully attaching an instance, we record the information
@@ -22138,21 +22155,13 @@ done:
 	return (status);
 }
 
-typedef struct unmap_param_hdr_s {
-	uint16_t	uph_data_len;
-	uint16_t	uph_descr_data_len;
-	uint32_t	uph_reserved;
-} unmap_param_hdr_t;
-
-typedef struct unmap_blk_descr_s {
-	uint64_t	ubd_lba;
-	uint32_t	ubd_lba_cnt;
-	uint32_t	ubd_reserved;
-} unmap_blk_descr_t;
-
+/*
+ * Issues a single SCSI UNMAP command with a prepared UNMAP parameter list.
+ * Returns zero on success, or the non-zero command error code on failure.
+ */
 static int
 sd_send_scsi_UNMAP_issue_one(sd_ssc_t *ssc, unmap_param_hdr_t *uph,
-    int num_exts, uint64_t bytes)
+    uint64_t num_descr, uint64_t bytes)
 {
 	struct sd_lun		*un = ssc->ssc_un;
 	struct scsi_extended_sense	sense_buf;
@@ -22160,11 +22169,10 @@ sd_send_scsi_UNMAP_issue_one(sd_ssc_t *ssc, unmap_param_hdr_t *uph,
 	struct uscsi_cmd	ucmd_buf;
 	int			status;
 	const uint64_t		param_size = sizeof (unmap_param_hdr_t) +
-	    num_exts * sizeof (unmap_blk_descr_t);
+	    num_descr * sizeof (unmap_blk_descr_t);
 
 	uph->uph_data_len = BE_16(param_size - 2);
-	uph->uph_descr_data_len = BE_16(param_size -
-	    sizeof (unmap_param_hdr_t));
+	uph->uph_descr_data_len = BE_16(param_size - 8);
 
 	bzero(&cdb, sizeof (cdb));
 	bzero(&ucmd_buf, sizeof (ucmd_buf));
@@ -22192,7 +22200,7 @@ sd_send_scsi_UNMAP_issue_one(sd_ssc_t *ssc, unmap_param_hdr_t *uph,
 		if (un->un_unmapstats) {
 			atomic_inc_64(&un->un_unmapstats->us_cmds.value.ui64);
 			atomic_add_64(&un->un_unmapstats->us_extents.value.ui64,
-			    num_exts);
+			    num_descr);
 			atomic_add_64(&un->un_unmapstats->us_bytes.value.ui64,
 			    bytes);
 		}
@@ -22217,35 +22225,54 @@ sd_send_scsi_UNMAP_issue_one(sd_ssc_t *ssc, unmap_param_hdr_t *uph,
 	return (status);
 }
 
+/*
+ * Returns a pointer to the i'th block descriptor inside an UNMAP param list.
+ */
+static inline unmap_blk_descr_t *
+UNMAP_blk_descr_i(void *buf, uint64_t i)
+{
+	return ((unmap_blk_descr_t *)((uint8_t *)buf +
+	    sizeof (unmap_param_hdr_t) + (i * sizeof (unmap_blk_descr_t))));
+}
+
+/*
+ * Takes the list of extents from sd_send_scsi_UNMAP, chops it up, prepares
+ * UNMAP block descriptors and issues individual SCSI UNMAP commands. While
+ * doing so we consult the block limits to determine at most how many
+ * extents and LBAs we can UNMAP in one command.
+ * If a command fails for whatever, reason, extent list processing is aborted
+ * and the failed command's status is returned. Otherwise returns 0 on
+ * success.
+ */
 static int
 sd_send_scsi_UNMAP_issue(dev_t dev, sd_ssc_t *ssc, const dkioc_free_list_t *dfl)
 {
 	struct sd_lun *		un = ssc->ssc_un;
 	unmap_param_hdr_t	*uph;
-	size_t			num_exts = 0;
-	uint64_t		bytes = 0;
 	sd_blk_limits_t		*lim = &un->un_blk_lim;
 	int			rval = 0;
-
-	int zero_buf_len = 128 * 1024;
-	uint8_t	*zero_buf = kmem_zalloc(zero_buf_len, KM_SLEEP);
-
-	int		partition;
+	int			partition;
 	/* partition offset & length in system blocks */
-	diskaddr_t	part_off = 0, part_nblks = 0;
-	/* partition offset & length in target blocks */
-	diskaddr_t	part_off_tgtblks, part_tgtblks;
+	diskaddr_t		part_off_sysblks = 0, part_len_sysblks = 0;
+	uint64_t		part_off, part_len;
+	uint64_t		descr_cnt_lim, byte_cnt_lim;
+	uint64_t		descr_issued = 0, bytes_issued = 0;
 
-	VERIFY(SD_TGTBLOCKS2BYTES(un, un->un_blk_lim.lim_max_unmap_lba_cnt)
-	    != 0);
-	uph = kmem_zalloc(sizeof (unmap_param_hdr_t) + SD_UNMAP_MAX_EXTENTS *
-	    sizeof (unmap_blk_descr_t), KM_SLEEP);
+	uph = kmem_zalloc(SD_UNMAP_PARAM_LIST_MAXSZ, KM_SLEEP);
 
 	partition = SDPART(dev);
-	(void) cmlb_partinfo(un->un_cmlbhandle, partition, &part_nblks,
-	    &part_off, NULL, NULL, (void *)SD_PATH_DIRECT);
-	part_tgtblks = SD_SYS2TGTBLOCK(un, part_nblks);
-	part_off_tgtblks = SD_SYS2TGTBLOCK(un, part_off);
+	(void) cmlb_partinfo(un->un_cmlbhandle, partition, &part_len_sysblks,
+	    &part_off_sysblks, NULL, NULL, (void *)SD_PATH_DIRECT);
+	part_off = SD_SYSBLOCKS2BYTES(part_off_sysblks);
+	part_len = SD_SYSBLOCKS2BYTES(part_len_sysblks);
+
+	ASSERT(un->un_blk_lim.lim_max_unmap_lba_cnt != 0);
+	ASSERT(un->un_blk_lim.lim_max_unmap_descr_cnt != 0);
+	/* Spec says 0xffffffff are special values, so compute maximums. */
+	byte_cnt_lim = lim->lim_max_unmap_lba_cnt < UINT32_MAX ?
+	    (uint64_t)lim->lim_max_unmap_lba_cnt * un->un_tgt_blocksize :
+	    UINT64_MAX;
+	descr_cnt_lim = MIN(lim->lim_max_unmap_descr_cnt, SD_UNMAP_MAX_DESCR);
 
 	for (size_t i = 0; i < dfl->dfl_num_exts; i++) {
 		const dkioc_free_list_ext_t *ext = &dfl->dfl_exts[i];
@@ -22254,62 +22281,68 @@ sd_send_scsi_UNMAP_issue(dev_t dev, sd_ssc_t *ssc, const dkioc_free_list_t *dfl)
 
 		while (ext_length > 0) {
 			unmap_blk_descr_t *ubd;
-			/* Respect device limit on LBA count per descriptor */
-			uint64_t len = MIN(ext_length,
-			    SD_TGTBLOCKS2BYTES(un, lim->lim_max_unmap_lba_cnt));
-
-			ASSERT(num_exts < SD_UNMAP_MAX_EXTENTS);
-			ubd = (unmap_blk_descr_t *)((uint8_t *)uph +
-			    sizeof (*uph) + (sizeof (*ubd) * num_exts));
+			/* Respect device limit on LBA count per command */
+			uint64_t len = MIN(MIN(ext_length, byte_cnt_lim -
+			    bytes_issued), SD_TGTBLOCKS2BYTES(un, UINT32_MAX));
 
 			/* check partition limits */
-			if (SD_BYTES2TGTBLOCKS(un, ext_start) +
-			    SD_BYTES2TGTBLOCKS(un, len) > part_tgtblks) {
+			if (ext_start + len > part_len) {
 				rval = SET_ERROR(EINVAL);
 				goto out;
 			}
-
 #ifdef	DEBUG
 			if (dfl->dfl_ck_func)
 				dfl->dfl_ck_func(dfl->dfl_offset + ext_start,
 				    len, dfl->dfl_ck_arg);
 #endif
+			ASSERT3U(descr_issued, <, descr_cnt_lim);
+			ASSERT3U(bytes_issued, <, byte_cnt_lim);
+			ubd = UNMAP_blk_descr_i(uph, descr_issued);
 
 			/* adjust in-partition addresses to be device-global */
 			ubd->ubd_lba = BE_64(SD_BYTES2TGTBLOCKS(un,
-			    dfl->dfl_offset + ext_start) + part_off_tgtblks);
+			    dfl->dfl_offset + ext_start + part_off));
 			ubd->ubd_lba_cnt = BE_32(SD_BYTES2TGTBLOCKS(un, len));
-			num_exts++;
 
-			/* Respect limit on number of block descriptors */
-			if (num_exts >= lim->lim_max_unmap_descr_cnt) {
+			descr_issued++;
+			bytes_issued += len;
+
+			/* Issue command when device limits reached */
+			if (descr_issued == descr_cnt_lim ||
+			    bytes_issued == byte_cnt_lim) {
 				rval = sd_send_scsi_UNMAP_issue_one(ssc, uph,
-				    num_exts, bytes);
+				    descr_issued, bytes_issued);
 				if (rval != 0)
 					goto out;
-				num_exts = 0;
-				bytes = 0;
+				descr_issued = 0;
+				bytes_issued = 0;
 			}
 
 			ext_start += len;
 			ext_length -= len;
-			bytes += len;
 		}
 	}
 
-	if (num_exts > 0) {
+	if (descr_issued > 0) {
 		/* issue last command */
-		rval = sd_send_scsi_UNMAP_issue_one(ssc, uph, num_exts, bytes);
+		rval = sd_send_scsi_UNMAP_issue_one(ssc, uph, descr_issued,
+		    bytes_issued);
 	}
 
 out:
-	kmem_free(zero_buf, zero_buf_len);
-
-	kmem_free(uph, sizeof (unmap_param_hdr_t) +
-	    SD_UNMAP_MAX_EXTENTS * sizeof (unmap_blk_descr_t));
+	kmem_free(uph, SD_UNMAP_PARAM_LIST_MAXSZ);
 	return (rval);
 }
 
+/*
+ * Issues one or several UNMAP commands based on a list of extents to be
+ * unmapped. The internal multi-command processing is hidden, as the exact
+ * number of commands and extents per command is limited by both SCSI
+ * command syntax and device limits (as expressed in the SCSI Block Limits
+ * VPD page and un_blk_lim in struct sd_lun).
+ * Returns zero on success, or the error code of the first failed SCSI UNMAP
+ * command.
+ */
 static int
 sd_send_scsi_UNMAP(dev_t dev, sd_ssc_t *ssc, dkioc_free_list_t *dfl, int flag)
 {
@@ -22319,8 +22352,10 @@ sd_send_scsi_UNMAP(dev_t dev, sd_ssc_t *ssc, dkioc_free_list_t *dfl, int flag)
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 	ASSERT(dfl != NULL);
 
-	if (!(un->un_thin_flags & SD_THIN_PROV_ENABLED)) {
-		/* SCSI UNMAP is not supported */
+	/* Per spec, any of these conditions signals lack of UNMAP support. */
+	if (!(un->un_thin_flags & SD_THIN_PROV_ENABLED) ||
+	    un->un_blk_lim.lim_max_unmap_descr_cnt == 0 ||
+	    un->un_blk_lim.lim_max_unmap_lba_cnt == 0) {
 		return (SET_ERROR(ENOTSUP));
 	}
 
