@@ -211,7 +211,6 @@ unsigned int zfs_txgs_per_trim = 32;
 static void metaslab_trim_remove(void *arg, uint64_t offset, uint64_t size);
 static void metaslab_trim_add(void *arg, uint64_t offset, uint64_t size);
 
-static void metaslab_auto_trim(metaslab_t *msp, uint64_t txg);
 static zio_t *metaslab_exec_trim(metaslab_t *msp);
 
 static metaslab_trimset_t *metaslab_new_trimset(uint64_t txg, kmutex_t *lock);
@@ -707,7 +706,6 @@ metaslab_group_add(metaslab_group_t *mg, metaslab_t *msp)
 	msp->ms_group = mg;
 	msp->ms_weight = 0;
 	avl_add(&mg->mg_metaslab_tree, msp);
-	mg->mg_metaslab_tree_dirty = B_TRUE;
 	mutex_exit(&mg->mg_lock);
 
 	mutex_enter(&msp->ms_lock);
@@ -725,7 +723,6 @@ metaslab_group_remove(metaslab_group_t *mg, metaslab_t *msp)
 	mutex_enter(&mg->mg_lock);
 	ASSERT(msp->ms_group == mg);
 	avl_remove(&mg->mg_metaslab_tree, msp);
-	mg->mg_metaslab_tree_dirty = B_TRUE;
 	msp->ms_group = NULL;
 	mutex_exit(&mg->mg_lock);
 }
@@ -745,7 +742,6 @@ metaslab_group_sort(metaslab_group_t *mg, metaslab_t *msp, uint64_t weight)
 	avl_remove(&mg->mg_metaslab_tree, msp);
 	msp->ms_weight = weight;
 	avl_add(&mg->mg_metaslab_tree, msp);
-	mg->mg_metaslab_tree_dirty = B_TRUE;
 	mutex_exit(&mg->mg_lock);
 }
 
@@ -1305,18 +1301,7 @@ metaslab_init(metaslab_group_t *mg, uint64_t id, uint64_t object, uint64_t txg,
 		ASSERT(ms->ms_sm != NULL);
 	}
 
-	/*
-	 * Since we typically have hundreds of metaslabs per vdev, but we only
-	 * trim them once every zfs_txgs_per_trim txgs, it'd be best if we
-	 * could sequence the TRIM commands from all metaslabs so that they
-	 * don't all always pound the device in the same txg. We do so by
-	 * artificially inflating the birth txg of the first trim set by a
-	 * sequence number derived from the metaslab's starting offset
-	 * (modulo zfs_txgs_per_trim). Thus, for the default 200 metaslabs and
-	 * 32 txgs per trim, we'll only be trimming ~6.25 metaslabs per txg.
-	 */
-	ms->ms_cur_ts = metaslab_new_trimset(txg +
-	    (ms->ms_start / ms->ms_size) % zfs_txgs_per_trim, &ms->ms_lock);
+	ms->ms_cur_ts = metaslab_new_trimset(0, &ms->ms_lock);
 
 	/*
 	 * We create the main range tree here, but we don't create the
@@ -1689,8 +1674,8 @@ metaslab_group_preload(metaslab_group_t *mg)
 		 * less than optimal one.
 		 */
 		mutex_exit(&mg->mg_lock);
-		VERIFY(taskq_dispatch(mg->mg_taskq, metaslab_preload,
-		    msp, TQ_SLEEP) != NULL);
+		(void) taskq_dispatch(mg->mg_taskq, metaslab_preload,
+		    msp, TQ_SLEEP);
 		mutex_enter(&mg->mg_lock);
 		msp = msp_next;
 	}
@@ -1983,8 +1968,6 @@ metaslab_sync(metaslab_t *msp, uint64_t txg)
 
 	ASSERT0(range_tree_space(msp->ms_alloctree[txg & TXG_MASK]));
 	ASSERT0(range_tree_space(msp->ms_freetree[txg & TXG_MASK]));
-
-	metaslab_auto_trim(msp, txg);
 
 	mutex_exit(&msp->ms_lock);
 
@@ -2820,7 +2803,6 @@ metaslab_trim_all(metaslab_t *msp, uint64_t *delta)
 {
 	boolean_t was_loaded;
 	uint64_t trimmed_space;
-	uint64_t open_txg;
 	zio_t *trim_io;
 	spa_t *spa = msp->ms_group->mg_class->mc_spa;
 
@@ -2828,7 +2810,6 @@ metaslab_trim_all(metaslab_t *msp, uint64_t *delta)
 	    SCL_TRIM_ALL);
 	ASSERT(!MUTEX_HELD(&msp->ms_group->mg_lock));
 
-	open_txg = spa_syncing_txg(msp->ms_group->mg_class->mc_spa) + 1;
 	mutex_enter(&msp->ms_lock);
 
 	while (msp->ms_loading)
@@ -2849,7 +2830,7 @@ metaslab_trim_all(metaslab_t *msp, uint64_t *delta)
 	if (msp->ms_prev_ts != NULL)
 		metaslab_free_trimset(msp->ms_prev_ts);
 	msp->ms_prev_ts = msp->ms_cur_ts;
-	msp->ms_cur_ts = metaslab_new_trimset(open_txg, &msp->ms_lock);
+	msp->ms_cur_ts = metaslab_new_trimset(0, &msp->ms_lock);
 	trimmed_space = range_tree_space(msp->ms_tree);
 	if (!was_loaded)
 		metaslab_unload(msp);
@@ -2895,43 +2876,63 @@ metaslab_trim_add(void *arg, uint64_t offset, uint64_t size)
  * called from metaslab_sync, with the txg number of the txg. This function
  * issues trims in intervals as dictated by the zfs_txgs_per_trim tunable.
  */
-static void
+void
 metaslab_auto_trim(metaslab_t *msp, uint64_t txg)
 {
-	ASSERT(MUTEX_HELD(&msp->ms_lock));
-	spa_t *spa = msp->ms_group->mg_class->mc_spa;
+	/* for atomicity */
+	uint64_t txgs_per_trim = zfs_txgs_per_trim;
 
-	/* Is it time to swap out the current and previous trimsets? */
-	if (txg > msp->ms_cur_ts->ts_birth &&
-	    txg - msp->ms_cur_ts->ts_birth >= zfs_txgs_per_trim) {
+	ASSERT(!MUTEX_HELD(&msp->ms_lock));
+	mutex_enter(&msp->ms_lock);
+
+	/*
+	 * Since we typically have hundreds of metaslabs per vdev, but we only
+	 * trim them once every zfs_txgs_per_trim txgs, it'd be best if we
+	 * could sequence the TRIM commands from all metaslabs so that they
+	 * don't all always pound the device in the same txg. We do so by
+	 * artificially inflating the birth txg of the first trim set by a
+	 * sequence number derived from the metaslab's starting offset
+	 * (modulo zfs_txgs_per_trim). Thus, for the default 200 metaslabs and
+	 * 32 txgs per trim, we'll only be trimming ~6.25 metaslabs per txg.
+	 *
+	 * If we detect that the txg has advanced too far ahead of ts_birth,
+	 * it means our birth txg is out of lockstep. Recompute it by
+	 * rounding down to the nearest zfs_txgs_per_trim multiple and adding
+	 * our metaslab id modulo zfs_txgs_per_trim.
+	 */
+	if (txg > msp->ms_cur_ts->ts_birth + txgs_per_trim) {
+		msp->ms_cur_ts->ts_birth = (txg / txgs_per_trim) *
+		    txgs_per_trim + (msp->ms_id % txgs_per_trim);
+	}
+
+	/* Time to swap out the current and previous trimsets */
+	if (txg == msp->ms_cur_ts->ts_birth + txgs_per_trim) {
 		if (msp->ms_prev_ts != NULL) {
-			if (msp->ms_trimming_ts != NULL ||
-			    spa_get_auto_trim(spa) == SPA_AUTO_TRIM_OFF) {
+			if (msp->ms_trimming_ts != NULL) {
 				/*
 				 * The previous trim run is still ongoing, so
 				 * the device is reacting slowly to our trim
 				 * requests. Drop this trimset, so as not to
 				 * back the device up with trim requests.
-				 * Or maybe autotrim is turned off.
 				 */
 				metaslab_free_trimset(msp->ms_prev_ts);
 			} else {
-				spa_t *spa = msp->ms_group->mg_class->mc_spa;
 				/*
 				 * Trim out aged extents on the vdevs - these
 				 * are safe to be destroyed now. We'll keep
 				 * the trimset around to deny allocations from
 				 * these regions while the trims are ongoing.
 				 */
-				spa_config_enter(spa, SCL_TRIM_ALL, FTAG,
-				    RW_READER);
+				spa_t *spa = msp->ms_group->mg_class->mc_spa;
+				ASSERT(spa_config_held(spa, SCL_TRIM_ALL,
+				    RW_READER));
 				zio_nowait(metaslab_exec_trim(msp));
-				spa_config_exit(spa, SCL_TRIM_ALL, FTAG);
 			}
 		}
 		msp->ms_prev_ts = msp->ms_cur_ts;
 		msp->ms_cur_ts = metaslab_new_trimset(txg, &msp->ms_lock);
 	}
+	mutex_exit(&msp->ms_lock);
 }
 
 static void

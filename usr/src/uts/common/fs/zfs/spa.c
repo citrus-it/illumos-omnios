@@ -2817,6 +2817,8 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		    &spa->spa_dedup_ditto);
 		spa_prop_find(spa, ZPOOL_PROP_FORCETRIM, &spa->spa_force_trim);
 		spa_prop_find(spa, ZPOOL_PROP_AUTOTRIM, &spa->spa_auto_trim);
+		if (spa->spa_auto_trim == SPA_AUTO_TRIM_ON)
+			spa_auto_trim_taskq_create(spa);
 
 		spa_prop_find(spa, ZPOOL_PROP_HIWATERMARK, &spa->spa_hiwat);
 		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
@@ -3966,6 +3968,8 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	    zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_HI_BEST_EFFORT);
 	spa->spa_force_trim = zpool_prop_default_numeric(ZPOOL_PROP_FORCETRIM);
 	spa->spa_auto_trim = zpool_prop_default_numeric(ZPOOL_PROP_AUTOTRIM);
+	if (spa->spa_auto_trim == SPA_AUTO_TRIM_ON)
+		spa_auto_trim_taskq_create(spa);
 
 	mp->spa_enable_meta_placement_selection =
 	    zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
@@ -6584,7 +6588,14 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 				spa->spa_force_trim = intval;
 				break;
 			case ZPOOL_PROP_AUTOTRIM:
-				spa->spa_auto_trim = intval;
+				if (intval != spa->spa_auto_trim) {
+					spa->spa_auto_trim = intval;
+					if (intval)
+						spa_auto_trim_taskq_create(spa);
+					else
+						spa_auto_trim_taskq_destroy(
+						    spa);
+				}
 				break;
 			case ZPOOL_PROP_AUTOEXPAND:
 				spa->spa_autoexpand = intval;
@@ -6705,6 +6716,25 @@ spa_sync_upgrades(spa_t *spa, dmu_tx_t *tx)
 }
 
 /*
+ * Dispatches all auto-trim processing to all top-level vdevs. This is
+ * called from spa_sync once every txg.
+ */
+static void
+spa_auto_trim_dispatch(spa_t *spa, uint64_t txg)
+{
+	ASSERT(spa->spa_auto_trim_taskq != NULL);
+	for (uint64_t i = 0; i < spa->spa_root_vdev->vdev_children; i++) {
+		vdev_auto_trim_info_t *vati = kmem_zalloc(sizeof (*vati),
+		    KM_SLEEP);
+		vati->vati_vdev = spa->spa_root_vdev->vdev_child[i];
+		vati->vati_txg = txg;
+		spa_config_enter(spa, SCL_TRIM_ALL, vati, RW_READER);
+		(void) taskq_dispatch(spa->spa_auto_trim_taskq,
+		    (void (*)(void *))vdev_auto_trim, vati, TQ_SLEEP);
+	}
+}
+
+/*
  * Sync the specified transaction group.  New blocks may be dirtied as
  * part of the process, so we iterate until it converges.
  */
@@ -6816,6 +6846,9 @@ spa_sync(spa_t *spa, uint64_t txg)
 
 		ddt_sync(spa, txg);
 		dsl_scan_sync(dp, tx);
+
+		if (pass == 1 && spa->spa_auto_trim == SPA_AUTO_TRIM_ON)
+			spa_auto_trim_dispatch(spa, txg);
 
 		while (vd = txg_list_remove(&spa->spa_vdev_txg_list, txg))
 			vdev_sync(vd, txg);

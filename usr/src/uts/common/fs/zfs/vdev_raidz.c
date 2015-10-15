@@ -2497,6 +2497,24 @@ vdev_raidz_state_change(vdev_t *vd, int faulted, int degraded)
 		vdev_set_state(vd, B_FALSE, VDEV_STATE_HEALTHY, VDEV_AUX_NONE);
 }
 
+static inline void
+vdev_raidz_trim_append_rc(dkioc_free_list_t *dfl, uint64_t *num_extsp,
+    const raidz_col_t *rc)
+{
+	uint64_t num_exts = *num_extsp;
+	ASSERT(rc->rc_size != 0);
+
+	if (dfl->dfl_num_exts > 0 &&
+	    dfl->dfl_exts[num_exts - 1].dfle_start +
+	    dfl->dfl_exts[num_exts - 1].dfle_length == rc->rc_offset) {
+		dfl->dfl_exts[num_exts - 1].dfle_length += rc->rc_size;
+	} else {
+		dfl->dfl_exts[num_exts].dfle_start = rc->rc_offset;
+		dfl->dfl_exts[num_exts].dfle_length = rc->rc_size;
+		(*num_extsp)++;
+	}
+}
+
 /*
  * Processes a trim for a raidz vdev.
  */
@@ -2504,14 +2522,23 @@ static void
 vdev_raidz_trim(vdev_t *vd, zio_t *pio, void *trim_exts)
 {
 	dkioc_free_list_t *dfl = trim_exts;
-	dkioc_free_list_t **sub_dfl;
+	dkioc_free_list_t **sub_dfls;
+	uint64_t *sub_dfls_num_exts;
 
-	sub_dfl = kmem_zalloc(sizeof (*sub_dfl) * vd->vdev_children, KM_SLEEP);
+	sub_dfls = kmem_zalloc(sizeof (*sub_dfls) * vd->vdev_children,
+	    KM_SLEEP);
+	sub_dfls_num_exts = kmem_zalloc(sizeof (uint64_t) * vd->vdev_children,
+	    KM_SLEEP);
 	for (int i = 0; i < vd->vdev_children; i++) {
-		sub_dfl[i] = kmem_zalloc(DFL_SZ(dfl->dfl_num_exts), KM_SLEEP);
-		sub_dfl[i]->dfl_flags = dfl->dfl_flags;
-		sub_dfl[i]->dfl_num_exts = dfl->dfl_num_exts;
-		sub_dfl[i]->dfl_offset = dfl->dfl_offset;
+		/*
+		 * We might over-allocate here, because the sub-lists can never
+		 * be longer than the parent list, but they can be shorter.
+		 * The underlying driver will discard zero-length extents.
+		 */
+		sub_dfls[i] = kmem_zalloc(DFL_SZ(dfl->dfl_num_exts), KM_SLEEP);
+		sub_dfls[i]->dfl_num_exts = dfl->dfl_num_exts;
+		sub_dfls[i]->dfl_flags = dfl->dfl_flags;
+		sub_dfls[i]->dfl_offset = dfl->dfl_offset;
 		/* don't copy the check func, because it isn't raidz-aware */
 	}
 
@@ -2528,20 +2555,9 @@ vdev_raidz_trim(vdev_t *vd, zio_t *pio, void *trim_exts)
 		    vd->vdev_nparity, B_FALSE);
 
 		for (uint64_t j = 0; j < rm->rm_cols; j++) {
-			const raidz_col_t *rc = &rm->rm_col[j];
-
-			sub_dfl[rc->rc_devidx]->dfl_exts[i].dfle_start =
-			    rc->rc_offset;
-			sub_dfl[rc->rc_devidx]->dfl_exts[i].dfle_length =
-			    rc->rc_size;
-			ASSERT(rc->rc_size != 0);
-			/*
-			 * Actual number of extents required to be trimmed on
-			 * each component device may be smaller (but not
-			 * larger!) than the total number of extents in the
-			 * original list. This is OK, as the underlying driver
-			 * will ignore zero-length extents.
-			 */
+			uint64_t devidx = rm->rm_col[j].rc_devidx;
+			vdev_raidz_trim_append_rc(sub_dfls[devidx],
+			    &sub_dfls_num_exts[devidx], &rm->rm_col[j]);
 		}
 		vdev_raidz_map_free(rm);
 	}
@@ -2550,17 +2566,18 @@ vdev_raidz_trim(vdev_t *vd, zio_t *pio, void *trim_exts)
 	 * Issue the component ioctls as children of the parent zio.
 	 */
 	for (int i = 0; i < vd->vdev_children; i++) {
-		if (sub_dfl[i]->dfl_num_exts != 0) {
+		if (sub_dfls_num_exts[i] != 0) {
 			zio_nowait(zio_ioctl(pio, vd->vdev_child[i]->vdev_spa,
 			    vd->vdev_child[i], DKIOCFREE,
-			    vdev_raidz_trim_done, sub_dfl[i],
+			    vdev_raidz_trim_done, sub_dfls[i],
 			    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_PROPAGATE |
 			    ZIO_FLAG_DONT_RETRY));
 		} else {
-			dfl_free(sub_dfl[i]);
+			dfl_free(sub_dfls[i]);
 		}
 	}
-	kmem_free(sub_dfl, sizeof (*sub_dfl) * vd->vdev_children);
+	kmem_free(sub_dfls, sizeof (*sub_dfls) * vd->vdev_children);
+	kmem_free(sub_dfls_num_exts, sizeof (uint64_t) * vd->vdev_children);
 }
 
 /*

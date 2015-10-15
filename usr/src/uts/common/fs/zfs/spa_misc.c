@@ -2310,3 +2310,22 @@ spa_trimstats_update(spa_t *spa, uint64_t extents, uint64_t bytes,
 		    bytes_skipped);
 	}
 }
+
+void
+spa_auto_trim_taskq_create(spa_t *spa)
+{
+	char name[MAXPATHLEN];
+
+	ASSERT3P(spa->spa_auto_trim_taskq, ==, NULL);
+	(void) snprintf(name, sizeof (name), "%s_auto_trim", spa->spa_name);
+	spa->spa_auto_trim_taskq = taskq_create(name, 1, minclsyspri, 1,
+	    spa->spa_root_vdev->vdev_children, TASKQ_DYNAMIC);
+}
+
+void
+spa_auto_trim_taskq_destroy(spa_t *spa)
+{
+	ASSERT(spa->spa_auto_trim_taskq != NULL);
+	taskq_destroy(spa->spa_auto_trim_taskq);
+	spa->spa_auto_trim_taskq = NULL;
+}
