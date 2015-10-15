@@ -102,6 +102,8 @@ krrp_pdu_engine_create(krrp_pdu_engine_t **result_engine, boolean_t ctrl,
 	engine->max_pdu_cnt = (max_memory * 1024 * 1024) /
 	    total_dblk_sz / engine->dblks_per_pdu;
 
+	engine->pdu_data_sz = dblk_data_sz * engine->dblks_per_pdu;
+
 	max_dblk_cnt = engine->max_pdu_cnt * engine->dblks_per_pdu;
 	rc = krrp_dblk_engine_create(&engine->dblk_engine, prealloc,
 	    max_dblk_cnt, dblk_head_sz, dblk_data_sz,
@@ -195,6 +197,24 @@ out:
 		engine->notify_free.cb(engine->notify_free.cb_arg, value);
 
 	mutex_exit(&engine->mtx);
+}
+
+size_t
+krrp_pdu_engine_get_free_mem(krrp_pdu_engine_t *pdu_engine)
+{
+	size_t free_pdus;
+
+	/*
+	 * Mutex is not required here, because this
+	 * function is called from zfs-send context,
+	 * that does allocation of PDUs.
+	 *
+	 * Without mutex sometimes free mem may be less
+	 * than it actually is, but this is noncritical.
+	 */
+	free_pdus = pdu_engine->max_pdu_cnt - pdu_engine->cur_pdu_cnt;
+
+	return (pdu_engine->pdu_data_sz * free_pdus);
 }
 
 void

@@ -52,6 +52,9 @@ typedef struct krrp_stream_te_s {
 	boolean_t				embedded;
 	nvlist_t				*ignore_props_list;
 	nvlist_t				*replace_props_list;
+
+	krrp_check_enough_mem	*mem_check_cb;
+	void					*mem_check_cb_arg;
 } krrp_stream_te_t;
 
 typedef struct krrp_stream_task_s krrp_stream_task_t;
@@ -88,7 +91,9 @@ struct krrp_stream_task_s {
 int krrp_stream_te_read_create(krrp_stream_te_t **result_te,
     const char *dataset, boolean_t include_all_snaps,
     boolean_t recursive, boolean_t send_props,
-    boolean_t enable_cksum, boolean_t embedded, krrp_error_t *error);
+    boolean_t enable_cksum, boolean_t embedded,
+    krrp_check_enough_mem *mem_check_cb, void *mem_check_cb_arg,
+    krrp_error_t *error);
 int krrp_stream_te_write_create(krrp_stream_te_t **result_te,
     const char *dataset, boolean_t force_receive,
     boolean_t enable_cksum, nvlist_t *ignore_props_list,

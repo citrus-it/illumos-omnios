@@ -70,6 +70,7 @@ typedef struct krrp_pdu_engine_s {
 
 	krrp_dblk_engine_t	*dblk_engine;
 	size_t				dblks_per_pdu;
+	size_t				pdu_data_sz;
 } krrp_pdu_engine_t;
 
 typedef struct krrp_hdr_s {
@@ -154,6 +155,8 @@ void krrp_pdu_engine_register_callback(krrp_pdu_engine_t *engine,
     krrp_pdu_free_notify_cb_t *notify_cb, void *notify_cb_arg);
 void krrp_pdu_engine_force_notify(krrp_pdu_engine_t *engine,
     boolean_t initial);
+
+size_t krrp_pdu_engine_get_free_mem(krrp_pdu_engine_t *pdu_engine);
 
 void krrp_pdu_alloc(krrp_pdu_engine_t *, krrp_pdu_t **, boolean_t);
 void krrp_pdu_rele(krrp_pdu_t *);

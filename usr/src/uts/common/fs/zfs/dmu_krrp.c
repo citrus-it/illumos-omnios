@@ -69,10 +69,28 @@ int
 dmu_krrp_arc_bypass(void *buf, int len, void *arg)
 {
 	dmu_krrp_arc_bypass_t *bypass = arg;
-	if (bypass->krrp_task->buffer_args.force_cksum)
+	dmu_krrp_task_t *task = bypass->krrp_task;
+	kreplication_zfs_args_t *buffer_args = &task->buffer_args;
+
+	if (buffer_args->mem_check_cb != NULL) {
+		/*
+		 * ARC holds the target buffer while
+		 * we read it, so to exclude deadlock need
+		 * to be sure that we have enough memory to
+		 * completely read the buffer without waiting
+		 * for free of required memory space
+		 */
+		boolean_t zero_copy_ready =
+		    buffer_args->mem_check_cb(len,
+		    buffer_args->mem_check_cb_arg);
+		if (!zero_copy_ready)
+			return (ENODATA);
+	}
+
+	if (buffer_args->force_cksum)
 		fletcher_4_incremental_native(buf, len, bypass->zc);
 	DTRACE_PROBE(arc_bypass_send);
-	return (bypass->cb(buf, len, bypass->krrp_task));
+	return (bypass->cb(buf, len, task));
 }
 
 /*

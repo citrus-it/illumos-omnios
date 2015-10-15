@@ -62,6 +62,7 @@ krrp_stream_te_read_create(krrp_stream_te_t **result_te,
     const char *dataset, boolean_t include_all_snaps,
     boolean_t recursive, boolean_t send_props,
     boolean_t enable_cksum, boolean_t embedded,
+	krrp_check_enough_mem *mem_check_cb, void *mem_check_cb_arg,
     krrp_error_t *error)
 {
 	int rc;
@@ -81,6 +82,8 @@ krrp_stream_te_read_create(krrp_stream_te_t **result_te,
 	task_engine->enable_cksum = enable_cksum;
 	task_engine->embedded = embedded;
 	task_engine->incremental_package = include_all_snaps;
+	task_engine->mem_check_cb = mem_check_cb;
+	task_engine->mem_check_cb_arg = mem_check_cb_arg;
 
 	return (0);
 }
@@ -374,6 +377,11 @@ krrp_stream_task_constructor(void *opaque_task,
 			task->process = &krrp_stream_task_read_handler;
 			task->start = &krrp_stream_task_read_start;
 			task->shutdown = &krrp_stream_task_common_stop;
+
+			task->zargs.mem_check_cb =
+			    task_engine->mem_check_cb;
+			task->zargs.mem_check_cb_arg =
+			    task_engine->mem_check_cb_arg;
 		}
 
 		break;

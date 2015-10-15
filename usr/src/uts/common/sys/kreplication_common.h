@@ -12,6 +12,12 @@ extern "C" {
 #include <sys/param.h>
 #include <sys/nvpair.h>
 
+/*
+ * This callback is used by send-side to decide what will be used:
+ * zero-copy ARC-read or regular ARC-read
+ */
+typedef boolean_t krrp_check_enough_mem(size_t, void *);
+
 typedef struct kreplication_buffer_s {
 	void	*data;
 	size_t	buffer_size;
@@ -47,6 +53,8 @@ typedef struct kreplication_zfs_args {
 	boolean_t force_cksum;
 	boolean_t embedok;
 	void *stream_handler;
+	krrp_check_enough_mem *mem_check_cb;
+	void *mem_check_cb_arg;
 } kreplication_zfs_args_t;
 
 typedef enum {

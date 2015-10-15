@@ -58,6 +58,9 @@ static int krrp_stream_validate_run(krrp_stream_t *stream,
 static uint64_t krrp_stream_get_snap_txg(krrp_stream_t *stream,
     const char *short_snap_name);
 
+static boolean_t
+krrp_stream_check_mem(size_t required_mem, void *void_stream);
+
 #if 0
 static void krrp_stream_debug(const char *, void *, void *, void *, void *);
 #endif
@@ -140,7 +143,8 @@ krrp_stream_read_create(krrp_stream_t **result_stream,
 
 	rc = krrp_stream_te_read_create(&stream->task_engine,
 	    stream->dataset, include_all_snaps, stream->recursive,
-	    send_props, enable_cksum, embedded, error);
+	    send_props, enable_cksum, embedded, &krrp_stream_check_mem,
+	    stream, error);
 	if (rc != 0)
 		goto err;
 
@@ -307,6 +311,19 @@ krrp_stream_destroy(krrp_stream_t *stream)
 	mutex_destroy(&stream->mtx);
 
 	kmem_free(stream, sizeof (krrp_stream_t));
+}
+
+static boolean_t
+krrp_stream_check_mem(size_t required_mem, void *void_stream)
+{
+	krrp_stream_t *stream = void_stream;
+	size_t available_mem =
+	    krrp_pdu_engine_get_free_mem(stream->data_pdu_engine);
+
+	if (available_mem < required_mem)
+		return (B_FALSE);
+
+	return (B_TRUE);
 }
 
 void

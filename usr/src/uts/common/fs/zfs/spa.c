@@ -1078,7 +1078,7 @@ spa_create_krrp_taskq(spa_t *spa)
 	(void) strcat(name, "_zfs_krrp");
 
 	spa->spa_krrp_taskq =
-	    taskq_create(name, 2, minclsyspri, 2, 4, TASKQ_DYNAMIC);
+	    taskq_create(name, 2, minclsyspri, 2, 4, TASKQ_PREPOPULATE);
 }
 
 taskqid_t
