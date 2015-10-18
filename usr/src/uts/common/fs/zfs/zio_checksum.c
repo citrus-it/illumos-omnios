@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2013 Saso Kiselkov. All rights reserved.
@@ -257,7 +257,7 @@ zio_checksum_template_init(enum zio_checksum checksum, spa_t *spa)
  */
 int
 zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
-	void *data, uint64_t size, int can_accumulate)
+    void *data, uint64_t size, int can_accumulate)
 {
 	blkptr_t *bp = zio->io_bp;
 	uint64_t offset = zio->io_offset;
