@@ -707,8 +707,26 @@ andx_more:
 		goto report_error;
 	}
 
-	atomic_add_64(&sds->sdt_rxb,
-	    (int64_t)(sr->smb_wct * 2 + sr->smb_bcc + 1));
+	/* Record rx bytes per:  server, session & kshare. */
+	{
+		int64_t	 rxb;
+		smb_disp_stats_t	*client_sds;	/* session */
+		smb_disp_stats_t	*share_sds;	/* kshare */
+
+		rxb = (int64_t)(sr->smb_wct * 2 + sr->smb_bcc + 1);
+
+		atomic_add_64(&sds->sdt_rxb, rxb);
+
+		client_sds = &session->s_stats;
+		atomic_add_64(&client_sds->sdt_rxb, rxb);
+
+		if ((sr->tid_tree != NULL) &&
+		    (sr->tid_tree->t_kshare != NULL)) {
+			share_sds = &sr->tid_tree->t_kshare->shr_stats;
+			atomic_add_64(&share_sds->sdt_rxb, rxb);
+		}
+	}
+
 	sr->sr_txb = sr->reply.chain_offset;
 
 	/*
@@ -800,10 +818,31 @@ andx_more:
 		(*sdd->sdt_post_op)(sr);
 		smbsr_cleanup(sr);
 	}
-	smb_latency_add_sample(&sds->sdt_lat, gethrtime() - sr->sr_time_start);
 
-	atomic_add_64(&sds->sdt_txb,
-	    (int64_t)(sr->reply.chain_offset - sr->sr_txb));
+	/* Record latency and tx bytes per:  server, session & kshare. */
+	{
+		hrtime_t	dt;
+		int64_t	 txb;
+		smb_disp_stats_t	*client_sds;	/* session */
+		smb_disp_stats_t	*share_sds;  /* kshare */
+
+		dt = gethrtime() - sr->sr_time_start;
+		txb = (int64_t)(sr->reply.chain_offset - sr->sr_txb);
+
+		smb_latency_add_sample(&sds->sdt_lat, dt);
+		atomic_add_64(&sds->sdt_txb, txb);
+
+		client_sds = &session->s_stats;
+		smb_latency_add_sample(&client_sds->sdt_lat, dt);
+		atomic_add_64(&client_sds->sdt_txb, txb);
+
+		if ((sr->tid_tree != NULL) &&
+		    (sr->tid_tree->t_kshare != NULL)) {
+			share_sds = &sr->tid_tree->t_kshare->shr_stats;
+			smb_latency_add_sample(&share_sds->sdt_lat, dt);
+			atomic_add_64(&share_sds->sdt_txb, txb);
+		}
+	}
 
 	switch (sdrc) {
 	case SDRC_SUCCESS:

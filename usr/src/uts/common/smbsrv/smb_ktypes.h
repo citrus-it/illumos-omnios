@@ -690,6 +690,8 @@ typedef struct smb_kshare {
 	char		*shr_access_rw;
 	avl_node_t	shr_link;
 	kmutex_t	shr_mutex;
+	kstat_t		*shr_ksp;
+	smb_disp_stats_t	shr_stats;
 } smb_kshare_t;
 
 
@@ -919,6 +921,8 @@ typedef struct smb_session {
 	int			outpipe_cookie;
 	smb_srqueue_t		*s_srqueue;
 	uint64_t		start_time;
+	kstat_t			*s_ksp;
+	smb_disp_stats_t	s_stats;
 	unsigned char		MAC_key[44];
 	char			ip_addr_str[INET6_ADDRSTRLEN];
 	char			clnt_uuid[16];
@@ -1028,6 +1032,7 @@ typedef struct smb_tree {
 	 */
 	smb_user_t		*t_owner;
 	smb_node_t		*t_snode;
+	smb_kshare_t		*t_kshare;
 
 	smb_llist_t		t_ofile_list;
 	smb_idpool_t		t_fid_pool;

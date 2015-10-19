@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -266,7 +266,18 @@ smb_tree_connect_core(smb_request_t *sr)
 		break;
 	}
 
-	smb_kshare_release(sr->sr_server, si);
+	/*
+	 * On return from smb_tree_connect_* sr->tid_tree is filled in
+	 * and valid for all share types.  We can't call smb_kshare_release
+	 * until we disconnect the tree or we will invalidate the reference
+	 * we have here.
+	 */
+	if (sr->tid_tree != NULL) {
+		sr->tid_tree->t_kshare = si;
+	} else {
+		smb_kshare_release(sr->sr_server, si);
+	}
+
 	sr->sr_tcon.si = NULL;
 
 	return (status);
@@ -306,6 +317,11 @@ smb_tree_disconnect(smb_tree_t *tree, boolean_t do_exec)
 		mutex_enter(&tree->t_mutex);
 		tree->t_state = SMB_TREE_STATE_DISCONNECTED;
 		smb_server_dec_trees(tree->t_server);
+	}
+
+	if (tree->t_kshare != NULL) {
+		smb_kshare_release(tree->t_server, tree->t_kshare);
+		tree->t_kshare = NULL;
 	}
 
 	mutex_exit(&tree->t_mutex);

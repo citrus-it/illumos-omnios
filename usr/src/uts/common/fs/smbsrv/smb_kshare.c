@@ -21,12 +21,13 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_door.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_ktypes.h>
+#include <smbsrv/smb_kstat.h>
 
 typedef struct smb_unshare {
 	list_node_t	us_lnd;
@@ -51,6 +52,9 @@ static int smb_kshare_export(smb_server_t *, smb_kshare_t *);
 static int smb_kshare_unexport(smb_server_t *, const char *);
 static int smb_kshare_export_trans(smb_server_t *, char *, char *, char *);
 static void smb_kshare_csc_flags(smb_kshare_t *, const char *);
+static int smb_kshare_kstat_update(kstat_t *, int);
+void kshare_stats_init(smb_server_t *, smb_kshare_t *);
+void kshare_stats_fini(smb_kshare_t *);
 
 static boolean_t smb_export_isready(smb_server_t *);
 
@@ -724,8 +728,91 @@ smb_kshare_export(smb_server_t *sv, smb_kshare_t *shr)
 		    shr->shr_name, shr->shr_path, rc);
 	}
 
+	kshare_stats_init(sv, shr);
+
 	VN_RELE(vp);
 	return (rc);
+}
+
+/*
+ * Following a pattern somewhat similar to smb_server_kstat_init,
+ * but organized a little differently.
+ */
+void
+kshare_stats_init(smb_server_t *sv, smb_kshare_t *ks)
+{
+	char			ks_name[KSTAT_STRLEN];
+	smb_kstat_req_t		*ksr;
+
+	/*
+	 * Create raw kstats for shares with a name composed as:
+	 *	sh/sharename	(always instance 0)
+	 * These will look like: smbsrv:0:sh/myshare
+	 */
+	(void) snprintf(ks_name, sizeof (ks_name), "sh/%s", ks->shr_name);
+
+	ks->shr_ksp = kstat_create_zone(SMBSRV_KSTAT_MODULE, 0,
+	    ks_name, SMBSRV_KSTAT_CLASS, KSTAT_TYPE_RAW,
+	    sizeof (smb_kstat_req_t), 0, sv->sv_zid);
+
+	if (ks->shr_ksp == NULL)
+		return;
+
+	ks->shr_ksp->ks_update = smb_kshare_kstat_update;
+	ks->shr_ksp->ks_private = ks;
+
+	/*
+	 * In-line equivalent of smb_dispatch_stats_init
+	 */
+	smb_latency_init(&ks->shr_stats.sdt_lat);
+	ksr = (smb_kstat_req_t *)ks->shr_ksp->ks_data;
+	(void) strlcpy(ksr->kr_name, ks_name, KSTAT_STRLEN);
+
+	kstat_install(ks->shr_ksp);
+}
+
+void
+kshare_stats_fini(smb_kshare_t *ks)
+{
+
+	smb_latency_destroy(&ks->shr_stats.sdt_lat);
+}
+
+/*
+ * Update the kstat data from our private stats.
+ */
+static int
+smb_kshare_kstat_update(kstat_t *ksp, int rw)
+{
+	smb_kshare_t *kshare;
+	smb_disp_stats_t *sds;
+	smb_kstat_req_t	*ksr;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	kshare = ksp->ks_private;
+	ASSERT(kshare->shr_magic == SMB_SHARE_MAGIC);
+	sds = &kshare->shr_stats;
+
+	ksr = (smb_kstat_req_t *)ksp->ks_data;
+
+	ksr->kr_rxb = sds->sdt_rxb;
+	ksr->kr_txb = sds->sdt_txb;
+	mutex_enter(&sds->sdt_lat.ly_mutex);
+	ksr->kr_nreq = sds->sdt_lat.ly_a_nreq;
+	ksr->kr_sum = sds->sdt_lat.ly_a_sum;
+	ksr->kr_a_mean = sds->sdt_lat.ly_a_mean;
+	ksr->kr_a_stddev = sds->sdt_lat.ly_a_stddev;
+	ksr->kr_d_mean = sds->sdt_lat.ly_d_mean;
+	ksr->kr_d_stddev = sds->sdt_lat.ly_d_stddev;
+	sds->sdt_lat.ly_d_mean = 0;
+	sds->sdt_lat.ly_d_nreq = 0;
+	sds->sdt_lat.ly_d_stddev = 0;
+	sds->sdt_lat.ly_d_sum = 0;
+	mutex_exit(&sds->sdt_lat.ly_mutex);
+
+	return (0);
 }
 
 /*
@@ -755,6 +842,12 @@ smb_kshare_unexport(smb_server_t *sv, const char *shrname)
 	key.shr_name = (char *)shrname;
 	if ((shr = smb_avl_lookup(share_avl, &key)) == NULL)
 		return (ENOENT);
+
+	if (shr->shr_ksp != NULL) {
+		kstat_delete(shr->shr_ksp);
+		shr->shr_ksp = NULL;
+		kshare_stats_fini(shr);
+	}
 
 	if ((shr->shr_flags & SMB_SHRF_AUTOHOME) != 0) {
 		mutex_enter(&shr->shr_mutex);
@@ -918,7 +1011,6 @@ smb_kshare_decode(nvlist_t *share)
 
 	if ((shr->shr_flags & SMB_SHRF_AUTOHOME) == SMB_SHRF_AUTOHOME)
 		shr->shr_autocnt = 1;
-
 	return (shr);
 }
 

@@ -144,6 +144,12 @@
 #define	SMBSRV_REQUESTS_FORMAT	\
 	"%30s  %02X   %3.0f  %1.3e  %1.3e  %1.3e  %1.3e  %1.3e\n"
 
+#define	SMBSRV_CLNT_SHARE_BANNER	\
+	"rbytes/s   tbytes/s     req/s     rt-mean   rt-stddev\n"
+#define	SMBSRV_CLNT_SHARE_FORMAT	\
+	"%1.3e  %1.3e  %1.3e  %1.3e  %1.3e\n"
+
+
 typedef enum {
 	CPU_TICKS_IDLE = 0,
 	CPU_TICKS_USER,
@@ -166,6 +172,12 @@ typedef struct smbstat_wrk_snapshot {
 	uint64_t	ws_maxthreads;
 	uint64_t	ws_bnalloc;
 } smbstat_wrk_snapshot_t;
+
+/* Per-Client or Per-Share statistics. */
+typedef struct smbstat_clsh_snapshot {
+	hrtime_t	cs_snaptime;
+	smb_kstat_req_t	cs_data;
+} smbstat_clsh_snapshot_t;
 
 typedef struct smbstat_req_info {
 	char		ri_name[KSTAT_STRLEN];
@@ -216,6 +228,10 @@ typedef struct smbstat_srv_info {
 	 */
 	smbstat_req_info_t	si_reqs1[SMB_COM_NUM];
 	smbstat_req_info_t	si_reqs2[SMB2__NCMDS];
+	/*
+	 * Latency & Throughput on specified client or share
+	 */
+	smbstat_req_info_t	si_clsh;
 } smbstat_srv_info_t;
 
 static void smbstat_init(void);
@@ -228,6 +244,7 @@ static void smbstat_print_counters(void);
 static void smbstat_print_throughput(void);
 static void smbstat_print_utilization(void);
 static void smbstat_print_requests(void);
+static void smbstat_print_client_or_share(void);
 
 static void smbstat_cpu_init(void);
 static void smbstat_cpu_fini(void);
@@ -241,6 +258,13 @@ static void smbstat_wrk_fini(void);
 static void smbstat_wrk_snapshot(void);
 static void smbstat_wrk_process(void);
 static smbstat_wrk_snapshot_t *smbstat_wrk_current_snapshot(void);
+
+static void smbstat_clsh_init(void);
+static void smbstat_clsh_fini(void);
+static void smbstat_clsh_snapshot(void);
+static void smbstat_clsh_process(void);
+static smbstat_clsh_snapshot_t *smbstat_clsh_current_snapshot(void);
+static smbstat_clsh_snapshot_t *smbstat_clsh_previous_snapshot(void);
 
 static void smbstat_srv_init(void);
 static void smbstat_srv_fini(void);
@@ -286,12 +310,16 @@ static boolean_t	smbstat_opt_u = B_FALSE;	/* utilization */
 static boolean_t	smbstat_opt_t = B_FALSE;	/* throughput */
 static boolean_t	smbstat_opt_r = B_FALSE;	/* requests */
 static boolean_t	smbstat_opt_z = B_FALSE;	/* non-zero requests */
+static boolean_t	smbstat_opt_C = B_FALSE;	/* per-client stats */
+static boolean_t	smbstat_opt_S = B_FALSE;	/* per-share stats */
+static char 		*smbstat_opt_clsh = NULL;	/* -C or -S arg. */
 
 static uint_t		smbstat_interval = 0;
 static long		smbstat_nrcpus = 0;
 static kstat_ctl_t	*smbstat_ksc = NULL;
 static kstat_t		*smbstat_srv_ksp = NULL;
 static kstat_t		*smbstat_wrk_ksp = NULL;
+static kstat_t		*smbstat_clsh_ksp = NULL;
 static struct winsize	smbstat_ws;
 static uint16_t		smbstat_rows = 0;
 
@@ -299,6 +327,7 @@ static int smbstat_snapshot_idx = 0;
 static smbstat_cpu_snapshot_t *smbstat_cpu_snapshots[SMBSTAT_SNAPSHOT_COUNT];
 static smbstat_srv_snapshot_t smbstat_srv_snapshots[SMBSTAT_SNAPSHOT_COUNT];
 static smbstat_wrk_snapshot_t smbstat_wrk_snapshots[SMBSTAT_SNAPSHOT_COUNT];
+static smbstat_clsh_snapshot_t smbstat_clsh_snapshots[SMBSTAT_SNAPSHOT_COUNT];
 static smbstat_srv_info_t smbstat_srv_info;
 
 /*
@@ -319,7 +348,7 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
-	while ((c = getopt(argc, argv, "achnrtuz")) != EOF) {
+	while ((c = getopt(argc, argv, "achnrtuzC:S:")) != EOF) {
 		switch (c) {
 		case 'a':
 			smbstat_opt_a = B_TRUE;
@@ -342,6 +371,16 @@ main(int argc, char *argv[])
 		case 'z':
 			smbstat_opt_z = B_TRUE;
 			break;
+		case 'C': /* per-client stats. */
+			smbstat_opt_S = B_FALSE;
+			smbstat_opt_C = B_TRUE;
+			smbstat_opt_clsh = optarg;
+			break;
+		case 'S': /* per-share stats. */
+			smbstat_opt_C = B_FALSE;
+			smbstat_opt_S = B_TRUE;
+			smbstat_opt_clsh = optarg;
+			break;
 		case 'h':
 			smbstat_usage(stdout, 0);
 		default:
@@ -352,7 +391,9 @@ main(int argc, char *argv[])
 	if (!smbstat_opt_u &&
 	    !smbstat_opt_c &&
 	    !smbstat_opt_r &&
-	    !smbstat_opt_t) {
+	    !smbstat_opt_t &&
+	    !smbstat_opt_C &&
+	    !smbstat_opt_S) {
 		/* Default options when none is specified. */
 		smbstat_opt_u = B_TRUE;
 		smbstat_opt_t = B_TRUE;
@@ -369,6 +410,7 @@ main(int argc, char *argv[])
 
 	(void) atexit(smbstat_fini);
 	smbstat_init();
+	smbstat_req_order();
 	for (;;) {
 		smbstat_kstat_snapshot();
 		smbstat_kstat_process();
@@ -395,7 +437,7 @@ smbstat_init(void)
 	smbstat_cpu_init();
 	smbstat_srv_init();
 	smbstat_wrk_init();
-	smbstat_req_order();
+	smbstat_clsh_init();
 }
 
 /*
@@ -406,6 +448,7 @@ smbstat_init(void)
 static void
 smbstat_fini(void)
 {
+	smbstat_clsh_fini();
 	smbstat_wrk_fini();
 	smbstat_srv_fini();
 	smbstat_cpu_fini();
@@ -423,6 +466,7 @@ smbstat_kstat_snapshot(void)
 	smbstat_cpu_snapshot();
 	smbstat_srv_snapshot();
 	smbstat_wrk_snapshot();
+	smbstat_clsh_snapshot();
 }
 
 /*
@@ -434,6 +478,7 @@ smbstat_kstat_process(void)
 	smbstat_cpu_process();
 	smbstat_srv_process();
 	smbstat_wrk_process();
+	smbstat_clsh_process();
 }
 
 /*
@@ -449,6 +494,7 @@ smbstat_kstat_print(void)
 	smbstat_print_throughput();
 	smbstat_print_utilization();
 	smbstat_print_requests();
+	smbstat_print_client_or_share();
 	(void) fflush(stdout);
 }
 
@@ -491,7 +537,8 @@ smbstat_print_throughput(void)
 		return;
 
 	if (smbstat_opt_u || smbstat_opt_r || smbstat_opt_c ||
-	    (smbstat_rows == 0) || (smbstat_rows >= smbstat_ws.ws_row)) {
+	    smbstat_opt_C || smbstat_opt_S || (smbstat_rows == 0) ||
+	    (smbstat_rows >= smbstat_ws.ws_row)) {
 		(void) printf(SMBSRV_THROUGHPUT_BANNER);
 		smbstat_rows = 1;
 	}
@@ -593,6 +640,27 @@ smbstat_print_requests(void)
 		}
 	}
 }
+
+static void
+smbstat_print_client_or_share(void)
+{
+	smbstat_req_info_t	*prq;
+
+	if (smbstat_opt_clsh == NULL)
+		return;
+
+	(void) printf(SMBSRV_CLNT_SHARE_BANNER);
+
+	prq = &smbstat_srv_info.si_clsh;
+
+	(void) printf(SMBSRV_CLNT_SHARE_FORMAT,
+	    smbstat_zero(prq->ri_rbs),
+	    smbstat_zero(prq->ri_tbs),
+	    smbstat_zero(prq->ri_rqs),
+	    prq->ri_mean,
+	    prq->ri_stddev);
+}
+
 
 /*
  * smbstat_cpu_init
@@ -792,13 +860,121 @@ smbstat_wrk_current_snapshot(void)
 }
 
 /*
+ * smbstat_clsh_init
+ *
+ * Lookup the kstat for the client or share specified.
+ * The names for these look like:
+ *	session (a.k.a. client)
+ *		cl/$IPADDR  and instance ss->s_kid
+ *	share
+ *		sh/sharename	(always instance 0)
+ *
+ * These will look like: smbsrv:0:sh/myshare
+ * or smbsrv:N:cl/10.10.0.2
+ */
+static void
+smbstat_clsh_init(void)
+{
+	char	ks_name[KSTAT_STRLEN];
+	char 	*prefix = "";
+	int	instance = -1;
+
+	if (smbstat_opt_clsh == NULL)
+		return;
+
+	/*
+	 * Currently we don't take an instance so this will return data
+	 * from the first or the only client from the IP address specified.
+	 */
+	if (smbstat_opt_C)
+		prefix = "cl";
+	if (smbstat_opt_S)
+		prefix = "sh";
+	(void) snprintf(ks_name, sizeof (ks_name),
+	    "%s/%s", prefix, smbstat_opt_clsh);
+
+	smbstat_clsh_ksp = kstat_lookup(smbstat_ksc, SMBSRV_KSTAT_MODULE,
+	    instance, ks_name);
+	if (smbstat_clsh_ksp == NULL) {
+		smbstat_fail(1, gettext("cannot retrieve smbsrv %s kstat\n"),
+		    ks_name);
+	}
+}
+
+static void
+smbstat_clsh_fini(void)
+{
+	smbstat_clsh_ksp = NULL;
+}
+
+/*
+ * smbstat_clsh_snapshot
+ */
+static void
+smbstat_clsh_snapshot(void)
+{
+	smbstat_clsh_snapshot_t	*curr;
+
+	if (smbstat_clsh_ksp == NULL)
+		return;
+
+	curr = smbstat_clsh_current_snapshot();
+
+	if ((kstat_read(smbstat_ksc, smbstat_clsh_ksp, NULL) == -1) ||
+	    (smbstat_clsh_ksp->ks_data_size != sizeof (curr->cs_data)))
+		smbstat_fail(1, gettext("kstat_read('%s') failed"),
+		    smbstat_clsh_ksp->ks_name);
+
+	curr->cs_snaptime = smbstat_clsh_ksp->ks_snaptime;
+	bcopy(smbstat_srv_ksp->ks_data, &curr->cs_data, sizeof (curr->cs_data));
+}
+
+/*
+ * smbstat_clsh_process
+ */
+static void
+smbstat_clsh_process(void)
+{
+	smbstat_clsh_snapshot_t	*curr, *prev;
+	boolean_t		firstcall;
+
+	curr = smbstat_clsh_current_snapshot();
+	prev = smbstat_clsh_previous_snapshot();
+	firstcall = (prev->cs_snaptime == 0);
+
+	smbstat_srv_process_one_req(
+	    &smbstat_srv_info.si_clsh,
+	    &curr->cs_data,
+	    &prev->cs_data,
+	    firstcall);
+}
+
+/*
+ * smbstat_clsh_current_snapshot
+ */
+static smbstat_clsh_snapshot_t *
+smbstat_clsh_current_snapshot(void)
+{
+	return (&smbstat_clsh_snapshots[smbstat_snapshot_idx]);
+}
+
+static smbstat_clsh_snapshot_t *
+smbstat_clsh_previous_snapshot(void)
+{
+	int	idx;
+
+	idx = (smbstat_snapshot_idx - 1) & SMBSTAT_SNAPSHOT_MASK;
+	return (&smbstat_clsh_snapshots[idx]);
+}
+
+/*
  * smbstat_srv_init
  */
 static void
 smbstat_srv_init(void)
 {
 	smbstat_srv_ksp = kstat_lookup(smbstat_ksc, SMBSRV_KSTAT_MODULE,
-	    getzoneid(), SMBSRV_KSTAT_STATISTICS);
+	    -1, SMBSRV_KSTAT_STATISTICS);
 	if (smbstat_srv_ksp == NULL)
 		smbstat_fail(1, gettext("cannot retrieve smbsrv kstat\n"));
 }
