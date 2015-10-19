@@ -2682,6 +2682,7 @@ int
 zfs_set_prop_nvlist(const char *dsname, zprop_source_t source, nvlist_t *nvl,
     nvlist_t *errlist)
 {
+	spa_t *spa = NULL;
 	nvpair_t *pair;
 	nvpair_t *propval;
 	int rv = 0;
@@ -2691,6 +2692,11 @@ zfs_set_prop_nvlist(const char *dsname, zprop_source_t source, nvlist_t *nvl,
 	nvlist_t *retrynvl = fnvlist_alloc();
 	zfsvfs_t *zfsvfs;
 	boolean_t set_worm = B_FALSE;
+	boolean_t set_wrc_mode = B_FALSE;
+	boolean_t wrc_walk_locked = B_FALSE;
+
+	if ((rv = spa_open(dsname, &spa, FTAG)) != 0)
+		return (rv);
 
 retry:
 	pair = NULL;
@@ -2702,6 +2708,13 @@ retry:
 		if (!set_worm && (strcmp(propname, "nms:worm") == 0)) {
 			set_worm = B_TRUE;
 		}
+
+		/*
+		 * If 'wrc_mode' is going to be changed, then we need to
+		 * do some actions before 'set'
+		 */
+		if (prop == ZFS_PROP_WRC_MODE)
+			set_wrc_mode = B_TRUE;
 
 		/* decode the property value */
 		propval = pair;
@@ -2788,6 +2801,16 @@ retry:
 		goto retry;
 	}
 
+	/*
+	 * Additional actions before set wrc_mode:
+	 * - first need to try to lock WRC-walking, to stop migration and
+	 *   avoid the openning of new migration window
+	 * - second step (from sync-context): if migration window
+	 *   is active it will be purged, to correctly add/remove WRC-instance
+	 */
+	if (set_wrc_mode && wrc_walk_lock(spa) == 0)
+		wrc_walk_locked = B_TRUE;
+
 	if (!nvlist_empty(genericnvl) &&
 	    dsl_props_set(dsname, source, genericnvl) != 0) {
 		/*
@@ -2829,6 +2852,9 @@ retry:
 	nvlist_free(genericnvl);
 	nvlist_free(retrynvl);
 
+	if (wrc_walk_locked)
+		wrc_walk_unlock(spa);
+
 	if (set_worm && getzfsvfs(dsname, &zfsvfs) == 0) {
 		if (zfs_is_wormed(dsname)) {
 			zfsvfs->z_isworm = B_TRUE;
@@ -2841,6 +2867,7 @@ retry:
 	if (rv != 0)
 		autosnap_force_snap_by_name(dsname, NULL, B_FALSE);
 
+	spa_close(spa, FTAG);
 
 	return (rv);
 }

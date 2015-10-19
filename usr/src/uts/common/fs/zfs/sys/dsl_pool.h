@@ -121,8 +121,6 @@ typedef struct dsl_pool {
 	 */
 	hrtime_t dp_last_wakeup;
 
-	uint64_t dp_wrcio_towrite[TXG_SIZE];
-
 	/* Has its own locking */
 	tx_state_t dp_tx;
 	txg_list_t dp_dirty_datasets;

@@ -761,6 +761,7 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 	}
 
 	if (zfs_name_to_prop(propname) == ZFS_PROP_WRC_MODE &&
+	    source != ZPROP_SRC_INHERITED &&
 	    !spa_feature_is_active(spa, SPA_FEATURE_WRC)) {
 		/* Once activated cannot be deactivated */
 		spa_feature_incr(spa, SPA_FEATURE_WRC, tx);
@@ -1012,8 +1013,19 @@ dsl_props_set_sync_impl(dsl_dataset_t *ds, zprop_source_t source,
 			 * Also see comments in dsl_props_set_check()
 			 */
 			if (prop == ZFS_PROP_WRC_MODE &&
-			    source == ZPROP_SRC_LOCAL)
+			    source == ZPROP_SRC_LOCAL) {
+				spa_t *spa = dsl_dataset_get_spa(ds);
+				wrc_data_t *wrc_data = spa_get_wrc_data(spa);
 				src = ZPROP_SRC_INHERITED;
+
+				/*
+				 * Need to purge current window to
+				 * correctly disable WRC for this DS
+				 */
+				mutex_enter(&wrc_data->wrc_lock);
+				wrc_purge_window(spa, tx);
+				mutex_exit(&wrc_data->wrc_lock);
+			}
 
 			dsl_prop_set_sync_impl(ds, nvpair_name(pair),
 			    src, 0, 0, NULL, tx);

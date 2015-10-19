@@ -93,7 +93,6 @@ static int wrc_move_block_impl(wrc_block_t *block);
 static int wrc_collect_special_blocks(dsl_pool_t *dp);
 static void wrc_close_window(spa_t *spa);
 static void wrc_write_update_window(void *void_spa, dmu_tx_t *tx);
-static boolean_t dsl_pool_wrcio_limit(dsl_pool_t *dp, uint64_t txg);
 
 static int wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data);
 static int wrc_blocks_compare(const void *arg1, const void *arg2);
@@ -413,9 +412,7 @@ wrc_move_block(void *arg)
 	wrc_block_t *block = arg;
 	wrc_data_t *wrc_data = block->data;
 	spa_t *spa = wrc_data->wrc_spa;
-	dsl_pool_t *dp = spa->spa_dsl_pool;
 	int err = 0;
-	boolean_t stop_wrc_thr = B_FALSE;
 	boolean_t first_iter = B_TRUE;
 
 	do {
@@ -435,18 +432,9 @@ wrc_move_block(void *arg)
 		}
 	} while (spa_wrc_stop_move(spa));
 
-	/*
-	 * If txg is huge and write cache migration i/o interferes with
-	 * Normal user traffic, then we should no longer dirty blocks.
-	 */
-	stop_wrc_thr = dsl_pool_wrcio_limit(dp, dp->dp_tx.tx_open_txg);
-
 	err = wrc_move_block_impl(block);
-	if (!err) {
+	if (err == 0) {
 		atomic_inc_64(&wrc_data->wrc_blocks_mv);
-
-		if (stop_wrc_thr == B_TRUE)
-			wrc_data->wrc_stop = B_TRUE;
 	} else {
 		/* io error occured */
 		if (++wrc_data->wrc_fault_moves >= wrc_fault_limit) {
@@ -991,35 +979,6 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 	return (err);
 }
 
-/*
- * This function checks if write cache migration i/o is
- * affecting the normal user i/o traffic. We determine this
- * by checking if total data in current txg > zfs_wrc_data_max
- * and migration i/o is more than zfs_wrc_io_perc_max % of total
- * data in this txg. If total data in this txg < zfs_dirty_data_sync/4,
- * we assume not much of user traffic is happening..
- */
-static boolean_t
-dsl_pool_wrcio_limit(dsl_pool_t *dp, uint64_t txg)
-{
-	boolean_t ret = B_FALSE;
-	if (mutex_tryenter(&dp->dp_lock)) {
-		if (dp->dp_dirty_pertxg[txg & TXG_MASK] !=
-		    dp->dp_wrcio_towrite[txg & TXG_MASK] &&
-		    dp->dp_dirty_pertxg[txg & TXG_MASK] >
-		    zfs_wrc_data_max &&
-		    dp->dp_wrcio_towrite[txg & TXG_MASK] > ((WRCIO_PERC_MIN *
-		    dp->dp_dirty_pertxg[txg & TXG_MASK]) / 100) &&
-		    dp->dp_wrcio_towrite[txg & TXG_MASK] <
-		    ((WRCIO_PERC_MAX * dp->dp_dirty_pertxg[txg & TXG_MASK]) /
-		    100))
-			ret = B_TRUE;
-		mutex_exit(&dp->dp_lock);
-	}
-	return (ret);
-
-}
-
 /* WRC-THREAD_CONTROL */
 
 /* Starts wrc threads and set associated structures */
@@ -1276,6 +1235,9 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 	uint64_t snap_txg;
 
 	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
+
+	if (wrc_data->wrc_finish_txg == 0)
+		return;
 
 	/*
 	 * Clean tree with blocks which are not queued
