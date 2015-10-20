@@ -38,6 +38,7 @@ file path=opt/nfssharemnt-tests/bin/cleanup mode=0555
 file path=opt/nfssharemnt-tests/bin/config.vars mode=0555
 file path=opt/nfssharemnt-tests/bin/configure mode=0555
 file path=opt/nfssharemnt-tests/bin/miscshare mode=0555
+file path=opt/nfssharemnt-tests/bin/nfssharemntest mode=0555
 file path=opt/nfssharemnt-tests/bin/setup mode=0555
 file path=opt/nfssharemnt-tests/bin/srv_setup mode=0555
 file path=opt/nfssharemnt-tests/bin/stf_description mode=0444

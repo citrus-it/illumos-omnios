@@ -24,7 +24,7 @@ ROOTDESC = $(ROOTBIN)
 #
 STFDESC = stf_description
 SCRIPTS = checkenv_def cleanup config.vars configure \
-	setup srv_setup unconfigure nfs-shrmntest miscshare
+	setup srv_setup unconfigure nfssharemntest miscshare
 
 CMDS = $(SCRIPTS:%=$(ROOTBIN)/%)
 DESC = $(STFDESC:%=$(ROOTDESC)/%)
