@@ -210,55 +210,212 @@ function display_status
 
 	$KILL -9 $pid
 
-	$SLEEP 60
-
 	return $ret
 }
 
+function create_dataset # <dataset> [size]
+{
+	typeset dataset_name=$1
+	typeset size=${2:+-V $2}
+
+	if [[ -z $dataset_name ]] ; then
+		log_note "Missing dataset name."
+		return 1
+	fi
+
+	if [[ -d /$dataset_name ]] ; then
+		$RM -rf /$dataset_name
+	fi
+
+	$ZFS create -p $dataset_name $size
+
+	return $?
+}
 
 # Return 0 if create successfully or the pool exists; $? otherwise
 # Note: In local zones, this function should return 0 silently.
 #
-# $1 - pool name
-# $2 - wrc mode
+# $1 - pool name:    required
+# $2 - pool_type:    optional
+# $3 - recordsize:   optional
+# $4 - compression:  optional
 
-function create_pool_wrc #pool_name wrc_mode
+function create_pool #pool_name
 {
 	typeset pool_name=${1%%/*}
-	typeset wrc_mode=$2
-	typeset -i ret=0
+	typeset pool_type=$2
+	typeset recordsize=$3
+	typeset compression=$4
 
 	if [[ -z $pool_name ]]; then
 		log_note "Missing pool name."
 		return 1
 	fi
 
-	if is_global_zone ; then
-		if poolexists $pool_name ; then
-			destroy_pool $pool_name
-		fi
+	is_global_zone || return 0
 
-		if [[ -d /$pool_name ]] ; then
-			$RM -rf /$pool_name
-		fi
-
-		typeset -r pool_type=$(random_get "" "mirror" "raidz" "raidz2" "raidz3")
-		typeset -r wrc_type=$(random_get "" "mirror")
-		typeset -r record_size=$(random_get "4k" "8k" "16k" "32k" "64k" "128k")
-		typeset -r compression=$(random_get "off" "on" "lz4" "lzjb")
-
-		$ZPOOL create -f \
-			-O compression=$compression \
-			-O recordsize=$record_size \
-			$pool_name $pool_type $HDD_DISKS \
-			special $wrc_type $SSD_DISKS
-		((ret |= $?))
-
-		$ZPOOL set wrc_mode=$wrc_mode $pool_name
-		((ret |= $?))
+	if poolexists $pool_name ; then
+		destroy_pool $pool_name
 	fi
 
-	return $ret
+	if [[ -d /$pool_name ]] ; then
+		$RM -rf /$pool_name
+	fi
+
+	test -z $pool_type && pool_type=$(get_random_pool_type)
+	test -z $recordsize && recordsize=$(get_random_recordsize)
+	test -z $compression && compression=$(get_random_compression)
+
+	test $pool_type = "stripe" && pool_type=""
+
+	$ZPOOL create -f \
+		-O compression=$compression \
+		-O recordsize=$recordsize \
+		$pool_name \
+		$pool_type $HDD_DISKS
+
+	return $?
+}
+
+# Return 0 if create successfully or the pool exists; $? otherwise
+# Note: In local zones, this function should return 0 silently.
+#
+# $1 - pool name:    required
+# $2 - wrc_mode:     optional
+# $3 - pool_type:    optional
+# $4 - special_type: optional
+# $5 - recordsize:   optional
+# $6 - compression:  optional
+
+function create_pool_special #pool_name
+{
+	typeset pool_name=${1%%/*}
+	typeset wrc_mode=$2
+	typeset pool_type=$3
+	typeset special_type=$4
+	typeset recordsize=$5
+	typeset compression=$6
+
+	if [[ -z $pool_name ]]; then
+		log_note "Missing pool name."
+		return 1
+	fi
+
+	is_global_zone || return 0
+
+	if poolexists $pool_name ; then
+		destroy_pool $pool_name
+	fi
+
+	if [[ -d /$pool_name ]] ; then
+		$RM -rf /$pool_name
+	fi
+
+	test -z $pool_type && pool_type=$(get_random_pool_type)
+	test -z $special_type && special_type=$(get_random_special_type)
+	test -z $recordsize && recordsize=$(get_random_recordsize)
+	test -z $compression && compression=$(get_random_compression)
+	test -n $wrc_mode && wrc_mode="-O wrc_mode=$wrc_mode"
+
+	test $pool_type = "stripe" && pool_type=""
+	test $special_type = "stripe" && special_type=""
+
+	$ZPOOL create -f \
+		-O compression=$compression \
+		-O recordsize=$recordsize \
+		$wrc_mode \
+		$pool_name \
+		$pool_type $HDD_DISKS \
+		special $special_type $SSD_DISKS
+
+	return $?
+}
+
+function get_random_recordsize
+{
+	random_get "4k" "8k" "16k" "32k" "64k" "128k"
+}
+
+function get_random_compression
+{
+	random_get "off" "on" "lzjb" "gzip" "zle" "lz4"
+}
+
+function get_random_pool_type
+{
+	random_get "stripe" "mirror" "raidz" "raidz2" "raidz3"
+}
+
+function get_random_special_type
+{
+	random_get "stripe" "mirror"
+}
+
+function get_wrc_mode # <dataset>
+{
+	typeset dataset=$1
+
+	if [[ -z $dataset ]] ; then
+		log_note "Missing dataset name."
+		return 1
+	fi
+
+	$ZFS get -H -o value wrc_mode $dataset
+
+	return $?
+}
+
+function set_wrc_mode # <dataset> <mode>
+{
+	typeset dataset=$1
+	typeset mode=$2
+
+	if [[ -z $dataset ]] ; then
+		log_note "Missing dataset name."
+		return 1
+	fi
+
+	if [[ -z $mode ]] ; then
+		log_note "Missing wrc mode."
+		return 1
+	fi
+
+	$ZFS set wrc_mode=$mode $dataset
+	value=$(get_wrc_mode $dataset)
+
+	if [[ "$mode" != "$value" ]] ; then
+		return 1
+	fi
+
+	return 0
+}
+
+function enable_wrc # <dataset>
+{
+	typeset dataset=$1
+
+	if [[ -z $dataset ]] ; then
+		log_note "Missing dataset name."
+		return 1
+	fi
+
+	set_wrc_mode $dataset on
+
+	return $?
+}
+
+function disable_wrc # <dataset>
+{
+	typeset dataset=$1
+
+	if [[ -z $dataset ]] ; then
+		log_note "Missing dataset name."
+		return 1
+	fi
+
+	set_wrc_mode $dataset off
+
+	return $?
 }
 
 function check_pool_errors # <pool> [<vdev>]

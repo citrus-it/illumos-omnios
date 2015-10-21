@@ -20,28 +20,21 @@
 
 #
 # DESCRIPTION:
-#	Detaching wrc vdev succeeds.
+#	Detaching redundant special vdev succeeds
 #
 # STRATEGY:
-#	1. Create pool with mirrored wrc devices.
-#	2. Enable wrc active/passive/off mode
-#	3. Display pool status
-#	4. Try to detach new wrc vdev 
-#	5. Display pool status
-#	6. Scrub pool and check status
+#	1. Create pool with mirrored special devices and enabled/disabled write back cache
+#	2. Display pool status
+#	3. Try to detach one special vdev
+#	4. Display pool status
+#	5. Scrub pool and check status
 #
 
 verify_runnable "global"
-log_assert "Detaching wrc vdev succeeds."
+log_assert "Detaching redundant special vdev succeeds."
 log_onexit cleanup
-for wrc_mode in "off" "active" "passive" ; do
-	rs=$(random_get "4k" "8k" "16k" "32k" "64k" "128k")
-	cs=$(random_get "off" "on" "lz4" "lzjb")
-	log_must $ZPOOL create -f \
-		-O compression=$cs -O recordsize=$rs \
-		$TESTPOOL $pool_type $HDD_DISKS \
-		special mirror $SSD_DISKS
-	log_must $ZPOOL set wrc_mode=$wrc_mode $TESTPOOL
+for wrc_mode in "on" "off" ; do
+	log_must create_pool_special $TESTPOOL $wrc_mode mirror mirror
 	log_must display_status $TESTPOOL
 	log_must $ZPOOL detach $TESTPOOL $SSD_DISK1
 	log_must $ZPOOL scrub $TESTPOOL
@@ -51,4 +44,4 @@ for wrc_mode in "off" "active" "passive" ; do
 	log_must check_pool_errors $TESTPOOL
 	log_must destroy_pool $TESTPOOL
 done
-log_pass "Detaching wrc vdev succeeds."
+log_pass "Detaching redundant special vdev succeeds."

@@ -20,30 +20,26 @@
 
 #
 # DESCRIPTION:
-#	Creating a pool and adding wrc device to existing pool succeeds.
+#	Creating a pool and adding special device to existing pool succeeds
 #
 # STRATEGY:
-#	1. Create pool without separated wrc devices.
+#	1. Create pool without separated special devices
 #	2. Display pool status
-#	3. Add wrc device.
+#	3. Add special device
 #	4. Display pool status
 #	5. Scrub pool and check status
-#	6. Destroy and loop to create pool with different configuration.
+#	6. Destroy and loop to create pool with different configuration
 #
 
 verify_runnable "global"
-log_assert "Creating a pool and adding wrc device to existing pool succeeds."
+log_assert "Creating a pool and adding special device to existing pool succeeds."
 log_onexit cleanup
 for pool_type in "" "mirror" "raidz" "raidz2" "raidz3" ; do
-	for wrc_type in "" "mirror" ; do
-		for wrc_mode in "off" "active" "passive" ; do
-			rs=$(random_get "4k" "8k" "16k" "32k" "64k" "128k")
-			cs=$(random_get "off" "on" "lz4" "lzjb")
-			log_must $ZPOOL create -f \
-				-O compression=$cs -O recordsize=$rs \
-				$TESTPOOL $pool_type $HDD_DISKS 
-			log_must $ZPOOL add -f $TESTPOOL special $wrc_type $SSD_DISKS
-			log_must $ZPOOL set wrc_mode=$wrc_mode $TESTPOOL
+	for special_type in "" "mirror" ; do
+		for wrc_mode in "on" "off" ; do
+			log_must create_pool $TESTPOOL $pool_type 
+			log_must $ZPOOL add -f $TESTPOOL special $special_type $SSD_DISKS
+			log_must set_wrc_mode $TESTPOOL $wrc_mode
 			log_must display_status $TESTPOOL
 			log_must $SYNC
 			log_must $ZPOOL scrub $TESTPOOL
@@ -55,4 +51,4 @@ for pool_type in "" "mirror" "raidz" "raidz2" "raidz3" ; do
 		done
 	done
 done
-log_pass "Creating a pool and adding wrc device to existing pool succeeds."
+log_pass "Creating a pool and adding special device to existing pool succeeds."

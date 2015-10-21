@@ -20,23 +20,22 @@
 
 #
 # DESCRIPTION:
-#	A raidz wrc can not be added to existing pool.
+#	A raidz special can not be added to existing pool
 #
 # STRATEGY:
-#	1. Create pool without wrc.
-#	2. Add a raidz wrc to this pool.
-#	3. Verify failed to add.
+#	1. Create pool without separated special devices
+#	2. Try to add a raidz special to this pool
+#	3. Verify failed to add
 #
 
 verify_runnable "global"
-log_assert "A raidz wrc can not be added to existing pool."
+log_assert "A raidz special can not be added to existing pool."
 log_onexit cleanup
 for pool_type in "" "mirror" ; do
-	for wrc_type in "raidz" "raidz2" "raidz3" ; do
-		log_must $ZPOOL create -f \
-			$TESTPOOL $pool_type $SSD_DISKS
-		log_mustnot $ZPOOL add $TESTPOOL special $wrc_type $HDD_DISKS
+	for special_type in "raidz" "raidz2" "raidz3" ; do
+		log_must create_pool $TESTPOOL $pool_type
+		log_mustnot $ZPOOL add $TESTPOOL special $special_type $SSD_DISKS
 		log_must destroy_pool $TESTPOOL
 	done
 done
-log_pass "A raidz wrc can not be added to existing pool."
+log_pass "A raidz special can not be added to existing pool."

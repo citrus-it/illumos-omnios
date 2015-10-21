@@ -20,23 +20,22 @@
 
 #
 # DESCRIPTION:
-#	Enabling passive wrc mode succeeds.
+#	Disabling write back cache succeeds
 #
 # STRATEGY:
-#	1. Create pool with separated wrc devices.
-#	2. Enable wrc active mode
-#	3. Display pool status
-#	4. Enable wrc passive mode
-#	5. Display pool status
-#	6. Scrub pool and check status
+#	1. Create pool with separated special devices and enabled write back cache
+#	2. Display pool status
+#	3. Disable write back cache
+#	4. Display pool status
+#	5. Scrub pool and check status
 #
 
 verify_runnable "global"
-log_assert "Enabling passive wrc mode succeeds."
+log_assert "Disabling wrc succeeds."
 log_onexit cleanup
-log_must create_pool_wrc $TESTPOOL active
+log_must create_pool_special $TESTPOOL on
 log_must display_status $TESTPOOL
-log_must $ZPOOL set wrc_mode=passive $TESTPOOL
+log_must disable_wrc $TESTPOOL
 log_must display_status $TESTPOOL
 log_must $SYNC
 log_must $ZPOOL scrub $TESTPOOL
@@ -45,4 +44,4 @@ while is_pool_scrubbing $TESTPOOL ; do
 done
 log_must check_pool_errors $TESTPOOL
 log_must destroy_pool $TESTPOOL
-log_pass "Enabling passive wrc mode succeeds."
+log_pass "Disabling wrc succeeds."

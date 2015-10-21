@@ -20,30 +20,29 @@
 
 #
 # DESCRIPTION:
-#	Attaching wrc vdev succeeds.
+#	Attaching special vdev succeeds
 #
 # STRATEGY:
-#	1. Create pool with separated wrc devices.
-#	2. Enable wrc active/passive/off mode
-#	3. Display pool status
-#	4. Try to attach new wrc vdev 
-#	5. Display pool status
-#	6. Scrub pool and check status
+#	1. Create pool without separated special devices
+#   2. Display pool statu
+#   3. Add special device
+#	4. Display pool status
+#	5. Try to attach new special device
+#	6. Display pool status
+#	7. Scrub pool and check status
 #
 
 verify_runnable "global"
-log_assert "Attaching wrc vdev succeeds."
+log_assert "Attaching special vdev succeeds."
 log_onexit cleanup
-for wrc_mode in "off" "active" "passive" ; do
-	rs=$(random_get "4k" "8k" "16k" "32k" "64k" "128k")
-	cs=$(random_get "off" "on" "lz4" "lzjb")
-	log_must $ZPOOL create -f \
-		-O compression=$cs -O recordsize=$rs \
-		$TESTPOOL $pool_type $HDD_DISKS \
-		special $SSD_DISK1
-	log_must $ZPOOL set wrc_mode=$wrc_mode $TESTPOOL
+for wrc_mode in "on" "off" ; do
+	log_must create_pool $TESTPOOL $pool_type
+	log_must display_status $TESTPOOL
+	log_must $ZPOOL add -f $TESTPOOL special $SSD_DISK1
+	log_must set_wrc_mode $TESTPOOL $wrc_mode
 	log_must display_status $TESTPOOL
 	log_must $ZPOOL attach $TESTPOOL $SSD_DISK1 $SSD_DISK2
+	log_must display_status $TESTPOOL
 	while is_pool_resilvering $TESTPOOL ; do
 		$SLEEP 1
 	done
@@ -54,4 +53,4 @@ for wrc_mode in "off" "active" "passive" ; do
 	log_must check_pool_errors $TESTPOOL
 	log_must destroy_pool $TESTPOOL
 done
-log_pass "Attaching wrc vdev succeeds."
+log_pass "Attaching special vdev succeeds."

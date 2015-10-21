@@ -20,27 +20,20 @@
 
 #
 # DESCRIPTION:
-#	Non-redundant wrc vdev can not be detached from existing pool.
+#	Non-redundant special vdev can not be detached from existing pool
 #
 # STRATEGY:
-#	1. Create pool with separated wrc devices.
-#	2. Enable wrc active/passive/off mode
-#	3. Display pool status
-#	4. Try to detach non-redundant wrc vdev 
-#	5. Verify failed to detach
+#	1. Create pool with separated wrc devices and enabled/disabled wrte back cache
+#	2. Display pool status
+#	3. Try to detach non-redundant special vdev
+#	4. Verify failed to detach
 #
 
 verify_runnable "global"
-log_assert "Non-redundant wrc vdev can not be detached."
+log_assert "Non-redundant special vdev can not be detached."
 log_onexit cleanup
-for wrc_mode in "off" "active" "passive" ; do
-	rs=$(random_get "4k" "8k" "16k" "32k" "64k" "128k")
-	cs=$(random_get "off" "on" "lz4" "lzjb")
-	log_must $ZPOOL create -f \
-		-O compression=$cs -O recordsize=$rs \
-		$TESTPOOL $pool_type $HDD_DISKS \
-		special $SSD_DISKS
-	log_must $ZPOOL set wrc_mode=$wrc_mode $TESTPOOL
+for wrc_mode in "on" "off" ; do
+	log_must create_pool_special $TESTPOOL $wrc_mode "stripe" "stripe"
 	log_must display_status $TESTPOOL
 	log_mustnot $ZPOOL detach $TESTPOOL $SSD_DISK1
 	log_must $ZPOOL scrub $TESTPOOL
@@ -50,4 +43,4 @@ for wrc_mode in "off" "active" "passive" ; do
 	log_must check_pool_errors $TESTPOOL
 	log_must destroy_pool $TESTPOOL
 done
-log_pass "Non-redundant wrc vdev can not be detached."
+log_pass "Non-redundant special vdev can not be detached."

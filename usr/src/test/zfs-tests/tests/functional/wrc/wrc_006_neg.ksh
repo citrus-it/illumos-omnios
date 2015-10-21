@@ -20,21 +20,19 @@
 
 #
 # DESCRIPTION:
-#	A raidz wrc is not supported.
+#	A raidz special is not supported
 #
 # STRATEGY:
-#	1. Try to create pool with unsupported type
-#	2. Creating pool must fail.
+#	1. Try to create pool with unsupported vdev type
+#	2. Creating pool must fail
 #
 
 verify_runnable "global"
-log_assert "A raidz wrc is not supported."
+log_assert "A raidz special is not supported."
 log_onexit cleanup
 for pool_type in "" "mirror" ; do
-	for wrc_type in "raidz" "raidz2" "raidz3" ; do
-		log_mustnot $ZPOOL create -f \
-			$TESTPOOL $pool_type $SSD_DISKS \
-			special $wrc_type $HDD_DISKS
+	for special_type in "raidz" "raidz2" "raidz3" ; do
+		log_mustnot create_pool_special $TESTPOOL $wrc_mode $pool_type $special_type
 	done
 done
-log_pass "A raidz wrc is not supported."
+log_pass "A raidz special is not supported."
