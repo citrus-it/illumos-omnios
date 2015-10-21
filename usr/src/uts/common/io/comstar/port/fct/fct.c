@@ -2916,24 +2916,38 @@ void
 fct_cmd_unlink_els(fct_i_remote_port_t *irp, fct_i_cmd_t *icmd)
 {
 	ASSERT(rw_write_held(&irp->irp_lock));
-	/*
-	 * If the command found is linked into a chain it is the ELS queue.
-	 * Decrement the appropriate ELS counter, clear the IRP in queue
-	 * flag, and remove it from the linked list.
-	 */
 	if (icmd->icmd_node.list_next) {
+		/*
+		 * Command is on two queues. Determine which queue and
+		 * handle appropriately.
+		 */
 		if (icmd->icmd_flags & ICMD_IN_IRP_QUEUE) {
+			/*
+			 * If the command is active on the IRP queue it
+			 * will be freed during command termination
+			 * processing. Unfortuntely the ELS processing will
+			 * peek at the command and possibly panic if it's
+			 * been freed already. Remove it from the ELS
+			 * queue to avoid that.
+			 */
 			if (icmd->icmd_flags & ICMD_SESSION_AFFECTING)
 				atomic_dec_16(&irp->irp_sa_elses_count);
 			else
 				atomic_dec_16(&irp->irp_nsa_elses_count);
 			atomic_and_32(&icmd->icmd_flags, ~ICMD_IN_IRP_QUEUE);
 			list_remove(&irp->irp_els_list, icmd);
-		} else {
-			cmn_err(CE_NOTE, "%s: icmd on non-ELS chain: icmd=%p",
-			    __func__, (void *)icmd);
-			ASSERT(0);
 		}
+		/*
+		 * There's an else case here, but the processing is handled
+		 * in fct_check_solcmd_queue(). In this case the command
+		 * is on the solicited queue and will be marked as aborted.
+		 * During command termination processing the command will be
+		 * marked as complete, but not freed. The freeing of the memory
+		 * is done in fct_check_solcmd_queue(). If that routine, which
+		 * holds the appropriate lock, is run first it will remove the
+		 * command from the abort queue so that no memory access
+		 * is done after the command has been freed.
+		 */
 	}
 }
 

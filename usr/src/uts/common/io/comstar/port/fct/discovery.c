@@ -2294,6 +2294,17 @@ fct_check_solcmd_queue(fct_i_local_port_t *iport)
 			}
 
 			icmd->icmd_cb = NULL;
+
+			/*
+			 * If the command has none-zero icmd_node pointers
+			 * it means it's been linked onto the iport_abort_queue.
+			 * Since the iport_worker_lock is held the command
+			 * can be removed before it's freed.
+			 */
+			if (icmd->icmd_node.list_next != NULL) {
+				list_remove(&iport->iport_abort_queue, icmd);
+			}
+
 			mutex_exit(&iport->iport_worker_lock);
 			fct_cmd_free(icmd->icmd_cmd);
 			mutex_enter(&iport->iport_worker_lock);
