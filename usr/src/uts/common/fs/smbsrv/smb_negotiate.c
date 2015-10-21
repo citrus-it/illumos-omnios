@@ -230,6 +230,15 @@ static int smb_ndialects = sizeof (smb_dialect) / sizeof (smb_dialect[0]);
 static uint32_t	smb_dos_tcp_rcvbuf = 8700;
 static uint32_t	smb_nt_tcp_rcvbuf = 1048560;	/* scale factor of 4 */
 
+/*
+ * Maximum number of simultaneously pending SMB requests allowed on
+ * one connection.  This is like "credits" in SMB2, but SMB1 uses a
+ * fixed limit, having no way to request an increase like SMB2 does.
+ * Note: Some older clients only handle the low byte of this value,
+ * so this value should be less than 256.
+ */
+static uint16_t smb_maxmpxcount = 64;
+
 static int smb_xlate_dialect(const char *);
 
 /*
@@ -435,7 +444,7 @@ smb_com_negotiate(smb_request_t *sr)
 	negprot->ni_servertime.tv_sec = gethrestime_sec();
 	negprot->ni_servertime.tv_nsec = 0;
 	negprot->ni_tzcorrection = sr->sr_gmtoff / 60;
-	negprot->ni_maxmpxcount = sr->sr_cfg->skc_maxworkers;
+	negprot->ni_maxmpxcount = smb_maxmpxcount;
 	negprot->ni_keylen = SMB_CHALLENGE_SZ;
 	bcopy(&session->challenge_key, negprot->ni_key, SMB_CHALLENGE_SZ);
 	nbdomain = sr->sr_cfg->skc_nbdomain;

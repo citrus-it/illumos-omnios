@@ -24,10 +24,11 @@
 
 #include <smbsrv/smb2_kproto.h>
 
+static void smb2_ss_adjust_credits(smb_request_t *);
+
 smb_sdrc_t
 smb2_session_setup(smb_request_t *sr)
 {
-	smb_session_t *s;
 	smb_arg_sessionsetup_t	*sinfo;
 	uint16_t StructureSize;
 	uint8_t  Flags;
@@ -42,7 +43,6 @@ smb2_session_setup(smb_request_t *sr)
 	int skip;
 	int rc = 0;
 
-	s = sr->session;
 	sinfo = smb_srm_zalloc(sr, sizeof (smb_arg_sessionsetup_t));
 	sr->sr_ssetup = sinfo;
 
@@ -104,15 +104,12 @@ smb2_session_setup(smb_request_t *sr)
 
 	switch (status) {
 
-	case NT_STATUS_SUCCESS:
+	case NT_STATUS_SUCCESS:	/* Authenticated */
 		if (sr->uid_user->u_flags & SMB_USER_FLAG_GUEST)
 			SessionFlags |= SMB2_SESSION_FLAG_IS_GUEST;
 		if (sr->uid_user->u_flags & SMB_USER_FLAG_ANON)
 			SessionFlags |= SMB2_SESSION_FLAG_IS_NULL;
-		/* Authenticated.  Let them use all their credits. */
-		mutex_enter(&s->s_credits_mutex);
-		s->s_max_credits = s->s_cfg.skc_maximum_credits;
-		mutex_exit(&s->s_credits_mutex);
+		smb2_ss_adjust_credits(sr);
 		break;
 
 	/*
@@ -148,4 +145,45 @@ errout:
 		return (SDRC_ERROR);
 
 	return (SDRC_SUCCESS);
+}
+
+/*
+ * After a successful authentication, raise s_max_credits up to the
+ * normal maximum that clients are allowed to request.  Also, if we
+ * haven't yet given them their initial credits, do that now.
+ *
+ * Normally, clients will request some credits with session setup,
+ * but in case they don't request enough to raise s_cur_credits
+ * up to the configured initial_credits, increase the requested
+ * credits of this SR sufficiently to make that happen.  The actual
+ * increase happens in the dispatch code after we return.
+ */
+static void
+smb2_ss_adjust_credits(smb_request_t *sr)
+{
+	smb_session_t *s = sr->session;
+
+	mutex_enter(&s->s_credits_mutex);
+	s->s_max_credits = s->s_cfg.skc_maximum_credits;
+
+	if (s->s_cur_credits < s->s_cfg.skc_initial_credits) {
+		uint16_t grant;
+
+		/* How many credits we want to grant with this SR. */
+		grant = s->s_cfg.skc_initial_credits - s->s_cur_credits;
+
+		/*
+		 * Do we need to increase the smb2_credit_request?
+		 * One might prefer to read this expression as:
+		 *	((credit_request - credit_charge) < grant)
+		 * but we know credit_charge == 1 and would rather not
+		 * deal with a possibly negative value on the left,
+		 * so adding credit_charge to both sides...
+		 */
+		if (sr->smb2_credit_request < (grant + 1)) {
+			sr->smb2_credit_request = (grant + 1);
+		}
+	}
+
+	mutex_exit(&s->s_credits_mutex);
 }

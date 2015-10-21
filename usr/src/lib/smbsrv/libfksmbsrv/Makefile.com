@@ -30,6 +30,7 @@ VERS =		.1
 
 OBJS_LOCAL = \
 		fksmb_cred.o \
+		fksmb_dt.o \
 		fksmb_fem.o \
 		fksmb_idmap.o \
 		fksmb_init.o \

@@ -104,14 +104,20 @@ extern "C" {
  * SMB_PI_MAX_WORKERS_MIN must therefore be < 256
  */
 #define	SMB_PI_MAX_WORKERS_MIN		64
+#define	SMB_PI_MAX_WORKERS_DEF		1024
+#define	SMB_PI_MAX_WORKERS_MAX		16384
 
 /*
- * Min/max initial credit grant (for SMB2 Negotiate)
- * and credit limit we allow to be configured via
- * SMB_CI_INITIAL_CREDITS, SMB_CI_MAXIMUM_CREDITS
+ * Min/max initial credit grant and credit limit we allow to be
+ * configured via SMB_CI_INITIAL_CREDITS, SMB_CI_MAXIMUM_CREDITS
  */
-#define	SMB_PI_MIN_CREDITS	20
-#define	SMB_PI_MAX_CREDITS	1000
+#define	SMB_PI_INITIAL_CREDITS_MIN	16
+#define	SMB_PI_INITIAL_CREDITS_DEF	20
+#define	SMB_PI_INITIAL_CREDITS_MAX	256
+
+#define	SMB_PI_MAXIMUM_CREDITS_MIN	64
+#define	SMB_PI_MAXIMUM_CREDITS_DEF	1000
+#define	SMB_PI_MAXIMUM_CREDITS_MAX	1024
 
 /*
  * sv_size is used by the RPC services and should be set to

@@ -274,20 +274,13 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 	s->reply_max_bytes = smb2_tcp_bufsize;
 
 	/*
-	 * We need to grant some initial credits to the client.
-	 * Note that we keep max_credits small until the client
-	 * has done at least one successful session setup.
-	 *
-	 * Version 0x2FF is a special case because there will be
-	 * another negotiate, so we'll grant credits later.
+	 * "The number of credits held by the client MUST be considered
+	 * as 1 when the connection is established." [MS-SMB2]
+	 * We leave credits at 1 until the first successful
+	 * session setup is completed.
 	 */
-	if (version == 0x2FF) {
-		sr->smb2_credit_response = 1;
-	} else {
-		s->s_cur_credits = s->s_cfg.skc_initial_credits;
-		s->s_max_credits = s->s_cur_credits;
-		sr->smb2_credit_response = s->s_cur_credits;
-	}
+	s->s_cur_credits = s->s_max_credits = 1;
+	sr->smb2_credit_response = 1;
 
 	boot_tv.tv_sec = smb_get_boottime();
 	boot_tv.tv_nsec = 0;

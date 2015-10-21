@@ -351,7 +351,10 @@ cmd_start:
 	 * In case we bail out with an error before we get to the
 	 * section that computes the credit grant, initialize the
 	 * response header fields so that credits won't change.
+	 * Note: SMB 2.02 clients may send credit charge zero.
 	 */
+	if (sr->smb2_credit_charge == 0)
+		sr->smb2_credit_charge = 1;
 	sr->smb2_credit_response = sr->smb2_credit_charge;
 
 	/*
@@ -581,50 +584,49 @@ cmd_start:
 	 * limiting the decrease so they don't run out of credits.
 	 *
 	 * Later, this could do something dynamic based on load.
+	 *
+	 * One other non-obvious bit about credits: We keep the
+	 * session s_max_credits low until the 1st authentication,
+	 * at which point we'll set the normal maximum_credits.
+	 * Some clients ask for more credits with session setup,
+	 * and we need to handle that requested increase _after_
+	 * the command-specific handler returns so it won't be
+	 * restricted to the lower (pre-auth) limit.
 	 */
-	if (sr->smb2_credit_charge == 0)
-		sr->smb2_credit_charge = 1;
 	sr->smb2_credit_response = sr->smb2_credit_request;
-	if (sr->smb2_credit_request != sr->smb2_credit_charge) {
+	if (sr->smb2_credit_request < sr->smb2_credit_charge) {
 		uint16_t cur, d;
 
 		mutex_enter(&session->s_credits_mutex);
 		cur = session->s_cur_credits;
 
-		/* Apply the credit charge & request. */
-		cur -= sr->smb2_credit_charge;
-		cur += sr->smb2_credit_request;
+		/* Handle credit decrease. */
+		d = sr->smb2_credit_charge - sr->smb2_credit_request;
+		cur -= d;
 		if (cur & 0x8000) {
 			/*
-			 * underflow or overflow (bad charge/request)
+			 * underflow (bad credit charge or request)
 			 * leave credits unchanged (response=charge)
 			 */
 			cur = session->s_cur_credits;
 			sr->smb2_credit_response = sr->smb2_credit_charge;
-			DTRACE_PROBE1(smb2__credit__bad, smb_request_t, sr);
+			DTRACE_PROBE1(smb2__credit__neg, smb_request_t, sr);
 		}
 
 		/*
-		 * If new credits would be below min,
-		 * grant additional credits.
+		 * The server MUST ensure that the number of credits
+		 * held by the client is never reduced to zero.
+		 * [MS-SMB2] 3.3.1.2
 		 */
-		if (cur < SMB_PI_MIN_CREDITS) {
-			d = SMB_PI_MIN_CREDITS - cur;
-			cur = SMB_PI_MIN_CREDITS;
-			sr->smb2_credit_response += d;
+		if (cur == 0) {
+			cur = 1;
+			sr->smb2_credit_response += 1;
 			DTRACE_PROBE1(smb2__credit__min, smb_request_t, sr);
 		}
 
-		/*
-		 * If new credits would be above max,
-		 * reduce the credit grant.
-		 */
-		if (cur > session->s_max_credits) {
-			d = cur - session->s_max_credits;
-			cur = session->s_max_credits;
-			sr->smb2_credit_response -= d;
-			DTRACE_PROBE1(smb2__credit__max, smb_request_t, sr);
-		}
+		DTRACE_PROBE3(smb2__credit__decrease,
+		    smb_request_t, sr, int, (int)cur,
+		    int, (int)session->s_cur_credits);
 
 		session->s_cur_credits = cur;
 		mutex_exit(&session->s_credits_mutex);
@@ -643,6 +645,38 @@ cmd_start:
 	}
 
 	MBC_FLUSH(&sr->raw_data);
+
+	/*
+	 * Second half of SMB2 credit handling (increases)
+	 */
+	if (sr->smb2_credit_request > sr->smb2_credit_charge) {
+		uint16_t cur, d;
+
+		mutex_enter(&session->s_credits_mutex);
+		cur = session->s_cur_credits;
+
+		/* Handle credit increase. */
+		d = sr->smb2_credit_request - sr->smb2_credit_charge;
+		cur += d;
+
+		/*
+		 * If new credits would be above max,
+		 * reduce the credit grant.
+		 */
+		if (cur > session->s_max_credits) {
+			d = cur - session->s_max_credits;
+			cur = session->s_max_credits;
+			sr->smb2_credit_response -= d;
+			DTRACE_PROBE1(smb2__credit__max, smb_request_t, sr);
+		}
+
+		DTRACE_PROBE3(smb2__credit__increase,
+		    smb_request_t, sr, int, (int)cur,
+		    int, (int)session->s_cur_credits);
+
+		session->s_cur_credits = cur;
+		mutex_exit(&session->s_credits_mutex);
+	}
 
 cmd_done:
 	/*
