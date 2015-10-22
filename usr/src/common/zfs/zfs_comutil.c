@@ -43,11 +43,13 @@
 
 /*
  * Are there allocatable vdevs?
+ * Any pool must have at least one normal (metaslab) class vdev, which means:
+ * at least one that is simultaneously non-slog and non-special
  */
 boolean_t
 zfs_allocatable_devs(nvlist_t *nv)
 {
-	uint64_t is_log;
+	uint64_t is_log, is_special;
 	uint_t c;
 	nvlist_t **child;
 	uint_t children;
@@ -57,10 +59,12 @@ zfs_allocatable_devs(nvlist_t *nv)
 		return (B_FALSE);
 	}
 	for (c = 0; c < children; c++) {
-		is_log = 0;
+		is_log = is_special = 0;
 		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
 		    &is_log);
-		if (!is_log)
+		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_SPECIAL,
+		    &is_special);
+		if (!is_log && !is_special)
 			return (B_TRUE);
 	}
 	return (B_FALSE);
