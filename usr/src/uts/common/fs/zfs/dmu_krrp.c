@@ -1131,9 +1131,29 @@ zfs_recv_thread(void *krrp_task_void)
 		goto out;
 	}
 
+	/*
+	 * This option requires a functionality (similar to
+	 * create_parents() from libzfs_dataset.c), that is not
+	 * implemented yet
+	 */
+	if (krrp_task->buffer_args.strip_head) {
+		err = ENOTSUP;
+		goto out;
+	}
+
 	(void) strcpy(to_ds, krrp_task->buffer_args.to_ds);
 	if (dsl_dataset_creation_txg(to_ds) == UINT64_MAX) {
 		char *p;
+
+		/*
+		 * If 'leave_tail' or 'strip_head' are define,
+		 * then 'to_ds' just a prefix and must exist
+		 */
+		if (krrp_task->buffer_args.leave_tail ||
+		    krrp_task->buffer_args.strip_head) {
+			err = ENOENT;
+			goto out;
+		}
 
 		/*
 		 * spa found, '/' must be, becase the above

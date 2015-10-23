@@ -44,6 +44,9 @@ static int krrp_ioctl_zfs_get_recv_cookies(nvlist_t *params,
 static krrp_sess_t *krrp_ioctl_sess_action_common(nvlist_t *params,
     krrp_error_t *error);
 
+static krrp_stream_read_flag_t krrp_fill_read_stream_flags(nvlist_t *params);
+static krrp_stream_write_flag_t krrp_fill_write_stream_flags(nvlist_t *params);
+
 int
 krrp_ioctl_validate_cmd(krrp_ioctl_cmd_t cmd)
 {
@@ -535,10 +538,8 @@ krrp_ioctl_sess_create_read_stream(krrp_stream_t **result_stream,
 	int rc;
 	const char *dataset = NULL, *base_snap_name = NULL,
 	    *common_snap_name = NULL, *zcookies = NULL;
-	boolean_t send_recursive = B_FALSE, send_props = B_FALSE,
-	    include_all_snaps = B_FALSE, enable_cksum = B_FALSE,
-	    embedded = B_FALSE;
 	uint32_t keep_snaps;
+	krrp_stream_read_flag_t flags;
 
 	rc = krrp_param_get(KRRP_PARAM_SRC_DATASET,
 	    params, (void *) &dataset);
@@ -554,16 +555,6 @@ krrp_ioctl_sess_create_read_stream(krrp_stream_t **result_stream,
 	    params, (void *) &common_snap_name);
 	(void) krrp_param_get(KRRP_PARAM_SRC_SNAPSHOT,
 	    params, (void *) &base_snap_name);
-	(void) krrp_param_get(KRRP_PARAM_SEND_RECURSIVE,
-	    params, (void *) &send_recursive);
-	(void) krrp_param_get(KRRP_PARAM_SEND_PROPERTIES,
-	    params, (void *) &send_props);
-	(void) krrp_param_get(KRRP_PARAM_INCLUDE_ALL_SNAPSHOTS,
-	    params, (void *) &include_all_snaps);
-	(void) krrp_param_get(KRRP_PARAM_ENABLE_STREAM_CHKSUM,
-	    params, (void *) &enable_cksum);
-	(void) krrp_param_get(KRRP_PARAM_STREAM_EMBEDDED_BLOCKS,
-	    params, (void *) &embedded);
 
 	rc = krrp_param_get(KRRP_PARAM_STREAM_KEEP_SNAPS,
 	    params, (void *) &keep_snaps);
@@ -576,10 +567,9 @@ krrp_ioctl_sess_create_read_stream(krrp_stream_t **result_stream,
 		return (-1);
 	}
 
+	flags = krrp_fill_read_stream_flags(params);
 	return (krrp_stream_read_create(result_stream, keep_snaps, dataset,
-	    base_snap_name, common_snap_name, zcookies, include_all_snaps,
-	    send_recursive, send_props, enable_cksum, embedded,
-	    error));
+	    base_snap_name, common_snap_name, zcookies, flags, error));
 }
 
 static int
@@ -589,9 +579,9 @@ krrp_ioctl_sess_create_write_stream(krrp_stream_t **result_stream,
 	int rc;
 	const char *dataset = NULL, *common_snap_name = NULL,
 	    *zcookies = NULL;
-	boolean_t force_receive = B_FALSE, enable_cksum = B_FALSE;
 	nvlist_t *ignore_props_list = NULL, *replace_props_list = NULL;
 	uint32_t keep_snaps;
+	krrp_stream_write_flag_t flags;
 
 	rc = krrp_param_get(KRRP_PARAM_DST_DATASET,
 	    params, (void *) &dataset);
@@ -610,10 +600,6 @@ krrp_ioctl_sess_create_write_stream(krrp_stream_t **result_stream,
 
 	(void) krrp_param_get(KRRP_PARAM_COMMON_SNAPSHOT,
 	    params, (void *) &common_snap_name);
-	(void) krrp_param_get(KRRP_PARAM_FORCE_RECEIVE,
-	    params, (void *) &force_receive);
-	(void) krrp_param_get(KRRP_PARAM_ENABLE_STREAM_CHKSUM,
-	    params, (void *) &enable_cksum);
 
 	rc = krrp_param_get(KRRP_PARAM_STREAM_KEEP_SNAPS,
 	    params, (void *) &keep_snaps);
@@ -626,9 +612,11 @@ krrp_ioctl_sess_create_write_stream(krrp_stream_t **result_stream,
 		return (-1);
 	}
 
+	flags = krrp_fill_write_stream_flags(params);
+
 	return (krrp_stream_write_create(result_stream, keep_snaps,
-	    dataset, common_snap_name, zcookies, force_receive,
-	    enable_cksum, ignore_props_list, replace_props_list, error));
+	    dataset, common_snap_name, zcookies, flags,
+	    ignore_props_list, replace_props_list, error));
 }
 
 static int
@@ -750,4 +738,58 @@ krrp_ioctl_sess_action_common(nvlist_t *params, krrp_error_t *error)
 
 out:
 	return (sess);
+}
+
+static krrp_stream_read_flag_t
+krrp_fill_read_stream_flags(nvlist_t *params)
+{
+	boolean_t value = B_FALSE;
+	krrp_stream_read_flag_t flags = 0;
+
+	if (krrp_param_get(KRRP_PARAM_SEND_RECURSIVE,
+	    params, (void *) &value) == 0 && value)
+		krrp_stream_set_read_flag(&flags, KRRP_STRMRF_RECURSIVE);
+
+	if (krrp_param_get(KRRP_PARAM_SEND_PROPERTIES,
+	    params, (void *) &value) == 0 && value)
+		krrp_stream_set_read_flag(&flags, KRRP_STRMRF_SEND_PROPS);
+
+	if (krrp_param_get(KRRP_PARAM_INCLUDE_ALL_SNAPSHOTS,
+	    params, (void *) &value) && value)
+		krrp_stream_set_read_flag(&flags, KRRP_STRMRF_SEND_ALL_SNAPS);
+
+	if (krrp_param_get(KRRP_PARAM_ENABLE_STREAM_CHKSUM,
+	    params, (void *) &value) == 0 && value)
+		krrp_stream_set_read_flag(&flags, KRRP_STRMRF_ENABLE_CHKSUM);
+
+	if (krrp_param_get(KRRP_PARAM_STREAM_EMBEDDED_BLOCKS,
+	    params, (void *) &value) == 0 && value)
+		krrp_stream_set_read_flag(&flags, KRRP_STRMRF_EMBEDDED);
+
+	return (flags);
+}
+
+static krrp_stream_write_flag_t
+krrp_fill_write_stream_flags(nvlist_t *params)
+{
+	boolean_t value = B_FALSE;
+	krrp_stream_write_flag_t flags = 0;
+
+	if (krrp_param_get(KRRP_PARAM_FORCE_RECEIVE,
+	    params, (void *) &value) == 0 && value)
+		krrp_stream_set_write_flag(&flags, KRRP_STRMWF_FORCE_RECV);
+
+	if (krrp_param_get(KRRP_PARAM_ENABLE_STREAM_CHKSUM,
+	    params, (void *) &value) == 0 && value)
+		krrp_stream_set_write_flag(&flags, KRRP_STRMWF_ENABLE_CHKSUM);
+
+	if (krrp_param_get(KRRP_PARAM_STREAM_DISCARD_HEAD,
+	    params, (void *) &value) == 0 && value)
+		krrp_stream_set_write_flag(&flags, KRRP_STRMWF_DISCARD_HEAD);
+
+	if (krrp_param_get(KRRP_PARAM_STREAM_LEAVE_TAIL,
+	    params, (void *) &value) == 0 && value)
+		krrp_stream_set_write_flag(&flags, KRRP_STRMWF_LEAVE_TAIL);
+
+	return (flags);
 }

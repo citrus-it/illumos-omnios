@@ -32,6 +32,22 @@ typedef enum {
 	KRRP_STEM_WRITE,
 } krrp_stream_te_mode_t;
 
+typedef enum {
+	KRRP_STRMRF_RECURSIVE = 1,
+	KRRP_STRMRF_SEND_PROPS = 2,
+	KRRP_STRMRF_SEND_ALL_SNAPS = 4,
+	KRRP_STRMRF_EMBEDDED = 8,
+	KRRP_STRMRF_ENABLE_CHKSUM = 10
+} krrp_stream_read_flag_t;
+
+typedef enum {
+	KRRP_STRMWF_FORCE_RECV = 1,
+	KRRP_STRMWF_DISCARD_HEAD = 2,
+	KRRP_STRMWF_LEAVE_TAIL = 4,
+	KRRP_STRMWF_ENABLE_CHKSUM = 8
+} krrp_stream_write_flag_t;
+
+
 typedef struct krrp_stream_te_s {
 	krrp_queue_t			*tasks;
 	krrp_queue_t			*tasks_done;
@@ -44,6 +60,8 @@ typedef struct krrp_stream_te_s {
 	const char				*dataset;
 
 	boolean_t				fake_mode;
+	boolean_t				discard_head;
+	boolean_t				leave_tail;
 	boolean_t				force_receive;
 	boolean_t				recursive;
 	boolean_t				incremental_package;
@@ -89,15 +107,13 @@ struct krrp_stream_task_s {
 };
 
 int krrp_stream_te_read_create(krrp_stream_te_t **result_te,
-    const char *dataset, boolean_t include_all_snaps,
-    boolean_t recursive, boolean_t send_props,
-    boolean_t enable_cksum, boolean_t embedded,
+    const char *dataset, krrp_stream_read_flag_t flags,
     krrp_check_enough_mem *mem_check_cb, void *mem_check_cb_arg,
     krrp_error_t *error);
 int krrp_stream_te_write_create(krrp_stream_te_t **result_te,
-    const char *dataset, boolean_t force_receive,
-    boolean_t enable_cksum, nvlist_t *ignore_props_list,
-    nvlist_t *replace_props_list, krrp_error_t *error);
+    const char *dataset, krrp_stream_write_flag_t flags,
+    nvlist_t *ignore_props_list, nvlist_t *replace_props_list,
+    krrp_error_t *error);
 int krrp_stream_te_fake_read_create(krrp_stream_te_t **result_te,
     krrp_error_t *error);
 int krrp_stream_te_fake_write_create(krrp_stream_te_t **result_te,

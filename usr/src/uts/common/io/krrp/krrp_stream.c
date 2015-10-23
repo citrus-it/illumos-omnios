@@ -78,9 +78,7 @@ int
 krrp_stream_read_create(krrp_stream_t **result_stream,
     size_t keep_snaps, const char *dataset, const char *base_snap_name,
     const char *incr_snap_name, const char *zcookies,
-    boolean_t include_all_snaps,
-    boolean_t recursive, boolean_t send_props,
-    boolean_t enable_cksum, boolean_t embedded, krrp_error_t *error)
+    krrp_stream_read_flag_t flags, krrp_error_t *error)
 {
 	krrp_stream_t *stream;
 	int rc;
@@ -91,7 +89,8 @@ krrp_stream_read_create(krrp_stream_t **result_stream,
 	stream = krrp_stream_common_create();
 
 	stream->mode = KRRP_STRMM_READ;
-	stream->recursive = recursive;
+	stream->recursive =
+	    krrp_stream_is_read_flag_set(flags, KRRP_STRMRF_RECURSIVE);
 	stream->keep_snaps = keep_snaps;
 
 	rc = copy_str(stream->dataset, dataset, sizeof (stream->dataset));
@@ -142,8 +141,7 @@ krrp_stream_read_create(krrp_stream_t **result_stream,
 	}
 
 	rc = krrp_stream_te_read_create(&stream->task_engine,
-	    stream->dataset, include_all_snaps, stream->recursive,
-	    send_props, enable_cksum, embedded, &krrp_stream_check_mem,
+	    stream->dataset, flags, &krrp_stream_check_mem,
 	    stream, error);
 	if (rc != 0)
 		goto err;
@@ -161,9 +159,9 @@ err:
 int
 krrp_stream_write_create(krrp_stream_t **result_stream,
     size_t keep_snaps, const char *dataset, const char *incr_snap_name,
-	const char *zcookies, boolean_t force_receive,
-    boolean_t enable_cksum, nvlist_t *ignore_props_list,
-    nvlist_t *replace_props_list, krrp_error_t *error)
+    const char *zcookies, krrp_stream_write_flag_t flags,
+    nvlist_t *ignore_props_list, nvlist_t *replace_props_list,
+    krrp_error_t *error)
 {
 	krrp_stream_t *stream;
 	int rc;
@@ -201,8 +199,8 @@ krrp_stream_write_create(krrp_stream_t **result_stream,
 	}
 
 	rc = krrp_stream_te_write_create(&stream->task_engine,
-	    stream->dataset, force_receive, enable_cksum,
-	    ignore_props_list, replace_props_list, error);
+	    stream->dataset, flags, ignore_props_list,
+	    replace_props_list, error);
 	if (rc != 0)
 		goto err;
 
@@ -1104,4 +1102,32 @@ krrp_zfs_get_recv_cookies(const char *dataset, char *cookies_buf,
 	}
 
 	return (rc);
+}
+
+boolean_t
+krrp_stream_is_write_flag_set(krrp_stream_write_flag_t flags,
+    krrp_stream_write_flag_t flag)
+{
+	return ((flags & flag) != 0);
+}
+
+void
+krrp_stream_set_write_flag(krrp_stream_write_flag_t *flags,
+    krrp_stream_write_flag_t flag)
+{
+	*flags |= flag;
+}
+
+boolean_t
+krrp_stream_is_read_flag_set(krrp_stream_read_flag_t flags,
+    krrp_stream_read_flag_t flag)
+{
+	return ((flags & flag) != 0);
+}
+
+void
+krrp_stream_set_read_flag(krrp_stream_read_flag_t *flags,
+    krrp_stream_read_flag_t flag)
+{
+	*flags |= flag;
 }

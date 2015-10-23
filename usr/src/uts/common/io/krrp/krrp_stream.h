@@ -111,14 +111,12 @@ struct krrp_stream_s {
 int krrp_stream_read_create(krrp_stream_t **result_stream,
     size_t keep_snaps, const char *dataset, const char *base_snap_name,
     const char *incr_snap_name, const char *zcookies,
-    boolean_t include_all_snaps,
-    boolean_t recursive, boolean_t send_props,
-    boolean_t enable_cksum, boolean_t embedded, krrp_error_t *error);
+	krrp_stream_read_flag_t flags, krrp_error_t *error);
 int krrp_stream_write_create(krrp_stream_t **result_stream,
     size_t keep_snaps, const char *dataset, const char *incr_snap_name,
-    const char *zcookies, boolean_t force_receive,
-    boolean_t enable_cksum, nvlist_t *ignore_props_list,
-    nvlist_t *replace_props_list, krrp_error_t *error);
+    const char *zcookies, krrp_stream_write_flag_t flags,
+    nvlist_t *ignore_props_list, nvlist_t *replace_props_list,
+    krrp_error_t *error);
 int krrp_stream_fake_read_create(krrp_stream_t **result_stream,
     uint64_t fake_data_sz, krrp_error_t *error);
 int krrp_stream_fake_write_create(krrp_stream_t **result_stream,
@@ -138,6 +136,15 @@ int krrp_stream_send_stop(krrp_stream_t *stream);
 
 int krrp_zfs_get_recv_cookies(const char *dataset, char *cookies_buf,
     size_t cookies_buf_len, krrp_error_t *error);
+
+boolean_t krrp_stream_is_write_flag_set(krrp_stream_write_flag_t flags,
+    krrp_stream_write_flag_t flag);
+void krrp_stream_set_write_flag(krrp_stream_write_flag_t *flags,
+    krrp_stream_write_flag_t flag);
+boolean_t krrp_stream_is_read_flag_set(krrp_stream_read_flag_t flags,
+    krrp_stream_read_flag_t flag);
+void krrp_stream_set_read_flag(krrp_stream_read_flag_t *flags,
+    krrp_stream_read_flag_t flag);
 
 #ifdef __cplusplus
 }

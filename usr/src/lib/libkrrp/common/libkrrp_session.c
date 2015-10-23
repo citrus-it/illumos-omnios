@@ -337,9 +337,25 @@ krrp_sess_create_write_stream(libkrrp_handle_t *hdl, uuid_t sess_id,
 		    replace_props);
 	}
 
+	if (krrp_sess_stream_flags & KRRP_STREAM_DISCARD_HEAD) {
+		/*
+		 * Kernel does not yet support this flag
+		 */
+		libkrrp_error_set(&hdl->libkrrp_error,
+		    LIBKRRP_ERRNO_NOTSUP, 0, 0);
+		rc = -1;
+		goto out;
+	}
+
+	if (krrp_sess_stream_flags & KRRP_STREAM_LEAVE_TAIL) {
+		(void) krrp_param_put(KRRP_PARAM_STREAM_LEAVE_TAIL,
+		    params, NULL);
+	}
+
 	rc = krrp_ioctl_perform(hdl, KRRP_IOCTL_SESS_CREATE_WRITE_STREAM,
 	    params, NULL);
 
+out:
 	fnvlist_free(params);
 
 	return (rc);

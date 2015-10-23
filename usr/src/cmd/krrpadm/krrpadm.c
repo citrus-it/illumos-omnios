@@ -266,7 +266,7 @@ krrp_usage_sess(int rc, krrp_cmd_t *cmd, boolean_t use_return)
 	case KRRP_CMD_SESS_CREATE_WRITE_STREAM:
 		fprintf_msg("Usage: %s sess-create-write-stream "
 		    "<-s sess_id> [-d <dst dataset>] [-c <common snapshot>] "
-		    "[-F] [-e] [-k] [-i <prop_name>] "
+		    "[-F] [-e] [-k] [-l | -x] [-i <prop_name>] "
 		    "[-o <prop_name=value>] [-t <zcookies>] "
 		    "[-n <keep snaps>]\n", tool_name);
 		break;
@@ -1009,7 +1009,7 @@ krrp_do_sess_create_write_stream(int argc, char **argv, krrp_cmd_t *cmd)
 
 	uuid_clear(sess_id);
 
-	while ((c = getopt(argc, argv, "hs:d:c:Feki:o:t:n:")) != -1) {
+	while ((c = getopt(argc, argv, "hs:d:c:Feki:o:t:n:lx")) != -1) {
 		switch (c) {
 		case 's':
 			if (krrp_parse_and_check_sess_id(optarg, sess_id) != 0)
@@ -1116,6 +1116,22 @@ krrp_do_sess_create_write_stream(int argc, char **argv, krrp_cmd_t *cmd)
 
 			keep_snaps = i;
 			break;
+		case 'l':
+			if ((flags & KRRP_STREAM_LEAVE_TAIL) != 0) {
+				krrp_print_err_already_defined("l");
+				exit(1);
+			}
+
+			flags |= KRRP_STREAM_LEAVE_TAIL;
+			break;
+		case 'x':
+			if ((flags & KRRP_STREAM_DISCARD_HEAD) != 0) {
+				krrp_print_err_already_defined("x");
+				exit(1);
+			}
+
+			flags |= KRRP_STREAM_DISCARD_HEAD;
+			break;
 		case '?':
 			krrp_print_err_unknown_param(argv[optind - 1]);
 			cmd->usage_func(1, cmd, B_FALSE);
@@ -1125,6 +1141,14 @@ krrp_do_sess_create_write_stream(int argc, char **argv, krrp_cmd_t *cmd)
 			break;
 		}
 	}
+
+	if (((flags & KRRP_STREAM_DISCARD_HEAD) != 0) &&
+	    ((flags & KRRP_STREAM_LEAVE_TAIL) != 0)) {
+		fprintf_err("Parameters 'x' and 'l' cannot "
+		    "be used together\n");
+		exit(1);
+	}
+
 
 	if (uuid_is_null(sess_id) == 1) {
 		krrp_print_err_no_sess_id();

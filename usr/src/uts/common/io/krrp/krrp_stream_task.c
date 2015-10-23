@@ -34,6 +34,11 @@
 
 /* #define KRRP_STREAM_TASK_DEBUG 1 */
 
+extern boolean_t krrp_stream_is_write_flag_set(krrp_stream_write_flag_t flags,
+    krrp_stream_write_flag_t flag);
+extern boolean_t krrp_stream_is_read_flag_set(krrp_stream_read_flag_t flags,
+    krrp_stream_read_flag_t flag);
+
 static int krrp_stream_te_common_create(krrp_stream_te_t **result_te,
     const char *dataset, boolean_t read_mode, krrp_error_t *error);
 
@@ -59,9 +64,7 @@ uint32_t krrp_stream_fake_rate_limit_mb = 0;
 
 int
 krrp_stream_te_read_create(krrp_stream_te_t **result_te,
-    const char *dataset, boolean_t include_all_snaps,
-    boolean_t recursive, boolean_t send_props,
-    boolean_t enable_cksum, boolean_t embedded,
+    const char *dataset, krrp_stream_read_flag_t flags,
 	krrp_check_enough_mem *mem_check_cb, void *mem_check_cb_arg,
     krrp_error_t *error)
 {
@@ -77,11 +80,17 @@ krrp_stream_te_read_create(krrp_stream_te_t **result_te,
 
 	task_engine = *result_te;
 
-	task_engine->recursive = recursive;
-	task_engine->properties = send_props;
-	task_engine->enable_cksum = enable_cksum;
-	task_engine->embedded = embedded;
-	task_engine->incremental_package = include_all_snaps;
+	task_engine->recursive =
+	    krrp_stream_is_read_flag_set(flags, KRRP_STRMRF_RECURSIVE);
+	task_engine->properties =
+	    krrp_stream_is_read_flag_set(flags, KRRP_STRMRF_SEND_PROPS);
+	task_engine->enable_cksum =
+	    krrp_stream_is_read_flag_set(flags, KRRP_STRMRF_ENABLE_CHKSUM);
+	task_engine->embedded =
+	    krrp_stream_is_read_flag_set(flags, KRRP_STRMRF_EMBEDDED);
+	task_engine->incremental_package =
+	    krrp_stream_is_read_flag_set(flags, KRRP_STRMRF_SEND_ALL_SNAPS);
+
 	task_engine->mem_check_cb = mem_check_cb;
 	task_engine->mem_check_cb_arg = mem_check_cb_arg;
 
@@ -90,9 +99,9 @@ krrp_stream_te_read_create(krrp_stream_te_t **result_te,
 
 int
 krrp_stream_te_write_create(krrp_stream_te_t **result_te,
-    const char *dataset, boolean_t force_receive,
-    boolean_t enable_cksum, nvlist_t *ignore_props_list,
-    nvlist_t *replace_props_list, krrp_error_t *error)
+    const char *dataset, krrp_stream_write_flag_t flags,
+    nvlist_t *ignore_props_list, nvlist_t *replace_props_list,
+    krrp_error_t *error)
 {
 	int rc;
 	krrp_stream_te_t *task_engine;
@@ -106,8 +115,14 @@ krrp_stream_te_write_create(krrp_stream_te_t **result_te,
 
 	task_engine = *result_te;
 
-	task_engine->force_receive = force_receive;
-	task_engine->enable_cksum = enable_cksum;
+	task_engine->force_receive =
+	    krrp_stream_is_write_flag_set(flags, KRRP_STRMWF_FORCE_RECV);
+	task_engine->enable_cksum =
+	    krrp_stream_is_write_flag_set(flags, KRRP_STRMWF_ENABLE_CHKSUM);
+	task_engine->discard_head =
+	    krrp_stream_is_write_flag_set(flags, KRRP_STRMWF_DISCARD_HEAD);
+	task_engine->leave_tail =
+	    krrp_stream_is_write_flag_set(flags, KRRP_STRMWF_LEAVE_TAIL);
 
 	/*
 	 * Need to dup the nvls because they are part of another nvl,
@@ -353,15 +368,8 @@ krrp_stream_task_constructor(void *opaque_task,
 
 	bzero(&task->zargs, sizeof (kreplication_zfs_args_t));
 
-	task->zargs.force = task_engine->force_receive;
-	task->zargs.do_all = task_engine->incremental_package;
-	task->zargs.properties = task_engine->properties;
-	task->zargs.recursive = task_engine->recursive;
-	task->zargs.force_cksum = task_engine->enable_cksum;
-	task->zargs.embedok = task_engine->embedded;
 	task->zargs.stream_handler = task_engine->global_zfs_ctx;
-	task->zargs.ignore_list = task_engine->ignore_props_list;
-	task->zargs.replace_list = task_engine->replace_props_list;
+	task->zargs.force_cksum = task_engine->enable_cksum;
 
 	switch (task_engine->mode) {
 	case KRRP_STEM_READ:
@@ -384,6 +392,11 @@ krrp_stream_task_constructor(void *opaque_task,
 			    task_engine->mem_check_cb_arg;
 		}
 
+		task->zargs.do_all = task_engine->incremental_package;
+		task->zargs.properties = task_engine->properties;
+		task->zargs.recursive = task_engine->recursive;
+		task->zargs.embedok = task_engine->embedded;
+
 		break;
 	case KRRP_STEM_WRITE:
 		if (task_engine->fake_mode) {
@@ -396,6 +409,12 @@ krrp_stream_task_constructor(void *opaque_task,
 			task->process = &krrp_stream_task_write_handler;
 			task->shutdown = &krrp_stream_task_common_stop;
 		}
+
+		task->zargs.force = task_engine->force_receive;
+		task->zargs.ignore_list = task_engine->ignore_props_list;
+		task->zargs.replace_list = task_engine->replace_props_list;
+		task->zargs.strip_head = task_engine->discard_head;
+		task->zargs.leave_tail = task_engine->leave_tail;
 
 		break;
 	default:
