@@ -2270,6 +2270,7 @@ spa_trimstats_create(spa_t *spa)
 	if (spa->spa_trimstats_ks) {
 		spa->spa_trimstats = spa->spa_trimstats_ks->ks_data;
 
+#ifdef _KERNEL
 		kstat_named_init(&spa->spa_trimstats->st_extents,
 		    "extents", KSTAT_DATA_UINT64);
 		kstat_named_init(&spa->spa_trimstats->st_bytes,
@@ -2278,6 +2279,7 @@ spa_trimstats_create(spa_t *spa)
 		    "extents_skipped", KSTAT_DATA_UINT64);
 		kstat_named_init(&spa->spa_trimstats->st_bytes_skipped,
 		    "bytes_skipped", KSTAT_DATA_UINT64);
+#endif	/* _KERNEL */
 
 		kstat_install(spa->spa_trimstats_ks);
 	} else {
