@@ -1373,6 +1373,12 @@ spa_unload(spa_t *spa)
 	spa_async_suspend(spa);
 
 	/*
+	 * Stop autotrim tasks.
+	 */
+	if (spa->spa_auto_trim_taskq)
+		spa_auto_trim_taskq_destroy(spa);
+
+	/*
 	 * Stop syncing.
 	 */
 	if (spa->spa_sync_on) {
