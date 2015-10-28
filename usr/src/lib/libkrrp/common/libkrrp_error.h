@@ -93,10 +93,11 @@ typedef enum {
 #define	LIBKRRP_EMSG_ZFSWRCBADUSE \
 	    "WRC is enabled, but source or destination is not a pool"
 #define	LIBKRRP_EMSG_CMNSNAP_NOTEXIST "Common snapshot does not exist"
-#define	LIBKRRP_EMSG_SESS_INVAL "Cannot process the call at the receiver side"
-#define	LIBKRRP_EMSG_SESS_REMOTE_CALL_FAIL \
-	    "Cannot process the call at the receiver side"
+#define	LIBKRRP_EMSG_SESS_THROTTLE_RECV \
+	    "Throttle limit can be set only for sender session"
 #define	LIBKRRP_EMSG_SESS_SEND_STOP_ALREADY "Session is already stopping"
+#define	LIBKRRP_EMSG_SESS_SEND_STOP_RECV "Cannot stop session " \
+	    "at the receiver side"
 #define	LIBKRRP_EMSG_SESS_NOTACTIVE "Session is not running"
 #define	LIBKRRP_EMSG_CFGTYPE_NOENT "Configuration type not specified"
 #define	LIBKRRP_EMSG_CFGTYPE_INVAL "Invalid configuration type"
@@ -144,7 +145,7 @@ typedef enum {
 #define	LIBKRRP_EMSG_ZCOOKIES_INVAL "Invalid ZFS cookie"
 #define	LIBKRRP_EMSG_ZCOOKIES_NOENT "ZFS cookie does not exist"
 #define	LIBKRRP_EMSG_ZCOOKIES_FAIL "Failed to retrieve ZFS cookie (%s)"
-#define	LIBKRRP_EMSG_RUN_RECV_ONCE "Impossible to use the option 'run-once' " \
+#define	LIBKRRP_EMSG_RUN_ONCE_RECV "Impossible to use the option 'run-once' " \
 	    "at the receiver side"
 #define	LIBKRRP_EMSG_STREAM_POOL_FAULT "Failed to read configuration of " \
 	    "target ZFS pool"
