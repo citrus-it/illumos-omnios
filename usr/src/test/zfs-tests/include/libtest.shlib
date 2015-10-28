@@ -26,7 +26,7 @@
 #
 
 #
-# Copyright (c) 2012, 2014 by Delphix. All rights reserved.
+# Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.
 #
 
@@ -1706,8 +1706,7 @@ function get_remote_pkgpath
 #/**
 # A function to find and locate free disks on a system or from given
 # disks as the parameter. It works by locating disks that are in use
-# as swap devices, and dump devices, and also disks
-# listed in /etc/vfstab
+# as swap devices and dump devices, and also disks listed in /etc/vfstab
 #
 # $@ given disks to find which are free, default is all disks in
 # the test system
