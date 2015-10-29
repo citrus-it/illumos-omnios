@@ -421,12 +421,8 @@ wrc_move_block(void *arg)
 
 		first_iter = B_FALSE;
 
-		if (wrc_data->wrc_isfault || !wrc_data->wrc_isvalid)
-			return;
-		/*
-		 * If the queue is being purged, skip blocks.
-		 */
-		if (wrc_data->wrc_purge) {
+		if (wrc_data->wrc_purge || wrc_data->wrc_isfault ||
+		    !wrc_data->wrc_isvalid) {
 			atomic_inc_64(&wrc_data->wrc_blocks_mv);
 			return;
 		}
@@ -1427,6 +1423,9 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 		result = B_FALSE;
 	} else if (wrc_data->wrc_walking) {
 		/* Current window already done, but is not closed yet */
+		result = B_FALSE;
+	} else if (wrc_data->wrc_locked) {
+		/* WRC is locked by an external caller */
 		result = B_FALSE;
 	} else {
 		/* Accept new windows */
