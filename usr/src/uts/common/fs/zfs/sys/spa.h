@@ -177,7 +177,7 @@ typedef struct zio_cksum_salt {
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
  * 5	|G|			 offset3				|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
- * 6	|BDX|lvl| type	| cksum |E| comp|    PSIZE	|     LSIZE	|
+ * 6	|BDS|lvl| type	| cksum |E| comp|    PSIZE	|     LSIZE	|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
  * 7	|			padding					|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
@@ -211,7 +211,7 @@ typedef struct zio_cksum_salt {
  * G		gang block indicator
  * B		byteorder (endianness)
  * D		dedup
- * X		encryption (on version 30, which is not supported)
+ * S		special WRC block (unused for embedded blocks)
  * E		blkptr_t contains embedded data (see below)
  * lvl		level of indirection
  * type		DMU object type
@@ -237,7 +237,7 @@ typedef struct zio_cksum_salt {
  * 4	|      payload                                                  |
  * 5	|      payload                                                  |
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
- * 6	|BDX|lvl| type	| etype |E| comp| PSIZE|              LSIZE	|
+ * 6	|BDS|lvl| type	| etype |E| comp| PSIZE|              LSIZE	|
  *	+-------+-------+-------+-------+-------+-------+-------+-------+
  * 7	|      payload                                                  |
  * 8	|      payload                                                  |
@@ -257,7 +257,7 @@ typedef struct zio_cksum_salt {
  * payload		contains the embedded data
  * B (byteorder)	byteorder (endianness)
  * D (dedup)		padding (set to zero)
- * X			encryption (set to zero; see above)
+ * S			special WRC block (unused for embedded blocks)
  * E (embedded)		set to one
  * lvl			indirection level
  * type			DMU object type
@@ -397,6 +397,9 @@ _NOTE(CONSTCOND) } while (0)
 
 #define	BP_GET_LEVEL(bp)		BF64_GET((bp)->blk_prop, 56, 5)
 #define	BP_SET_LEVEL(bp, x)		BF64_SET((bp)->blk_prop, 56, 5, x)
+
+#define	BP_IS_SPECIAL(bp)		BF64_GET((bp)->blk_prop, 61, 1)
+#define	BP_SET_SPECIAL(bp, x)	BF64_SET((bp)->blk_prop, 61, 1, x)
 
 #define	BP_GET_DEDUP(bp)		BF64_GET((bp)->blk_prop, 62, 1)
 #define	BP_SET_DEDUP(bp, x)		BF64_SET((bp)->blk_prop, 62, 1, x)

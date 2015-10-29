@@ -314,19 +314,9 @@ vdev_mirror_io_start(zio_t *zio)
 
 	mm = vdev_mirror_map_alloc(zio);
 
-	/*
-	 * offset zero tells us that it's not a physical zio, but logical,
-	 * so we need to check for the special case
-	 */
-	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
-	/*
-	 * wrc is persistent and can not be turned off so if it is disabled
-	 * there are no special blocks for sure
-	 */
-	if (zio->io_child_type != ZIO_CHILD_VDEV)
-		spec_case = wrc_is_block_special(spa, zio->io_bp);
-
-	spa_config_exit(spa, SCL_VDEV, FTAG);
+	if (zio->io_child_type != ZIO_CHILD_VDEV &&
+	    BP_IS_SPECIAL(zio->io_bp))
+		spec_case = B_TRUE;
 
 	if (zio->io_type == ZIO_TYPE_READ) {
 		if ((zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_replacing) {

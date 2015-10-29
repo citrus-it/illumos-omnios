@@ -1920,7 +1920,7 @@ bp_get_dsize_sync(spa_t *spa, const blkptr_t *bp)
 	uint64_t dsize = 0;
 	boolean_t spec_bp;
 
-	spec_bp = wrc_is_block_special(spa, bp);
+	spec_bp = BP_IS_SPECIAL(bp);
 	for (int d = 0; d < BP_GET_NDVAS(bp); d++) {
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
 		if (spec_bp)
@@ -1938,7 +1938,7 @@ bp_get_dsize(spa_t *spa, const blkptr_t *bp)
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
-	spec_bp = wrc_is_block_special(spa, bp);
+	spec_bp = BP_IS_SPECIAL(bp);
 	for (int d = 0; d < BP_GET_NDVAS(bp); d++) {
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
 		if (spec_bp)

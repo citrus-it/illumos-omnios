@@ -97,7 +97,6 @@ static void wrc_write_update_window(void *void_spa, dmu_tx_t *tx);
 static int wrc_io(wrc_io_type_t type, wrc_block_t *block, void *data);
 static int wrc_blocks_compare(const void *arg1, const void *arg2);
 static int wrc_instances_compare(const void *arg1, const void *arg2);
-static boolean_t wrc_is_block_special_impl(spa_t *spa, const blkptr_t *bp);
 
 static void wrc_unregister_instance_impl(wrc_instance_t *wrc_instance,
     boolean_t rele_autosnap);
@@ -751,23 +750,8 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 	if (bp == NULL || zb->zb_level == ZB_ZIL_LEVEL)
 		return (0);
 
-	if (BP_IS_EMBEDDED(bp) || BP_IS_HOLE(bp))
+	if (!BP_IS_SPECIAL(bp))
 		return (0);
-
-	/* skip metadata */
-	if (BP_IS_METADATA(bp))
-		return (0);
-
-	/*  Skip blocks which are not placed on both classes */
-	if (BP_GET_NDVAS(bp) == 1)
-		return (0);
-
-	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
-	if (!wrc_is_block_special_impl(spa, bp)) {
-		spa_config_exit(spa, SCL_VDEV, FTAG);
-		return (0);
-	}
-	spa_config_exit(spa, SCL_VDEV, FTAG);
 
 	mutex_enter(&wrc_data->wrc_lock);
 
@@ -1701,38 +1685,6 @@ wrc_select_dva(wrc_data_t *wrc_data, zio_t *zio)
 	mutex_exit(&wrc_data->wrc_lock);
 
 	return (c);
-}
-
-static boolean_t
-wrc_is_block_special_impl(spa_t *spa, const blkptr_t *bp)
-{
-	const dva_t *dva = bp->blk_dva;
-	vdev_t *v1, *v2;
-
-	v1 = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[WRC_SPECIAL_DVA]));
-	v2 = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[WRC_NORMAL_DVA]));
-
-	if (vdev_is_special(v1) && !vdev_is_special(v2))
-		return (B_TRUE);
-
-	return (B_FALSE);
-}
-
-
-boolean_t
-wrc_is_block_special(spa_t *spa, const blkptr_t *bp)
-{
-	/*
-	 * wrc is persistent and can not be turned off so if it is disabled
-	 * there are no special blocks for sure
-	 */
-	if (!spa_feature_is_active(spa, SPA_FEATURE_WRC))
-		return (B_FALSE);
-
-	if (BP_GET_NDVAS(bp) >= 2)
-		return (wrc_is_block_special_impl(spa, bp));
-
-	return (B_FALSE);
 }
 
 /*

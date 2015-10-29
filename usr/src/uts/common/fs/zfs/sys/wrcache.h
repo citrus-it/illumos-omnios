@@ -202,7 +202,6 @@ void wrc_deactivate(spa_t *spa);
 void wrc_enter_fault_state(spa_t *spa);
 
 int wrc_select_dva(wrc_data_t *wrc_data, zio_t *zio);
-boolean_t wrc_is_block_special(spa_t *spa, const blkptr_t *bp);
 int wrc_first_valid_dva(const blkptr_t *bp,
     wrc_data_t *wrc_data, boolean_t removal);
 

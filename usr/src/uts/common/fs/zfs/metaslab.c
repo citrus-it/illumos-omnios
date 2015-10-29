@@ -2618,14 +2618,16 @@ metaslab_alloc(spa_t *spa, metaslab_class_t *mc, uint64_t psize, blkptr_t *bp,
 		error = metaslab_alloc_dva(spa, spa_normal_class(spa),
 		    psize, &dva[WRC_NORMAL_DVA], 0, NULL, txg,
 		    flags | METASLAB_USE_WEIGHT_SECONDARY);
-		if (!error) {
+		if (error == 0) {
 			error = metaslab_alloc_dva(spa, mc, psize,
 			    &dva[WRC_SPECIAL_DVA], 0, NULL, txg, flags);
-			if (error) {
+			if (error != 0) {
 				error = 0;
 				bcopy(&dva[WRC_NORMAL_DVA],
 				    &dva[WRC_SPECIAL_DVA], sizeof (dva_t));
 				bzero(&dva[WRC_SPECIAL_DVA], sizeof (dva_t));
+			} else {
+				BP_SET_SPECIAL(bp, 1);
 			}
 		} else {
 			spa_config_exit(spa, SCL_ALLOC, FTAG);
@@ -2667,7 +2669,7 @@ metaslab_free(spa_t *spa, const blkptr_t *bp, uint64_t txg, boolean_t now)
 
 	spa_config_enter(spa, SCL_FREE, FTAG, RW_READER);
 
-	if (wrc_is_block_special(spa, bp)) {
+	if (BP_IS_SPECIAL(bp)) {
 		int start_dva;
 		wrc_data_t *wrc_data = spa_get_wrc_data(spa);
 
@@ -2713,7 +2715,7 @@ metaslab_claim(spa_t *spa, const blkptr_t *bp, uint64_t txg)
 
 	spa_config_enter(spa, SCL_ALLOC, FTAG, RW_READER);
 
-	if (wrc_is_block_special(spa, bp)) {
+	if (BP_IS_SPECIAL(bp)) {
 		int start_dva;
 		wrc_data_t *wrc_data = spa_get_wrc_data(spa);
 
@@ -2754,18 +2756,12 @@ metaslab_check_free(spa_t *spa, const blkptr_t *bp)
 	if ((zfs_flags & ZFS_DEBUG_ZIO_FREE) == 0)
 		return;
 
-	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
-
-	/*
-	 * wrc is persistent and can not be turned off so if it is disabled
-	 * there are no special blocks for sure
-	 */
-	if (wrc_is_block_special(spa, bp)) {
+	if (BP_IS_SPECIAL(bp)) {
 		/* Do not check frees for wrc blocks */
-		spa_config_exit(spa, SCL_VDEV, FTAG);
 		return;
 	}
 
+	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 	for (int i = 0; i < BP_GET_NDVAS(bp); i++) {
 		uint64_t vdev = DVA_GET_VDEV(&bp->blk_dva[i]);
 		vdev_t *vd = vdev_lookup_top(spa, vdev);
