@@ -5988,6 +5988,8 @@ arc_fini(void)
 		multilist_destroy(&arc_mfu->arcs_list[arcs]);
 		multilist_destroy(&arc_mfu_ghost->arcs_list[arcs]);
 	}
+	multilist_destroy(&arc_l2c_only->arcs_list[ARC_BUFC_METADATA]);
+	multilist_destroy(&arc_l2c_only->arcs_list[ARC_BUFC_DATA]);
 	taskq_destroy(arc_flush_taskq);
 
 	buf_fini();
