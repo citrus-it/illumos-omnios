@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/sysmacros.h>
@@ -287,14 +287,20 @@ sbd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ddi_report_dev(dip);
 
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS, "vendor-id", &prop) == DDI_SUCCESS)
+		    DDI_PROP_DONTPASS, "vendor-id", &prop) == DDI_SUCCESS) {
 			(void) snprintf(sbd_vendor_id, 9, "%s%8s", prop, "");
+			ddi_prop_free(prop);
+		}
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS, "product-id", &prop) == DDI_SUCCESS)
+		    DDI_PROP_DONTPASS, "product-id", &prop) == DDI_SUCCESS) {
 			(void) snprintf(sbd_product_id, 17, "%s%16s", prop, "");
+			ddi_prop_free(prop);
+		}
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
-		    DDI_PROP_DONTPASS, "revision", &prop) == DDI_SUCCESS)
+		    DDI_PROP_DONTPASS, "revision", &prop) == DDI_SUCCESS) {
 			(void) snprintf(sbd_revision, 5, "%s%4s", prop, "");
+			ddi_prop_free(prop);
+		}
 
 		return (DDI_SUCCESS);
 	}
