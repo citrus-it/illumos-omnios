@@ -27,6 +27,8 @@ extern uint32_t smb2_tcp_rcvbuf;
 extern uint32_t smb2_max_rwsize;
 extern uint32_t smb2_max_trans;
 
+extern int smb2_aapl_use_file_ids;
+
 void	smb2_dispatch_stats_init(smb_server_t *);
 void	smb2_dispatch_stats_fini(smb_server_t *);
 void	smb2_dispatch_stats_update(smb_server_t *,

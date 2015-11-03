@@ -356,6 +356,10 @@ smb2_find_entries(smb_request_t *sr, smb_odir_t *od, smb2_find_args_t *args)
 			(void) smb2_aapl_get_macinfo(sr, od,
 			    &args->fa_fi, &args->fa_mi, tbuf, tbuflen);
 
+		if (smb2_aapl_use_file_ids == 0 &&
+		    (sr->session->s_flags & SMB_SSN_AAPL_CCEXT) != 0)
+			args->fa_fi.fi_nodeid = 0;
+
 		status = smb2_find_mbc_encode(sr, args);
 		if (status) {
 			/*
