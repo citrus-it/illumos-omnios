@@ -191,6 +191,7 @@ smb_session_send(smb_session_t *session, uint8_t nbt_type, mbuf_chain_t *mbc)
 	if (rc != 0)
 		goto out;
 
+	smb_server_add_txb(session->s_server, (int64_t)uio.uio_resid);
 	rc = smb_net_send_uio(session, &uio);
 
 out:
