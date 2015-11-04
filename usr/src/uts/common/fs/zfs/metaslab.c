@@ -2623,9 +2623,20 @@ metaslab_alloc(spa_t *spa, metaslab_class_t *mc, uint64_t psize, blkptr_t *bp,
 			    &dva[WRC_SPECIAL_DVA], 0, NULL, txg, flags);
 			if (error != 0) {
 				error = 0;
+				/*
+				 * Change the place of NORMAL and cleanup the
+				 * second DVA. After that this BP is just a
+				 * regular BP with one DVA
+				 *
+				 * This operation is valid only if:
+				 * WRC_SPECIAL_DVA is dva[0]
+				 * WRC_NORMAL_DVA is dva[1]
+				 *
+				 * see wrcache.h
+				 */
 				bcopy(&dva[WRC_NORMAL_DVA],
 				    &dva[WRC_SPECIAL_DVA], sizeof (dva_t));
-				bzero(&dva[WRC_SPECIAL_DVA], sizeof (dva_t));
+				bzero(&dva[WRC_NORMAL_DVA], sizeof (dva_t));
 			} else {
 				BP_SET_SPECIAL(bp, 1);
 			}
