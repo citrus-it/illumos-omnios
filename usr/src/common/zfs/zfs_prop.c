@@ -348,6 +348,9 @@ zfs_prop_init(void)
 	zprop_register_index(ZFS_PROP_NBMAND, "nbmand", 0, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP,
 	    "on | off", "NBMAND", boolean_table);
+	zprop_register_index(ZFS_PROP_SMARTCOMPRESSION, "smartcompression", 1,
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM, "on | off", "SMARTCOMPRESSION",
+	    boolean_table);
 
 	/* default index properties */
 	zprop_register_index(ZFS_PROP_VERSION, "version", 0, PROP_DEFAULT,
