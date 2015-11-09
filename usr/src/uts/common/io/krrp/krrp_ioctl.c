@@ -755,7 +755,7 @@ krrp_fill_read_stream_flags(nvlist_t *params)
 		krrp_stream_set_read_flag(&flags, KRRP_STRMRF_SEND_PROPS);
 
 	if (krrp_param_get(KRRP_PARAM_INCLUDE_ALL_SNAPSHOTS,
-	    params, (void *) &value) && value)
+	    params, (void *) &value) == 0 && value)
 		krrp_stream_set_read_flag(&flags, KRRP_STRMRF_SEND_ALL_SNAPS);
 
 	if (krrp_param_get(KRRP_PARAM_ENABLE_STREAM_CHKSUM,
