@@ -4407,6 +4407,37 @@ print_dedup_stats(nvlist_t *config)
 }
 
 /*
+ * Calculates the total space available on log devices on the pool.
+ * For whatever reason, this is not counted in the root vdev's space stats.
+ */
+static uint64_t
+zpool_slog_space(nvlist_t *nvroot)
+{
+	nvlist_t **newchild;
+	uint_t c, children;
+	uint64_t space = 0;
+
+	verify(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
+	    &newchild, &children) == 0);
+
+	for (c = 0; c < children; c++) {
+		uint64_t islog = B_FALSE;
+		vdev_stat_t *vs;
+		uint_t n;
+
+		(void) nvlist_lookup_uint64(newchild[c], ZPOOL_CONFIG_IS_LOG,
+		    &islog);
+		if (!islog)
+			continue;
+		verify(nvlist_lookup_uint64_array(newchild[c],
+		    ZPOOL_CONFIG_VDEV_STATS, (uint64_t **)&vs, &n) == 0);
+		space += vs->vs_space;
+	}
+
+	return (space);
+}
+
+/*
  * Display a summary of pool status.  Displays a summary such as:
  *
  *        pool: tank
@@ -4678,7 +4709,12 @@ status_callback(zpool_handle_t *zhp, void *data)
 		    &trim_prog) == 0 &&
 		    nvlist_lookup_uint64(config, ZPOOL_CONFIG_TRIM_RATE,
 		    &trim_rate) == 0) {
-			print_trim_status(trim_prog, vs->vs_space, trim_rate);
+			/*
+			 * For whatever reason, root vdev_stats_t don't
+			 * include log devices.
+			 */
+			print_trim_status(trim_prog, vs->vs_space +
+			    zpool_slog_space(nvroot), trim_rate);
 		}
 
 		namewidth = max_width(zhp, nvroot, 0, 0);
