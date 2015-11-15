@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -294,7 +294,6 @@ typedef struct dmu_sendarg {
 	int dsa_err;
 	dmu_pendop_t dsa_pending_op;
 	boolean_t sendsize;
-	boolean_t dsa_incremental;
 	uint64_t dsa_featureflags;
 	uint64_t dsa_last_data_object;
 	uint64_t dsa_last_data_offset;
