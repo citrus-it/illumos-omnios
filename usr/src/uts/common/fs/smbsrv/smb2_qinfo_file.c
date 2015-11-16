@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -86,6 +86,7 @@ smb2_qinfo_file(smb_request_t *sr, smb_queryinfo_t *qi)
 
 	case FileStreamInformation:
 		mask = SMB_AT_STANDARD;
+		getstd = B_TRUE;
 		break;
 
 	case FileCompressionInformation:
