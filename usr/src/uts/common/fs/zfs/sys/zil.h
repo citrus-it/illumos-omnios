@@ -341,11 +341,12 @@ typedef struct {
  *    and a pointer to the block is put into the log record.
  *    When the txg commits the block is linked in.
  *    This saves additionally writing the data into the log record.
- *    There are a few requirements for this to occur:
- *	- write is greater than zfs/zvol_immediate_write_sz
- *	- not using slogs (as slogs are assumed to always be faster
- *	  than writing into the main pool)
- *	- the write occupies only one block
+ *    There are a few requirements for this to occur. In general, WR_INDIRECT
+ *    with the subsequent dmu_sync-ing of the data directly into the filesystem
+ *    is used in the two following separate cases:
+ *      - logbias = THROUGHPUT mode
+ *      - writeback cache (via special vdev) when there is no separate slog
+ *    For specific details and configurable tunables - see zfs_log_write().
  * WR_COPIED:
  *    If we know we'll immediately be committing the
  *    transaction (FSYNC or FDSYNC), the we allocate a larger

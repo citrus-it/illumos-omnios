@@ -2766,11 +2766,10 @@ zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp, blkptr_t *old_bp,
 	}
 
 	/*
-	 * If there is no dedicated log device and pool has a special device,
-	 * then ZIL should be allocated on the special device.
+	 * use special when failed to allocate from the regular slog,
+	 * but only if the special is usable and has enough space
 	 */
-	if (zil_use_sdev && error && spa_has_special(spa) &&
-	    spa->spa_usesc) {
+	if (zil_use_sdev && error && spa_can_special_be_used(spa)) {
 		error = metaslab_alloc(spa, spa_special_class(spa), size,
 		    new_bp, 1, txg, old_bp,
 		    METASLAB_HINTBP_AVOID | METASLAB_GANG_AVOID);

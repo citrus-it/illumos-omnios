@@ -388,6 +388,7 @@ struct spa {
 	/* specialclass support */
 	boolean_t	spa_usesc;		/* enable special class */
 	spa_specialclass_t spa_specialclass;	/* class of special device */
+	uint64_t	spa_special_vdev_correction_rate;
 	uint64_t	spa_lowat;		/* low watermark percent */
 	uint64_t	spa_hiwat;		/* high watermark percent */
 	uint64_t	spa_lwm_space;		/* low watermark */

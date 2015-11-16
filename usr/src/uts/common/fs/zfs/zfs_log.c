@@ -450,7 +450,7 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
  * Handles TX_WRITE transactions.
  */
 ssize_t zfs_immediate_write_sz = 32768;
-boolean_t zfs_wrcache_write_once = 1;
+ssize_t zfs_immediate_write_sz_special = 1;
 
 void
 zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
@@ -495,16 +495,27 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	slogging = spa_has_slogs(zilog->zl_spa) &&
 	    (zilog->zl_logbias == ZFS_LOGBIAS_LATENCY);
 
-	if (immediate_write_sz && !slogging && zfs_wrcache_write_once &&
-	    spa_write_data_to_special(zilog->zl_spa, zilog->zl_os))
-		immediate_write_sz = 0;
+	if (immediate_write_sz && !slogging && zfs_immediate_write_sz_special &&
+	    immediate_write_sz > zfs_immediate_write_sz_special &&
+	    (ioflag & (FSYNC | FDSYNC)) &&
+	    spa_can_special_be_used(zilog->zl_spa))
+		immediate_write_sz = zfs_immediate_write_sz_special;
 
-	if (resid > immediate_write_sz && !slogging && resid <= zp->z_blksz)
+	if (resid > immediate_write_sz && !slogging && resid <= zp->z_blksz) {
 		write_state = WR_INDIRECT;
-	else if (ioflag & (FSYNC | FDSYNC))
-		write_state = WR_COPIED;
-	else
+	} else if (ioflag & (FSYNC | FDSYNC)) {
+		/*
+		 * If the target DS is under WRC, then we can
+		 * be like 'zl_logbias == ZFS_LOGBIAS_THROUGHPUT'
+		 */
+		if (spa_write_data_to_special(zilog->zl_spa, zilog->zl_os)) {
+			write_state = WR_INDIRECT;
+		} else {
+			write_state = WR_COPIED;
+		}
+	} else {
 		write_state = WR_NEED_COPY;
+	}
 
 	DTRACE_PROBE3(zfs_lwr, ssize_t, immediate_write_sz,
 	    itx_wr_state_t, write_state, uint_t, zp->z_blksz);

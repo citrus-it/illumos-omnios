@@ -127,6 +127,13 @@ spa_write_data_to_special(spa_t *spa, objset_t *os)
 	    (os->os_wrc_mode != ZFS_WRC_MODE_OFF));
 }
 
+boolean_t
+spa_can_special_be_used(spa_t *spa)
+{
+	return (spa_has_special(spa) && spa->spa_usesc &&
+	    (spa->spa_watermark == SPA_WM_NONE));
+}
+
 spa_specialclass_id_t
 spa_specialclass_id(objset_t *os)
 {
@@ -201,6 +208,18 @@ spa_check_watermarks(spa_t *spa)
 			spa->spa_watermark = SPA_WM_LOW;
 			spa_event_notify(spa, vd, ESC_ZFS_LOW_WATERMARK);
 		}
+
+		/*
+		 * correction_rate is used by the spa_special_load_adjust()
+		 * the coefficient changes proportionally to the space on the
+		 * special vdev utilized beyond low watermark:
+		 * 	from 0% - when we are below low watermark
+		 * 	to 100% - at high watermark
+		 */
+		spa->spa_special_vdev_correction_rate =
+		    ((aspace - spa->spa_lwm_space) * 100) /
+		    (spa->spa_hwm_space - spa->spa_lwm_space);
+
 		if (spa->spa_wrc.wrc_thread != NULL) {
 			/*
 			 * Unlike Meta device, write cache is enabled, when
@@ -354,6 +373,7 @@ spa_meta_to_special(spa_t *spa, objset_t *os, dmu_object_type_t ot)
 
 	ASSERT(os != NULL);
 	/* some duplication of the spa_select_class() here */
+
 	if (spa_has_special(spa) && spa->spa_usesc) {
 		uint64_t specflags = spa_specialclass_flags(os);
 		result = (!!(SPECIAL_FLAG_DATAMETA & specflags)) ||
@@ -451,9 +471,7 @@ spa_select_class(spa_t *spa, zio_t *zio)
 		} else {
 			match = zio->io_prop.zp_usewrc;
 			if (match) {
-				if (zio->io_priority !=
-				    ZIO_PRIORITY_SYNC_WRITE)
-					match = spa_refine_data_placement(spa);
+				match = spa_refine_data_placement(spa);
 
 				DTRACE_PROBE1(wrc_data_placement,
 				    boolean_t, match);
@@ -472,23 +490,48 @@ spa_select_class(spa_t *spa, zio_t *zio)
 	return (spa_normal_class(spa));
 }
 
-uint64_t spa_static_routing_percentage = 0;
+uint64_t spa_static_routing_percentage = UINT64_MAX;
 uint64_t spa_special_lt_limit = 15;
 
 static void
 spa_special_load_adjust(spa_t *spa)
 {
 	spa_special_stat_t *stat = &spa->spa_special_stat;
+	int special_vdev_busy = spa_special_vdev_busy;
+	int normal_vdev_busy = spa_normal_vdev_busy;
+
 	/*
 	 * write to special until utilization threshold is reached
 	 * then look at either latency or vdev utilization and adjust
 	 * load distribution accordingly
 	 */
 
-	if (spa_static_routing_percentage != 0) {
+	if (spa_static_routing_percentage <= 100) {
 		spa->spa_special_to_normal_ratio =
 		    spa_static_routing_percentage;
-		return;
+		goto out;
+	}
+
+	if (spa->spa_watermark == SPA_WM_HIGH) {
+		/*
+		 * Free space on the special device is too low,
+		 * so need to offload it
+		 */
+		spa->spa_special_to_normal_ratio = 0;
+		goto out;
+	}
+
+	if (spa->spa_watermark == SPA_WM_LOW) {
+		/*
+		 * Additional correction to little reduce of load
+		 * to special and increase load to normal.
+		 */
+		special_vdev_busy = special_vdev_busy *
+		    ((100 - spa->spa_special_vdev_correction_rate) / 100);
+		normal_vdev_busy = normal_vdev_busy *
+		    ((100 + spa->spa_special_vdev_correction_rate) / 100);
+		if (normal_vdev_busy > 100)
+			normal_vdev_busy = 100;
 	}
 
 	ASSERT(SPA_SPECIAL_SELECTION_VALID(spa_special_selection));
@@ -530,7 +573,7 @@ spa_special_load_adjust(spa_t *spa)
 		}
 		break;
 	case SPA_SPECIAL_SELECTION_THROUGHPUT:
-		if (stat->ht_special_ut < spa_special_vdev_busy) {
+		if (stat->ht_special_ut < special_vdev_busy) {
 			/*
 			 * keep using special class until
 			 * the threshold is reached
@@ -538,7 +581,7 @@ spa_special_load_adjust(spa_t *spa)
 			spa->spa_special_to_normal_ratio +=
 			    MIN(spa_special_factor,
 			    100 - spa->spa_special_to_normal_ratio);
-		} else if (stat->ht_normal_ut < spa_normal_vdev_busy) {
+		} else if (stat->ht_normal_ut < normal_vdev_busy) {
 			/*
 			 * move some of the work to the normal class,
 			 * unless it is already busy
@@ -551,6 +594,8 @@ spa_special_load_adjust(spa_t *spa)
 	default:
 		break; /* do nothing */
 	}
+
+out:
 #ifdef _KERNEL
 	DTRACE_PROBE5(spa_adjust_routing,
 	    uint64_t, stat->ht_special_ut,
