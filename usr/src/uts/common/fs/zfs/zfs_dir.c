@@ -179,9 +179,14 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 	 * determine if we need to normalize this text by looking for a FIRST
 	 * match, or if this is an EXACT match, bypassing normalization.  Then
 	 * determine if the match needs to honor case, and if so keep track of
-	 * that so that during normalization we don't fold case.
+	 * that so that during normalization we don't fold case.  Note that
+	 * a FIRST match is necessary for a case insensitive filesystem when
+	 * the lookup request is not exact because normalizion can fold case
+	 * independent of normalizing code point sequences.
 	 */
-	if (zfsvfs->z_norm & ~U8_TEXTPREP_TOUPPER) {
+	if ((zfsvfs->z_norm & ~U8_TEXTPREP_TOUPPER) ||
+	    ((zfsvfs->z_case == ZFS_CASE_INSENSITIVE) &&
+	    !(flag & ZCIEXACT))) {
 		mt = MT_FIRST;
 	} else {
 		mt = MT_EXACT;
