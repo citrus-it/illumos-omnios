@@ -85,6 +85,11 @@ uint64_t wrc_mv_cancel_threshold_initial = 20;
 uint64_t wrc_mv_cancel_threshold_step = 0;
 uint64_t wrc_mv_cancel_threshold_cap = 50;
 
+static void wrc_free_block(wrc_block_t *block);
+static void wrc_clean_tree(wrc_data_t *wrc_data, avl_tree_t *tree);
+static void wrc_clean_plan_tree(spa_t *spa);
+static void wrc_clean_moved_tree(spa_t *spa);
+
 static void wrc_activate_impl(spa_t *spa);
 static wrc_block_t *wrc_create_block(wrc_data_t *wrc_data,
     const blkptr_t *bp);
@@ -129,12 +134,16 @@ wrc_init(wrc_data_t *wrc_data, spa_t *spa)
 void
 wrc_fini(wrc_data_t *wrc_data)
 {
+	mutex_enter(&wrc_data->wrc_lock);
+
 	wrc_clean_plan_tree(wrc_data->wrc_spa);
 	wrc_clean_moved_tree(wrc_data->wrc_spa);
 
 	avl_destroy(&wrc_data->wrc_blocks);
 	avl_destroy(&wrc_data->wrc_moved_blocks);
 	avl_destroy(&wrc_data->wrc_instances);
+
+	mutex_exit(&wrc_data->wrc_lock);
 
 	cv_destroy(&wrc_data->wrc_cv);
 	mutex_destroy(&wrc_data->wrc_lock);
@@ -188,35 +197,41 @@ wrc_create_block(wrc_data_t *wrc_data, const blkptr_t *bp)
 	return (block);
 }
 
-void
+static void
 wrc_free_block(wrc_block_t *block)
 {
 	mutex_destroy(&block->lock);
 	kmem_free(block, sizeof (*block));
 }
 
-void
-wrc_clean_plan_tree(spa_t *spa)
+static void
+wrc_clean_tree(wrc_data_t *wrc_data, avl_tree_t *tree)
 {
 	void *cookie = NULL;
-	wrc_block_t *node = NULL;
-	avl_tree_t *tree = &spa->spa_wrc.wrc_blocks;
+	wrc_block_t *block = NULL;
 
-	while ((node = avl_destroy_nodes(tree, &cookie)) != NULL)
-		wrc_free_block(node);
+	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
 
-	spa->spa_wrc.wrc_block_count = 0;
+	while ((block = avl_destroy_nodes(tree, &cookie)) != NULL)
+		wrc_free_block(block);
 }
 
-void
+static void
+wrc_clean_plan_tree(spa_t *spa)
+{
+	wrc_data_t *wrc_data = spa_get_wrc_data(spa);
+
+	wrc_clean_tree(wrc_data, &wrc_data->wrc_blocks);
+	wrc_data->wrc_block_count = 0;
+}
+
+static void
 wrc_clean_moved_tree(spa_t *spa)
 {
-	void *cookie = NULL;
-	wrc_block_t *node = NULL;
-	avl_tree_t *tree = &spa->spa_wrc.wrc_moved_blocks;
+	wrc_data_t *wrc_data = spa_get_wrc_data(spa);
 
-	while ((node = avl_destroy_nodes(tree, &cookie)) != NULL)
-		wrc_free_block(node);
+	wrc_clean_tree(wrc_data, &wrc_data->wrc_moved_blocks);
+	wrc_data->wrc_blocks_mv = 0;
 }
 
 /* WRC-MOVE routines */
@@ -334,11 +349,11 @@ spa_wrc_thread(spa_t *spa)
 					taskqid_t res;
 					avl_add(
 					    &wrc_data->wrc_moved_blocks, block);
+					wrc_data->wrc_blocks_out++;
 					mutex_exit(&wrc_data->wrc_lock);
 					res = taskq_dispatch(
 					    wrc_data->wrc_move_taskq,
 					    wrc_move_block, block, TQ_SLEEP);
-					wrc_data->wrc_blocks_out++;
 					if (res == 0) {
 						atomic_inc_64(
 						    &wrc_data->wrc_blocks_mv);
@@ -373,8 +388,6 @@ out:
 	taskq_wait(wrc_data->wrc_move_taskq);
 	taskq_destroy(wrc_data->wrc_move_taskq);
 
-	wrc_clean_plan_tree(spa);
-	wrc_clean_moved_tree(spa);
 	wrc_data->wrc_thread = NULL;
 
 	DTRACE_PROBE1(wrc_thread_done, char *, spa->spa_name);
@@ -755,6 +768,11 @@ wrc_traverse_ds_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 
 	mutex_enter(&wrc_data->wrc_lock);
 
+	if (wrc_data->wrc_thr_exit) {
+		mutex_exit(&wrc_data->wrc_lock);
+		return (ERESTART);
+	}
+
 	if (spa_wrc_stop_move(spa)) {
 		mutex_exit(&wrc_data->wrc_lock);
 		return (ERESTART);
@@ -1010,6 +1028,9 @@ wrc_stop_thread(spa_t *spa)
 		wrc_data->wrc_walk_thread = NULL;
 		stop |= B_TRUE;
 	}
+
+	wrc_clean_plan_tree(spa);
+	wrc_clean_moved_tree(spa);
 
 	mutex_exit(&wrc_data->wrc_lock);
 

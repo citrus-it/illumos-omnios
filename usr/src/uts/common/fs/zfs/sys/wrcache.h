@@ -228,10 +228,6 @@ boolean_t wrc_try_hold(spa_t *);
 int wrc_walk_lock(spa_t *);
 void wrc_walk_unlock(spa_t *);
 
-void wrc_free_block(wrc_block_t *block);
-void wrc_clean_plan_tree(spa_t *spa);
-void wrc_clean_moved_tree(spa_t *spa);
-
 void wrc_process_objset(wrc_data_t *wrc_data, objset_t *os, boolean_t destroy);
 void wrc_mode_changed(void *arg, uint64_t newval);
 uint64_t wrc_pack_wrc_mode(uint64_t value, uint64_t objset_num);
