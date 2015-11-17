@@ -22,6 +22,9 @@
 #include <smbsrv/smb2_aapl.h>
 #include <smbsrv/smb_fsops.h>
 
+/* SMB2 AAPL extensions: enabled? */
+int smb2_aapl_extensions = 1;
+
 /*
  * Normally suppress file IDs for MacOS because it
  * requires them to be unique per share, and ours
@@ -46,6 +49,9 @@ smb2_aapl_crctx(smb_request_t *sr,
 	uint32_t cmdcode;
 	uint32_t status;
 	int rc;
+
+	if (smb2_aapl_extensions == 0)
+		return (NT_STATUS_NOT_SUPPORTED);
 
 	rc = smb_mbc_decodef(mbcin, "l4.", &cmdcode);
 	if (rc != 0)

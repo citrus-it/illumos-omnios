@@ -371,6 +371,8 @@ smb2_create(smb_request_t *sr)
 		 * what the incoming context looks like, so it does all
 		 * the work of building cc_out_aapl, including setting
 		 * cce_len, cce_mbc.max_bytes, and smb_mbc_encode.
+		 * If we see errors getting this, simply omit it from
+		 * the collection of returned create contexts.
 		 */
 		status = smb2_aapl_crctx(sr,
 		    &cctx.cc_in_aapl.cce_mbc, &cce->cce_mbc);
@@ -378,6 +380,7 @@ smb2_create(smb_request_t *sr)
 			cce->cce_len = cce->cce_mbc.chain_offset;
 			cctx.cc_out_flags |= CCTX_AAPL_EXT;
 		}
+		status = 0;
 	}
 	if (cctx.cc_out_flags) {
 		sr->raw_data.max_bytes = smb2_max_trans;
