@@ -36,6 +36,7 @@ FILEMODE=644
 #	neither installed or shipped as part of the product:
 #		cpuid_drv.h:		Private interface for cpuid consumers
 #		unix_bb_info.h:		Private interface to kcov
+#		nvme.h			Private interface to nvme
 #
 
 i386_HDRS=			\
@@ -50,6 +51,7 @@ i386_HDRS=			\
 	fdc.h			\
 	fdmedia.h		\
 	mouse.h			\
+	nvme.h			\
 	ucode.h
 
 sparc_HDRS= 			\
@@ -417,6 +419,7 @@ CHKHDRS=			\
 	netstack.h		\
 	nexusdefs.h		\
 	note.h			\
+	nvme.h			\
 	nvpair.h		\
 	nvpair_impl.h		\
 	objfs.h			\

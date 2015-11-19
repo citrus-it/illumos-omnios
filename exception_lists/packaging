@@ -1002,6 +1002,11 @@ usr/lib/llib-lpcidb
 usr/lib/llib-lpcidb.ln
 
 #
+# private nvme header file
+#
+usr/include/sys/nvme.h
+
+#
 # diskfltinj tool is not supposed to be installed
 #
 usr/bin/diskfltinj

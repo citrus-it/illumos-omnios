@@ -1,0 +1,278 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+.\"
+.Dd December 02, 2015
+.Dt NVMEADM 1M
+.Os
+.Sh NAME
+.Nm nvmeadm
+.Nd NVMe administration utility
+.Sh SYNOPSIS
+.Nm
+.Fl h
+.Op Ar command
+.Nm
+.Op Fl dv
+.Cm list
+.Op Ar ctrl[/nsid]
+.Nm
+.Op Fl dv
+.Cm identify
+.Ar ctrl[/nsid]
+.Nm
+.Op Fl dv
+.Cm get-logpage
+.Ar ctrl[/nsid]
+.Ar logpage
+.Nm
+.Op Fl dv
+.Cm get-feature
+.Ar ctrl[/nsid]
+.Ar feature
+.Nm
+.Op Fl dv
+.Cm get-features
+.Ar ctrl[/nsid]
+.Sh DESCRIPTION
+The
+.Nm
+utility can be used to enumerate the NVMe controllers and their
+namespaces, and to query hardware information from a NVMe controller
+or namespace.
+.Pp
+The information returned by the hardware is printed by
+.Nm
+in a human-readable form were applicable.
+Generally all 0-based counts are normalized and values may be
+converted to useful units such as MB (megabytes), W (watts), or C
+(degrees Celsius).
+.Sh OPTIONS
+The following options are supported:
+.Bl -tag -width Ds
+.It Fl h
+Print a short help text for
+.Nm ,
+or for a optionally specified
+.Nm
+command.
+.It Fl d
+Enable debugging output.
+.It Fl v
+Enable verbose output.
+.El
+.Sh ARGUMENTS
+.Nm
+expects the following kinds of arguments:
+.Bl -tag -width "ctrl/[nsid]"
+.It Ar command
+Any command
+.Nm
+understands. See section
+.Sx COMMANDS .
+.It Ar ctrl/[nsid]
+Specifies a NVMe controller and optionally a namespace within that
+controller.
+The controller name consists of the driver name
+.Qq nvme
+followed by an instance number.
+A namespace is specified by appending a single
+.Qq /
+followed by the namespace ID to the controller name.
+Namespace IDs are positive non-zero decimal numbers.
+.It Ar logpage
+Specifies the log page name for the
+.Cm get-logpage
+command.
+.It Ar feature
+Specifies the feature name for the
+.Cm get-feature
+command.
+Feature names can be specified in upper or lower case and can be
+shortened the shortest unique name.
+Some features may also have an alternative short name.
+.El
+.Sh COMMANDS
+.Bl -tag -width ""
+.It Xo
+.Nm
+.Cm list
+.Op Ar ctrl[/nsid]
+.Xc
+Lists the NVMe controllers and their namespaces in the system and
+prints a 1-line summary of their basic properties for each.
+If a
+.Ar ctrl[/nsid]
+argument is given then the listing is limited to the specified
+controller or namespace.
+.It Xo
+.Nm
+.Cm identify
+.Ar ctrl[/nsid]
+.Xc
+Print detailed information about the specified controller or
+namespace.
+The information returned differs depending on whether a controller or
+a namespace is specified.
+For an explanation of the data printed by this command refer to the
+description of the
+.Qq IDENTIFY
+admin command in the NVMe specification.
+.It Xo
+.Nm
+.Cm get-logpage
+.Ar ctrl[/nsid]
+.Ar logpage
+.Xc
+Print the specified log page of the specified controller or namespace.
+Most log pages are only available on a per-controller basis.
+Known log pages are:
+.Bl -tag -width "firmware"
+.It error
+Error Information
+.It health
+SMART/Health Information.
+A controller may support this log page on a per-namespace basis.
+.It firmware
+Firmware Slot Information
+.El
+.Pp
+For an explanation of the contents of the log pages refer to the
+description of the
+.Qq GET LOGPAGE
+admin command in the NVMe specification.
+.It Xo
+.Nm
+.Cm get-feature
+.Ar ctrl[/nsid]
+.Ar feature
+.Xc
+Prints information about the specified feature of the specified
+controller or namespace.
+Feature names are case-insensitive, and they can be shortened as long
+as they remain unique.
+Some features also have alternative short names to which the same
+rules apply.
+The following features are supported:
+.Pp
+.TS
+tab(:);
+l l l.
+FULL NAME:SHORT NAME:CONTROLLER OR NAMESPACE
+Arbitration::controller
+Power Management::controller
+LBA Range Type:range:namespace
+Temperature Threshold::controller
+Error Recovery::controller
+Volatile Write Cache:cache:controller
+Number of Queues:queues:controller
+Interrupt Coalescing:coalescing:controller
+Interrupt Vector Configuration:vector:controller
+Write Atomicity:atomicity:controller
+Asynchronous Event Configuration:event:controller
+Software Progress Marker:progress:controller
+.TE
+.Pp
+For an explanation of the individual features refer to the description
+of the
+.Qq SET FEATURES
+admin command in the NVMe specification.
+.It Xo
+.Nm
+.Cm get-features
+.Ar ctrl[/nsid]
+.Xc
+Prints the values of all supported features of the specified
+controller or namespace.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+.Bl -tag -width ""
+.It Sy Example 1: List all NVMe controllers and namespaces
+.Bd -literal
+# nvmeadm list
+nvme1: INTEL SSDPEDMD800G4, serial: CVFT4134001R800CGN, FW rev: 8DV10049
+  nvme1/1: Size = 763097 MB, Capacity = 763097 MB, Used = 763097 MB
+nvme4: SAMSUNG MZVPV128HDGM-00000, serial: S1XVNYAGA00640, FW rev: BXW7300Q
+  nvme4/1: Size = 122104 MB, Capacity = 122104 MB, Used = 5127 MB
+.Ed
+.It Sy Example 2: Identify a namespace
+.Bd -literal
+# nvmeadm identify nvme4/1
+Namespace Capabilities and Features
+  Namespace Size:                         122104MB
+  Namespace Capacity:                     122104MB
+  Namespace Utilization:                  5127MB
+  Namespace Features
+    Thin Provisioning:                    unsupported
+  Number of LBA Formats:                  1
+  Formatted LBA Size
+    LBA Format:                           1
+    Extended Data LBA:                    no
+  Metadata Capabilities
+    Extended Data LBA:                    unsupported
+    Separate Metadata:                    unsupported
+  End-to-End Data Protection Capabilities
+    Protection Information Type 1:        unsupported
+    Protection Information Type 2:        unsupported
+    Protection Information Type 3:        unsupported
+    Protection Information first:         unsupported
+    Protection Information last:          unsupported
+  End-to-End Data Protection Settings
+    Protection Information:               disabled
+    Protection Information in Metadata:   last 8 bytes
+  LBA Format 1
+    Metadata Size:                        0 bytes
+    LBA Data Size:                        512 bytes
+    Relative Performance:                 Best
+.Ed
+.It Sy Example 3: Get SMART/Health information (verbose)
+.Bd -literal
+# nvmeadm -v get-logpage nvme4/1 health
+SMART/Health Information
+  Critical Warnings
+    Available Space:                      OK
+    Temperature:                          OK
+    Device Reliability:                   OK
+    Media:                                OK
+    Volatile Memory Backup:               OK
+  Temperature:                            37C
+  Available Spare Capacity:               100%
+  Available Spare Threshold:              10%
+  Device Life Used:                       0%
+  Data Read:                              0GB
+  Data Written:                           64GB
+  Read Commands:                          52907
+  Write Commands:                         567874
+  Controller Busy:                        1min
+  Power Cycles:                           6
+  Power On:                               141h
+  Unsafe Shutdowns:                       1
+  Uncorrectable Media Errors:             0
+  Errors Logged:                          1
+.Ed
+.It Sy Example 4: Get Asynchronous Event Configuration information
+.Bd -literal
+# nvmeadm get-feature nvme4 event
+Asynchronous Event Configuration
+  Available Space below threshold:        disabled
+  Temperature above threshold:            disabled
+  Device Reliability compromised:         disabled
+  Media read-only:                        disabled
+  Volatile Memory Backup failed:          disabled
+.Ed
+.El
+.Sh SEE ALSO
+.Xr nvme 7D
+.Pp
+.Lk http://www.nvmexpress.org/specifications/ "NVMe specifications"

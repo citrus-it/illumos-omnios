@@ -594,7 +594,8 @@ _MANFILES=	6to4relay.1m		\
 		zstreamdump.1m
 
 i386_MANFILES=				\
-		lms.1m
+		lms.1m			\
+		nvmeadm.1m
 
 sparc_MANFILES=	cvcd.1m			\
 		dcs.1m			\

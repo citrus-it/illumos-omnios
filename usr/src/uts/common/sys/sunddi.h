@@ -23,7 +23,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_SUNDDI_H
@@ -211,6 +211,8 @@ extern "C" {
 
 #define	DDI_NT_NEXUS	"ddi_ctl:devctl"	/* nexus drivers */
 
+#define	DDI_NT_NVME_NEXUS	"ddi_ctl:devctl:nvme"	/* nexus drivers */
+
 #define	DDI_NT_SCSI_NEXUS	"ddi_ctl:devctl:scsi"	/* nexus drivers */
 
 #define	DDI_NT_SATA_NEXUS	"ddi_ctl:devctl:sata"	/* nexus drivers */
@@ -218,6 +220,9 @@ extern "C" {
 #define	DDI_NT_IB_NEXUS		"ddi_ctl:devctl:ib"	/* nexus drivers */
 
 #define	DDI_NT_ATTACHMENT_POINT	"ddi_ctl:attachment_point" /* attachment pt */
+
+#define	DDI_NT_NVME_ATTACHMENT_POINT	"ddi_ctl:attachment_point:nvme"
+						/* nvme attachment pt */
 
 #define	DDI_NT_SCSI_ATTACHMENT_POINT	"ddi_ctl:attachment_point:scsi"
 						/* scsi attachment pt */
