@@ -1013,6 +1013,13 @@ wrc_stop_thread(spa_t *spa)
 
 	stop |= spa_stop_perfmon_thread(spa);
 	mutex_enter(&wrc_data->wrc_lock);
+
+	/*
+	 * We do not want to wait the finishing of migration,
+	 * because it can take a long time
+	 */
+	wrc_purge_window(spa, NULL);
+
 	if (wrc_data->wrc_thread != NULL || wrc_data->wrc_walk_thread != NULL) {
 		wrc_data->wrc_thr_exit = B_TRUE;
 		cv_broadcast(&wrc_data->wrc_cv);
