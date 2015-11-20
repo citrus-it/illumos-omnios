@@ -843,12 +843,6 @@ smb_kshare_unexport(smb_server_t *sv, const char *shrname)
 	if ((shr = smb_avl_lookup(share_avl, &key)) == NULL)
 		return (ENOENT);
 
-	if (shr->shr_ksp != NULL) {
-		kstat_delete(shr->shr_ksp);
-		shr->shr_ksp = NULL;
-		kshare_stats_fini(shr);
-	}
-
 	if ((shr->shr_flags & SMB_SHRF_AUTOHOME) != 0) {
 		mutex_enter(&shr->shr_mutex);
 		shr->shr_autocnt--;
@@ -1109,6 +1103,12 @@ smb_kshare_destroy(void *p)
 
 	ASSERT(shr);
 	ASSERT(shr->shr_magic == SMB_SHARE_MAGIC);
+
+	if (shr->shr_ksp != NULL) {
+		kstat_delete(shr->shr_ksp);
+		shr->shr_ksp = NULL;
+		kshare_stats_fini(shr);
+	}
 
 	smb_mem_free(shr->shr_name);
 	smb_mem_free(shr->shr_path);
