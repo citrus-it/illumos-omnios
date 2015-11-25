@@ -2313,21 +2313,58 @@ spa_trimstats_update(spa_t *spa, uint64_t extents, uint64_t bytes,
 	}
 }
 
+/*
+ * Creates the taskq's used for autotrim and on-demand trim. This is called
+ * either when a user sets the autotrim pool property to on or when they
+ * start an on-demand trim.
+ */
 void
-spa_auto_trim_taskq_create(spa_t *spa)
+spa_trim_taskq_create(spa_t *spa)
 {
 	char name[MAXPATHLEN];
+	boolean_t held = MUTEX_HELD(&spa->spa_trim_lock);
 
-	ASSERT3P(spa->spa_auto_trim_taskq, ==, NULL);
-	(void) snprintf(name, sizeof (name), "%s_auto_trim", spa->spa_name);
-	spa->spa_auto_trim_taskq = taskq_create(name, 1, minclsyspri, 1,
+	if (!held)
+		mutex_enter(&spa->spa_trim_lock);
+	if (spa->spa_trim_taskq != NULL)
+		goto out;
+	spa_async_unrequest(spa, SPA_ASYNC_TRIM_TASKQ_DESTROY);
+	(void) snprintf(name, sizeof (name), "%s_trim", spa->spa_name);
+	spa->spa_trim_taskq = taskq_create(name, 1, minclsyspri, 1,
 	    spa->spa_root_vdev->vdev_children, TASKQ_DYNAMIC);
+	VERIFY(spa->spa_trim_taskq != NULL);
+out:
+	if (!held)
+		mutex_exit(&spa->spa_trim_lock);
 }
 
+/*
+ * Destroys the taskq's used for autotrim and on-demand trim. `unload'
+ * specifies whether we've been called from spa_unload and hence whether
+ * the autotrim setting on the pool should be ignored.
+ */
 void
-spa_auto_trim_taskq_destroy(spa_t *spa)
+spa_trim_taskq_destroy(spa_t *spa, boolean_t unload)
 {
-	ASSERT(spa->spa_auto_trim_taskq != NULL);
-	taskq_destroy(spa->spa_auto_trim_taskq);
-	spa->spa_auto_trim_taskq = NULL;
+	boolean_t held = MUTEX_HELD(&spa->spa_trim_lock);
+
+	if (!held)
+		mutex_enter(&spa->spa_trim_lock);
+	/* Check if we still need to exist */
+	if ((spa->spa_auto_trim == SPA_AUTO_TRIM_ON && !unload) ||
+	    spa->spa_num_trimming > 0) {
+		/*
+		 * If we're unloading the pool, we must NEVER skip out here.
+		 * The spa_unload must terminate all on-demand trims before
+		 * calling spa_trim_taskq_destroy.
+		 */
+		VERIFY(!unload);
+		goto out;
+	}
+	ASSERT(spa->spa_trim_taskq != NULL);
+	taskq_destroy(spa->spa_trim_taskq);
+	spa->spa_trim_taskq = NULL;
+out:
+	if (!held)
+		mutex_exit(&spa->spa_trim_lock);
 }

@@ -670,6 +670,7 @@ extern int spa_scan_get_stats(spa_t *spa, pool_scan_stat_t *ps);
 #define	SPA_ASYNC_REMOVE_DONE		0x40
 #define	SPA_ASYNC_REMOVE_STOP		0x80
 #define	SPA_ASYNC_L2CACHE_REBUILD	0x100
+#define	SPA_ASYNC_TRIM_TASKQ_DESTROY	0x200
 
 /*
  * Controls the behavior of spa_vdev_remove().

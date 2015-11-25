@@ -1373,12 +1373,6 @@ spa_unload(spa_t *spa)
 	spa_async_suspend(spa);
 
 	/*
-	 * Stop autotrim tasks.
-	 */
-	if (spa->spa_auto_trim_taskq)
-		spa_auto_trim_taskq_destroy(spa);
-
-	/*
 	 * Stop syncing.
 	 */
 	if (spa->spa_sync_on) {
@@ -1401,6 +1395,12 @@ spa_unload(spa_t *spa)
 	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
 
 	spa_trim_stop_wait(spa);
+
+	/*
+	 * Stop autotrim tasks.
+	 */
+	if (spa->spa_trim_taskq)
+		spa_trim_taskq_destroy(spa, B_TRUE);
 
 	/*
 	 * Close all vdevs.
@@ -2824,7 +2824,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		spa_prop_find(spa, ZPOOL_PROP_FORCETRIM, &spa->spa_force_trim);
 		spa_prop_find(spa, ZPOOL_PROP_AUTOTRIM, &spa->spa_auto_trim);
 		if (spa->spa_auto_trim == SPA_AUTO_TRIM_ON)
-			spa_auto_trim_taskq_create(spa);
+			spa_trim_taskq_create(spa);
 
 		spa_prop_find(spa, ZPOOL_PROP_HIWATERMARK, &spa->spa_hiwat);
 		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
@@ -3975,7 +3975,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_force_trim = zpool_prop_default_numeric(ZPOOL_PROP_FORCETRIM);
 	spa->spa_auto_trim = zpool_prop_default_numeric(ZPOOL_PROP_AUTOTRIM);
 	if (spa->spa_auto_trim == SPA_AUTO_TRIM_ON)
-		spa_auto_trim_taskq_create(spa);
+		spa_trim_taskq_create(spa);
 
 	mp->spa_enable_meta_placement_selection =
 	    zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
@@ -6202,6 +6202,9 @@ spa_async_thread(spa_t *spa)
 	if (tasks & SPA_ASYNC_L2CACHE_REBUILD)
 		l2arc_spa_rebuild_start(spa);
 
+	if (tasks & SPA_ASYNC_TRIM_TASKQ_DESTROY)
+		spa_trim_taskq_destroy(spa, B_FALSE);
+
 	/*
 	 * Let the world know that we're done.
 	 */
@@ -6270,6 +6273,15 @@ spa_async_request(spa_t *spa, int task)
 	zfs_dbgmsg("spa=%s async request task=%u", spa->spa_name, task);
 	mutex_enter(&spa->spa_async_lock);
 	spa->spa_async_tasks |= task;
+	mutex_exit(&spa->spa_async_lock);
+}
+
+void
+spa_async_unrequest(spa_t *spa, int task)
+{
+	zfs_dbgmsg("spa=%s async unrequest task=%u", spa->spa_name, task);
+	mutex_enter(&spa->spa_async_lock);
+	spa->spa_async_tasks &= ~task;
 	mutex_exit(&spa->spa_async_lock);
 }
 
@@ -6597,10 +6609,10 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 				if (intval != spa->spa_auto_trim) {
 					spa->spa_auto_trim = intval;
 					if (intval)
-						spa_auto_trim_taskq_create(spa);
+						spa_trim_taskq_create(spa);
 					else
-						spa_auto_trim_taskq_destroy(
-						    spa);
+						spa_trim_taskq_destroy(spa,
+						    B_FALSE);
 				}
 				break;
 			case ZPOOL_PROP_AUTOEXPAND:
@@ -6728,14 +6740,14 @@ spa_sync_upgrades(spa_t *spa, dmu_tx_t *tx)
 static void
 spa_auto_trim_dispatch(spa_t *spa, uint64_t txg)
 {
-	ASSERT(spa->spa_auto_trim_taskq != NULL);
+	ASSERT(spa->spa_trim_taskq != NULL);
 	for (uint64_t i = 0; i < spa->spa_root_vdev->vdev_children; i++) {
 		vdev_auto_trim_info_t *vati = kmem_zalloc(sizeof (*vati),
 		    KM_SLEEP);
 		vati->vati_vdev = spa->spa_root_vdev->vdev_child[i];
 		vati->vati_txg = txg;
 		spa_config_enter(spa, SCL_TRIM_ALL, vati, RW_READER);
-		(void) taskq_dispatch(spa->spa_auto_trim_taskq,
+		(void) taskq_dispatch(spa->spa_trim_taskq,
 		    (void (*)(void *))vdev_auto_trim, vati, TQ_SLEEP);
 	}
 }
@@ -7298,6 +7310,7 @@ spa_trim(spa_t *spa, uint64_t rate)
 	}
 
 	spa_event_notify(spa, NULL, ESC_ZFS_TRIM_START);
+	spa_trim_taskq_create(spa);
 
 	spa->spa_trim_stop = B_FALSE;
 	for (uint64_t i = 0; i < spa->spa_root_vdev->vdev_children; i++) {
@@ -7313,9 +7326,8 @@ spa_trim(spa_t *spa, uint64_t rate)
 		spa_open_ref(spa, vti);
 
 		vd->vdev_trim_prog = 0;
-		VERIFY3U(taskq_dispatch(system_taskq,
-		    (void (*)(void *))vdev_trim_all, vti,
-		    TQ_SLEEP | TQ_NOQUEUE), !=, 0);
+		(void) taskq_dispatch(spa->spa_trim_taskq,
+		    (void (*)(void *))vdev_trim_all, vti, TQ_SLEEP);
 	}
 	mutex_exit(&spa->spa_trim_lock);
 	spa_config_exit(spa, SCL_TRIM_ALL, FTAG);
@@ -7389,11 +7401,13 @@ spa_vdev_trim_all_done(vdev_trim_info_t *vti)
 	mutex_enter(&spa->spa_trim_lock);
 	ASSERT(spa->spa_num_trimming != 0);
 	spa->spa_num_trimming--;
-	if (spa->spa_num_trimming == 0)
+	if (spa->spa_num_trimming == 0) {
 		spa_event_notify(spa, NULL, ESC_ZFS_TRIM_FINISH);
-	spa_close(spa, vti);
+		spa_async_request(spa, SPA_ASYNC_TRIM_TASKQ_DESTROY);
+	}
 	cv_broadcast(&spa->spa_trim_done_cv);
 	mutex_exit(&spa->spa_trim_lock);
+	spa_close(spa, vti);
 }
 
 /*
