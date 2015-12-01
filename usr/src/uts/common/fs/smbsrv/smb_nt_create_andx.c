@@ -32,6 +32,8 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_vops.h>
 
+int smb_nt_create_enable_extended_response = 1;
+
 /*
  * smb_com_nt_create_andx
  *
@@ -310,16 +312,32 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		goto errout;
 	}
 
-	if (op->nt_flags & NT_CREATE_FLAG_EXTENDED_RESPONSE) {
+	if ((op->nt_flags & NT_CREATE_FLAG_EXTENDED_RESPONSE) != 0 &&
+	    smb_nt_create_enable_extended_response != 0) {
 		uint32_t MaxAccess = 0;
 		if (of->f_node != NULL) {
 			smb_fsop_eaccess(sr, of->f_cr, of->f_node, &MaxAccess);
 		}
 		MaxAccess |= of->f_granted_access;
 
-		rc = smbsr_encode_result(
-		    sr, 50, 0, "bb.wbwlTTTTlqqwwb16.qllw",
-		    50,		/* word count	   (b) */
+		/*
+		 * Here is a really ugly protocol wart in SMB1:
+		 *
+		 * [MS-SMB] Sec. 2.2.4.9.2: Windows-based SMB servers
+		 * send 50 (0x32) words in the extended response although
+		 * they set the WordCount field to 0x2A.
+		 *
+		 * In other words, THEY LIE!  We really do need to encode
+		 * 50 words here, but lie and say we encoded 42 words.
+		 * This means we can't use smbsr_encode_result() to
+		 * build this response, because the rules it breaks
+		 * would cause errors in smbsr_check_result().
+		 */
+		sr->smb_wct = 50; /* real word count */
+		sr->smb_bcc = 0;
+		rc = smb_mbc_encodef(&sr->reply,
+		    "bb.wbwlTTTTlqqwwb16.qllw",
+		    42,		/* fake word count (b) */
 		    sr->andx_com,		/* (b.) */
 		    0x87,	/* andx offset	   (w) */
 		    op->op_oplock_level,	/* (b) */
