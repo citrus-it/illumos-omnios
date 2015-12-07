@@ -105,6 +105,7 @@ struct objset {
 	uint64_t os_zpl_meta_to_special;
 	zfs_wrc_mode_t os_wrc_mode;
 	uint64_t os_wrc_root_ds_obj;
+	uint64_t os_wrc_off_txg;
 
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */

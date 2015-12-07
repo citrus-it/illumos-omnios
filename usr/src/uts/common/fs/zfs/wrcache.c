@@ -106,12 +106,14 @@ static int wrc_instances_compare(const void *arg1, const void *arg2);
 static void wrc_unregister_instance_impl(wrc_instance_t *wrc_instance,
     boolean_t rele_autosnap);
 static void wrc_unregister_instances(wrc_data_t *wrc_data);
-static void wrc_register_instance(wrc_data_t *wrc_data, objset_t *os);
+static wrc_instance_t *wrc_register_instance(wrc_data_t *wrc_data,
+    objset_t *os);
 static void wrc_unregister_instance(wrc_data_t *wrc_data, objset_t *os,
     boolean_t rele_autosnap);
 static wrc_instance_t *wrc_lookup_instance(wrc_data_t *wrc_data,
     uint64_t ds_object, avl_index_t *where);
-static void wrc_rele_autosnaps(wrc_data_t *wrc_data, uint64_t txg_to_rele);
+static void wrc_rele_autosnaps(wrc_data_t *wrc_data, uint64_t txg_to_rele,
+    boolean_t purge);
 
 void
 wrc_init(wrc_data_t *wrc_data, spa_t *spa)
@@ -129,11 +131,17 @@ wrc_init(wrc_data_t *wrc_data, spa_t *spa)
 	    sizeof (wrc_block_t), offsetof(wrc_block_t, node));
 	avl_create(&wrc_data->wrc_instances, wrc_instances_compare,
 	    sizeof (wrc_instance_t), offsetof(wrc_instance_t, node));
+
+	wrc_data->wrc_instance_fini = taskq_create("wrc_instance_finalization",
+	    1, maxclsyspri, 50, INT_MAX, TASKQ_PREPOPULATE);
 }
 
 void
 wrc_fini(wrc_data_t *wrc_data)
 {
+	taskq_wait(wrc_data->wrc_instance_fini);
+	taskq_destroy(wrc_data->wrc_instance_fini);
+
 	mutex_enter(&wrc_data->wrc_lock);
 
 	wrc_clean_plan_tree(wrc_data->wrc_spa);
@@ -283,8 +291,7 @@ spa_wrc_thread(spa_t *spa)
 	DTRACE_PROBE1(wrc_thread_start, char *, spa->spa_name);
 
 	/* Prepare move queue and make the wrc active */
-	(void) strcpy(name, spa->spa_name);
-	(void) strcat(name, "_wrc_move");
+	(void) snprintf(name, sizeof (name), "%s_wrc_move", spa->spa_name);
 	wrc_data->wrc_move_taskq = taskq_create(name, 10, maxclsyspri,
 	    50, INT_MAX, TASKQ_PREPOPULATE);
 
@@ -664,7 +671,7 @@ spa_wrc_walk_thread(spa_t *spa)
 		mutex_exit(&wrc_data->wrc_lock);
 
 		err = wrc_collect_special_blocks(spa->spa_dsl_pool);
-		if (err && err != ERESTART && err != EAGAIN) {
+		if (err != 0) {
 			cmn_err(CE_WARN, "WRC: can not "
 			    "traverse pool: error [%d]\n"
 			    "WRC: collector thread will be disabled", err);
@@ -885,7 +892,7 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 	scan_start = gethrtime();
 	diff = scan_start - dp->dp_spec_rtime;
 	if (diff / NANOSEC < zfs_wrc_schedtmo)
-		return (EAGAIN);
+		return (0);
 
 	cb_data.wrc_data = wrc_data;
 	cb_data.zb = spa->spa_lszb;
@@ -922,7 +929,7 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 			 */
 			if (wrc_data->wrc_thr_exit) {
 				mutex_exit(&wrc_data->wrc_lock);
-				return (EINTR);
+				return (0);
 			}
 
 			cmn_err(CE_WARN,
@@ -930,6 +937,7 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 			    "because of error [%d]", err);
 
 			wrc_purge_window(spa, NULL);
+			wrc_data->wrc_wait_for_window = B_TRUE;
 			mutex_exit(&wrc_data->wrc_lock);
 
 			err = 0;
@@ -940,6 +948,7 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 
 			/* Say to others that walking stopped */
 			wrc_data->wrc_walking = B_FALSE;
+			wrc_data->wrc_wait_for_window = B_TRUE;
 			cv_broadcast(&wrc_data->wrc_cv);
 
 			/* and wait until a new window appears */
@@ -950,7 +959,7 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 
 			if (wrc_data->wrc_thr_exit) {
 				mutex_exit(&wrc_data->wrc_lock);
-				return (EINTR);
+				return (0);
 			}
 
 			mutex_exit(&wrc_data->wrc_lock);
@@ -970,6 +979,7 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 		 */
 		DTRACE_PROBE2(traverse__intr, spa_t *, spa,
 		    wrc_parseblock_cb_t *, &cb_data);
+		err = 0;
 	}
 
 	dp->dp_spec_rtime = gethrtime();
@@ -984,11 +994,14 @@ void
 wrc_start_thread(spa_t *spa)
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
+	boolean_t lock_held;
 
 	ASSERT(strcmp(spa->spa_name, TRYIMPORT_NAME) != 0);
 	ASSERT(wrc_data->wrc_isvalid);
 
-	mutex_enter(&wrc_data->wrc_lock);
+	lock_held = MUTEX_HELD(&wrc_data->wrc_lock);
+	if (!lock_held)
+		mutex_enter(&wrc_data->wrc_lock);
 
 	if (wrc_data->wrc_thread == NULL && wrc_data->wrc_walk_thread == NULL) {
 		wrc_data->wrc_thr_exit = B_FALSE;
@@ -1001,7 +1014,9 @@ wrc_start_thread(spa_t *spa)
 #endif
 	}
 
-	mutex_exit(&wrc_data->wrc_lock);
+	wrc_data->wrc_wait_for_window = B_TRUE;
+	if (!lock_held)
+		mutex_exit(&wrc_data->wrc_lock);
 }
 
 /* Disables wrc thread and reset associated data structures */
@@ -1019,6 +1034,7 @@ wrc_stop_thread(spa_t *spa)
 	 * because it can take a long time
 	 */
 	wrc_purge_window(spa, NULL);
+	wrc_data->wrc_wait_for_window = B_FALSE;
 
 	if (wrc_data->wrc_thread != NULL || wrc_data->wrc_walk_thread != NULL) {
 		wrc_data->wrc_thr_exit = B_TRUE;
@@ -1204,11 +1220,27 @@ wrc_close_window(spa_t *spa)
 
 	wrc_close_window_impl(spa, &wrc_data->wrc_moved_blocks);
 
-	wrc_rele_autosnaps(wrc_data, txg_to_rele);
+	wrc_rele_autosnaps(wrc_data, txg_to_rele, B_FALSE);
+}
+
+/*
+ * To fini of a wrc_instance need to inherit wrc_mode.
+ * During this operation will be called wrc_process_objset()
+ * that will unregister this instance and destroy it
+ */
+static void
+wrc_instance_finalization(void *arg)
+{
+	wrc_instance_t *wrc_instance = arg;
+
+	VERIFY3U(dsl_prop_inherit(wrc_instance->ds_name,
+	    zfs_prop_to_name(ZFS_PROP_WRC_MODE),
+	    ZPROP_SRC_INHERITED), ==, 0);
 }
 
 static void
-wrc_rele_autosnaps(wrc_data_t *wrc_data, uint64_t txg_to_rele)
+wrc_rele_autosnaps(wrc_data_t *wrc_data, uint64_t txg_to_rele,
+    boolean_t purge)
 {
 	wrc_instance_t *wrc_instance;
 
@@ -1217,10 +1249,33 @@ wrc_rele_autosnaps(wrc_data_t *wrc_data, uint64_t txg_to_rele)
 		if (wrc_instance->txg_to_rele != 0) {
 			VERIFY3U(wrc_instance->txg_to_rele,
 			    ==, txg_to_rele);
+			if (wrc_instance->fini_migration &&
+			    txg_to_rele > wrc_instance->txg_off && !purge) {
+				/*
+				 * This WRC instance will be terminated in
+				 * the preallocated taskq
+				 *
+				 * WRC instance termination involves writing
+				 * and therefore requires sync context.
+				 * But since we are here already in the sync
+				 * context, the operation is task-dispatched
+				 */
+				VERIFY(taskq_dispatch(
+				    wrc_data->wrc_instance_fini,
+				    wrc_instance_finalization, wrc_instance,
+				    TQ_SLEEP) != NULL);
+			} else if (wrc_instance->fini_migration) {
+				autosnap_force_snap_fast(
+				    wrc_instance->wrc_autosnap_hdl);
+			}
+
 			autosnap_release_snapshots_by_txg(
 			    wrc_instance->wrc_autosnap_hdl,
 			    txg_to_rele, AUTOSNAP_NO_SNAP);
 			wrc_instance->txg_to_rele = 0;
+		} else if (wrc_instance->fini_migration) {
+			autosnap_force_snap_fast(
+			    wrc_instance->wrc_autosnap_hdl);
 		}
 
 		wrc_instance = AVL_NEXT(&wrc_data->wrc_instances,
@@ -1329,7 +1384,7 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 		mutex_enter(&wrc_data->wrc_lock);
 	}
 
-	wrc_rele_autosnaps(wrc_data, snap_txg);
+	wrc_rele_autosnaps(wrc_data, snap_txg, B_TRUE);
 }
 
 /* Finalize interrupted with power cycle window */
@@ -1376,7 +1431,7 @@ wrc_confirm_cb(const char *name, boolean_t recursive, uint64_t txg, void *arg)
 	wrc_instance_t *wrc_instance = arg;
 	wrc_data_t *wrc_data = wrc_instance->wrc_data;
 
-	return (wrc_data->wrc_finish_txg == 0);
+	return (wrc_data->wrc_wait_for_window && !wrc_data->wrc_locked);
 }
 
 uint64_t wrc_window_roll_delay = 0;
@@ -1416,10 +1471,13 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 	wrc_data_t *wrc_data = wrc_instance->wrc_data;
 
 	mutex_enter(&wrc_data->wrc_lock);
+	if (!wrc_data->wrc_isvalid || wrc_data->wrc_isfault) {
+		mutex_exit(&wrc_data->wrc_lock);
+		return (B_FALSE);
+	}
+
 	if (wrc_data->wrc_finish_txg != 0) {
-		if (wrc_data->wrc_isvalid &&
-		    !wrc_data->wrc_isfault &&
-		    wrc_data->wrc_finish_txg == etxg) {
+		if (wrc_data->wrc_finish_txg == etxg) {
 			/* Same window-snapshot for another WRC-Instance */
 			wrc_instance->txg_to_rele = txg;
 			result = B_TRUE;
@@ -1430,8 +1488,9 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 	}
 
 	if (wrc_check_time(wrc_data) &&
-	    wrc_check_space(wrc_data->wrc_spa)) {
-		/* To soon to start a new window */
+	    wrc_check_space(wrc_data->wrc_spa) &&
+	    !wrc_instance->fini_migration) {
+		/* Too soon to start a new window */
 		result = B_FALSE;
 	} else if (wrc_data->wrc_walking) {
 		/* Current window already done, but is not closed yet */
@@ -1454,6 +1513,7 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 		cv_broadcast(&wrc_data->wrc_cv);
 		result = B_TRUE;
 		wrc_instance->txg_to_rele = txg;
+		wrc_data->wrc_wait_for_window = B_FALSE;
 	}
 
 	mutex_exit(&wrc_data->wrc_lock);
@@ -1500,6 +1560,104 @@ wrc_activate(spa_t *spa)
 {
 	if (spa_feature_is_enabled(spa, SPA_FEATURE_WRC))
 		wrc_activate_impl(spa);
+}
+
+/*
+ * This function is callback for dmu_objset_find_dp()
+ * that is called during the initialization of WRC.
+ *
+ * Here we register wrc_instance for the given dataset
+ * if WRC is activated for this datasets
+ */
+/* ARGSUSED */
+static int
+wrc_activate_instances(dsl_pool_t *dp, dsl_dataset_t *ds, void *arg)
+{
+	wrc_data_t *wrc_data = arg;
+	objset_t *os = NULL;
+	wrc_instance_t *wrc_instance = NULL;
+	int rc = 0;
+
+	(void) dmu_objset_from_ds(ds, &os);
+	VERIFY(os != NULL);
+
+	if (os->os_wrc_mode == ZFS_WRC_MODE_OFF)
+		return (0);
+
+	if (os->os_dsl_dataset->ds_object != os->os_wrc_root_ds_obj)
+		return (0);
+
+	mutex_enter(&wrc_data->wrc_lock);
+
+	if (wrc_data->wrc_isvalid)
+		wrc_instance = wrc_register_instance(wrc_data, os);
+	else
+		rc = EINTR;
+
+	mutex_exit(&wrc_data->wrc_lock);
+
+	if (wrc_instance != NULL) {
+		if (os->os_wrc_mode == ZFS_WRC_MODE_OFF_DELAYED) {
+			wrc_instance->fini_migration = B_TRUE;
+			wrc_instance->txg_off = os->os_wrc_off_txg;
+		}
+
+		autosnap_force_snap_fast(wrc_instance->wrc_autosnap_hdl);
+	}
+
+	return (rc);
+}
+
+/*
+ * Second stage of the WRC initialization.
+ *
+ * We walk over all DS of the given pool to activate
+ * wrc_instances for DSs with activated WRC
+ */
+static void
+wrc_init_thread(void *arg)
+{
+	wrc_data_t *wrc_data = arg;
+	spa_t *spa = wrc_data->wrc_spa;
+	dsl_dataset_t *ds_root = NULL;
+	uint64_t dd_root_object;
+	int err;
+
+	/*
+	 * If the feature flag is active then need to
+	 * lookup the datasets that have enabled WRC
+	 */
+	if (spa_feature_is_active(spa, SPA_FEATURE_WRC)) {
+		dsl_pool_config_enter(spa_get_dsl(spa), FTAG);
+
+		err = dsl_dataset_hold(spa_get_dsl(spa), spa->spa_name,
+		    FTAG, &ds_root);
+		if (err != 0) {
+			dsl_pool_config_exit(spa_get_dsl(spa), FTAG);
+			mutex_enter(&wrc_data->wrc_lock);
+			goto out;
+		}
+
+		dd_root_object = ds_root->ds_dir->dd_object;
+		dsl_dataset_rele(ds_root, FTAG);
+
+		VERIFY0(dmu_objset_find_dp(spa_get_dsl(spa), dd_root_object,
+		    wrc_activate_instances, wrc_data, DS_FIND_CHILDREN));
+
+		dsl_pool_config_exit(spa_get_dsl(spa), FTAG);
+	}
+
+	mutex_enter(&wrc_data->wrc_lock);
+
+	wrc_data->wrc_ready_to_use = B_TRUE;
+	if (avl_numnodes(&wrc_data->wrc_instances) != 0 &&
+	    !wrc_data->wrc_thr_exit)
+		wrc_start_thread(wrc_data->wrc_spa);
+
+out:
+	wrc_data->wrc_init_thread = NULL;
+	cv_broadcast(&wrc_data->wrc_cv);
+	mutex_exit(&wrc_data->wrc_lock);
 }
 
 /*
@@ -1575,20 +1733,21 @@ wrc_activate_impl(spa_t *spa)
 	wrc_data->wrc_spa = spa;
 	wrc_data->wrc_isvalid = B_TRUE;
 
-	/* SELECTIVE WRC */
-	/* Finalize window interrupted with power cycle */
-	/* wrc_free_restore(spa); */
+	/* Finalize window interrupted by power cycle or reimport */
+	wrc_free_restore(spa);
 
-	wrc_data->wrc_ready_to_use = B_TRUE;
+	/*
+	 * Need to restore wrc_instances. Do this asynchronously.
+	 */
+	wrc_data->wrc_init_thread = thread_create(NULL, 0,
+	    wrc_init_thread, wrc_data, 0, &p0, TS_RUN, maxclsyspri);
+
 	mutex_exit(&wrc_data->wrc_lock);
 
 	DTRACE_PROBE2(wrc_spa_add, char *, spa->spa_name,
 	    spa_t *, spa);
 }
 
-/*
- * Caller should hold the wrc_lock.
- */
 void
 wrc_deactivate(spa_t *spa)
 {
@@ -1603,16 +1762,19 @@ wrc_deactivate(spa_t *spa)
 
 	DTRACE_PROBE1(wrc_deactiv_start, char *, spa->spa_name);
 
-	wrc_unregister_instances(wrc_data);
-
 	wrc_data->wrc_isvalid = B_FALSE;
+
+	while (wrc_data->wrc_init_thread != NULL)
+		cv_wait(&wrc_data->wrc_cv, &wrc_data->wrc_lock);
+
+	wrc_unregister_instances(wrc_data);
 
 	VERIFY(avl_is_empty(&wrc_data->wrc_blocks));
 	VERIFY(avl_is_empty(&wrc_data->wrc_moved_blocks));
 
 	DTRACE_PROBE1(wrc_deactiv_done, char *, spa->spa_name);
 
-	mutex_exit(&spa->spa_wrc.wrc_lock);
+	mutex_exit(&wrc_data->wrc_lock);
 }
 
 static int
@@ -1765,24 +1927,43 @@ wrc_first_valid_dva(const blkptr_t *bp,
 }
 
 /*
- * This function is called from dsl_prop_set_sync_impl()
- * during changing of wrc_mode property on the corresponding
- * dataset.
+ * 1) for each dataset of the given pool at the dataset load time
+ * 2) on each change of the wrc_mode property, for the dataset in
+ * question and all its children
+ *
+ * see dsl_prop_register()/dsl_prop_unregister() and
+ * dmu_objset_open_impl()/dmu_objset_evict()
+ *
+ * wrc_mode has 3 states:
+ * ON, OFF - for user
+ * OFF_DELAYED - for the internal using
+ *
+ * ON - generation of special BPs and migration
+ * OFF_DELAYED - special BPs will not be created, but migration
+ * still active to migrate. To migrate all blocks that still on SPECIAL
+ * OFF - we migrated all blocks that were on special, so this instance
+ * can be destroyed.
  */
 void
 wrc_mode_changed(void *arg, uint64_t newval)
 {
 	objset_t *os = arg;
 	wrc_data_t *wrc_data = spa_get_wrc_data(os->os_spa);
+	wrc_mode_prop_val_t *val =
+	    (wrc_mode_prop_val_t *)((uintptr_t)newval);
 
-	if (newval == 0) {
+	if (val->root_ds_object != 0) {
+		os->os_wrc_root_ds_obj = val->root_ds_object;
+		os->os_wrc_off_txg = val->txg_off;
+		if (val->txg_off == 0)
+			os->os_wrc_mode = ZFS_WRC_MODE_ON;
+		else
+			os->os_wrc_mode = ZFS_WRC_MODE_OFF_DELAYED;
+	} else {
 		if (os->os_wrc_mode == ZFS_WRC_MODE_OFF)
 			return;
 
 		os->os_wrc_mode = ZFS_WRC_MODE_OFF;
-	} else {
-		os->os_wrc_mode = ZFS_WRC_MODE_ON;
-		os->os_wrc_root_ds_obj = newval >> 1;
 	}
 
 	DTRACE_PROBE4(wrc_mc,
@@ -1793,97 +1974,139 @@ wrc_mode_changed(void *arg, uint64_t newval)
 
 	wrc_process_objset(wrc_data, os, B_FALSE);
 
-	if (os->os_wrc_mode == ZFS_WRC_MODE_OFF)
+	if (os->os_wrc_mode == ZFS_WRC_MODE_OFF) {
 		os->os_wrc_root_ds_obj = 0;
+		os->os_wrc_off_txg = 0;
+	}
 }
 
+/*
+ * This function is called:
+ * 1) on change of wrc_mode property
+ * 2) on destroying of a DS
+ *
+ * It processes only top-level DS of a WRC-DS-tree
+ */
 void
 wrc_process_objset(wrc_data_t *wrc_data,
     objset_t *os, boolean_t destroy)
 {
-	/* Process only top-level datasets */
-	if (os->os_dsl_dataset->ds_object == os->os_wrc_root_ds_obj) {
-		size_t num_nodes_before, num_nodes_after;
+	wrc_instance_t *wrc_instance;
+	size_t num_nodes_before, num_nodes_after;
 
-		mutex_enter(&wrc_data->wrc_lock);
+	if (os->os_wrc_root_ds_obj == 0)
+		return;
 
-		num_nodes_before = avl_numnodes(&wrc_data->wrc_instances);
+	mutex_enter(&wrc_data->wrc_lock);
+	/* Do not register instances too early */
+	if (!wrc_data->wrc_ready_to_use) {
+		mutex_exit(&wrc_data->wrc_lock);
+		return;
+	}
 
-		if (os->os_wrc_mode == ZFS_WRC_MODE_OFF || destroy) {
-			wrc_unregister_instance(wrc_data, os, !destroy);
-			if (os->os_wrc_mode == ZFS_WRC_MODE_OFF)
-				os->os_wrc_root_ds_obj = 0;
-		} else {
-			wrc_register_instance(wrc_data, os);
-		}
+	if (os->os_dsl_dataset->ds_object != os->os_wrc_root_ds_obj) {
+		wrc_instance = wrc_lookup_instance(wrc_data,
+		    os->os_wrc_root_ds_obj, NULL);
 
-		num_nodes_after = avl_numnodes(&wrc_data->wrc_instances);
+		/*
+		 * If instance for us does not exist, then wrcache
+		 * should not be enabled for this DS
+		 */
+		if (wrc_instance == NULL)
+			os->os_wrc_mode = ZFS_WRC_MODE_OFF;
 
 		mutex_exit(&wrc_data->wrc_lock);
+		return;
+	}
 
-		/*
-		 * The first instance, so need to
-		 * start the collector and the mover
-		 */
-		if ((num_nodes_after > num_nodes_before) &&
-		    (num_nodes_before == 0)) {
-			wrc_start_thread(wrc_data->wrc_spa);
+	num_nodes_before = avl_numnodes(&wrc_data->wrc_instances);
+
+	if (os->os_wrc_mode == ZFS_WRC_MODE_OFF || destroy) {
+		wrc_unregister_instance(wrc_data, os, !destroy);
+	} else {
+		wrc_instance = wrc_register_instance(wrc_data, os);
+		if (wrc_instance != NULL &&
+		    os->os_wrc_mode == ZFS_WRC_MODE_OFF_DELAYED &&
+		    !wrc_instance->fini_migration) {
+			wrc_instance->fini_migration = B_TRUE;
+			wrc_instance->txg_off = os->os_wrc_off_txg;
+			autosnap_force_snap_fast(
+			    wrc_instance->wrc_autosnap_hdl);
 		}
 
-		/*
-		 * The last instance, so need to
-		 * stop the collector and the mover
-		 */
-		if ((num_nodes_after < num_nodes_before) &&
-		    (num_nodes_after == 0)) {
-			(void) wrc_stop_thread(wrc_data->wrc_spa);
+		if (wrc_instance == NULL) {
+			/*
+			 * We do not want to write data to special
+			 * if the data will not be migrated, because
+			 * registration failed
+			 */
+			os->os_wrc_mode = ZFS_WRC_MODE_OFF;
 		}
+	}
+
+	num_nodes_after = avl_numnodes(&wrc_data->wrc_instances);
+
+	mutex_exit(&wrc_data->wrc_lock);
+
+	/*
+	 * The first instance, so need to
+	 * start the collector and the mover
+	 */
+	if ((num_nodes_after > num_nodes_before) &&
+	    (num_nodes_before == 0)) {
+		wrc_start_thread(wrc_data->wrc_spa);
+	}
+
+	/*
+	 * The last instance, so need to
+	 * stop the collector and the mover
+	 */
+	if ((num_nodes_after < num_nodes_before) &&
+	    (num_nodes_after == 0)) {
+		(void) wrc_stop_thread(wrc_data->wrc_spa);
 	}
 }
 
-static void
+static wrc_instance_t *
 wrc_register_instance(wrc_data_t *wrc_data, objset_t *os)
 {
-	char ds_name[MAXNAMELEN];
 	dsl_dataset_t *ds = os->os_dsl_dataset;
 	wrc_instance_t *wrc_instance;
 	avl_index_t where = NULL;
+	zfs_autosnap_t *autosnap;
 
 	ASSERT(MUTEX_HELD(&wrc_data->wrc_lock));
-
-	/* Do not register instances too early */
-	if (!wrc_data->wrc_ready_to_use) {
-		return;
-	}
 
 	/* Is it already registered? */
 	wrc_instance = wrc_lookup_instance(wrc_data,
 	    ds->ds_object, &where);
-	if (wrc_instance != NULL) {
-		return;
-	}
+	if (wrc_instance != NULL)
+		return (wrc_instance);
 
 	wrc_instance = kmem_zalloc(sizeof (wrc_instance_t), KM_SLEEP);
 	wrc_instance->ds_object = ds->ds_object;
 	wrc_instance->wrc_data = wrc_data;
-	dsl_dataset_name(ds, ds_name);
+	dsl_dataset_name(ds, wrc_instance->ds_name);
+	autosnap = spa_get_autosnap(wrc_data->wrc_spa);
 	wrc_instance->wrc_autosnap_hdl =
-	    autosnap_register_handler(ds_name,
+	    autosnap_register_handler_impl(autosnap, wrc_instance->ds_name,
 	    AUTOSNAP_CREATOR | AUTOSNAP_DESTROYER |
-	    AUTOSNAP_RECURSIVE,
+	    AUTOSNAP_RECURSIVE | AUTOSNAP_WRC,
 	    wrc_confirm_cb, wrc_nc_cb, wrc_err_cb, wrc_instance);
 	if (wrc_instance->wrc_autosnap_hdl == NULL) {
 		cmn_err(CE_WARN, "Cannot register autosnap handler "
-		    "for WRC-Instance (%s)", ds_name);
+		    "for WRC-Instance (%s)", wrc_instance->ds_name);
 		kmem_free(wrc_instance, sizeof (wrc_instance_t));
-		return;
+		return (NULL);
 	}
 
 	DTRACE_PROBE2(register_done,
 	    uint64_t, wrc_instance->ds_object,
-	    char *, ds_name);
+	    char *, wrc_instance->ds_name);
 
 	avl_insert(&wrc_data->wrc_instances, wrc_instance, where);
+
+	return (wrc_instance);
 }
 
 static void
@@ -1945,34 +2168,6 @@ wrc_lookup_instance(wrc_data_t *wrc_data,
 	wrc_instance.ds_object = ds_object;
 	return (avl_find(&wrc_data->wrc_instances,
 	    &wrc_instance, where));
-}
-
-/*
- * To be backward compatible with the next releases
- * Now WRC supports only one mode.
- * It is possible to extend WRC and add second mode,
- * so need to be ready.
- */
-/* ARGSUSED */
-uint64_t
-wrc_pack_wrc_mode(uint64_t value, uint64_t objset_num)
-{
-	uint64_t result;
-
-	ASSERT0(((objset_num >> 63) & 1));
-	result = (objset_num << 1);
-
-	return (result);
-}
-
-/*
- * To be backward compatible with the next releases
- */
-uint64_t
-wrc_unpack_wrc_mode(uint64_t value)
-{
-	ASSERT(value != 0);
-	return (ZFS_WRC_MODE_ON);
 }
 
 int

@@ -4,6 +4,8 @@
 #ifndef _SYS_AUTOSNAP_H
 #define	_SYS_AUTOSNAP_H
 
+#include <sys/dsl_pool.h>
+#include <sys/dmu_tx.h>
 #include <sys/dsl_dataset.h>
 #include <sys/spa.h>
 #include <sys/nvpair.h>
@@ -45,6 +47,12 @@ typedef struct autosnap_zone {
 	zfs_autosnap_t *autosnap;
 	boolean_t created; /* Snap already created */
 	boolean_t delayed; /* Snap delayed for some reasons */
+
+	/*
+	 * B_TRUE if this zone is related to dirty
+	 * DS in the given sync-round
+	 */
+	boolean_t dirty;
 } autosnap_zone_t;
 
 struct zfs_autosnap {
@@ -85,6 +93,11 @@ typedef struct autosnap_handler {
 	autosnap_zone_t *zone;
 } autosnap_handler_t;
 
+void * autosnap_register_handler_impl(zfs_autosnap_t *autosnap,
+    const char *name, uint64_t flags,
+    autosnap_confirm_cb confirm_cb,
+    autosnap_notify_created_cb nc_cb,
+    autosnap_error_cb err_cb, void *cb_arg);
 void *autosnap_register_handler(const char *name, uint64_t flags,
     autosnap_confirm_cb confirm_cb,
     autosnap_notify_created_cb nc_cb,
@@ -98,6 +111,7 @@ void autosnap_exempt_snapshot(spa_t *spa, const char *name);
 void autosnap_force_snap_by_name(const char *dsname,
     autosnap_zone_t *zone, boolean_t sync);
 void autosnap_force_snap(void *opaque, boolean_t sync);
+void autosnap_force_snap_fast(void *opaque);
 boolean_t autosnap_confirm_snap(autosnap_zone_t *zone, uint64_t txg);
 void autosnap_error_snap(autosnap_zone_t *zone, uint64_t txg, int err);
 
@@ -117,7 +131,8 @@ typedef enum autosnap_flags {
 	AUTOSNAP_CREATOR	= 1 << 1,
 	AUTOSNAP_DESTROYER	= 1 << 2,
 	AUTOSNAP_KRRP		= 1 << 3,
-	AUTOSNAP_OWNER		= 1 << 4
+	AUTOSNAP_OWNER		= 1 << 4,
+	AUTOSNAP_WRC		= 1 << 5
 } autosnap_flags_t;
 
 /*
@@ -144,6 +159,9 @@ void autosnap_destroyer_thread_start(spa_t *spa);
 void autosnap_destroyer_thread_stop(spa_t *spa);
 void autosnap_init(spa_t *spa);
 void autosnap_fini(spa_t *spa);
+
+void autosnap_create_snapshot(autosnap_zone_t *azone, char *snap,
+    dsl_pool_t *dp, uint64_t txg, dmu_tx_t *tx);
 
 #ifdef	__cplusplus
 }

@@ -1505,6 +1505,19 @@ zfs_setprop_error(libzfs_handle_t *hdl, zfs_prop_t prop, int err,
 		}
 
 		switch (err) {
+		case EINPROGRESS:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "WRC cannot be enabled for the dataset since "
+			    "the latter is currently in transition to "
+			    "wrc_mode = off. Try again later"));
+			(void) zfs_error(hdl, EZFS_WRCINPROGRESS, errbuf);
+			break;
+		case EALREADY:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "WRC is already in the requested (on/off) "
+			    "state, nothing to do"));
+			(void) zfs_error(hdl, EZFS_WRCALREADY, errbuf);
+			break;
 		case EOPNOTSUPP:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "feature flag 'wrcache' is not enabled or "

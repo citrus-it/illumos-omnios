@@ -472,89 +472,6 @@ dsl_pool_dirty_delta(dsl_pool_t *dp, int64_t delta)
 		cv_signal(&dp->dp_spaceavail_cv);
 }
 
-/* Collect datasets with a given param and create a snapshoting synctask */
-#define	AUTOSNAP_COLLECTOR_BUSY_LIMIT (1000)
-int
-dsl_pool_collect_ds_for_autosnap(dsl_pool_t *dp, uint64_t txg,
-    const char *root_ds, const char *snap_name, boolean_t recursive,
-    dmu_tx_t *tx)
-{
-	spa_t *spa = dp->dp_spa;
-	dsl_dataset_t *ds;
-	list_t ds_to_send;
-	zfs_ds_collector_entry_t *el;
-	nvlist_t *nv_auto;
-	int err;
-	int busy_counter = 0;
-
-	err = nvlist_alloc(&nv_auto, NV_UNIQUE_NAME, KM_SLEEP);
-	if (err)
-		return (err);
-
-	list_create(&ds_to_send, sizeof (zfs_ds_collector_entry_t),
-	    offsetof(zfs_ds_collector_entry_t, node));
-
-	while ((err = zfs_collect_ds(spa, root_ds, recursive,
-	    B_FALSE, &ds_to_send)) == EBUSY &&
-	    busy_counter++ < AUTOSNAP_COLLECTOR_BUSY_LIMIT)
-		delay(NSEC_TO_TICK(100));
-
-	if (err) {
-		list_destroy(&ds_to_send);
-		nvlist_free(nv_auto);
-		return (err);
-	}
-
-	for (el = list_head(&ds_to_send);
-	    el != NULL;
-	    el = list_head(&ds_to_send)) {
-		boolean_t len_ok =
-		    (strlen(el->name) + strlen(snap_name) + 1) < MAXNAMELEN;
-		if (!err && !len_ok)
-			err = ENAMETOOLONG;
-		if (!err)
-			err = dsl_dataset_hold(dp, el->name, FTAG, &ds);
-		if (!err) {
-			err = dsl_dataset_snapshot_check_impl(ds,
-			    snap_name, tx, B_FALSE, 0, NULL);
-			dsl_dataset_rele(ds, FTAG);
-		}
-		if (!err) {
-			(void) strcat(el->name, "@");
-			(void) strcat(el->name, snap_name);
-
-			err = nvlist_add_boolean(nv_auto, el->name);
-		}
-
-		(void) list_remove_head(&ds_to_send);
-		dsl_dataset_collector_cache_free(el);
-	}
-	list_destroy(&ds_to_send);
-
-	if (!err) {
-		dsl_sync_task_t *dst =
-		    kmem_zalloc(sizeof (dsl_sync_task_t), KM_SLEEP);
-		dsl_dataset_snapshot_arg_t *ddsa =
-		    kmem_zalloc(sizeof (dsl_dataset_snapshot_arg_t), KM_SLEEP);
-		ddsa->ddsa_autosnap = B_TRUE;
-		ddsa->ddsa_snaps = nv_auto;
-		ddsa->ddsa_cr = CRED();
-		dst->dst_pool = dp;
-		dst->dst_txg = txg;
-		dst->dst_space = 3 << DST_AVG_BLKSHIFT;
-		dst->dst_checkfunc = dsl_dataset_snapshot_check;
-		dst->dst_syncfunc = dsl_dataset_snapshot_sync;
-		dst->dst_arg = ddsa;
-		dst->dst_error = 0;
-		dst->dst_nowaiter = B_TRUE;
-		(void) txg_list_add_tail(&dp->dp_sync_tasks, dst, dst->dst_txg);
-	} else {
-		nvlist_free(nv_auto);
-	}
-
-	return (err);
-}
-
 void
 dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 {
@@ -566,7 +483,8 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	spa_t *spa = dp->dp_spa;
 	list_t synced_datasets;
 	dsl_sync_task_t *iter;
-	boolean_t autosnap_skip_txg = B_FALSE;
+	boolean_t wrc_skip_txg = B_FALSE;
+	boolean_t sync_ops = B_FALSE;
 	boolean_t user_snap = B_FALSE;
 	zfs_autosnap_t *autosnap = spa_get_autosnap(spa);
 	boolean_t autosnap_initialized = autosnap->initialized;
@@ -574,7 +492,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 
 	/* check if there are  ny sync ops in the txg */
 	if (txg_list_head(&dp->dp_sync_tasks, txg) != NULL)
-		autosnap_skip_txg = B_TRUE;
+		sync_ops = B_TRUE;
 
 	/* check if there are user snaps in the txg */
 	for (iter = txg_list_head(&dp->dp_sync_tasks, txg);
@@ -595,47 +513,72 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	(void) sprintf(snap, "%s%llu", AUTOSNAP_PREFIX,
 	    (unsigned long long int) txg);
 
-	if (autosnap_initialized) {
+	if (autosnap_initialized && spa->spa_sync_pass == 1) {
+		autosnap_zone_t *azone;
+
 		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 		mutex_enter(&autosnap->autosnap_lock);
 
 		/*
-		 * iterate through dirty datasets to delay
-		 * ones with usersnaps
+		 * WRC: the mechanism to ensure all wrc-ed dirty datasets
+		 * are synchronously auto-snapshotted
+		 * within (or by) the same TXG sync
+		 * The "synchronicity" of the rightmost boundary of the WRC
+		 * window is important to avoid used-space leakages
+		 * on special vdev.
+		 * Note that we skip here the wrc-ed datasets that are
+		 * already fully migrated and don't have data on special
 		 */
+
 		for (ds = txg_list_head(&dp->dp_dirty_datasets, txg);
-		    ds != NULL && spa->spa_sync_pass <= 1;
+		    ds != NULL;
 		    ds = txg_list_next(&dp->dp_dirty_datasets, ds, txg)) {
 			char ds_name[MAXPATHLEN];
-			autosnap_zone_t *azone;
+			boolean_t wrc_azone;
 
 			dsl_dataset_name(ds, ds_name);
 
 			azone = autosnap_find_zone(autosnap, ds_name, B_TRUE);
-
 			if (azone == NULL)
 				continue;
 
-			if (autosnap_skip_txg) {
-				azone->delayed = B_TRUE;
+			if ((azone->flags & AUTOSNAP_CREATOR) == 0)
 				continue;
-			}
 
-			if (azone->created)
-				continue;
+			azone->delayed = B_TRUE;
+			azone->dirty = B_TRUE;
+			wrc_azone = (azone->flags & AUTOSNAP_WRC) != 0;
 
 			if (autosnap_confirm_snap(azone, txg)) {
-				int err = dsl_pool_collect_ds_for_autosnap(dp,
-				    txg, azone->dataset, snap,
-				    !!(azone->flags & AUTOSNAP_RECURSIVE), tx);
-				if (err == 0) {
-					azone->created = B_TRUE;
-				} else {
-					autosnap_error_snap(azone, txg, err);
+				if (!wrc_azone && !user_snap && !sync_ops) {
+					autosnap_create_snapshot(azone,
+					    snap, dp, txg, tx);
+				}
+			} else if (wrc_azone) {
+				wrc_skip_txg = B_TRUE;
+			}
+		}
+
+		azone = list_head(&autosnap->autosnap_zones);
+		while (azone != NULL) {
+			boolean_t wrc_azone =
+			    ((azone->flags & AUTOSNAP_WRC) != 0);
+
+			if (user_snap) {
+				azone->delayed = B_TRUE;
+			} else if (!azone->dirty && azone->delayed) {
+				if (autosnap_confirm_snap(azone, txg)) {
+					if (!wrc_azone && !user_snap &&
+					    !sync_ops) {
+						autosnap_create_snapshot(azone,
+						    snap, dp, txg, tx);
+					}
+				} else if (wrc_azone) {
+					wrc_skip_txg = B_TRUE;
 				}
 			}
 
-			azone->delayed = B_FALSE;
+			azone = list_next(&autosnap->autosnap_zones, azone);
 		}
 
 		mutex_exit(&autosnap->autosnap_lock);
@@ -661,41 +604,35 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 
 	VERIFY0(zio_wait(zio));
 
-	if (autosnap_initialized && spa->spa_sync_pass == 1) {
+	if (autosnap_initialized && spa->spa_sync_pass == 1 &&
+	    !user_snap) {
 		autosnap_zone_t *azone;
-		/*
-		 * check if there are any delayed
-		 * autosnap left and reset the flag
-		 */
 
 		rrw_enter(&dp->dp_config_rwlock, RW_READER, FTAG);
 		mutex_enter(&autosnap->autosnap_lock);
 
+		/*
+		 * At this stage we are walking over all delayed zones
+		 * to create autosnaps
+		 */
+
 		azone = list_head(&autosnap->autosnap_zones);
 		while (azone != NULL) {
-			if (user_snap) {
-				azone->delayed = B_TRUE;
-			} else if (azone->delayed) {
-				boolean_t confirmed;
+			boolean_t skip_zone =
+			    ((azone->flags & AUTOSNAP_CREATOR) == 0);
 
-				confirmed = autosnap_confirm_snap(azone, txg);
-				if (confirmed) {
-					boolean_t recurs = !!(azone->flags &
-					    AUTOSNAP_RECURSIVE);
-					int err =
-					    dsl_pool_collect_ds_for_autosnap(
-					    dp, txg, azone->dataset, snap,
-					    recurs, tx);
-					if (err == 0) {
-						azone->created = B_TRUE;
-					} else {
-						autosnap_error_snap(azone,
-						    txg, err);
-					}
+			if (azone->delayed && !skip_zone) {
+				boolean_t wrc_azone =
+				    ((azone->flags & AUTOSNAP_WRC) != 0);
+
+				if (!wrc_azone || !wrc_skip_txg) {
+					autosnap_create_snapshot(azone,
+					    snap, dp, txg, tx);
 				}
-
-				azone->delayed = B_FALSE;
 			}
+
+			if (skip_zone)
+				azone->delayed = B_FALSE;
 
 			azone = list_next(&autosnap->autosnap_zones, azone);
 		}

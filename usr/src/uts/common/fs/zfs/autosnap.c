@@ -5,7 +5,6 @@
 #include <sys/spa.h>
 #include <sys/autosnap.h>
 #include <sys/dmu_objset.h>
-#include <sys/dsl_pool.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_destroy.h>
 #include <sys/unique.h>
@@ -425,33 +424,16 @@ snapshot_txg_compare(const void *arg1, const void *arg2)
 /* AUTOSNAP-HDL routines */
 
 void *
-autosnap_register_handler(const char *name, uint64_t flags,
+autosnap_register_handler_impl(zfs_autosnap_t *autosnap,
+    const char *name, uint64_t flags,
     autosnap_confirm_cb confirm_cb,
     autosnap_notify_created_cb nc_cb,
     autosnap_error_cb err_cb, void *cb_arg)
 {
-	spa_t *spa;
 	autosnap_handler_t *hdl = NULL;
 	autosnap_zone_t *zone, *rzone;
 	boolean_t children_have_zone;
-	zfs_autosnap_t *autosnap;
-	boolean_t namespace_alteration = B_TRUE;
 
-	if (nc_cb == NULL)
-		return (NULL);
-
-	/* special case for unregistering on deletion */
-	if (!MUTEX_HELD(&spa_namespace_lock)) {
-		mutex_enter(&spa_namespace_lock);
-		namespace_alteration = B_FALSE;
-	}
-
-	spa = spa_lookup(name);
-
-	if (!spa)
-		goto out;
-
-	autosnap = spa_get_autosnap(spa);
 
 	mutex_enter(&autosnap->autosnap_lock);
 
@@ -523,10 +505,39 @@ autosnap_register_handler(const char *name, uint64_t flags,
 		autosnap_claim_orphaned_snaps(hdl);
 
 out:
-	if (spa)
-		mutex_exit(&autosnap->autosnap_lock);
+	mutex_exit(&autosnap->autosnap_lock);
+
+	return (hdl);
+}
+
+void *
+autosnap_register_handler(const char *name, uint64_t flags,
+    autosnap_confirm_cb confirm_cb,
+    autosnap_notify_created_cb nc_cb,
+    autosnap_error_cb err_cb, void *cb_arg)
+{
+	spa_t *spa;
+	autosnap_handler_t *hdl = NULL;
+	boolean_t namespace_alteration = B_TRUE;
+
+	if (nc_cb == NULL)
+		return (NULL);
+
+	/* special case for unregistering on deletion */
+	if (!MUTEX_HELD(&spa_namespace_lock)) {
+		mutex_enter(&spa_namespace_lock);
+		namespace_alteration = B_FALSE;
+	}
+
+	spa = spa_lookup(name);
+	if (spa != NULL) {
+		hdl = autosnap_register_handler_impl(spa_get_autosnap(spa),
+		    name, flags, confirm_cb, nc_cb, err_cb, cb_arg);
+	}
+
 	if (!namespace_alteration)
 		mutex_exit(&spa_namespace_lock);
+
 	return (hdl);
 }
 
@@ -871,6 +882,26 @@ autosnap_force_snap(void *opaque, boolean_t sync)
 	autosnap_force_snap_by_name(zone->dataset, zone, sync);
 }
 
+/*
+ * This function is called when the caller wants snapshot ASAP
+ */
+void
+autosnap_force_snap_fast(void *opaque)
+{
+	autosnap_handler_t *hdl = opaque;
+	autosnap_zone_t *zone = hdl->zone;
+
+	mutex_enter(&zone->autosnap->autosnap_lock);
+
+	/*
+	 * Mark this autosnap zone as "delayed", so that autosnap
+	 * for this zone is created in the next TXG sync
+	 */
+	zone->delayed = B_TRUE;
+
+	mutex_exit(&zone->autosnap->autosnap_lock);
+}
+
 /* AUTOSNAP-NOTIFIER routines */
 
 /* iterate through handlers and call its confirm callbacks */
@@ -1099,8 +1130,7 @@ autosnap_destroyer_thread(spa_t *spa)
 
 	mutex_enter(&autosnap->autosnap_lock);
 	while (!autosnap->need_stop) {
-		nvlist_t *nvl = fnvlist_alloc();
-		nvlist_t *errlist = fnvlist_alloc();
+		nvlist_t *nvl, *errlist;
 		nvpair_t *pair;
 		autosnap_snapshot_t *snapshot, *tmp;
 		int err;
@@ -1108,13 +1138,11 @@ autosnap_destroyer_thread(spa_t *spa)
 		if (list_head(&autosnap->autosnap_destroy_queue) == NULL) {
 			cv_wait(&autosnap->autosnap_cv,
 			    &autosnap->autosnap_lock);
+			continue;
 		}
 
-		if (autosnap->need_stop) {
-			fnvlist_free(errlist);
-			fnvlist_free(nvl);
-			break;
-		}
+		nvl = fnvlist_alloc();
+		errlist = fnvlist_alloc();
 
 		/* iterate through list of snapshots to be destroyed */
 		snapshot = list_head(&autosnap->autosnap_destroy_queue);
@@ -1172,6 +1200,9 @@ autosnap_destroyer_thread(spa_t *spa)
 		fnvlist_free(errlist);
 		fnvlist_free(nvl);
 	}
+
+	autosnap->destroyer = NULL;
+	cv_broadcast(&autosnap->autosnap_cv);
 	mutex_exit(&autosnap->autosnap_lock);
 }
 
@@ -1194,17 +1225,17 @@ autosnap_destroyer_thread_stop(spa_t *spa)
 		return;
 
 	mutex_enter(&autosnap->autosnap_lock);
-	if (autosnap->need_stop || !autosnap->destroyer) {
+	if (autosnap->need_stop || autosnap->destroyer == NULL) {
 		mutex_exit(&autosnap->autosnap_lock);
 		return;
 	}
+
 	autosnap->need_stop = B_TRUE;
 	cv_broadcast(&autosnap->autosnap_cv);
+	while (autosnap->destroyer != NULL)
+		cv_wait(&autosnap->autosnap_cv, &autosnap->autosnap_lock);
+
 	mutex_exit(&autosnap->autosnap_lock);
-#ifdef _KERNEL
-	thread_join(autosnap->destroyer->t_did);
-#endif
-	autosnap->destroyer = NULL;
 }
 
 /* AUTOSNAP-INIT routines */
@@ -1312,4 +1343,113 @@ autosnap_check_name(const char *snap_name)
 	}
 
 	return (B_TRUE);
+}
+
+/* Collect datasets with a given param and create a snapshoting synctask */
+#define	AUTOSNAP_COLLECTOR_BUSY_LIMIT (1000)
+static int
+dsl_pool_collect_ds_for_autosnap(dsl_pool_t *dp, uint64_t txg,
+    const char *root_ds, const char *snap_name, boolean_t recursive,
+    dmu_tx_t *tx)
+{
+	spa_t *spa = dp->dp_spa;
+	dsl_dataset_t *ds;
+	list_t ds_to_send;
+	zfs_ds_collector_entry_t *el;
+	nvlist_t *nv_auto;
+	int err;
+	int busy_counter = 0;
+
+	nv_auto = fnvlist_alloc();
+
+	list_create(&ds_to_send, sizeof (zfs_ds_collector_entry_t),
+	    offsetof(zfs_ds_collector_entry_t, node));
+
+	while ((err = zfs_collect_ds(spa, root_ds, recursive,
+	    B_FALSE, &ds_to_send)) == EBUSY &&
+	    busy_counter++ < AUTOSNAP_COLLECTOR_BUSY_LIMIT)
+		delay(NSEC_TO_TICK(100));
+
+	if (err != 0) {
+		list_destroy(&ds_to_send);
+		nvlist_free(nv_auto);
+		return (err);
+	}
+
+	while ((el = list_head(&ds_to_send)) != NULL) {
+		boolean_t len_ok =
+		    (strlen(el->name) + strlen(snap_name) + 1) < MAXNAMELEN;
+		if (err == 0 && !len_ok)
+			err = ENAMETOOLONG;
+
+		if (err == 0)
+			err = dsl_dataset_hold(dp, el->name, FTAG, &ds);
+
+		if (err == 0) {
+			err = dsl_dataset_snapshot_check_impl(ds,
+			    snap_name, tx, B_FALSE, 0, NULL);
+			dsl_dataset_rele(ds, FTAG);
+		}
+
+		if (err == 0) {
+			(void) strcat(el->name, "@");
+			(void) strcat(el->name, snap_name);
+
+			fnvlist_add_boolean(nv_auto, el->name);
+		}
+
+		(void) list_remove_head(&ds_to_send);
+		dsl_dataset_collector_cache_free(el);
+	}
+
+	list_destroy(&ds_to_send);
+
+	if (err == 0) {
+		dsl_sync_task_t *dst =
+		    kmem_zalloc(sizeof (dsl_sync_task_t), KM_SLEEP);
+		dsl_dataset_snapshot_arg_t *ddsa =
+		    kmem_zalloc(sizeof (dsl_dataset_snapshot_arg_t), KM_SLEEP);
+		ddsa->ddsa_autosnap = B_TRUE;
+		ddsa->ddsa_snaps = nv_auto;
+		ddsa->ddsa_cr = CRED();
+		dst->dst_pool = dp;
+		dst->dst_txg = txg;
+		dst->dst_space = 3 << DST_AVG_BLKSHIFT;
+		dst->dst_checkfunc = dsl_dataset_snapshot_check;
+		dst->dst_syncfunc = dsl_dataset_snapshot_sync;
+		dst->dst_arg = ddsa;
+		dst->dst_error = 0;
+		dst->dst_nowaiter = B_TRUE;
+		(void) txg_list_add_tail(&dp->dp_sync_tasks, dst, dst->dst_txg);
+	} else {
+		nvlist_free(nv_auto);
+	}
+
+	return (err);
+}
+
+/*
+ * This function is called from dsl_pool_sync() during
+ * the walking autosnap-zone that have confirmed the creation
+ * of autosnapshot.
+ * Here we try to create autosnap for the given autosnap-zone
+ * and notify the listeners of the zone in case of an error
+ */
+void
+autosnap_create_snapshot(autosnap_zone_t *azone, char *snap,
+    dsl_pool_t *dp, uint64_t txg, dmu_tx_t *tx)
+{
+	int err;
+	boolean_t recurs;
+
+	recurs = !!(azone->flags & AUTOSNAP_RECURSIVE);
+	err = dsl_pool_collect_ds_for_autosnap(dp, txg,
+	    azone->dataset, snap, recurs, tx);
+	if (err == 0) {
+		azone->created = B_TRUE;
+		azone->delayed = B_FALSE;
+		azone->dirty = B_FALSE;
+	} else {
+		autosnap_error_snap(azone, txg, err);
+	}
 }

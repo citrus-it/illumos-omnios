@@ -468,8 +468,11 @@ spa_select_class(spa_t *spa, zio_t *zio)
 			if (match && mp->spa_enable_meta_placement_selection)
 				match = spa_refine_meta_placement(spa,
 				    zp->zp_zpl_meta_to_special, zp->zp_type);
+			else
+				match = B_FALSE;
 		} else {
-			match = zio->io_prop.zp_usewrc;
+			match = zio->io_prop.zp_usewrc &&
+			    spa->spa_wrc.wrc_ready_to_use;
 			if (match) {
 				match = spa_refine_data_placement(spa);
 

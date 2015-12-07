@@ -462,7 +462,8 @@ typedef enum {
 
 typedef enum {
 	ZFS_WRC_MODE_OFF,
-	ZFS_WRC_MODE_ON
+	ZFS_WRC_MODE_ON,
+	ZFS_WRC_MODE_OFF_DELAYED
 } zfs_wrc_mode_t;
 
 /*

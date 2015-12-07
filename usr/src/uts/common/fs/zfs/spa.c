@@ -6833,11 +6833,16 @@ spa_sync(spa_t *spa, uint64_t txg)
 	 */
 
 	zfs_autosnap_t *autosnap = spa_get_autosnap(dp->dp_spa);
+	mutex_enter(&autosnap->autosnap_lock);
+
 	autosnap_zone_t *zone = list_head(&autosnap->autosnap_zones);
 	while (zone != NULL) {
 		zone->created = B_FALSE;
+		zone->dirty = B_FALSE;
 		zone = list_next(&autosnap->autosnap_zones, zone);
 	}
+
+	mutex_exit(&autosnap->autosnap_lock);
 
 	do {
 		int pass = ++spa->spa_sync_pass;

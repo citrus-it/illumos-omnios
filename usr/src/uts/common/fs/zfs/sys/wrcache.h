@@ -85,9 +85,25 @@ typedef struct wrc_instance {
 	avl_node_t	node;
 
 	wrc_data_t	*wrc_data;
-	uint64_t	ds_object;
-	uint64_t	txg_to_rele;
 	void		*wrc_autosnap_hdl;
+	char		ds_name[MAXNAMELEN];
+
+	/* copy of dsl_dataset_t->ds_object */
+	uint64_t	ds_object;
+
+	/*
+	 * TXG of the right boundary WRC-window
+	 * can be 0 if this instance is 'idle'
+	 */
+	uint64_t	txg_to_rele;
+
+	/*
+	 * txg of the specific TXG sync that
+	 * executed 'off' on this instance
+	 */
+	uint64_t	txg_off;
+
+	boolean_t	fini_migration;
 } wrc_instance_t;
 
 /*
@@ -96,11 +112,15 @@ typedef struct wrc_instance {
  * is attached to spa structure.
  */
 struct wrc_data {
+	kthread_t	*wrc_init_thread;
 	kthread_t	*wrc_thread;		/* move thread */
 	kthread_t	*wrc_walk_thread;	/* collector thread */
 
 	kmutex_t	wrc_lock;
 	kcondvar_t	wrc_cv;
+
+	/* TASKQ that does async finalization of wrc_instances */
+	taskq_t		*wrc_instance_fini;
 
 	avl_tree_t	wrc_blocks;		/* collected blocks */
 	avl_tree_t	wrc_moved_blocks;	/* moved blocks */
@@ -137,6 +157,7 @@ struct wrc_data {
 	boolean_t	wrc_stop;	/* should pause */
 	boolean_t	wrc_locked;	/* do not walk while locked */
 	boolean_t	wrc_walking;	/* currently walking */
+	boolean_t	wrc_wait_for_window;
 
 	boolean_t	wrc_delete;	/* delete state */
 
@@ -194,6 +215,29 @@ typedef struct wrc_parseblock_cb {
 	uint64_t	actv_txg;
 } wrc_parseblock_cb_t;
 
+/*
+ * This structure describes ZFS_PROP_WRC_MODE property
+ */
+typedef struct {
+	/*
+	 * copy of dsl_dataset_t->ds_object of dataset
+	 * for which user does wrc_mode=on
+	 */
+	uint64_t	root_ds_object;
+
+	/*
+	 * TXG when user did 'wrc_mode=off'
+	 */
+	uint64_t	txg_off;
+
+	/*
+	 * Flags. Now is not used.
+	 */
+	uint64_t	flags;
+} wrc_mode_prop_val_t;
+
+#define	WRC_MODE_PROP_VAL_SZ (sizeof (wrc_mode_prop_val_t) / sizeof (uint64_t))
+
 void wrc_init(wrc_data_t *wrc_data, spa_t *spa);
 void wrc_fini(wrc_data_t *wrc_data);
 
@@ -230,8 +274,6 @@ void wrc_walk_unlock(spa_t *);
 
 void wrc_process_objset(wrc_data_t *wrc_data, objset_t *os, boolean_t destroy);
 void wrc_mode_changed(void *arg, uint64_t newval);
-uint64_t wrc_pack_wrc_mode(uint64_t value, uint64_t objset_num);
-uint64_t wrc_unpack_wrc_mode(uint64_t value);
 int wrc_check_dataset(const char *ds_name);
 
 #ifdef	__cplusplus

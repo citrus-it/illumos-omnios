@@ -135,6 +135,8 @@ typedef enum zfs_error {
 	EZFS_WRCNOTSUP,		/* wrcache feature flag is not enabled */
 	EZFS_WRCCHILD,		/* child ds has enabled wrc */
 	EZFS_WRCPARENT,		/* parent ds has enabled wrc */
+	EZFS_WRCALREADY,    /* wrc already enabled or disabled */
+	EZFS_WRCINPROGRESS, /* wrc is disabling */
 	EZFS_UNKNOWN
 } zfs_error_t;
 

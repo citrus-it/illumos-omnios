@@ -291,7 +291,16 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 
 	ASSERT(dsl_pool_config_held(dp));
 
-	err = dsl_prop_get_int_ds(ds, propname, &value);
+	if (zfs_name_to_prop(propname) == ZFS_PROP_WRC_MODE) {
+		wrc_mode_prop_val_t val;
+
+		err = dsl_prop_get_ds(ds, propname, 8,
+		    WRC_MODE_PROP_VAL_SZ, &val, NULL);
+		if (err == 0)
+			value = (uintptr_t)((void *)&val);
+	} else
+		err = dsl_prop_get_int_ds(ds, propname, &value);
+
 	if (err != 0)
 		return (err);
 
@@ -723,7 +732,21 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 	strfree(inheritstr);
 	strfree(recvdstr);
 
-	if (isint) {
+	if (zfs_name_to_prop(propname) == ZFS_PROP_WRC_MODE) {
+		wrc_mode_prop_val_t val;
+
+		VERIFY0(dsl_prop_get_ds(ds, propname, 8,
+		    WRC_MODE_PROP_VAL_SZ, &val, NULL));
+
+		dsl_prop_changed_notify(ds->ds_dir->dd_pool,
+		    ds->ds_dir->dd_object, propname,
+		    (uintptr_t)((void *)&val), TRUE);
+
+		(void) snprintf(valbuf, sizeof (valbuf),
+		    "%s", (val.root_ds_object != 0 &&
+		    val.txg_off == 0) ? "on" : "off");
+		valstr = valbuf;
+	} else if (isint) {
 		VERIFY0(dsl_prop_get_int_ds(ds, propname, &intval));
 
 		if (ds->ds_is_snapshot) {
@@ -838,10 +861,9 @@ dsl_prop_wrc_mode_check_child_cb(dsl_pool_t *dp,
 }
 
 static int
-dsl_prop_wrc_mode_check(dsl_dataset_t *ds, objset_t *os,
-    nvpair_t *wrc_mode_nvp, boolean_t *is_inherit_required)
+dsl_prop_wrc_mode_check(dsl_dataset_t *ds, objset_t *os)
 {
-	int err;
+	int err = 0;
 
 	if (os->os_wrc_mode != ZFS_WRC_MODE_OFF) {
 		/*
@@ -860,25 +882,9 @@ dsl_prop_wrc_mode_check(dsl_dataset_t *ds, objset_t *os,
 		    ds->ds_dir->dd_object,
 		    dsl_prop_wrc_mode_check_child_cb, ds,
 		    DS_FIND_CHILDREN);
-		if (err)
-			return (err);
 	}
 
-	/*
-	 * check func is called 2 times, so everything already
-	 * done at first stage
-	 */
-	if (nvpair_type(wrc_mode_nvp) != DATA_TYPE_BOOLEAN) {
-		uint64_t value;
-
-		VERIFY3U(nvpair_type(wrc_mode_nvp), ==,
-		    DATA_TYPE_UINT64);
-		value = fnvpair_value_uint64(wrc_mode_nvp);
-		if (value == ZFS_WRC_MODE_OFF)
-			*is_inherit_required = B_TRUE;
-	}
-
-	return (0);
+	return (err);
 }
 
 typedef struct dsl_props_set_arg {
@@ -897,7 +903,6 @@ dsl_props_set_check(void *arg, dmu_tx_t *tx)
 	uint64_t version;
 	nvpair_t *elem = NULL;
 	int err;
-	nvpair_t *wrc_mode_nvp = NULL;
 
 	err = dsl_dataset_hold(dp, dpsa->dpsa_dsname, FTAG, &ds);
 	if (err != 0)
@@ -919,16 +924,49 @@ dsl_props_set_check(void *arg, dmu_tx_t *tx)
 		}
 
 		if (zfs_name_to_prop(prop_name) == ZFS_PROP_WRC_MODE) {
-			boolean_t require_inherit = B_FALSE;
-			err = dsl_prop_wrc_mode_check(ds, os,
-			    elem, &require_inherit);
+			uint64_t wrc_mode_new = 0;
+			data_type_t elem_type = nvpair_type(elem);
+
+			if (elem_type == DATA_TYPE_UINT64)
+				wrc_mode_new = fnvpair_value_uint64(elem);
+
+			if (os->os_wrc_root_ds_obj == ds->ds_object &&
+			    elem_type == DATA_TYPE_UINT64) {
+
+				/*
+				 * ZFS_WRC_MODE_OFF_DELAYED means that
+				 * the coresponding wrc_instance is in
+				 * transition state: from ON to OFF
+				 * so ON/OFF is not permitted
+				 */
+				if (os->os_wrc_mode ==
+				    ZFS_WRC_MODE_OFF_DELAYED) {
+					dsl_dataset_rele(ds, FTAG);
+					return (SET_ERROR(EINPROGRESS));
+				}
+
+				ASSERT3U(os->os_wrc_mode, ==, ZFS_WRC_MODE_ON);
+
+				/* Check for double ON */
+				if (wrc_mode_new == ZFS_WRC_MODE_ON) {
+					dsl_dataset_rele(ds, FTAG);
+					return (SET_ERROR(EALREADY));
+				}
+			}
+
+			err = dsl_prop_wrc_mode_check(ds, os);
 			if (err != 0) {
 				dsl_dataset_rele(ds, FTAG);
 				return (err);
 			}
 
-			if (require_inherit)
-				wrc_mode_nvp = elem;
+			/* Check for double OFF */
+			if (os->os_wrc_root_ds_obj == 0 &&
+			    elem_type == DATA_TYPE_UINT64 &&
+			    wrc_mode_new == ZFS_WRC_MODE_OFF) {
+				dsl_dataset_rele(ds, FTAG);
+				return (SET_ERROR(EALREADY));
+			}
 
 			continue;
 		}
@@ -943,19 +981,6 @@ dsl_props_set_check(void *arg, dmu_tx_t *tx)
 			}
 		}
 
-	}
-
-	/*
-	 * We cannot just set wrc_mode=off, because
-	 * in this case inheritance will be broken.
-	 * So user executes "zfs set wrc_mode=off",
-	 * but we translate this to "zfs inherit wrc_mode".
-	 * This works because our parent always has wrc_mode=off
-	 */
-	if (wrc_mode_nvp != NULL) {
-		fnvlist_remove_nvpair(dpsa->dpsa_props, wrc_mode_nvp);
-		fnvlist_add_boolean(dpsa->dpsa_props,
-		    zfs_prop_to_name(ZFS_PROP_WRC_MODE));
 	}
 
 	if (ds->ds_is_snapshot && version < SPA_VERSION_SNAP_PROPS) {
@@ -993,42 +1018,34 @@ dsl_props_set_sync_impl(dsl_dataset_t *ds, zprop_source_t source,
 			zfs_prop_t prop = zfs_name_to_prop(propname);
 			uint64_t intval = fnvpair_value_uint64(pair);
 
-			if (intval != 0 && prop == ZFS_PROP_WRC_MODE) {
-				intval = wrc_pack_wrc_mode(intval,
-				    ds->ds_object);
-			}
-
-			dsl_prop_set_sync_impl(ds, nvpair_name(pair),
-			    source, sizeof (intval), 1, &intval, tx);
-		} else if (nvpair_type(pair) == DATA_TYPE_BOOLEAN) {
-			const char *propname = nvpair_name(pair);
-			zfs_prop_t prop = zfs_name_to_prop(propname);
-			zprop_source_t src = source;
-
-			/*
-			 * User executes 'zfs set wrc_mode=off',
-			 * this operation is ZPROP_SRC_LOCAL,
-			 * we replace the original command by
-			 * 'zfs inherit wrc_mode' that is ZPROP_SRC_INHERITED
-			 * Also see comments in dsl_props_set_check()
-			 */
-			if (prop == ZFS_PROP_WRC_MODE &&
-			    source == ZPROP_SRC_LOCAL) {
-				spa_t *spa = dsl_dataset_get_spa(ds);
-				wrc_data_t *wrc_data = spa_get_wrc_data(spa);
-				src = ZPROP_SRC_INHERITED;
+			if (prop == ZFS_PROP_WRC_MODE) {
+				wrc_mode_prop_val_t val;
 
 				/*
-				 * Need to purge current window to
-				 * correctly disable WRC for this DS
+				 * Disabling WRC involves the following:
+				 * 1) all the subsequent data writes will
+				 * stop using special vdev
+				 * 2) already wrcached data blocks (with
+				 * TXG <= txg_off below) will gradually
+				 * migrated from special vdev
+				 *
+				 * To handle this need to remember TXG.
+				 * WRC will be completely disabled for this DS,
+				 * after WRC-window cross this TXG
 				 */
-				mutex_enter(&wrc_data->wrc_lock);
-				wrc_purge_window(spa, tx);
-				mutex_exit(&wrc_data->wrc_lock);
-			}
+				val.txg_off = (intval == 0) ? tx->tx_txg : 0;
+				val.root_ds_object = ds->ds_object;
+				val.flags = 0;
 
+				dsl_prop_set_sync_impl(ds, nvpair_name(pair),
+				    source, 8, WRC_MODE_PROP_VAL_SZ, &val, tx);
+			} else {
+				dsl_prop_set_sync_impl(ds, nvpair_name(pair),
+				    source, sizeof (intval), 1, &intval, tx);
+			}
+		} else if (nvpair_type(pair) == DATA_TYPE_BOOLEAN) {
 			dsl_prop_set_sync_impl(ds, nvpair_name(pair),
-			    src, 0, 0, NULL, tx);
+			    source, 0, 0, NULL, tx);
 		} else {
 			panic("invalid nvpair type");
 		}
@@ -1188,10 +1205,22 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
 			 */
 			ASSERT(za.za_integer_length == 8);
 
-			if (za.za_first_integer != 0 &&
-			    prop == ZFS_PROP_WRC_MODE) {
-				za.za_first_integer =
-				    wrc_unpack_wrc_mode(za.za_first_integer);
+			if (prop == ZFS_PROP_WRC_MODE) {
+				wrc_mode_prop_val_t val;
+
+				ASSERT(za.za_num_integers ==
+				    WRC_MODE_PROP_VAL_SZ);
+
+				err = zap_lookup(mos, propobj,
+				    za.za_name, 8, za.za_num_integers, &val);
+				if (err != 0)
+					break;
+
+				if (val.root_ds_object != 0 &&
+				    val.txg_off == 0)
+					za.za_first_integer = ZFS_WRC_MODE_ON;
+				else
+					za.za_first_integer = ZFS_WRC_MODE_OFF;
 			}
 
 			(void) nvlist_add_uint64(propval, ZPROP_VALUE,

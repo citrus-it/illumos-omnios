@@ -4325,6 +4325,14 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 			/* WRC cannot be used without special-vdev */
 			if (!wrc_feature_enabled || !spa_has_special(spa))
 				return (SET_ERROR(EOPNOTSUPP));
+
+			/*
+			 * We do not want to have races, because on
+			 * import or after reboot WRC does registration
+			 * asynchronously.
+			 */
+			if (!spa->spa_wrc.wrc_ready_to_use)
+				return (SET_ERROR(EBUSY));
 		}
 		break;
 
