@@ -62,6 +62,8 @@ extern "C" {
  * Flag for LDI handle's lh_flags field
  */
 #define	LH_FLAGS_NOTIFY	0x0001		/* invoked in context of a notify */
+#define	LH_FLAGS_NOTIFY_NOTIFY 0x0002	/* processed once in notify loop */
+#define	LH_FLAGS_NOTIFY_FINALIZE 0x0004	/* processed once in finalize loop */
 
 /*
  * LDI initialization function
