@@ -132,50 +132,17 @@ typedef enum spa_watermark {
 	SPA_WM_HIGH
 } spa_watermark_t;
 
-/* Tunables and default values for special/normal class selection */
-extern boolean_t spa_special_selection_enable;
-
-#define	SPA_SPECIAL_ADJUSTMENT	5
-#define	SPA_SPECIAL_UTILIZATION	70
-
-typedef enum {
-	SPA_SPECIAL_SELECTION_MIN,
-	SPA_SPECIAL_SELECTION_LATENCY,
-	SPA_SPECIAL_SELECTION_THROUGHPUT,
-	SPA_SPECIAL_SELECTION_LATENCY_BIAS,
-	SPA_SPECIAL_SELECTION_THROUGHPUT_BIAS,
-	SPA_SPECIAL_SELECTION_MAX
-} spa_special_selection_t;
-
-#define	SPA_SPECIAL_SELECTION_VALID(sel)	\
-	(((sel) > SPA_SPECIAL_SELECTION_MIN) &&	\
-	    ((sel) < SPA_SPECIAL_SELECTION_MAX))
-
-typedef struct spa_special_stat {
-	uint64_t special_ut;
-	uint64_t normal_ut;
-	uint64_t normal_lt;
-	uint64_t special_lt;
-
-	uint64_t ht_special_lt;
-	uint64_t ht_normal_lt;
-	uint64_t rt_special_lt;
-	uint64_t rt_normal_lt;
-	uint64_t ac_special_lt;
-	uint64_t ac_normal_lt;
-
-	vdev_io_stat_t normal_stat;
-	vdev_io_stat_t special_stat;
-
-	uint64_t ht_special_ut;
-	uint64_t ht_normal_ut;
-	uint64_t rt_special_ut;
-	uint64_t rt_normal_ut;
-	uint64_t ac_special_ut;
-	uint64_t ac_normal_ut;
-
-	uint64_t ac_divisor;
-} spa_special_stat_t;
+/*
+ * spa average utilization, latency and throughput for special/normal classes
+ */
+typedef struct spa_avg_stat {
+	uint64_t special_utilization;
+	uint64_t normal_utilization;
+	uint64_t special_latency;
+	uint64_t normal_latency;
+	uint64_t special_throughput;
+	uint64_t normal_throughput;
+} spa_avg_stat_t;
 
 typedef struct spa_perfmon_data {
 	kthread_t		*perfmon_thread;
@@ -191,7 +158,6 @@ typedef struct spa_meta_placement {
 	uint64_t spa_other_meta_to_special;
 	uint64_t spa_small_data_to_special;
 } spa_meta_placement_t;
-
 
 /*
  * SPA info copied from spa_t and optionally from vdev_t that is provided
@@ -408,11 +374,11 @@ struct spa {
 	list_t		spa_cos_list;
 
 	/*
-	 * latency stats per metaslab_class to aid dynamic balancing of io
-	 * across normal and special classes
+	 * utilization, latency and throughput statistics per metaslab_class
+	 * to aid dynamic balancing of I/O across normal and special classes
 	 */
-	uint64_t		spa_special_stat_rotor;
-	spa_special_stat_t	spa_special_stat;
+	uint64_t		spa_avg_stat_rotor;
+	spa_avg_stat_t		spa_avg_stat;
 
 	spa_perfmon_data_t	spa_perfmon;
 

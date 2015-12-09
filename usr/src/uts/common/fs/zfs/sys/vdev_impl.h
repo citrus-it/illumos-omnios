@@ -153,14 +153,25 @@ struct vdev_queue {
 	kmutex_t	vq_lock;
 };
 
-typedef struct vdev_io_stat {
-	uint64_t run_last_time;
-	uint64_t wait_last_time;
-	uint64_t run_len_time;
-	uint64_t wait_len_time;
-	uint64_t read_op;
-	uint64_t write_op;
-} vdev_io_stat_t;
+/*
+ * vdev auxiliary kstat I/O statistics:
+ * updates every spa_special_stat_update_ticks interval
+ * it is used for adjust special vs normal data routing
+ */
+typedef struct vdev_aux_stat {
+	uint64_t nread;		/* number of bytes read */
+	uint64_t nwritten;	/* number of bytes written */
+	uint64_t reads;		/* number of read operations */
+	uint64_t writes;	/* number of write operations */
+	uint64_t rtime;		/* cumulative run (service) time */
+	uint64_t wtime;		/* cumulative wait (pre-service) time */
+	uint64_t rlentime;	/* cumulative run length*time product */
+	uint64_t wlentime;	/* cumulative wait length*time product */
+	uint64_t rlastupdate;	/* last time run queue changed */
+	uint64_t wlastupdate;	/* last time wait queue changed */
+	uint64_t rcnt;		/* count of elements in run state */
+	uint64_t wcnt;		/* count of elements in wait state */
+} vdev_aux_stat_t;
 
 /*
  * Compound argument to vdev_auto_trim().
@@ -269,8 +280,8 @@ struct vdev {
 
 	char		*vdev_spare_group; /* spare group name */
 
-	struct kstat	*vdev_iokstat;
-	vdev_io_stat_t	vdev_iostat;
+	struct kstat	*vdev_iokstat; /* vdev kstat I/O statistics */
+	vdev_aux_stat_t	vdev_aux_stat; /* auxiliary vdev kstat I/O statistics */
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must
 	 * remain at the end of the structure.  DTrace will use the kernel's

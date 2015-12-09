@@ -870,11 +870,6 @@ typedef struct vdev_stat {
 	uint64_t	vs_fragmentation;	/* device fragmentation */
 	hrtime_t	vs_latency[ZIO_TYPES];	/* moving average of latency */
 	hrtime_t	vs_iotime[ZIO_TYPES];	/* time spent doing i/o */
-	/* utilization telemetry */
-	hrtime_t	vs_bzstart;		/* busy time start */
-	hrtime_t	vs_bztotal;		/* busy time total */
-	hrtime_t	vs_wcstart;		/* wall-clock time start */
-	uint64_t	vs_busy;		/* vdev utilization */
 } vdev_stat_t;
 
 /*

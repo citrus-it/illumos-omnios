@@ -269,7 +269,7 @@ static boolean_t
 spa_wrc_stop_move(spa_t *spa)
 {
 	boolean_t stop =
-	    ((spa->spa_special_stat.ht_normal_ut > wrc_hdd_load_limit &&
+	    ((spa->spa_avg_stat.normal_utilization > wrc_hdd_load_limit &&
 	    spa->spa_watermark == SPA_WM_NONE) || spa->spa_wrc.wrc_locked);
 
 	return (stop);

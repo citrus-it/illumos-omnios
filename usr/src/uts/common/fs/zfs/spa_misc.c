@@ -684,8 +684,8 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 
 	wrc_init(&spa->spa_wrc, spa);
 
-	bzero(&(spa->spa_special_stat), sizeof (spa_special_stat_t));
-	spa->spa_special_stat_rotor = 0;
+	bzero(&spa->spa_avg_stat, sizeof (spa_avg_stat_t));
+	spa->spa_avg_stat_rotor = 0;
 	spa->spa_special_to_normal_ratio = 100;
 	spa->spa_dedup_percentage = 100;
 	spa->spa_dedup_rotor = 0;
