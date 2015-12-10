@@ -671,15 +671,6 @@ spa_vdev_walk_stats(vdev_t *pvd, spa_load_cb func,
     cos_acc_stat_t *cos_acc)
 {
 	if (pvd->vdev_children == 0) {
-		/*
-		 * If vdev_physpath is not defined, this vdev
-		 * is not a real-device so it is impossible
-		 * to collect stats for this vdev, because
-		 * stats available only for real-devices.
-		 */
-		if (pvd->vdev_physpath == NULL)
-			return;
-
 		/* Single vdev (itself) */
 		ASSERT(pvd->vdev_ops->vdev_op_leaf);
 		DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, pvd);
@@ -697,15 +688,6 @@ spa_vdev_walk_stats(vdev_t *pvd, spa_load_cb func,
 				continue;
 
 			if (vd->vdev_ops->vdev_op_leaf) {
-				/*
-				 * If vdev_physpath is not defined, this vdev
-				 * is not a real-device so it is impossible
-				 * to collect stats for this vdev, because
-				 * stats available only for real-devices.
-				 */
-				if (vd->vdev_physpath == NULL)
-					continue;
-
 				DTRACE_PROBE1(spa_vdev_walk_lf, vdev_t *, vd);
 				func(vd, cos_acc);
 			} else {
@@ -983,7 +965,7 @@ spa_load_stats_update(spa_t *spa, spa_acc_stat_t *spa_acc, uint64_t rotor)
 
 	spa_class_collect_stats(spa, spa_acc, weight);
 
-	if (residue == 0) {
+	if (residue == 0 && spa_acc->count != 0) {
 		spa_avg->special_utilization =
 		    spa_acc->special_utilization / spa_acc->count;
 		spa_avg->normal_utilization =
