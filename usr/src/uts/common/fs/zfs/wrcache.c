@@ -941,7 +941,8 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 			mutex_exit(&wrc_data->wrc_lock);
 
 			err = 0;
-		} else if (wrc_data->wrc_blocks_in == wrc_data->wrc_blocks_mv) {
+		} else if (wrc_data->wrc_blocks_in == wrc_data->wrc_blocks_mv &&
+		    !wrc_data->wrc_purge) {
 			/* Everything is moved, close the window */
 			if (wrc_data->wrc_finish_txg != 0)
 				wrc_close_window(spa);
@@ -1324,8 +1325,6 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 		    ddi_get_lbolt() + 1000);
 	}
 
-	wrc_data->wrc_purge = B_FALSE;
-
 	/*
 	 * Reset the deletion flag to make sure
 	 * that the purge is appreciated by
@@ -1385,6 +1384,9 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 	}
 
 	wrc_rele_autosnaps(wrc_data, snap_txg, B_TRUE);
+
+	/* Purge done */
+	wrc_data->wrc_purge = B_FALSE;
 }
 
 /* Finalize interrupted with power cycle window */
