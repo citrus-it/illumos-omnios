@@ -144,6 +144,8 @@ HBA_API HBA_STATUS Sun_HBA_ForceLip(
     HBA_HANDLE handle,
     int *rval);
 
+HBA_STATUS Sun_HBA_FreeLibrary(void);
+
 #endif /* HBA_API_SUN_H */
 
 #ifdef __cplusplus

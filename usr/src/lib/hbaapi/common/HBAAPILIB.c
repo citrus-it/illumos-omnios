@@ -44,6 +44,7 @@
 #include <time.h>
 #include "hbaapi.h"
 #include "vendorhbaapi.h"
+#include "hbaapi-sun.h"
 #include <stdlib.h>
 #ifdef USESYSLOG
 #include <syslog.h>
@@ -969,9 +970,9 @@ HBA_FreeLibrary(void) {
     DeleteCriticalSection(&_hbaapi_LE_mutex);
 #endif
     
-    return HBA_STATUS_OK;
+    return Sun_HBA_FreeLibrary();
 }
-
+
 /*
  * The API used to use fixed size tables as its primary data structure.
  * Indexing from 1 to N identified each adapters.  Now the adapters are

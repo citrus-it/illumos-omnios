@@ -865,3 +865,26 @@ Sun_HBA_ForceLip(HBA_HANDLE handle, int *rval)
 	}
 	RELEASE_MUTEX_RETURN(&_hbaapi_LL_mutex, status);
 }
+
+HBA_STATUS
+Sun_HBA_FreeLibrary(void)
+{
+	HBA_TGTADAPTER_INFO	*adapt_infop;
+	HBA_TGTADAPTER_INFO	*adapt_next;
+
+	GRAB_MUTEX(&_hbaapi_AL_mutex);
+
+	for(adapt_infop = _hbaapi_tgtadapterlist;
+	    adapt_infop != NULL;
+	    adapt_infop = adapt_next) {
+	    adapt_next = adapt_infop->next;
+		free(adapt_infop->name);
+		free(adapt_infop);
+	}
+
+	_hbaapi_tgtadapterlist = NULL;
+	_hbaapi_total_tgtadapter_count = 0;
+
+	RELEASE_MUTEX_RETURN(&_hbaapi_AL_mutex, HBA_STATUS_OK);
+}
+
