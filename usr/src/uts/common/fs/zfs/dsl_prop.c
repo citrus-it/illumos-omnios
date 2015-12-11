@@ -742,6 +742,32 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 		    ds->ds_dir->dd_object, propname,
 		    (uintptr_t)((void *)&val), TRUE);
 
+		/*
+		 * Flow diagram of ZFS_PROP_WRC_MODE states
+		 *
+		 * off (root_ds_object == 0, txg_off == 0)
+		 *	(user sees wrc_mode=off, source=default)
+		 *
+		 *	user operation "set on" ==>>
+		 *
+		 * on (root_ds_object != 0, txg_off == 0)
+		 *	(user sees wrc_mode=on, source=local)
+		 *
+		 *	user operation "set off" ==>>
+		 *
+		 * off_delayed (root_ds_object != 0, txg_off != 0)
+		 *	(user sees wrc_mode=off, source=local)
+		 *
+		 *	internal operation "inherit" ==>>
+		 *
+		 * off (root_ds_object == 0, txg_off == 0)
+		 *	(user sees wrc_mode=off, source=default)
+		 */
+		if (val.root_ds_object == 0)
+			spa_feature_decr(spa, SPA_FEATURE_WRC, tx);
+		else if (val.txg_off == 0)
+			spa_feature_incr(spa, SPA_FEATURE_WRC, tx);
+
 		(void) snprintf(valbuf, sizeof (valbuf),
 		    "%s", (val.root_ds_object != 0 &&
 		    val.txg_off == 0) ? "on" : "off");
@@ -781,13 +807,6 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 			    ZAP_MAXVALUELEN, tbuf, NULL) == 0)
 				valstr = tbuf;
 		}
-	}
-
-	if (zfs_name_to_prop(propname) == ZFS_PROP_WRC_MODE &&
-	    source != ZPROP_SRC_INHERITED &&
-	    !spa_feature_is_active(spa, SPA_FEATURE_WRC)) {
-		/* Once activated cannot be deactivated */
-		spa_feature_incr(spa, SPA_FEATURE_WRC, tx);
 	}
 
 	spa_history_log_internal_ds(ds, (source == ZPROP_SRC_NONE ||

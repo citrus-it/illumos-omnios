@@ -276,6 +276,8 @@ void wrc_process_objset(wrc_data_t *wrc_data, objset_t *os, boolean_t destroy);
 void wrc_mode_changed(void *arg, uint64_t newval);
 int wrc_check_dataset(const char *ds_name);
 
+boolean_t wrc_try_disable(wrc_data_t *wrc_data);
+
 #ifdef	__cplusplus
 }
 #endif

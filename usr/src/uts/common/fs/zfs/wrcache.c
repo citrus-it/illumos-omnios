@@ -1673,11 +1673,6 @@ wrc_activate_impl(spa_t *spa)
 	boolean_t hold = B_FALSE;
 
 	mutex_enter(&wrc_data->wrc_lock);
-	if (wrc_data->wrc_thr_exit) {
-		mutex_exit(&wrc_data->wrc_lock);
-		return;
-	}
-
 	if (wrc_data->wrc_isvalid) {
 		mutex_exit(&wrc_data->wrc_lock);
 		return;
@@ -1730,6 +1725,8 @@ wrc_activate_impl(spa_t *spa)
 
 	wrc_data->wrc_latest_window_time = ddi_get_lbolt();
 
+	wrc_data->wrc_ready_to_use = B_FALSE;
+	wrc_data->wrc_thr_exit = B_FALSE;
 	wrc_data->wrc_purge = B_FALSE;
 	wrc_data->wrc_walk = B_TRUE;
 	wrc_data->wrc_spa = spa;
@@ -2001,7 +1998,7 @@ wrc_process_objset(wrc_data_t *wrc_data,
 
 	mutex_enter(&wrc_data->wrc_lock);
 	/* Do not register instances too early */
-	if (!wrc_data->wrc_ready_to_use) {
+	if (!wrc_data->wrc_isvalid || !wrc_data->wrc_ready_to_use) {
 		mutex_exit(&wrc_data->wrc_lock);
 		return;
 	}
@@ -2216,4 +2213,25 @@ wrc_check_dataset(const char *ds_name)
 	}
 
 	return (ENOTACTIVE);
+}
+
+/*
+ * The function requires that all the writecache
+ * instances are already disabled
+ */
+boolean_t
+wrc_try_disable(wrc_data_t *wrc_data)
+{
+	boolean_t result = B_FALSE;
+
+	mutex_enter(&wrc_data->wrc_lock);
+
+	if (avl_numnodes(&wrc_data->wrc_instances) == 0) {
+		wrc_data->wrc_isvalid = B_FALSE;
+		result = B_TRUE;
+	}
+
+	mutex_exit(&wrc_data->wrc_lock);
+
+	return (result);
 }

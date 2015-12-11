@@ -316,11 +316,11 @@ zfs_prop_init(void)
 	    "zil | meta", "SPECIALCLASS", specialclass_table);
 #endif
 
-	zprop_register_index(ZFS_PROP_ZPL_TO_METADEV, "zpl_to_metadev",
-	    META_PLACEMENT_ON, PROP_INHERIT,
+	zprop_register_index(ZFS_PROP_ZPL_META_TO_METADEV,
+	    "zpl_meta_to_metadev", META_PLACEMENT_OFF, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_AUTOSNAP |
 	    ZFS_TYPE_VOLUME,
-	    "on | dual | off", "ZPL_TO_MD", meta_placement_table);
+	    "on | dual | off", "ZPLMETA_TO_MD", meta_placement_table);
 
 	/* inherit index (boolean) properties */
 	zprop_register_index(ZFS_PROP_ATIME, "atime", 1, PROP_INHERIT,

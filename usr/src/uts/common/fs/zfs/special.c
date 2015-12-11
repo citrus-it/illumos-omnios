@@ -295,18 +295,14 @@ spa_refine_meta_placement(spa_t *spa, uint64_t zpl_meta_to_special,
 {
 	spa_meta_placement_t *mp = &spa->spa_meta_policy;
 	boolean_t isddt = DMU_OT_IS_DDT_META(ot),
-	    isgen = DMU_OT_IS_GENERAL_META(ot),
 	    iszpl = DMU_OT_IS_ZPL_META(ot);
 
-	if (isddt && (mp->spa_ddt_to_special == META_PLACEMENT_OFF))
-		return (B_FALSE);
-	else if (isgen && (mp->spa_general_meta_to_special ==
-	    META_PLACEMENT_OFF))
+	if (isddt && (mp->spa_ddt_meta_to_special == META_PLACEMENT_OFF))
 		return (B_FALSE);
 	else if (iszpl && (zpl_meta_to_special == META_PLACEMENT_OFF))
 		return (B_FALSE);
-	else if (!isddt && !isgen && !iszpl &&
-	    (mp->spa_other_meta_to_special == META_PLACEMENT_OFF))
+	else if (!isddt && !iszpl && (mp->spa_zfs_meta_to_special ==
+	    META_PLACEMENT_OFF))
 		return (B_FALSE);
 	else
 		return (B_TRUE);
@@ -318,18 +314,14 @@ spa_meta_is_dual(spa_t *spa, uint64_t zpl_meta_to_special, dmu_object_type_t ot)
 {
 	spa_meta_placement_t *mp = &spa->spa_meta_policy;
 	boolean_t isddt = DMU_OT_IS_DDT_META(ot),
-	    isgen = DMU_OT_IS_GENERAL_META(ot),
 	    iszpl = DMU_OT_IS_ZPL_META(ot);
 
-	if (isddt && (mp->spa_ddt_to_special != META_PLACEMENT_DUAL))
-		return (B_FALSE);
-	else if (isgen && (mp->spa_general_meta_to_special !=
-	    META_PLACEMENT_DUAL))
+	if (isddt && (mp->spa_ddt_meta_to_special != META_PLACEMENT_DUAL))
 		return (B_FALSE);
 	else if (iszpl && (zpl_meta_to_special != META_PLACEMENT_DUAL))
 		return (B_FALSE);
-	else if (!isddt && !isgen && !iszpl &&
-	    (mp->spa_other_meta_to_special != META_PLACEMENT_DUAL))
+	else if (!isddt && !iszpl && (mp->spa_zfs_meta_to_special !=
+	    META_PLACEMENT_DUAL))
 		return (B_FALSE);
 	else
 		return (B_TRUE);
@@ -438,7 +430,7 @@ dbuf_ddt_is_l2cacheable(dmu_buf_impl_t *db)
 	if ((!DMU_OT_IS_DDT_META(ot)) || (!match))
 		return (B_TRUE);
 
-	return (mp->spa_ddt_to_special != META_PLACEMENT_ON);
+	return (mp->spa_ddt_meta_to_special != META_PLACEMENT_ON);
 }
 
 /*

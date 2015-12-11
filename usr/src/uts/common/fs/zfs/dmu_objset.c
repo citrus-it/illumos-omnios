@@ -247,7 +247,7 @@ special_class_changed_cb(void *arg, uint64_t newval)
 }
 
 static void
-zpl_placement_changed_cb(void *arg, uint64_t newval)
+zpl_meta_placement_changed_cb(void *arg, uint64_t newval)
 {
 	objset_t *os = arg;
 
@@ -410,9 +410,11 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		if (err == 0)
 			err = dsl_prop_register(ds, "specialclass",
 			    special_class_changed_cb, os);
-		if (err == 0)
-			err = dsl_prop_register(ds, "zpl_to_metadev",
-			    zpl_placement_changed_cb, os);
+		if (err == 0) {
+			err = dsl_prop_register(ds,
+			    zfs_prop_to_name(ZFS_PROP_ZPL_META_TO_METADEV),
+			    zpl_meta_placement_changed_cb, os);
+		}
 		if (!ds->ds_is_snapshot) {
 			if (err == 0) {
 				err = dsl_prop_register(ds,

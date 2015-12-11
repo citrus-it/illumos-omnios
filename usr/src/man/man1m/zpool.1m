@@ -1946,11 +1946,11 @@ Reopen all the vdevs associated with the pool.
 .sp .6
 .RS 4n
 Removes the specified device from the pool. This command currently only
-supports removing hot spares, cache, and log devices. A mirrored log device can
-be removed by specifying the top-level mirror for the log. Non-log devices that
-are part of a mirrored configuration can be removed using the \fBzpool
-detach\fR command. Non-redundant and \fBraidz\fR devices cannot be removed from
-a pool.
+supports removing hot spares, cache, log, and special devices. A mirrored log
+device can be removed by specifying the top-level mirror for the log. Non-log
+devices that are part of a mirrored configuration can be removed using the
+\fBzpool detach\fR command. Non-redundant and \fBraidz\fR devices cannot be
+removed from a pool.
 .RE
 
 .sp

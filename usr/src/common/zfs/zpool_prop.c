@@ -145,20 +145,17 @@ zpool_prop_init(void)
 	    0, PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "DEDUP_BEST_EFFORT",
 	    boolean_table);
 
-	zprop_register_index(ZPOOL_PROP_META_PLACEMENT, "meta_placement", 1,
+	zprop_register_index(ZPOOL_PROP_META_PLACEMENT, "meta_placement", 0,
 	    PROP_DEFAULT, ZFS_TYPE_POOL, "on | off", "META_PLCMNT",
 	    boolean_table);
-	zprop_register_index(ZPOOL_PROP_DDT_TO_METADEV, "ddt_to_metadev",
-	    META_PLACEMENT_ON, PROP_DEFAULT, ZFS_TYPE_POOL, "on | dual | off",
-	    "DDT_TO_MD", meta_placement_table);
-	zprop_register_index(ZPOOL_PROP_GENERAL_META_TO_METADEV,
-	    "gen_meta_to_metadev", META_PLACEMENT_ON, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | dual | off", "GENMETA_TO_MD",
-	    meta_placement_table);
-	zprop_register_index(ZPOOL_PROP_OTHER_META_TO_METADEV,
-	    "other_meta_to_metadev", META_PLACEMENT_ON, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "on | dual | off", "OTHERMETA_TO_MD",
-	    meta_placement_table);
+	zprop_register_index(ZPOOL_PROP_DDT_META_TO_METADEV,
+	    "ddt_meta_to_metadev", META_PLACEMENT_OFF, PROP_DEFAULT,
+	    ZFS_TYPE_POOL, "on | dual | off",
+	    "DDTMETA_TO_MD", meta_placement_table);
+	zprop_register_index(ZPOOL_PROP_ZFS_META_TO_METADEV,
+	    "zfs_meta_to_metadev", META_PLACEMENT_OFF, PROP_DEFAULT,
+	    ZFS_TYPE_POOL, "on | dual | off",
+	    "ZFSMETA_TO_MD", meta_placement_table);
 
 	/* default index properties */
 	zprop_register_index(ZPOOL_PROP_FAILUREMODE, "failmode",

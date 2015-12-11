@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <libzfs.h>
@@ -461,7 +462,8 @@ translate_device(const char *pool, const char *device, err_type_t label_type,
 
 	record->zi_guid = strtoull(device, &end, 16);
 	if (record->zi_guid == 0 || *end != '\0') {
-		tgt = zpool_find_vdev(zhp, device, &isspare, &iscache, NULL);
+		tgt = zpool_find_vdev(zhp, device, &isspare, &iscache, NULL,
+		    NULL);
 
 		if (tgt == NULL) {
 			(void) fprintf(stderr, "cannot find device '%s' in "

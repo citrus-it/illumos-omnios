@@ -5793,7 +5793,7 @@ vdev_get_callback(zpool_handle_t *zhp, void *data)
 	nvlist_t *nvl = NULL;
 
 	(void) zpool_find_vdev(zhp, vcb->vcb_vdev, &avail_space,
-	    &l2cache, NULL);
+	    &l2cache, NULL, NULL);
 	for (pl = cb->cb_proplist; pl != NULL; pl = pl->pl_next) {
 		if ((err = vdev_get_prop(zhp, vcb->vcb_vdev,
 		    pl->pl_prop, value, sizeof (value), &nvl)) != 0)

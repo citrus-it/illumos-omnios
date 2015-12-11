@@ -151,11 +151,23 @@ typedef struct spa_perfmon_data {
 	kcondvar_t		perfmon_cv;
 } spa_perfmon_data_t;
 
+/*
+ * Metaplacement controls 3-types of meta
+ * (see spa_refine_meta_placement() in special.c):
+ * - DDT-Meta (pool level property) (see DMU_OT_IS_DDT_META())
+ * - ZPL-Meta (dataset level property) (see DMU_OT_IS_ZPL_META())
+ * - ZFS-Meta (pool level property) all other metadata except
+ * DDT-Meta and ZPL-Meta
+ *
+ * spa_enable_meta_placement_selection is global switch
+ *
+ * spa_small_data_to_special contains max size of data that
+ * can be placed on special
+ */
 typedef struct spa_meta_placement {
 	uint64_t spa_enable_meta_placement_selection;
-	uint64_t spa_ddt_to_special;
-	uint64_t spa_general_meta_to_special;
-	uint64_t spa_other_meta_to_special;
+	uint64_t spa_ddt_meta_to_special;
+	uint64_t spa_zfs_meta_to_special;
 	uint64_t spa_small_data_to_special;
 } spa_meta_placement_t;
 

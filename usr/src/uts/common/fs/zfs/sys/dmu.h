@@ -250,17 +250,6 @@ typedef enum txg_how {
 	(type == DMU_OT_MASTER_NODE) ||		\
 	(type == DMU_OT_UNLINKED_SET))
 
-#define	DMU_OT_IS_GENERAL_META(type)		\
-	((type == DMU_OT_DNODE) ||		\
-	(type == DMU_OT_OBJSET) ||		\
-	(type == DMU_OT_OBJECT_DIRECTORY) ||	\
-	(type == DMU_OT_OBJECT_ARRAY) ||	\
-	(type == DMU_OT_PACKED_NVLIST) ||	\
-	(type == DMU_OT_PACKED_NVLIST_SIZE) ||	\
-	(type == DMU_OT_OBJECT_ARRAY) ||	\
-	(type == DMU_OT_BPOBJ) ||		\
-	(type == DMU_OT_BPOBJ_HDR))
-
 void byteswap_uint64_array(void *buf, size_t size);
 void byteswap_uint32_array(void *buf, size_t size);
 void byteswap_uint16_array(void *buf, size_t size);

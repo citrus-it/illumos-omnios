@@ -225,12 +225,10 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 
 		spa_prop_add_list(*nvp, ZPOOL_PROP_META_PLACEMENT, NULL,
 		    mp->spa_enable_meta_placement_selection, src);
-		spa_prop_add_list(*nvp, ZPOOL_PROP_DDT_TO_METADEV, NULL,
-		    mp->spa_ddt_to_special, src);
-		spa_prop_add_list(*nvp, ZPOOL_PROP_GENERAL_META_TO_METADEV,
-		    NULL, mp->spa_general_meta_to_special, src);
-		spa_prop_add_list(*nvp, ZPOOL_PROP_OTHER_META_TO_METADEV, NULL,
-		    mp->spa_other_meta_to_special, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_DDT_META_TO_METADEV, NULL,
+		    mp->spa_ddt_meta_to_special, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_ZFS_META_TO_METADEV,
+		    NULL, mp->spa_zfs_meta_to_special, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_SMALL_DATA_TO_METADEV, NULL,
 		    mp->spa_small_data_to_special, src);
 
@@ -518,9 +516,8 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				error = SET_ERROR(EINVAL);
 			break;
 
-		case ZPOOL_PROP_DDT_TO_METADEV:
-		case ZPOOL_PROP_GENERAL_META_TO_METADEV:
-		case ZPOOL_PROP_OTHER_META_TO_METADEV:
+		case ZPOOL_PROP_DDT_META_TO_METADEV:
+		case ZPOOL_PROP_ZFS_META_TO_METADEV:
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && intval > META_PLACEMENT_DUAL)
 				error = SET_ERROR(EINVAL);
@@ -2795,12 +2792,10 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 
 	mp->spa_enable_meta_placement_selection =
 	    zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
-	mp->spa_ddt_to_special =
-	    zpool_prop_default_numeric(ZPOOL_PROP_DDT_TO_METADEV);
-	mp->spa_general_meta_to_special =
-	    zpool_prop_default_numeric(ZPOOL_PROP_GENERAL_META_TO_METADEV);
-	mp->spa_other_meta_to_special =
-	    zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
+	mp->spa_ddt_meta_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DDT_META_TO_METADEV);
+	mp->spa_zfs_meta_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_ZFS_META_TO_METADEV);
 	mp->spa_small_data_to_special =
 	    zpool_prop_default_numeric(ZPOOL_PROP_SMALL_DATA_TO_METADEV);
 	spa_set_ddt_classes(spa,
@@ -2842,12 +2837,10 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 
 		spa_prop_find(spa, ZPOOL_PROP_META_PLACEMENT,
 		    &mp->spa_enable_meta_placement_selection);
-		spa_prop_find(spa, ZPOOL_PROP_DDT_TO_METADEV,
-		    &mp->spa_ddt_to_special);
-		spa_prop_find(spa, ZPOOL_PROP_GENERAL_META_TO_METADEV,
-		    &mp->spa_general_meta_to_special);
-		spa_prop_find(spa, ZPOOL_PROP_OTHER_META_TO_METADEV,
-		    &mp->spa_other_meta_to_special);
+		spa_prop_find(spa, ZPOOL_PROP_DDT_META_TO_METADEV,
+		    &mp->spa_ddt_meta_to_special);
+		spa_prop_find(spa, ZPOOL_PROP_ZFS_META_TO_METADEV,
+		    &mp->spa_zfs_meta_to_special);
 		spa_prop_find(spa, ZPOOL_PROP_SMALL_DATA_TO_METADEV,
 		    &mp->spa_small_data_to_special);
 
@@ -3979,12 +3972,10 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	mp->spa_enable_meta_placement_selection =
 	    zpool_prop_default_numeric(ZPOOL_PROP_META_PLACEMENT);
-	mp->spa_ddt_to_special =
-	    zpool_prop_default_numeric(ZPOOL_PROP_DDT_TO_METADEV);
-	mp->spa_general_meta_to_special =
-	    zpool_prop_default_numeric(ZPOOL_PROP_GENERAL_META_TO_METADEV);
-	mp->spa_other_meta_to_special =
-	    zpool_prop_default_numeric(ZPOOL_PROP_OTHER_META_TO_METADEV);
+	mp->spa_ddt_meta_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_DDT_META_TO_METADEV);
+	mp->spa_zfs_meta_to_special =
+	    zpool_prop_default_numeric(ZPOOL_PROP_ZFS_META_TO_METADEV);
 	mp->spa_small_data_to_special =
 	    zpool_prop_default_numeric(ZPOOL_PROP_SMALL_DATA_TO_METADEV);
 
@@ -5762,8 +5753,8 @@ spa_vdev_remove_from_namespace(spa_t *spa, vdev_t *vd)
  * grab and release the spa_config_lock while still holding the namespace
  * lock.  During each step the configuration is synced out.
  *
- * Currently, this supports removing only hot spares, slogs, and level 2 ARC
- * devices.
+ * Currently, this supports removing only hot spares, slogs, level 2 ARC
+ * and special devices.
  */
 int
 spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
@@ -5876,6 +5867,57 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		 */
 		spa_vdev_remove_from_namespace(spa, vd);
 
+	} else if (vd != NULL && vdev_is_special(vd)) {
+		ASSERT(!locked);
+		ASSERT(vd == vd->vdev_top);
+
+		mg = vd->vdev_mg;
+
+		/*
+		 * Stop allocating from this vdev.
+		 */
+		metaslab_group_passivate(mg);
+
+		if (spa_feature_is_active(spa, SPA_FEATURE_WRC)) {
+			/*
+			 * WRC still active, so we cannot remove
+			 * special at this time
+			 */
+			metaslab_group_activate(mg);
+			return (spa_vdev_exit(spa, NULL, txg,
+			    SET_ERROR(EBUSY)));
+		}
+
+		if (metaslab_class_get_alloc(spa->spa_special_class) != 0) {
+			/*
+			 * Writecache disabled, but special still
+			 * have some data. It is possible if user
+			 * enabled a *_to_metadev prop, but we cannot
+			 * migrate metadata from special to normal.
+			 */
+			metaslab_group_activate(mg);
+			return (spa_vdev_exit(spa, NULL, txg,
+			    SET_ERROR(ENOTSUP)));
+		}
+
+		vd->vdev_removing = B_TRUE;
+		vdev_dirty_leaves(vd, VDD_DTL, txg);
+		vdev_config_dirty(vd);
+
+		/* This exit is required to sync dirty configuration */
+		spa_vdev_config_exit(spa, NULL, txg, 0, FTAG);
+
+		txg = spa_vdev_config_enter(spa);
+
+		/*
+		 * Release the references to CoS descriptors if any
+		 */
+		if (vd->vdev_queue.vq_cos) {
+			cos_rele(vd->vdev_queue.vq_cos);
+			vd->vdev_queue.vq_cos = NULL;
+		}
+
+		spa_vdev_remove_from_namespace(spa, vd);
 	} else if (vd != NULL) {
 		/*
 		 * Normal vdevs cannot be removed (yet).
@@ -6637,14 +6679,11 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 				mp->spa_enable_meta_placement_selection =
 				    intval;
 				break;
-			case ZPOOL_PROP_DDT_TO_METADEV:
-				mp->spa_ddt_to_special = intval;
+			case ZPOOL_PROP_DDT_META_TO_METADEV:
+				mp->spa_ddt_meta_to_special = intval;
 				break;
-			case ZPOOL_PROP_GENERAL_META_TO_METADEV:
-				mp->spa_general_meta_to_special = intval;
-				break;
-			case ZPOOL_PROP_OTHER_META_TO_METADEV:
-				mp->spa_other_meta_to_special = intval;
+			case ZPOOL_PROP_ZFS_META_TO_METADEV:
+				mp->spa_zfs_meta_to_special = intval;
 				break;
 			case ZPOOL_PROP_SMALL_DATA_TO_METADEV:
 				mp->spa_small_data_to_special = intval;

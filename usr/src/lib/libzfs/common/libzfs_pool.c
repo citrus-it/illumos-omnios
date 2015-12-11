@@ -1959,12 +1959,12 @@ ctd_check_path(char *str)
  */
 static nvlist_t *
 vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
-    boolean_t *l2cache, boolean_t *log)
+    boolean_t *l2cache, boolean_t *log, boolean_t *special)
 {
 	uint_t c, children;
 	nvlist_t **child;
 	nvlist_t *ret;
-	uint64_t is_log;
+	uint64_t is_log, is_special;
 	char *srchkey;
 	nvpair_t *pair = nvlist_next_nvpair(search, NULL);
 
@@ -2109,7 +2109,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
 
 	for (c = 0; c < children; c++) {
 		if ((ret = vdev_to_nvlist_iter(child[c], search,
-		    avail_spare, l2cache, NULL)) != NULL) {
+		    avail_spare, l2cache, NULL, NULL)) != NULL) {
 			/*
 			 * The 'is_log' value is only set for the toplevel
 			 * vdev, not the leaf vdevs.  So we always lookup the
@@ -2122,6 +2122,14 @@ vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
 			    is_log) {
 				*log = B_TRUE;
 			}
+
+			if (special != NULL &&
+			    nvlist_lookup_uint64(child[c],
+			    ZPOOL_CONFIG_IS_SPECIAL, &is_special) == 0 &&
+			    is_special) {
+				*special = B_TRUE;
+			}
+
 			return (ret);
 		}
 	}
@@ -2130,7 +2138,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
 	    &child, &children) == 0) {
 		for (c = 0; c < children; c++) {
 			if ((ret = vdev_to_nvlist_iter(child[c], search,
-			    avail_spare, l2cache, NULL)) != NULL) {
+			    avail_spare, l2cache, NULL, NULL)) != NULL) {
 				*avail_spare = B_TRUE;
 				return (ret);
 			}
@@ -2141,7 +2149,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
 	    &child, &children) == 0) {
 		for (c = 0; c < children; c++) {
 			if ((ret = vdev_to_nvlist_iter(child[c], search,
-			    avail_spare, l2cache, NULL)) != NULL) {
+			    avail_spare, l2cache, NULL, NULL)) != NULL) {
 				*l2cache = B_TRUE;
 				return (ret);
 			}
@@ -2171,7 +2179,8 @@ zpool_find_vdev_by_physpath(zpool_handle_t *zhp, const char *ppath,
 	*l2cache = B_FALSE;
 	if (log != NULL)
 		*log = B_FALSE;
-	ret = vdev_to_nvlist_iter(nvroot, search, avail_spare, l2cache, log);
+	ret = vdev_to_nvlist_iter(nvroot, search, avail_spare, l2cache, log,
+	    NULL);
 	nvlist_free(search);
 
 	return (ret);
@@ -2191,7 +2200,7 @@ zpool_vdev_is_interior(const char *name)
 
 nvlist_t *
 zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
-    boolean_t *l2cache, boolean_t *log)
+    boolean_t *l2cache, boolean_t *log, boolean_t *special)
 {
 	char buf[MAXPATHLEN];
 	char *end;
@@ -2219,7 +2228,12 @@ zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
 	*l2cache = B_FALSE;
 	if (log != NULL)
 		*log = B_FALSE;
-	ret = vdev_to_nvlist_iter(nvroot, search, avail_spare, l2cache, log);
+
+	if (special != NULL)
+		*special = B_FALSE;
+
+	ret = vdev_to_nvlist_iter(nvroot, search, avail_spare, l2cache, log,
+	    special);
 	nvlist_free(search);
 
 	return (ret);
@@ -2435,7 +2449,7 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
-	    &islog)) == NULL)
+	    &islog, NULL)) == NULL)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, &zc.zc_guid) == 0);
@@ -2502,7 +2516,7 @@ zpool_vdev_offline(zpool_handle_t *zhp, const char *path, boolean_t istmp)
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
-	    NULL)) == NULL)
+	    NULL, NULL)) == NULL)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, &zc.zc_guid) == 0);
@@ -2652,7 +2666,7 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if ((tgt = zpool_find_vdev(zhp, old_disk, &avail_spare, &l2cache,
-	    &islog)) == 0)
+	    &islog, NULL)) == 0)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	if (avail_spare)
@@ -2684,7 +2698,7 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	if (replacing &&
 	    nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_IS_SPARE, &val) == 0 &&
 	    (zpool_find_vdev(zhp, newname, &avail_spare, &l2cache,
-	    NULL) == NULL || !avail_spare) &&
+	    NULL, NULL) == NULL || !avail_spare) &&
 	    is_replacing_spare(config_root, tgt, 1)) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "can only be replaced by another hot spare"));
@@ -2805,7 +2819,7 @@ zpool_vdev_detach(zpool_handle_t *zhp, const char *path)
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
-	    NULL)) == 0)
+	    NULL, NULL)) == 0)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	if (avail_spare)
@@ -3106,7 +3120,7 @@ zpool_vdev_remove(zpool_handle_t *zhp, const char *path)
 	zfs_cmd_t zc = { 0 };
 	char msg[1024];
 	nvlist_t *tgt;
-	boolean_t avail_spare, l2cache, islog;
+	boolean_t avail_spare, l2cache, islog, isspecial;
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 	uint64_t version;
 
@@ -3115,15 +3129,15 @@ zpool_vdev_remove(zpool_handle_t *zhp, const char *path)
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
-	    &islog)) == 0)
+	    &islog, &isspecial)) == 0)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 	/*
 	 * XXX - this should just go away.
 	 */
-	if (!avail_spare && !l2cache && !islog) {
+	if (!avail_spare && !l2cache && !islog && !isspecial) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "only inactive hot spares, cache, top-level, "
-		    "or log devices can be removed"));
+		    "log, or special devices can be removed"));
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 	}
 
@@ -3138,6 +3152,12 @@ zpool_vdev_remove(zpool_handle_t *zhp, const char *path)
 
 	if (zfs_ioctl(hdl, ZFS_IOC_VDEV_REMOVE, &zc) == 0)
 		return (0);
+
+	if (errno == ENOTSUP && isspecial) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "special device contains metadata"));
+		return (zfs_error(hdl, EZFS_POOL_NOTSUP, msg));
+	}
 
 	return (zpool_standard_error(hdl, errno, msg));
 }
@@ -3169,7 +3189,7 @@ zpool_clear(zpool_handle_t *zhp, const char *path, nvlist_t *rewindnvl)
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if (path) {
 		if ((tgt = zpool_find_vdev(zhp, path, &avail_spare,
-		    &l2cache, NULL)) == 0)
+		    &l2cache, NULL, NULL)) == 0)
 			return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 		/*
@@ -4142,7 +4162,7 @@ vdev_get_guid(zpool_handle_t *zhp, const char *path, uint64_t *guid)
 	boolean_t avail_spare, l2cache, islog;
 
 	if ((nvl = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
-	    &islog)) == NULL)
+	    &islog, NULL)) == NULL)
 		return (1);
 	verify(nvlist_lookup_uint64(nvl, ZPOOL_CONFIG_GUID, guid) == 0);
 	return (0);
