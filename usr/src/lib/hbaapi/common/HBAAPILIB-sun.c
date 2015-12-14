@@ -874,7 +874,7 @@ Sun_HBA_FreeLibrary(void)
 
 	GRAB_MUTEX(&_hbaapi_AL_mutex);
 
-	for(adapt_infop = _hbaapi_tgtadapterlist;
+	for (adapt_infop = _hbaapi_tgtadapterlist;
 	    adapt_infop != NULL;
 	    adapt_infop = adapt_next) {
 	    adapt_next = adapt_infop->next;
@@ -887,4 +887,3 @@ Sun_HBA_FreeLibrary(void)
 
 	RELEASE_MUTEX_RETURN(&_hbaapi_AL_mutex, HBA_STATUS_OK);
 }
-

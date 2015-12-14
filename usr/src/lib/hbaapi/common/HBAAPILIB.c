@@ -969,8 +969,8 @@ HBA_FreeLibrary(void) {
     DeleteCriticalSection(&_hbaapi_TE_mutex);
     DeleteCriticalSection(&_hbaapi_LE_mutex);
 #endif
-    
-    return Sun_HBA_FreeLibrary();
+
+    return (Sun_HBA_FreeLibrary());
 }
 
 /*
