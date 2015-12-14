@@ -79,6 +79,7 @@ parent_iodev_type(enum iodev_type type)
 		case IODEV_IOPATH_LI: return (0);
 		case IODEV_NFS: return (0);
 		case IODEV_TAPE: return (0);
+		case IODEV_ZFS: return (0);
 		case IODEV_IOPATH_LTI: return (IODEV_DISK);
 		case IODEV_DISK: return (IODEV_CONTROLLER);
 		case IODEV_PARTITION: return (IODEV_DISK);
@@ -680,6 +681,8 @@ get_iodev_type(kstat_t *ksp)
 		return (IODEV_IOPATH_LTI);
 	if (strcmp(ksp->ks_class, "tape") == 0)
 		return (IODEV_TAPE);
+	if (strcmp(ksp->ks_class, "zfs") == 0)
+		return (IODEV_ZFS);
 	return (IODEV_UNKNOWN);
 }
 

@@ -127,6 +127,8 @@ static	uint_t	do_cpu;			/* show cpu info (-c) */
 static	uint_t	do_interval;		/* do intervals (-I) */
 static	int	do_partitions;		/* per-partition stats (-p) */
 static	int	do_partitions_only;	/* per-partition stats only (-P) */
+static	int	do_zfs;
+static	int	do_zfs_only;
 					/* no per-device stats for disks */
 static	uint_t	do_conversions;		/* display disks as cXtYdZ (-n) */
 static	uint_t	do_megabytes;		/* display data in MB/sec (-M) */
@@ -152,7 +154,7 @@ static	int 	iter;			/* iterations from command line */
 
 static int	iodevs_nl;		/* name field width */
 #define	IODEVS_NL_MIN		6	/* not too thin for "device" */
-#define	IODEVS_NL_MAX		24	/* but keep full width under 80 */
+#define	IODEVS_NL_MAX		64	/* but keep full width under 80 */
 
 static	char	disk_header[132];
 static	uint_t 	dh_len;			/* disk header length for centering */
@@ -224,7 +226,7 @@ main(int argc, char **argv)
 	if (do_disk)
 		types |= SNAP_IODEVS;
 
-	if (do_disk && !do_partitions_only)
+	if (do_disk && !do_partitions_only && !do_zfs_only)
 		df.if_allowed_types |= IODEV_DISK;
 	if (do_disk & DISK_IOPATH_LI) {
 		df.if_allowed_types |= IODEV_IOPATH_LTI;
@@ -238,6 +240,8 @@ main(int argc, char **argv)
 		types |= SNAP_IODEV_ERRORS;
 	if (do_partitions || do_partitions_only)
 		df.if_allowed_types |= IODEV_PARTITION;
+	if (do_zfs || do_zfs_only)
+		df.if_allowed_types |= IODEV_ZFS;
 	if (do_conversions)
 		types |= SNAP_IODEV_PRETTY;
 	if (do_devid)
@@ -963,6 +967,10 @@ usage(void)
 	    "\t\t-p: 	report per-partition disk statistics\n"
 	    "\t\t-P: 	report per-partition disk statistics only,\n"
 	    "\t\t\tno per-device disk statistics\n"
+	    "\t\t-f:	report ZFS-level statistics for ZFS pool and\n"
+	    "\t\t\tindividual vdevs\n"
+	    "\t\t-F:	report ZFS pool and individual physical vdevs\n"
+	    "\t\t\tstatistics only, no per-device statistics\n"
 	    "\t\t-r: 	Display data in comma separated format\n"
 	    "\t\t-s: 	Suppress state change messages\n"
 	    "\t\t-T d|u	Display a timestamp in date (d) or unix "
@@ -1081,7 +1089,7 @@ do_args(int argc, char **argv)
 	extern char 	*optarg;
 	extern int 	optind;
 
-	while ((c = getopt(argc, argv, "tdDxXYCciIpPnmMeEszrT:l:")) != EOF)
+	while ((c = getopt(argc, argv, "tdDxXYCciIpPfFnmMeEszrT:l:")) != EOF)
 		switch (c) {
 		case 't':
 			do_tty++;
@@ -1121,6 +1129,12 @@ do_args(int argc, char **argv)
 			break;
 		case 'P':
 			do_partitions_only++;
+			break;
+		case 'f':
+			do_zfs++;
+			break;
+		case 'F':
+			do_zfs_only++;
 			break;
 		case 'n':
 			do_conversions++;

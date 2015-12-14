@@ -496,21 +496,20 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 #ifdef _KERNEL
 	if (vd->vdev_path) {
 		char dev_path[MAXPATHLEN];
-		char *last_slash;
+		char *last_slash = NULL;
 		kstat_t *exist = NULL;
 
-		/* strip slice tag */
-		last_slash = strrchr(vd->vdev_path, '/');
-		(void) strcpy(dev_path,
-		    last_slash ? (last_slash + 1) : vd->vdev_path);
+		if (strcmp(vd->vdev_ops->vdev_op_type, VDEV_TYPE_DISK) == 0)
+			last_slash = strrchr(vd->vdev_path, '/');
 
-		(void) strcat(dev_path, "_zfs");
+		(void) sprintf(dev_path, "%s:%s", spa->spa_name,
+		    last_slash != NULL ? last_slash + 1 : vd->vdev_path);
 
 		exist = kstat_hold_byname("zfs", 0, dev_path, ALL_ZONES);
 
 		if (!exist) {
 			vd->vdev_iokstat = kstat_create("zfs", 0, dev_path,
-			    "disk", KSTAT_TYPE_IO, 1, 0);
+			    "zfs", KSTAT_TYPE_IO, 1, 0);
 
 			if (vd->vdev_iokstat) {
 				vd->vdev_iokstat->ks_lock =

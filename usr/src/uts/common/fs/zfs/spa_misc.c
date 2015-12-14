@@ -668,7 +668,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	}
 
 	spa->spa_iokstat = kstat_create("zfs", 0, name,
-	    "disk", KSTAT_TYPE_IO, 1, 0);
+	    "zfs", KSTAT_TYPE_IO, 1, 0);
 	if (spa->spa_iokstat) {
 		spa->spa_iokstat->ks_lock = &spa->spa_iokstat_lock;
 		kstat_install(spa->spa_iokstat);

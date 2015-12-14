@@ -276,6 +276,11 @@ iodev_changed(struct iodev_snapshot *iodev, int added)
 		(void) printf("<<partition %s: %s>>\n",
 		    added ? "added" : "removed", name);
 		break;
+	case IODEV_ZFS:
+		(void) printf("<<ZFS %s %s: %s>>\n",
+		    strchr(name, '/') ? "vdev" : "pool",
+		    added ? "added" : "removed", name);
+		break;
 	case IODEV_NFS:
 		(void) printf("<<NFS %s: %s>>\n",
 		    added ? "mounted" : "unmounted", name);

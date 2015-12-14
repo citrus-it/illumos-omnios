@@ -28,7 +28,7 @@ iostat \- report I/O statistics
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/iostat\fR  [\fB-cCdDeEiImMnpPrstxXYz\fR] [\fB-l\fR \fIn\fR] [\fB-T\fR u | d]
+\fB/usr/bin/iostat\fR  [\fB-cCdDeEiImMnpPfFrstxXYz\fR] [\fB-l\fR \fIn\fR] [\fB-T\fR u | d]
  [\fIdisk\fR]... [\fIinterval\fR [\fIcount\fR]]
 .fi
 
@@ -365,6 +365,26 @@ statistics.
 .ad
 .RS 12n
 For each disk, report per-partition statistics only, no per-device statistics.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-f\fR\fR
+.ad
+.RS 12n
+Report ZFS-level statistics for ZFS pool and individual vdevs in addition to
+per-device statistics.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-F\fR\fR
+.ad
+.RS 12n
+Report ZFS pool and individual physical vdevs statistics only, no per-device
+statistics.
 .RE
 
 .sp

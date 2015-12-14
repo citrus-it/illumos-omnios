@@ -139,7 +139,8 @@ enum iodev_type {
 	IODEV_IOPATH_LT		= 1 << 5,	/* synthetic LunTarget */
 	IODEV_IOPATH_LI		= 1 << 6,	/* synthetic LunInitiator */
 	IODEV_IOPATH_LTI	= 1 << 7,	/* LunTgtInitiator (pathinfo) */
-	IODEV_UNKNOWN		= 1 << 8
+	IODEV_ZFS		= 1 << 8,
+	IODEV_UNKNOWN		= 1 << 9
 };
 
 /* identify a disk, partition, etc. */
