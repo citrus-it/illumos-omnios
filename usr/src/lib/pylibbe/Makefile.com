@@ -47,6 +47,9 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/python2.6 \
 		-D_FILE_OFFSET_BITS=64 -I../../libbe/common
 
+LINTFLAGS +=	-errhdr=no%$(ADJUNCT_PROTO)/usr/include/python2.6
+LINTFLAGS64 +=	-errhdr=no%$(ADJUNCT_PROTO)/usr/include/python2.6
+
 .KEEP_STATE:
 
 all install := LDLIBS += -lpython2.6

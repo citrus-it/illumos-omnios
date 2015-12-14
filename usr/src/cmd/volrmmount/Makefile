@@ -47,6 +47,8 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-function
 
+CERRWARN +=	-_cc=-errhdr=no%$(ADJUNCT_PROTO)/usr/include/glib-2.0
+
 .KEEP_STATE:
 
 all: $(PROG)

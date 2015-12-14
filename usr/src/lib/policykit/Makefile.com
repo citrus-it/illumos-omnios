@@ -30,6 +30,8 @@ CPPFLAGS =	$(POLICYKIT_DBUS_CPPFLAGS) $(POLICYKIT_GLIB_CPPFLAGS) $(CPPFLAGS.mast
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
 
+CERRWARN +=	-_cc=-errhdr=no%$(ADJUNCT_PROTO)/usr/include/glib-2.0
+
 C99MODE =	$(C99_ENABLE)
 
 ROOTLIBPCDIR =	$(ROOT)/usr/lib/pkgconfig
