@@ -518,7 +518,8 @@ spa_class_is_idle(int ut, int idle)
 static boolean_t
 spa_class_is_fairly_busy(int ut, int busy)
 {
-	ASSERT(busy - spa_fairly_busy_delta > 0);
+	if (busy < spa_fairly_busy_delta)
+		return (B_FALSE);
 	return (ut > busy - spa_fairly_busy_delta);
 }
 
