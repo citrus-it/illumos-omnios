@@ -181,7 +181,7 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 	 * determine if the match needs to honor case, and if so keep track of
 	 * that so that during normalization we don't fold case.  Note that
 	 * a FIRST match is necessary for a case insensitive filesystem when
-	 * the lookup request is not exact because normalizion can fold case
+	 * the lookup request is not exact because normalization can fold case
 	 * independent of normalizing code point sequences.
 	 */
 	if ((zfsvfs->z_norm & ~U8_TEXTPREP_TOUPPER) ||
@@ -836,25 +836,47 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 	return (0);
 }
 
+/*
+ * The match type in the code for this function should conform to:
+ *
+ * CS !norm | z_norm =     0       | mt = MT_EXACT
+ * CS  norm | z_norm = formD       | mt = MT_FIRST
+ *         or MT_FIRST | MT_CASE (it doesn't matter)
+ * CI !norm | z_norm = upper       | mt = MT_FIRST            (!ZCIEXACT)
+ * CI !norm | z_norm = upper       | mt = MT_FIRST | MT_CASE  (ZCIEXACT)
+ * CI  norm | z_norm = upper|formD | mt = MT_FIRST            (!ZCIEXACT)
+ * CI  norm | z_norm = upper|formD | mt = MT_FIRST | MT_CASE  (ZCIEXACT)
+ * CM !norm | z_norm = upper       | mt = MT_FIRST | MT_CASE  (unix = !ZCILOOK)
+ * CM !norm | z_norm = upper       | mt = MT_FIRST            (win  = ZCILOOK)
+ * CM  norm | z_norm = upper|formD | mt = MT_FIRST | MT_CASE  (unix = !ZCILOOK)
+ * CM  norm | z_norm = upper|formD | mt = MT_FIRST            (win  = ZCILOOK)
+ *
+ * Abbreviations:
+ *    CS = Case Sensitive, CI = Case Insensitive, CM = Case Mixed
+ *    upper = U8_TEXTPREP_TOUPPER - set by fs type on creation
+ */
 static int
 zfs_dropname(zfs_dirlock_t *dl, znode_t *zp, znode_t *dzp, dmu_tx_t *tx,
     int flag)
 {
 	int error;
+	matchtype_t mt = 0;
 
 	if (zp->z_zfsvfs->z_norm) {
+		mt = MT_FIRST;
+
 		if (((zp->z_zfsvfs->z_case == ZFS_CASE_INSENSITIVE) &&
 		    (flag & ZCIEXACT)) ||
 		    ((zp->z_zfsvfs->z_case == ZFS_CASE_MIXED) &&
-		    !(flag & ZCILOOK)))
-			error = zap_remove_norm(zp->z_zfsvfs->z_os,
-			    dzp->z_id, dl->dl_name, MT_EXACT, tx);
-		else
-			error = zap_remove_norm(zp->z_zfsvfs->z_os,
-			    dzp->z_id, dl->dl_name, MT_FIRST, tx);
+		    !(flag & ZCILOOK))) {
+			mt |= MT_CASE;
+		}
+
+		error = zap_remove_norm(zp->z_zfsvfs->z_os, dzp->z_id,
+		    dl->dl_name, mt, tx);
 	} else {
-		error = zap_remove(zp->z_zfsvfs->z_os,
-		    dzp->z_id, dl->dl_name, tx);
+		error = zap_remove(zp->z_zfsvfs->z_os, dzp->z_id, dl->dl_name,
+		    tx);
 	}
 
 	return (error);
