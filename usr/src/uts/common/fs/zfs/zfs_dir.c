@@ -182,18 +182,20 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 	 * that so that during normalization we don't fold case.  Note that
 	 * a FIRST match is necessary for a case insensitive filesystem when
 	 * the lookup request is not exact because normalization can fold case
-	 * independent of normalizing code point sequences.
+	 * independent of normalizing code point sequences.  See the table
+	 * above zfs_dropname().
 	 */
-	if ((zfsvfs->z_norm & ~U8_TEXTPREP_TOUPPER) ||
-	    ((zfsvfs->z_case == ZFS_CASE_INSENSITIVE) &&
-	    !(flag & ZCIEXACT))) {
+	if (zfsvfs->z_norm != 0) {
 		mt = MT_FIRST;
+
+		if (((zfsvfs->z_case == ZFS_CASE_INSENSITIVE) &&
+		    (flag & ZCIEXACT)) ||
+		    ((zfsvfs->z_case == ZFS_CASE_MIXED) &&
+		    !(flag & ZCILOOK))) {
+			mt |= MT_CASE;
+		}
 	} else {
 		mt = MT_EXACT;
-	}
-	if (((zfsvfs->z_case == ZFS_CASE_INSENSITIVE) && (flag & ZCIEXACT)) ||
-	    ((zfsvfs->z_case == ZFS_CASE_MIXED) && !(flag & ZCILOOK))) {
-		mt |= MT_CASE;
 	}
 
 	/*
