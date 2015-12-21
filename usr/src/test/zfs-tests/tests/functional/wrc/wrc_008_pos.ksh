@@ -24,8 +24,8 @@
 #
 # STRATEGY:
 #	1. Create pool without separated special devices
-#   2. Display pool statu
-#   3. Add special device
+#	2. Display pool status
+#	3. Add special device
 #	4. Display pool status
 #	5. Try to attach new special device
 #	6. Display pool status

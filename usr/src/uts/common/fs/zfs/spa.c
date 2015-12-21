@@ -3275,7 +3275,7 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t *nvpolicy,
 
 	if (open_with_activation) {
 		autosnap_collect_orphaned_snapshots(spa);
-		wrc_activate(spa);
+		wrc_activate(spa, B_FALSE);
 	}
 
 	*spapp = spa;
@@ -4019,7 +4019,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	mutex_exit(&spa_namespace_lock);
 
-	wrc_activate(spa);
+	wrc_activate(spa, B_TRUE);
 
 	return (0);
 }
@@ -4467,7 +4467,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 
 	autosnap_collect_orphaned_snapshots(spa);
 
-	wrc_activate(spa);
+	wrc_activate(spa, B_FALSE);
 
 	return (dsl_sync_task(spa->spa_name, NULL, spa_special_feature_activate,
 	    spa, 3, ZFS_SPACE_CHECK_RESERVED));
@@ -4852,7 +4852,7 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	spa_special_feature_activate(spa, tx);
 	dmu_tx_commit(tx);
 
-	wrc_activate(spa);
+	wrc_activate(spa, B_FALSE);
 
 	return (0);
 }

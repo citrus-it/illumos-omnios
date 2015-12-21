@@ -241,7 +241,7 @@ typedef struct {
 void wrc_init(wrc_data_t *wrc_data, spa_t *spa);
 void wrc_fini(wrc_data_t *wrc_data);
 
-void wrc_activate(spa_t *spa);
+void wrc_activate(spa_t *spa, boolean_t pool_creation);
 void wrc_deactivate(spa_t *spa);
 void wrc_enter_fault_state(spa_t *spa);
 

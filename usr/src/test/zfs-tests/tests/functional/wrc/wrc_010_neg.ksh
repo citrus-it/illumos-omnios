@@ -32,7 +32,7 @@
 verify_runnable "global"
 log_assert "Non-redundant special vdev can not be detached."
 log_onexit cleanup
-for wrc_mode in "on" "off" ; do
+for wrc_mode in "none" "on" ; do
 	log_must create_pool_special $TESTPOOL $wrc_mode "stripe" "stripe"
 	log_must display_status $TESTPOOL
 	log_mustnot $ZPOOL detach $TESTPOOL $SSD_DISK1

@@ -33,8 +33,8 @@
 verify_runnable "global"
 log_assert "Detaching redundant special vdev succeeds."
 log_onexit cleanup
-for wrc_mode in "on" "off" ; do
-	log_must create_pool_special $TESTPOOL $wrc_mode mirror mirror
+for wrc_mode in "none" "on" ; do
+	log_must create_pool_special $TESTPOOL $wrc_mode "mirror" "mirror"
 	log_must display_status $TESTPOOL
 	log_must $ZPOOL detach $TESTPOOL $SSD_DISK1
 	log_must $ZPOOL scrub $TESTPOOL

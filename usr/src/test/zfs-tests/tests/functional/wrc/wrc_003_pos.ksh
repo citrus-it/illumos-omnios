@@ -33,7 +33,7 @@
 verify_runnable "global"
 log_assert "Disabling wrc succeeds."
 log_onexit cleanup
-log_must create_pool_special $TESTPOOL on
+log_must create_pool_special $TESTPOOL "on"
 log_must display_status $TESTPOOL
 log_must disable_wrc $TESTPOOL
 log_must display_status $TESTPOOL

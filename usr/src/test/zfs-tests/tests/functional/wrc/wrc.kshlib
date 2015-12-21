@@ -262,11 +262,21 @@ function create_pool #pool_name
 		$RM -rf /$pool_name
 	fi
 
-	test -z $pool_type && pool_type=$(get_random_pool_type)
-	test -z $recordsize && recordsize=$(get_random_recordsize)
-	test -z $compression && compression=$(get_random_compression)
+	if [[ -z $pool_type ]] ; then
+		pool_type=$(get_random_pool_type)
+	fi
 
-	test $pool_type = "stripe" && pool_type=""
+	if [[ -z $recordsize ]] ; then
+		recordsize=$(get_random_recordsize)
+	fi
+
+	if [[ -z $compression ]] ; then
+		compression=$(get_random_compression)
+	fi
+
+	if [[ $pool_type == "stripe" ]] ; then
+		pool_type=""
+	fi
 
 	$ZPOOL create -f \
 		-O compression=$compression \
@@ -311,14 +321,37 @@ function create_pool_special #pool_name
 		$RM -rf /$pool_name
 	fi
 
-	test -z $pool_type && pool_type=$(get_random_pool_type)
-	test -z $special_type && special_type=$(get_random_special_type)
-	test -z $recordsize && recordsize=$(get_random_recordsize)
-	test -z $compression && compression=$(get_random_compression)
-	test -n $wrc_mode && wrc_mode="-O wrc_mode=$wrc_mode"
+	if [[ -z $pool_type ]] ; then
+		pool_type=$(get_random_pool_type)
+	fi
 
-	test $pool_type = "stripe" && pool_type=""
-	test $special_type = "stripe" && special_type=""
+	if [[ -z $special_type ]] ; then
+		special_type=$(get_random_special_type)
+	fi
+
+	if [[ -z $recordsize ]] ; then
+		recordsize=$(get_random_recordsize)
+	fi
+
+	if [[ -z $compression ]] ; then
+		compression=$(get_random_compression)
+	fi
+
+	if [[ $wrc_mode == "none" ]] ; then
+		wrc_mode=""
+	fi
+
+	if [[ -n $wrc_mode ]] ; then
+		wrc_mode="-O wrc_mode=$wrc_mode"
+	fi
+
+	if [[ $pool_type == "stripe" ]] ; then
+		pool_type=""
+	fi
+
+	if [[ $special_type == "stripe" ]] ; then
+		special_type=""
+	fi
 
 	$ZPOOL create -f \
 		-O compression=$compression \

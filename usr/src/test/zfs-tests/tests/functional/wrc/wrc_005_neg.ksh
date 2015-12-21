@@ -32,7 +32,7 @@
 verify_runnable "global"
 log_assert "Write back cache can not be deactivated for child dataset."
 log_onexit cleanup
-log_must create_pool_special $TESTPOOL on
+log_must create_pool_special $TESTPOOL "on"
 log_must display_status $TESTPOOL
 log_must create_dataset $TESTPOOL/child_dataset
 log_mustnot disable_wrc $TESTPOOL/child_dataset

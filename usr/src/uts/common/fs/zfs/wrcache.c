@@ -90,7 +90,7 @@ static void wrc_clean_tree(wrc_data_t *wrc_data, avl_tree_t *tree);
 static void wrc_clean_plan_tree(spa_t *spa);
 static void wrc_clean_moved_tree(spa_t *spa);
 
-static void wrc_activate_impl(spa_t *spa);
+static void wrc_activate_impl(spa_t *spa, boolean_t pool_creation);
 static wrc_block_t *wrc_create_block(wrc_data_t *wrc_data,
     const blkptr_t *bp);
 static void wrc_move_block(void *arg);
@@ -1558,10 +1558,10 @@ wrc_add_bytes(spa_t *spa, uint64_t txg, uint64_t bytes)
 /* WRC-INIT routines */
 
 void
-wrc_activate(spa_t *spa)
+wrc_activate(spa_t *spa, boolean_t pool_creation)
 {
 	if (spa_feature_is_enabled(spa, SPA_FEATURE_WRC))
-		wrc_activate_impl(spa);
+		wrc_activate_impl(spa, pool_creation);
 }
 
 /*
@@ -1666,7 +1666,7 @@ out:
  * Initialize wrc properties for the given pool.
  */
 static void
-wrc_activate_impl(spa_t *spa)
+wrc_activate_impl(spa_t *spa, boolean_t pool_creation)
 {
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 	int err = 0;
@@ -1735,11 +1735,17 @@ wrc_activate_impl(spa_t *spa)
 	/* Finalize window interrupted by power cycle or reimport */
 	wrc_free_restore(spa);
 
-	/*
-	 * Need to restore wrc_instances. Do this asynchronously.
-	 */
-	wrc_data->wrc_init_thread = thread_create(NULL, 0,
-	    wrc_init_thread, wrc_data, 0, &p0, TS_RUN, maxclsyspri);
+	if (pool_creation) {
+		/* On create there is no reason to start init_thread */
+		wrc_data->wrc_ready_to_use = B_TRUE;
+	} else {
+		/*
+		 * On import need to restore wrc_instances.
+		 * Do this asynchronously.
+		 */
+		wrc_data->wrc_init_thread = thread_create(NULL, 0,
+		    wrc_init_thread, wrc_data, 0, &p0, TS_RUN, maxclsyspri);
+	}
 
 	mutex_exit(&wrc_data->wrc_lock);
 

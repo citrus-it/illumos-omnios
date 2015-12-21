@@ -34,11 +34,15 @@
 verify_runnable "global"
 log_assert "Creating a pool and adding special device to existing pool succeeds."
 log_onexit cleanup
-for pool_type in "" "mirror" "raidz" "raidz2" "raidz3" ; do
-	for special_type in "" "mirror" ; do
+for pool_type in "stripe" "mirror" "raidz" "raidz2" "raidz3" ; do
+	for special_type in "stripe" "mirror" ; do
 		for wrc_mode in "on" "off" ; do
-			log_must create_pool $TESTPOOL $pool_type 
-			log_must $ZPOOL add -f $TESTPOOL special $special_type $SSD_DISKS
+			log_must create_pool $TESTPOOL $pool_type
+			if [[ $special_type == "stripe" ]] ; then
+				log_must $ZPOOL add -f $TESTPOOL special $SSD_DISKS
+			else
+				log_must $ZPOOL add -f $TESTPOOL special $special_type $SSD_DISKS
+			fi
 			log_must set_wrc_mode $TESTPOOL $wrc_mode
 			log_must display_status $TESTPOOL
 			log_must $SYNC

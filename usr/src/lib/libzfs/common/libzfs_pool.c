@@ -1119,6 +1119,7 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 	nvlist_t *zc_props = NULL;
 	char msg[1024];
 	int ret = -1;
+	boolean_t wrc_mode_prop_exists = B_FALSE;
 
 	(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
 	    "cannot create '%s'"), pool);
@@ -1150,6 +1151,12 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 		    fsprops, zoned, NULL, NULL, msg)) == NULL) {
 			goto create_failed;
 		}
+
+		if (nvlist_exists(zc_fsprops,
+		    zfs_prop_to_name(ZFS_PROP_WRC_MODE))) {
+			wrc_mode_prop_exists = B_TRUE;
+		}
+
 		if (!zc_props &&
 		    (nvlist_alloc(&zc_props, NV_UNIQUE_NAME, 0) != 0)) {
 			goto create_failed;
@@ -1225,6 +1232,13 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "cache device must be a disk or disk slice"));
 			return (zfs_error(hdl, EZFS_BADDEV, msg));
+
+		case EALREADY:
+			if (wrc_mode_prop_exists) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "WRC is already in the OFF state"));
+				return (zfs_error(hdl, EZFS_WRCALREADY, msg));
+			}
 
 		default:
 			return (zpool_standard_error(hdl, errno, msg));

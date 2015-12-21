@@ -20,28 +20,19 @@
 
 #
 # DESCRIPTION:
-#	Enabling write back cache succeeds
+#	Write back cache can not be deactivated during the creation of the pool
 #
 # STRATEGY:
-#	1. Create pool with separated wrc devices and disabled write back cache
-#	2. Display pool status
-#	3. Enable write back cache
-#	4. Display pool status
-#	5. Scrub pool and check status
+#	1. Try to create pool with wrc_mode=off
+#	2. Creating pool must fail
 #
 
 verify_runnable "global"
-log_assert "Enabling wrc succeeds."
+log_assert "Write back cache can not be deactivated during the creation of the pool."
 log_onexit cleanup
-log_must create_pool_special $TESTPOOL "none"
-log_must display_status $TESTPOOL
-log_must enable_wrc $TESTPOOL
-log_must display_status $TESTPOOL
-log_must $SYNC
-log_must $ZPOOL scrub $TESTPOOL
-while is_pool_scrubbing $TESTPOOL ; do
-	$SLEEP 1
+for pool_type in "stripe" "mirror" ; do
+	for special_type in "stripe" "mirror" ; do
+		log_mustnot create_pool_special $TESTPOOL "off" $pool_type $special_type
+	done
 done
-log_must check_pool_errors $TESTPOOL
-log_must destroy_pool $TESTPOOL
-log_pass "Enabling wrc succeeds."
+log_pass "Write back cache can not be deactivated during the creation of the pool."

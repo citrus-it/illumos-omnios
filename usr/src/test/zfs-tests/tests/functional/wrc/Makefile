@@ -29,7 +29,8 @@ PROGS = cleanup \
 	wrc_007_neg \
 	wrc_008_pos \
 	wrc_009_pos \
-	wrc_010_neg
+	wrc_010_neg \
+	wrc_011_neg
 
 FILES = wrc.cfg \
 	wrc.kshlib
