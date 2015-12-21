@@ -683,6 +683,8 @@ typedef struct zpool_rewind_policy {
 #define	ZPOOL_CONFIG_AUX_STATE		"aux_state"
 #define	ZPOOL_CONFIG_TRIM_PROG		"trim_prog"
 #define	ZPOOL_CONFIG_TRIM_RATE		"trim_rate"
+#define	ZPOOL_CONFIG_TRIM_START_TIME	"trim_start_time"
+#define	ZPOOL_CONFIG_TRIM_STOP_TIME	"trim_stop_time"
 
 /* Rewind policy parameters */
 #define	ZPOOL_REWIND_POLICY		"rewind-policy"

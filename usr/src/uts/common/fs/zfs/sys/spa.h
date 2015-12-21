@@ -721,7 +721,8 @@ extern int spa_scan_stop(spa_t *spa);
 /* trimming */
 extern void spa_trim(spa_t *spa, uint64_t rate);
 extern void spa_trim_stop(spa_t *spa);
-extern uint64_t spa_get_trim_prog(spa_t *spa);
+extern void spa_get_trim_prog(spa_t *spa, uint64_t *prog, uint64_t *rate,
+    uint64_t *start_time, uint64_t *stop_time);
 
 /* spa syncing */
 extern void spa_sync(spa_t *spa, uint64_t txg); /* only for DMU use */
@@ -776,7 +777,7 @@ extern boolean_t spa_refcount_zero(spa_t *spa);
 #define	SCL_LOCKS	7
 #define	SCL_ALL		((1 << SCL_LOCKS) - 1)
 #define	SCL_STATE_ALL	(SCL_STATE | SCL_L2ARC | SCL_ZIO)
-#define	SCL_TRIM_ALL	(SCL_STATE | SCL_ZIO)
+#define	SCL_TRIM_ALL	(SCL_CONFIG | SCL_STATE | SCL_ZIO)
 
 /* Pool configuration locks */
 extern int spa_config_tryenter(spa_t *spa, int locks, void *tag, krw_t rw);

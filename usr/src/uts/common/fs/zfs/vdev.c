@@ -3553,10 +3553,10 @@ vdev_trim_all(vdev_trim_info_t *vti)
 			}
 
 			sleep_delay = (delta * hz) / rate;
-			mutex_enter(&spa->spa_trim_lock);
+			mutex_enter(&spa->spa_trim_ondemand_lock);
 			(void) cv_timedwait(&spa->spa_trim_update_cv,
-			    &spa->spa_trim_lock, t);
-			mutex_exit(&spa->spa_trim_lock);
+			    &spa->spa_trim_ondemand_lock, t);
+			mutex_exit(&spa->spa_trim_ondemand_lock);
 
 			/* If interrupted, don't try to relock, get out */
 			if (spa->spa_trim_stop)

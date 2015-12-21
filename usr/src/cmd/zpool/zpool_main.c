@@ -4278,20 +4278,56 @@ print_scan_status(pool_scan_stat_t *ps)
 }
 
 static void
-print_trim_status(uint64_t trim_prog, uint64_t total_size, uint64_t rate)
+print_trim_status(uint64_t trim_prog, uint64_t total_size, uint64_t rate,
+    uint64_t start_time_u64, uint64_t end_time_u64)
 {
-	assert(trim_prog <= total_size);
-	if (trim_prog == 0 || trim_prog == total_size)
-		return;
+	time_t start_time = start_time_u64, end_time = end_time_u64;
+	struct tm t;
+	char buf[128];
 
-	if (rate != 0) {
-		char rate_str[32];
-		zfs_nicenum(rate, rate_str, sizeof (rate_str));
-		(void) printf("  trim: %.02f%%\t(rate: %s/s)\n",
-		    (((double)trim_prog) / total_size) * 100, rate_str);
+	assert(trim_prog <= total_size);
+	if (trim_prog != 0 && trim_prog != total_size) {
+		(void) gmtime_r(&start_time, &t);
+		(void) strftime(buf, sizeof (buf), NULL, &t);
+		if (rate != 0) {
+			char rate_str[32];
+			zfs_nicenum(rate, rate_str, sizeof (rate_str));
+			(void) printf("  trim: %.02f%%\tstarted: %s\t"
+			    "(rate: %s/s)\n", (((double)trim_prog) /
+			    total_size) * 100, buf, rate_str);
+		} else {
+			(void) printf("  trim: %.02f%%\tstarted: %s\t"
+			    "(rate: max)\n", (((double)trim_prog) /
+			    total_size) * 100, buf);
+		}
 	} else {
-		(void) printf("  trim: %.02f%%\n",
-		    (((double)trim_prog) / total_size) * 100);
+		if (start_time != 0) {
+			/*
+			 * Non-zero start time means we were run at some point
+			 * in the past.
+			 */
+			if (end_time != 0) {
+				/* Non-zero end time means we completed */
+				time_t diff = end_time - start_time;
+				int hrs, mins;
+
+				hrs = diff / 3600;
+				mins = (diff % 3600) / 60;
+				(void) gmtime_r(&end_time, &t);
+				(void) strftime(buf, sizeof (buf), NULL, &t);
+				(void) printf("  trim: completed on %s "
+				    "(after %dh%dm)\n", buf, hrs, mins);
+			} else {
+				/* Zero end time means we were interrupted */
+				(void) gmtime_r(&start_time, &t);
+				(void) strftime(buf, sizeof (buf), NULL, &t);
+				(void) printf("  trim: interrupted\t"
+				    "(started %s)\n", buf);
+			}
+		} else {
+			/* trim was never run */
+			(void) printf("  trim: none requested\n");
+		}
 	}
 }
 
@@ -4424,6 +4460,8 @@ zpool_slog_space(nvlist_t *nvroot)
 		uint64_t islog = B_FALSE;
 		vdev_stat_t *vs;
 		uint_t n;
+		uint_t n_subchildren = 1;
+		nvlist_t **subchild;
 
 		(void) nvlist_lookup_uint64(newchild[c], ZPOOL_CONFIG_IS_LOG,
 		    &islog);
@@ -4431,7 +4469,11 @@ zpool_slog_space(nvlist_t *nvroot)
 			continue;
 		verify(nvlist_lookup_uint64_array(newchild[c],
 		    ZPOOL_CONFIG_VDEV_STATS, (uint64_t **)&vs, &n) == 0);
-		space += vs->vs_space;
+
+		/* vdev can be non-leaf, so multiply by number of children */
+		nvlist_lookup_nvlist_array(newchild[c],
+		    ZPOOL_CONFIG_CHILDREN, &subchild, &n_subchildren);
+		space += n_subchildren * vs->vs_space;
 	}
 
 	return (space);
@@ -4699,22 +4741,28 @@ status_callback(zpool_handle_t *zhp, void *data)
 		nvlist_t **spares, **l2cache;
 		uint_t nspares, nl2cache;
 		pool_scan_stat_t *ps = NULL;
-		uint64_t trim_prog, trim_rate;
+		uint64_t trim_prog, trim_rate, trim_start_time, trim_stop_time;
 
 		(void) nvlist_lookup_uint64_array(nvroot,
 		    ZPOOL_CONFIG_SCAN_STATS, (uint64_t **)&ps, &c);
 		print_scan_status(ps);
 
+		/* Grab trim stats if the pool supports it */
 		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_TRIM_PROG,
 		    &trim_prog) == 0 &&
 		    nvlist_lookup_uint64(config, ZPOOL_CONFIG_TRIM_RATE,
-		    &trim_rate) == 0) {
+		    &trim_rate) == 0 &&
+		    nvlist_lookup_uint64(config, ZPOOL_CONFIG_TRIM_START_TIME,
+		    &trim_start_time) == 0 &&
+		    nvlist_lookup_uint64(config, ZPOOL_CONFIG_TRIM_STOP_TIME,
+		    &trim_stop_time) == 0) {
 			/*
 			 * For whatever reason, root vdev_stats_t don't
 			 * include log devices.
 			 */
 			print_trim_status(trim_prog, vs->vs_space +
-			    zpool_slog_space(nvroot), trim_rate);
+			    zpool_slog_space(nvroot), trim_rate,
+			    trim_start_time, trim_stop_time);
 		}
 
 		namewidth = max_width(zhp, nvroot, 0, 0);

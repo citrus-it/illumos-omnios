@@ -583,7 +583,9 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_iokstat_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_cos_props_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_vdev_props_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_trim_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_perfmon.perfmon_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_trim_ondemand_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_trim_taskq_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_evicting_os_cv, NULL, CV_DEFAULT, NULL);
@@ -785,7 +787,8 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_iokstat_lock);
 	mutex_destroy(&spa->spa_cos_props_lock);
 	mutex_destroy(&spa->spa_vdev_props_lock);
-	mutex_destroy(&spa->spa_trim_lock);
+	mutex_destroy(&spa->spa_trim_ondemand_lock);
+	mutex_destroy(&spa->spa_trim_taskq_lock);
 
 	kmem_free(spa, sizeof (spa_t));
 }
@@ -2309,39 +2312,60 @@ spa_trimstats_update(spa_t *spa, uint64_t extents, uint64_t bytes,
  * Creates the taskq's used for autotrim and on-demand trim. This is called
  * either when a user sets the autotrim pool property to on or when they
  * start an on-demand trim.
+ *
+ * There are two locks governing trim interactions on the pool,
+ * spa_trim_ondemand_lock and spa_trim_taskq_lock. Whenever on-demand trim
+ * manipulates its internal state (such as updating trim progress counters),
+ * it must hold spa_trim_ondemand_lock. In addition, both autotrim and
+ * on-demand trim need to use the spa_trim_taskq to launch trim tasks.
+ *
+ * When a user sets autotrim=on on the pool, we create the taskq by calling
+ * this function (often from syncing context if done using "zpool set" instead
+ * of during pool creation/import). We may also call this function when
+ * starting an on-demand trim. Crucially, on-demand trim can also request
+ * synctasks be performed for it in syncing context and will be holding
+ * spa_trim_ondemand_lock while waiting for the synctask to complete.
+ * Therefore it is important that we protect spa_trim_taskq's creation and
+ * destruction using a separate lock, the spa_trim_taskq_lock. When called
+ * on behalf of autotrim, the caller should only be holding spa_trim_taskq_lock.
+ * When called on behalf of on-demand trim, the caller will also be holding
+ * spa_trim_ondemand_lock. Also, it is crucial that threads trying to acquire
+ * spa_trim_ondemand_lock do so before trying to acquire spa_trim_taskq_lock.
+ *
+ * To enforce the proper locking strategy, callers must pass a `sync' flag
+ * indicating whether the call is from syncing context. If B_TRUE, the caller
+ * MUST NOT be holding spa_trim_ondemand_lock. If B_FALSE, the caller MAY
+ * be holding spa_trim_ondemand_lock. In any case, the caller is responsible
+ * for acquiring spa_trim_taskq_lock prior to calling spa_trim_taskq_create
+ * or spa_trim_taskq_destroy.
  */
 void
-spa_trim_taskq_create(spa_t *spa)
+spa_trim_taskq_create(spa_t *spa, boolean_t sync)
 {
 	char name[MAXPATHLEN];
-	boolean_t held = MUTEX_HELD(&spa->spa_trim_lock);
 
-	if (!held)
-		mutex_enter(&spa->spa_trim_lock);
-	if (spa->spa_trim_taskq != NULL)
-		goto out;
-	spa_async_unrequest(spa, SPA_ASYNC_TRIM_TASKQ_DESTROY);
-	(void) snprintf(name, sizeof (name), "%s_trim", spa->spa_name);
-	spa->spa_trim_taskq = taskq_create(name, 1, minclsyspri, 1,
-	    spa->spa_root_vdev->vdev_children, TASKQ_DYNAMIC);
-	VERIFY(spa->spa_trim_taskq != NULL);
-out:
-	if (!held)
-		mutex_exit(&spa->spa_trim_lock);
+	ASSERT(MUTEX_HELD(&spa->spa_trim_taskq_lock));
+	ASSERT(!MUTEX_HELD(&spa->spa_trim_ondemand_lock) || !sync);
+	if (spa->spa_trim_taskq == NULL) {
+		spa_async_unrequest(spa, SPA_ASYNC_TRIM_TASKQ_DESTROY);
+		(void) snprintf(name, sizeof (name), "%s_trim", spa->spa_name);
+		spa->spa_trim_taskq = taskq_create(name, 1, minclsyspri, 1,
+		    spa->spa_root_vdev->vdev_children, TASKQ_DYNAMIC);
+		VERIFY(spa->spa_trim_taskq != NULL);
+	}
 }
 
 /*
  * Destroys the taskq's used for autotrim and on-demand trim. `unload'
  * specifies whether we've been called from spa_unload and hence whether
- * the autotrim setting on the pool should be ignored.
+ * the autotrim setting on the pool should be ignored. `sync' has the same
+ * meaning as in spa_trim_taskq_create.
  */
 void
-spa_trim_taskq_destroy(spa_t *spa, boolean_t unload)
+spa_trim_taskq_destroy(spa_t *spa, boolean_t unload, boolean_t sync)
 {
-	boolean_t held = MUTEX_HELD(&spa->spa_trim_lock);
-
-	if (!held)
-		mutex_enter(&spa->spa_trim_lock);
+	ASSERT(MUTEX_HELD(&spa->spa_trim_taskq_lock));
+	ASSERT(!MUTEX_HELD(&spa->spa_trim_ondemand_lock) || !sync);
 	/* Check if we still need to exist */
 	if ((spa->spa_auto_trim == SPA_AUTO_TRIM_ON && !unload) ||
 	    spa->spa_num_trimming > 0) {
@@ -2351,12 +2375,9 @@ spa_trim_taskq_destroy(spa_t *spa, boolean_t unload)
 		 * calling spa_trim_taskq_destroy.
 		 */
 		VERIFY(!unload);
-		goto out;
+		return;
 	}
 	ASSERT(spa->spa_trim_taskq != NULL);
 	taskq_destroy(spa->spa_trim_taskq);
 	spa->spa_trim_taskq = NULL;
-out:
-	if (!held)
-		mutex_exit(&spa->spa_trim_lock);
 }

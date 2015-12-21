@@ -459,10 +459,15 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 
 	/* If we're getting stats, calculate trim progress from leaf vdevs. */
 	if (getstats) {
-		VERIFY3U(nvlist_add_uint64(config, ZPOOL_CONFIG_TRIM_PROG,
-		    spa_get_trim_prog(spa)), ==, 0);
-		VERIFY3U(nvlist_add_uint64(config, ZPOOL_CONFIG_TRIM_RATE,
-		    spa->spa_trim_rate), ==, 0);
+		uint64_t prog, rate, start_time, stop_time;
+
+		spa_get_trim_prog(spa, &prog, &rate, &start_time, &stop_time);
+		fnvlist_add_uint64(config, ZPOOL_CONFIG_TRIM_PROG, prog);
+		fnvlist_add_uint64(config, ZPOOL_CONFIG_TRIM_RATE, rate);
+		fnvlist_add_uint64(config, ZPOOL_CONFIG_TRIM_START_TIME,
+		    start_time);
+		fnvlist_add_uint64(config, ZPOOL_CONFIG_TRIM_STOP_TIME,
+		    stop_time);
 	}
 
 	/*

@@ -339,6 +339,8 @@ typedef struct dmu_buf {
 
 #define	DMU_POOL_COS_PROPS		"cos_props"
 #define	DMU_POOL_VDEV_PROPS		"vdev_props"
+#define	DMU_POOL_TRIM_START_TIME	"trim_start_time"
+#define	DMU_POOL_TRIM_STOP_TIME		"trim_stop_time"
 
 /*
  * Allocate an object from this objset.  The range of object numbers
