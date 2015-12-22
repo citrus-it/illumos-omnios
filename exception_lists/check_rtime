@@ -41,6 +41,7 @@
 
 # Directory hierarchies to skip completely
 SKIP		^usr/lib/libc/			# optimized libc
+SKIP		^usr/lib/mps/			# external libs
 SKIP		^usr/lib/rcm/			# 4426119
 SKIP		^usr/perl5/			# alan's taking care of these :-)
 SKIP		^usr/src/			# no objects in source code
@@ -53,6 +54,8 @@ SKIP		^usr/lib/fps/sun4u/UltraSPARC.*/fptest$
 SKIP		^usr/MACH(lib)/lddstub$		# lddstub has no dependencies
 SKIP		^usr/MACH(lib)/libssagent\.so\.1$	# 4328854
 SKIP		^usr/lib/MACH(iconv)/geniconvtbl.so$	# 4384329
+# Userspace SMB daemon
+SKIP		^usr/lib/smbsrv/fksmbd$
 
 # picl file exclusions (4385799)
 SKIP		^usr/platform/.*/libpsvcplugin_psr\.so\.1
@@ -142,6 +145,7 @@ UNUSED_RPATH	/usr/lib.*\ from\ .*/usr/lib/mps
 UNUSED_RPATH	/usr/ccs/lib.*\ from\ .*/usr/lib/mps
 UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/libpython2\.6
 UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython2\.6
+UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/amd64/libpython2\.6
 UNUSED_RPATH	/usr/snadm/lib.*\ from\ .*/usr/snadm/lib/libspmicommon\.so\.1
 
 # Unused runpaths for reasons not captured above
@@ -151,18 +155,21 @@ UNUSED_RPATH	/usr.*\ from\ .*tst\.gcc\.exe			# gcc built
 
 # Unreferenced objects of non-OSnet objects we can't change
 UNREF_OBJ	/lib.*\ of\ .*libcimapi\.so
-UNREF_OBJ	/lib.*\ of\ .*libdbus-1\.so\.3
-UNREF_OBJ	/lib.*\ of\ .*libdbus-glib-1\.so\.2
-UNREF_OBJ	/lib.*\ of\ .*libgio-2.0\.so\.0
-UNREF_OBJ	/lib.*\ of\ .*libglib-2.0\.so\.0
-UNREF_OBJ	/lib.*\ of\ .*libgobject-2.0\.so\.0
-UNREF_OBJ	/lib.*\ of\ .*libgthread-2\.0\.so\.0
+UNREF_OBJ	/lib.*\ of\ .*libdbus-1\.so
+UNREF_OBJ	/lib.*\ of\ .*libdbus-glib-1\.so
+UNREF_OBJ	/lib.*\ of\ .*libgio-2.0\.so
+UNREF_OBJ	/lib.*\ of\ .*libglib-2.0\.so
+UNREF_OBJ	/lib.*\ of\ .*libgobject-2.0\.so
+UNREF_OBJ	/lib.*\ of\ .*libgthread-2\.0\.so
 UNREF_OBJ	/lib.*\ of\ .*libjvm\.so
+UNREF_OBJ	/lib.*\ of\ .*liblzma\.so
 UNREF_OBJ	/lib.*\ of\ .*libnetsnmp\.so\..*
 UNREF_OBJ	/lib.*\ of\ .*libnetsnmpagent\.so\..*
 UNREF_OBJ	/lib.*\ of\ .*libnetsnmpmibs\.so\..*
 UNREF_OBJ	/lib.*\ of\ .*libnetsnmphelpers\.so\..*
 UNREF_OBJ	/lib.*\ of\ .*libnspr4\.so
+UNREF_OBJ	/lib.*\ of\ .*libnss3\.so
+UNREF_OBJ	/lib.*\ of\ .*libnssutil3\.so
 UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.5
 UNREF_OBJ	/lib.*\ of\ .*libsoftokn3\.so
 UNREF_OBJ	/lib.*\ of\ .*libspmicommon\.so\.1
@@ -171,11 +178,12 @@ UNREF_OBJ	/lib.*\ of\ .*libssl3\.so
 UNREF_OBJ	/lib.*\ of\ .*libtspi\.so\.1
 UNREF_OBJ	/lib.*\ of\ .*libxml2\.so\.2
 UNREF_OBJ	/lib.*\ of\ .*libxslt\.so\.1
+UNREF_OBJ	/lib.*\ of\ .*libz\.so
 UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.4
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.4\.so\.1\.0
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.6\.so\.1\.0
 UNREF_OBJ	/libgcc_s.*\ of\ .*libstdc\+\+\.so\.6
-UNREF_OBJ	/libgcc_s.*\ of\ .*libgmodule-2\.0\.so\.0
+UNREF_OBJ	/libgcc_s.*\ of\ .*libgmodule-2\.0\.so
 
 # Unreferenced object of objects we can't change for other reasons
 UNREF_OBJ	/libmapmalloc\.so\.1;\ unused\ dependency\ of	# interposer
