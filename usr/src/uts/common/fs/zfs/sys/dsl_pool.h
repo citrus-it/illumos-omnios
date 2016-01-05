@@ -111,6 +111,7 @@ typedef struct dsl_pool {
 	kcondvar_t dp_spaceavail_cv;
 	uint64_t dp_dirty_pertxg[TXG_SIZE];
 	uint64_t dp_dirty_total;
+	uint64_t dp_long_free_dirty_total;
 	uint64_t dp_mos_used_delta;
 	uint64_t dp_mos_compressed_delta;
 	uint64_t dp_mos_uncompressed_delta;

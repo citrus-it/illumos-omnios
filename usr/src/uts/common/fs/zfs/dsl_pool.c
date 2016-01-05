@@ -651,6 +651,15 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	dsl_pool_undirty_space(dp, dp->dp_dirty_pertxg[txg & TXG_MASK], txg);
 
 	/*
+	 * Reset the long range free counter after we're done syncing user data
+	 */
+	if (spa_sync_pass(dp->dp_spa) == 1) {
+		mutex_enter(&dp->dp_lock);
+		dp->dp_long_free_dirty_total = 0;
+		mutex_exit(&dp->dp_lock);
+	}
+
+	/*
 	 * After the data blocks have been written (ensured by the zio_wait()
 	 * above), update the user/group space accounting.
 	 */
