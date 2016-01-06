@@ -947,6 +947,20 @@ wrc_collect_special_blocks(dsl_pool_t *dp)
 			if (wrc_data->wrc_finish_txg != 0)
 				wrc_close_window(spa);
 
+			/*
+			 * Process of the window closing might be
+			 * interrupted by wrc_purge_window()
+			 * (e.g., when the pool gets destroyed, etc.)
+			 * If this is the case we simply return. New
+			 * wrc window will be opened later upon completion
+			 * of the purge..
+			 */
+			if (wrc_data->wrc_purge) {
+				mutex_exit(&wrc_data->wrc_lock);
+				return (0);
+			}
+
+
 			/* Say to others that walking stopped */
 			wrc_data->wrc_walking = B_FALSE;
 			wrc_data->wrc_wait_for_window = B_TRUE;
@@ -1098,6 +1112,14 @@ wrc_write_update_window(void *void_spa, dmu_tx_t *tx)
 	spa_t *spa = void_spa;
 	wrc_data_t *wrc_data = &spa->spa_wrc;
 
+	if (wrc_data->wrc_finish_txg == 0) {
+		/*
+		 * The "delete" state is not valid,
+		 * because window has been closed or purged
+		 */
+		wrc_clean_state_delete(void_spa, tx);
+	}
+
 	(void) zap_update(spa->spa_dsl_pool->dp_meta_objset,
 	    DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_WRC_START_TXG, sizeof (uint64_t), 1,
@@ -1180,9 +1202,7 @@ wrc_close_window_impl(spa_t *spa, avl_tree_t *tree)
 	wrc_data->wrc_blocks_out = 0;
 	wrc_data->wrc_blocks_mv = 0;
 
-	/* Clean deletion-state flag and write down new boundaries */
-	dsl_sync_task_nowait(spa->spa_dsl_pool,
-	    wrc_clean_state_delete, spa, 0, ZFS_SPACE_CHECK_NONE, tx);
+	/* Write down new boundaries */
 	dsl_sync_task_nowait(spa->spa_dsl_pool,
 	    wrc_write_update_window, spa, 0, ZFS_SPACE_CHECK_NONE, tx);
 	dmu_tx_commit(tx);
@@ -1234,6 +1254,8 @@ wrc_instance_finalization(void *arg)
 {
 	wrc_instance_t *wrc_instance = arg;
 
+	ASSERT(wrc_instance->fini_done);
+
 	VERIFY3U(dsl_prop_inherit(wrc_instance->ds_name,
 	    zfs_prop_to_name(ZFS_PROP_WRC_MODE),
 	    ZPROP_SRC_INHERITED), ==, 0);
@@ -1261,6 +1283,7 @@ wrc_rele_autosnaps(wrc_data_t *wrc_data, uint64_t txg_to_rele,
 				 * But since we are here already in the sync
 				 * context, the operation is task-dispatched
 				 */
+				wrc_instance->fini_done = B_TRUE;
 				VERIFY(taskq_dispatch(
 				    wrc_data->wrc_instance_fini,
 				    wrc_instance_finalization, wrc_instance,
@@ -1317,6 +1340,13 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 	 */
 	wrc_data->wrc_purge = B_TRUE;
 
+	/*
+	 * Reset the deletion flag to make sure
+	 * that the purge is appreciated by
+	 * dva[0] deleter
+	 */
+	wrc_data->wrc_delete = B_FALSE;
+
 	while (wrc_data->wrc_blocks_out !=
 	    wrc_data->wrc_blocks_mv &&
 	    !wrc_data->wrc_thr_exit) {
@@ -1324,13 +1354,6 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 		    &wrc_data->wrc_lock,
 		    ddi_get_lbolt() + 1000);
 	}
-
-	/*
-	 * Reset the deletion flag to make sure
-	 * that the purge is appreciated by
-	 * dva[0] deleter
-	 */
-	wrc_data->wrc_delete = B_FALSE;
 
 	/*
 	 * Clean the tree of moved blocks
@@ -1362,12 +1385,6 @@ wrc_purge_window(spa_t *spa, dmu_tx_t *tx)
 		cmn_err(CE_NOTE, "WRC: Right boundary will be moved forward");
 
 	if (tx) {
-		/*
-		 * After purge from sync context, delete state isn't valid,
-		 * so reset it
-		 */
-		dsl_sync_task_nowait(spa->spa_dsl_pool,
-		    wrc_clean_state_delete, spa, 0, ZFS_SPACE_CHECK_NONE, tx);
 		dsl_sync_task_nowait(spa->spa_dsl_pool,
 		    wrc_write_update_window, spa, 0, ZFS_SPACE_CHECK_NONE, tx);
 	} else {
@@ -1479,7 +1496,8 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 	}
 
 	if (wrc_data->wrc_finish_txg != 0) {
-		if (wrc_data->wrc_finish_txg == etxg) {
+		if (wrc_data->wrc_finish_txg == etxg &&
+		    !wrc_instance->fini_done) {
 			/* Same window-snapshot for another WRC-Instance */
 			wrc_instance->txg_to_rele = txg;
 			result = B_TRUE;
@@ -1499,6 +1517,9 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 		result = B_FALSE;
 	} else if (wrc_data->wrc_locked) {
 		/* WRC is locked by an external caller */
+		result = B_FALSE;
+	} else if (wrc_instance->fini_done) {
+		/* Instance already done, so snapshot is not required */
 		result = B_FALSE;
 	} else {
 		/* Accept new windows */

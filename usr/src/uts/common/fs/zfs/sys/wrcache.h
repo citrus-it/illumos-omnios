@@ -104,6 +104,7 @@ typedef struct wrc_instance {
 	uint64_t	txg_off;
 
 	boolean_t	fini_migration;
+	boolean_t	fini_done;
 } wrc_instance_t;
 
 /*
