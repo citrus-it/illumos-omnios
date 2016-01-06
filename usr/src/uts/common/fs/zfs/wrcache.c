@@ -328,7 +328,6 @@ spa_wrc_thread(spa_t *spa)
 		DTRACE_PROBE2(wrc_nblocks, char *, spa->spa_name,
 		    uint64_t, count);
 
-		wrc_data->wrc_stop = B_FALSE;
 		while (count > 0) {
 			mutex_enter(&wrc_data->wrc_lock);
 
@@ -353,20 +352,20 @@ spa_wrc_thread(spa_t *spa)
 				ASSERT(wrc_data->wrc_block_count >= 0);
 				avl_remove(&wrc_data->wrc_blocks, block);
 				if (block->data && block->data->wrc_isvalid) {
-					taskqid_t res;
 					avl_add(
 					    &wrc_data->wrc_moved_blocks, block);
 					wrc_data->wrc_blocks_out++;
 					mutex_exit(&wrc_data->wrc_lock);
-					res = taskq_dispatch(
+
+					/*
+					 * TQ_SLEEP guarantees
+					 * the successful dispatching
+					 */
+					VERIFY(taskq_dispatch(
 					    wrc_data->wrc_move_taskq,
-					    wrc_move_block, block, TQ_SLEEP);
-					if (res == 0) {
-						atomic_inc_64(
-						    &wrc_data->wrc_blocks_mv);
-						wrc_enter_fault_state(spa);
-						break;
-					}
+					    wrc_move_block, block,
+					    TQ_SLEEP) != 0);
+
 					mutex_enter(&wrc_data->wrc_lock);
 					written_sz += WRCBP_GET_PSIZE(block);
 				} else {
@@ -381,9 +380,7 @@ spa_wrc_thread(spa_t *spa)
 
 			count--;
 			if (written_sz >= zfs_wrc_data_max ||
-			    wrc_data->wrc_stop || spa_wrc_stop_move(spa)) {
-				DTRACE_PROBE1(wrc_sleep,
-				    int, wrc_data->wrc_stop);
+			    spa_wrc_stop_move(spa)) {
 				break;
 			}
 		}
@@ -455,12 +452,13 @@ wrc_move_block(void *arg)
 		if (++wrc_data->wrc_fault_moves >= wrc_fault_limit) {
 			/* error limit exceeded - disable wrc */
 			cmn_err(CE_WARN,
-			    "WRC: can not move data on %s with error[%d]\n"
-			    "WRC: the facility is disabled "
-			    "to prevent loss of data",
+			    "WRC: can not move data on %s with error[%d]. "
+			    "Current window will be purged\n",
 			    spa->spa_name, err);
 
-			wrc_enter_fault_state(spa);
+			mutex_enter(&wrc_data->wrc_lock);
+			wrc_purge_window(spa, NULL);
+			mutex_exit(&wrc_data->wrc_lock);
 		} else {
 			cmn_err(CE_WARN,
 			    "WRC: can not move data on %s with error[%d]\n"
@@ -472,12 +470,11 @@ wrc_move_block(void *arg)
 			/*
 			 * re-plan the block with the highest priority and
 			 * try to move it again
+			 *
+			 * TQ_SLEEP guarantees the successful dispatching
 			 */
-			if (!taskq_dispatch(wrc_data->wrc_move_taskq,
-			    wrc_move_block, block, TQ_SLEEP | TQ_FRONT)) {
-				atomic_inc_64(&wrc_data->wrc_blocks_mv);
-				wrc_enter_fault_state(spa);
-			}
+			VERIFY(taskq_dispatch(wrc_data->wrc_move_taskq,
+			    wrc_move_block, block, TQ_SLEEP | TQ_FRONT) != 0);
 		}
 	}
 }
@@ -673,15 +670,12 @@ spa_wrc_walk_thread(spa_t *spa)
 		err = wrc_collect_special_blocks(spa->spa_dsl_pool);
 		if (err != 0) {
 			cmn_err(CE_WARN, "WRC: can not "
-			    "traverse pool: error [%d]\n"
-			    "WRC: collector thread will be disabled", err);
-			break;
+			    "traverse pool: error [%d]. "
+			    "Current window will be purged\n", err);
+
+			wrc_purge_window(spa, NULL);
 		}
 	}
-
-out:
-	if (err)
-		wrc_enter_fault_state(spa);
 
 	wrc_data->wrc_walk_thread = NULL;
 
@@ -1533,6 +1527,7 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 		wrc_data->wrc_altered_limit = 0;
 		wrc_data->wrc_altered_bytes = 0;
 		wrc_data->wrc_window_bytes = 0;
+		wrc_data->wrc_fault_moves = 0;
 		cv_broadcast(&wrc_data->wrc_cv);
 		result = B_TRUE;
 		wrc_instance->txg_to_rele = txg;

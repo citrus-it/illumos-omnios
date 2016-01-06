@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  */
 
@@ -334,6 +334,13 @@ dsl_scan_done(dsl_scan_t *scn, boolean_t complete, dmu_tx_t *tx)
 	}
 
 	scn->scn_phys.scn_end_time = gethrestime_sec();
+
+	/*
+	 * If the special-vdev does not have any errors after
+	 * SCRUB/RESILVER we need to drop flag that does not
+	 * allow to write to special
+	 */
+	spa_special_check_errors(spa);
 }
 
 /* ARGSUSED */

@@ -50,6 +50,7 @@ uint64_t spa_specialclass_flags(objset_t *);
 void spa_check_special(spa_t *);
 boolean_t spa_write_data_to_special(spa_t *, objset_t *);
 boolean_t spa_can_special_be_used(spa_t *spa);
+void spa_special_check_errors(spa_t *spa);
 
 /* currently there are 2 flags */
 enum specialflagbit {

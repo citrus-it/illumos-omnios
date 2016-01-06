@@ -377,6 +377,7 @@ struct spa {
 	uint8_t		spa_wrc_perc;		/* percent of writes to spec. */
 	spa_watermark_t	spa_watermark;
 	boolean_t	spa_enable_specialclass;
+	boolean_t	spa_special_has_errors;
 
 	/* wrcache thread. */
 	uint64_t	spa_wrc_mode;

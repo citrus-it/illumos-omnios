@@ -155,7 +155,6 @@ struct wrc_data {
 
 	boolean_t	wrc_purge;	/* should purge queued blocks */
 	boolean_t	wrc_walk;	/* should walk */
-	boolean_t	wrc_stop;	/* should pause */
 	boolean_t	wrc_locked;	/* do not walk while locked */
 	boolean_t	wrc_walking;	/* currently walking */
 	boolean_t	wrc_wait_for_window;

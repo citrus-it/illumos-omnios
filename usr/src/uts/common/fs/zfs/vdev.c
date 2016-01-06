@@ -240,6 +240,9 @@ vdev_add_child(vdev_t *pvd, vdev_t *cvd)
 	pvd->vdev_child = newchild;
 	pvd->vdev_child[id] = cvd;
 
+	cvd->vdev_isspecial_child =
+	    (pvd->vdev_isspecial || pvd->vdev_isspecial_child);
+
 	cvd->vdev_top = (pvd->vdev_top ? pvd->vdev_top: cvd);
 	ASSERT(cvd->vdev_top->vdev_parent->vdev_parent == NULL);
 
@@ -482,6 +485,8 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	vd->vdev_islog = islog;
 	vd->vdev_isspecial = isspecial;
 	vd->vdev_nparity = nparity;
+	vd->vdev_isspecial_child = (parent != NULL &&
+	    (parent->vdev_isspecial || parent->vdev_isspecial_child));
 
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &vd->vdev_path) == 0)
 		vd->vdev_path = spa_strdup(vd->vdev_path);
@@ -794,6 +799,7 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 
 	tvd->vdev_isspecial = svd->vdev_isspecial;
 	svd->vdev_isspecial = 0;
+	svd->vdev_isspecial_child = tvd->vdev_isspecial;
 }
 
 static void
@@ -2904,9 +2910,13 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 		vs->vs_write_errors++;
 	mutex_exit(&vd->vdev_stat_lock);
 
-	if (vd->vdev_isspecial && (vs->vs_checksum_errors ||
-	    vs->vs_read_errors || vs->vs_write_errors)) {
-		wrc_enter_fault_state(vd->vdev_spa);
+	if ((vd->vdev_isspecial || vd->vdev_isspecial_child) &&
+	    (vs->vs_checksum_errors != 0 || vs->vs_read_errors != 0 ||
+	    vs->vs_write_errors != 0 || !vdev_readable(vd) ||
+	    !vdev_writeable(vd))) {
+		/* all new writes will be placed on normal */
+		cmn_err(CE_WARN, "New writes to special will be stopped");
+		spa->spa_special_has_errors = B_TRUE;
 	}
 
 	if (type == ZIO_TYPE_WRITE && txg != 0 &&

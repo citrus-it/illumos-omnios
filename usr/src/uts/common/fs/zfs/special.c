@@ -445,21 +445,22 @@ spa_select_class(spa_t *spa, zio_t *zio)
 	zio_prop_t *zp = &zio->io_prop;
 	spa_meta_placement_t *mp = &spa->spa_meta_policy;
 
-	if (zp->zp_usesc && spa_has_special(spa)) {
+	if (zp->zp_usesc && spa_has_special(spa) &&
+	    !spa->spa_special_has_errors) {
 		boolean_t match = B_FALSE;
 		uint64_t specflags = zp->zp_specflags;
 
 		if (zp->zp_metadata) {
-			match = (!!(SPECIAL_FLAG_DATAMETA & specflags)) ||
-			    zio->io_prop.zp_usewrc;
+			match = (!!(SPECIAL_FLAG_DATAMETA & specflags));
 			if (match && mp->spa_enable_meta_placement_selection)
 				match = spa_refine_meta_placement(spa,
 				    zp->zp_zpl_meta_to_special, zp->zp_type);
 			else
 				match = B_FALSE;
 		} else {
-			match = zio->io_prop.zp_usewrc &&
-			    spa->spa_wrc.wrc_ready_to_use;
+			match = zp->zp_usewrc &&
+			    spa->spa_wrc.wrc_ready_to_use &&
+			    !spa->spa_wrc.wrc_isfault;
 			if (match) {
 				match = spa_refine_data_placement(spa);
 
@@ -1121,4 +1122,81 @@ zio_best_effort_dedup(zio_t *zio)
 	val = atomic_inc_64_nv(&spa->spa_dedup_rotor);
 	if ((val % 100) >= spa->spa_dedup_percentage)
 		zp->zp_dedup = 0;
+}
+
+static boolean_t
+spa_has_special_child_errors(vdev_t *vd)
+{
+	vdev_stat_t *vs = &vd->vdev_stat;
+
+	return (vs->vs_checksum_errors != 0 || vs->vs_read_errors != 0 ||
+	    vs->vs_write_errors != 0 || !vdev_readable(vd) ||
+	    !vdev_writeable(vd));
+}
+
+static int
+spa_special_check_errors_children(vdev_t *pvd)
+{
+	int rc = 0;
+
+	if (pvd->vdev_children == 0) {
+		if (spa_has_special_child_errors(pvd))
+			rc = -1;
+	} else {
+		ASSERT(!pvd->vdev_ops->vdev_op_leaf);
+		for (size_t i = 0; i < pvd->vdev_children; i++) {
+			vdev_t *vd = pvd->vdev_child[i];
+			ASSERT(vd != NULL);
+
+			if (vd->vdev_ops->vdev_op_leaf) {
+				if (spa_has_special_child_errors(vd)) {
+					rc = -1;
+					break;
+				}
+			} else {
+				rc = spa_special_check_errors_children(vd);
+				if (rc != 0)
+					break;
+			}
+		}
+	}
+
+	return (rc);
+}
+
+/*
+ * This function is called from dsl_scan_done()
+ * that is executed in sync-ctx.
+ * Here we walk over all VDEVs, to find
+ * special-vdev and check errors on it.
+ *
+ * If special-vdev does not have errors we drop
+ * a flag that does not allow to write to special
+ */
+void
+spa_special_check_errors(spa_t *spa)
+{
+	vdev_t *rvd;
+	boolean_t clean_special_err_flag = B_TRUE;
+
+	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
+
+	rvd = spa->spa_root_vdev;
+	for (size_t i = 0; i < rvd->vdev_children; i++) {
+		vdev_t *vd = rvd->vdev_child[i];
+		ASSERT(vd != NULL);
+
+		if (!vd->vdev_isspecial)
+			continue;
+
+		if (spa_special_check_errors_children(vd) != 0) {
+			clean_special_err_flag = B_FALSE;
+			break;
+		}
+	}
+
+	spa_config_exit(spa, SCL_VDEV, FTAG);
+
+	if (clean_special_err_flag)
+		spa->spa_special_has_errors = B_FALSE;
 }
