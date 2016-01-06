@@ -50,6 +50,7 @@
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <sys/zfs_znode.h>
+#include <sys/zfs_vfsops.h>
 #endif
 #include <sys/special.h>
 
@@ -663,6 +664,34 @@ get_next_chunk(dnode_t *dn, uint64_t *start, uint64_t minimum)
 	return (0);
 }
 
+/*
+ * If this dnode is in the ZFS object set
+ * return true if vfs's unmounted flag is set, otherwise return false.
+ * Used below in dmu_free_long_range_impl() to enable abort on ZFS unmount
+ */
+/*ARGSUSED*/
+static boolean_t
+dmu_dnode_fs_unmounting(dnode_t *deleting_dn)
+{
+#ifdef _KERNEL
+	boolean_t unmounting = B_FALSE;
+	objset_t *os = deleting_dn->dn_objset;
+	zfsvfs_t *zfvp;
+
+	if (dmu_objset_type(os) == DMU_OST_ZFS) {
+		mutex_enter(&os->os_user_ptr_lock);
+		zfvp = dmu_objset_get_user(os);
+		if (zfvp->z_vfs->vfs_flag & VFS_UNMOUNTED)
+			unmounting = B_TRUE;
+		mutex_exit(&os->os_user_ptr_lock);
+	}
+
+	return (unmounting);
+#else
+	return (B_FALSE);
+#endif
+}
+
 static int
 dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
     uint64_t length)
@@ -691,6 +720,9 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 		uint8_t free_dirty_pct;
 		uint64_t chunk_end, chunk_begin, chunk_len;
 		dmu_tx_t *tx;
+
+		if (dmu_dnode_fs_unmounting(dn))
+			return (SET_ERROR(EINTR));
 
 		chunk_end = chunk_begin = offset + length;
 
