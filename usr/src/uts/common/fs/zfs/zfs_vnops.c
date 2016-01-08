@@ -4484,8 +4484,8 @@ out:
 }
 
 /*ARGSUSED*/
-void
-zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
+static void
+zfs_inactive_impl(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	znode_t	*zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
@@ -4542,6 +4542,46 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 
 	zfs_zinactive(zp);
 	rw_exit(&zfsvfs->z_teardown_inactive_lock);
+}
+
+static void
+zfs_inactive_task(void *task_arg)
+{
+	vnode_t *vp = (vnode_t *)task_arg;
+	ASSERT(vp);
+	zfs_inactive_impl(vp, CRED(), NULL);
+}
+
+/*
+ * This value will be multiplied by zfs_dirty_data_max to determine
+ * the threshold past which we will call zfs_inactive_impl() async.
+ *
+ * Selecting the multiplier is a balance between how long we're willing to wait
+ * for delete/free to complete (get shell back, have a NFS thread captive, etc)
+ * and reducing the number of active requests in the backing taskq.
+ *
+ * 4 GiB (zfs_dirty_data_max default) * 16 (multiplier default) = 64 GiB
+ * meaning by default we will call zfs_inactive_impl async for vnodes > 64 GiB
+ */
+uint16_t zfs_inactive_async_multiplier = 16;
+
+void
+zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
+{
+	znode_t	*zp = VTOZ(vp);
+
+	if (zp->z_size > zfs_inactive_async_multiplier * zfs_dirty_data_max) {
+		if (taskq_dispatch(dsl_pool_vnrele_taskq(
+		    dmu_objset_pool(zp->z_zfsvfs->z_os)), zfs_inactive_task,
+		    vp, TQ_SLEEP) != NULL)
+			return; /* task dispatched, we're done */
+	}
+
+	/*
+	 * If the size of the vnode is <= than the threshold computed above
+	 * or if the taskq dispatch failed - do a sync zfs_inactive call
+	 */
+	zfs_inactive_impl(vp, cr, ct);
 }
 
 /*
