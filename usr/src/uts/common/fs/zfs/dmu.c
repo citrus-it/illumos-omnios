@@ -681,7 +681,8 @@ dmu_dnode_fs_unmounting(dnode_t *deleting_dn)
 	if (dmu_objset_type(os) == DMU_OST_ZFS) {
 		mutex_enter(&os->os_user_ptr_lock);
 		zfvp = dmu_objset_get_user(os);
-		if (zfvp->z_vfs->vfs_flag & VFS_UNMOUNTED)
+		if (zfvp != NULL && zfvp->z_vfs != NULL &&
+		    (zfvp->z_vfs->vfs_flag & VFS_UNMOUNTED))
 			unmounting = B_TRUE;
 		mutex_exit(&os->os_user_ptr_lock);
 	}
