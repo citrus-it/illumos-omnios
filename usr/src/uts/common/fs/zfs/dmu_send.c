@@ -23,7 +23,7 @@
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2014 HybridCluster. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/dmu.h>
@@ -3082,6 +3082,18 @@ dmu_recv_end_check(void *arg, dmu_tx_t *tx)
 	int error;
 
 	ASSERT3P(drc->drc_ds->ds_owner, ==, dmu_recv_tag);
+
+	if (spa_feature_is_active(dp->dp_spa, SPA_FEATURE_WRC)) {
+		objset_t *os = NULL;
+
+		error  = dmu_objset_from_ds(drc->drc_ds, &os);
+		if (error)
+			return (error);
+
+		/* Recv is impossible into DS that uses WRC */
+		if (os->os_wrc_mode != ZFS_WRC_MODE_OFF)
+			return (SET_ERROR(ENOTSUP));
+	}
 
 	if (!drc->drc_newfs) {
 		dsl_dataset_t *origin_head;
