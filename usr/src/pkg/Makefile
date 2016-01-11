@@ -258,10 +258,16 @@ DEP_SYNTH_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.dep)
 PROC_SYNTH_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.mog)
 
 #
-# Root of pkg image to use for dependency resolution
-# Normally / on the machine used to build the binaries
+# Root of pkg image to use for dependency resolution Normally / on the machine
+# used to build the binaries, or the ADJUNCT_PROTO
 #
-PKGDEP_RESOLVE_IMAGE = /
+PKG_ADJUNCT.cmd= AP=$${ADJUNCT_PROTO:-/}; if [[ -d $${AP}/var/pkg ]]; then \
+		echo $$AP; \
+	else	\
+		echo /;	\
+	fi
+
+PKGDEP_RESOLVE_IMAGE = $(PKG_ADJUNCT.cmd:sh)
 
 #
 # For each package, we determine the target repository based on
