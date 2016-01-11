@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -165,7 +165,7 @@ smb_com_create_temporary(smb_request_t *sr)
 	if (smb_common_create(sr) != NT_STATUS_SUCCESS)
 		return (SDRC_ERROR);
 
-	if (smbsr_encode_result(sr, 1, VAR_BCC, "bww%S", 1, sr->smb_fid,
+	if (smbsr_encode_result(sr, 1, VAR_BCC, "bww%s", 1, sr->smb_fid,
 	    VAR_BCC, sr, name))
 		return (SDRC_ERROR);
 
