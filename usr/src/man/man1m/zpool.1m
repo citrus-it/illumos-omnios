@@ -614,10 +614,12 @@ The amount of free space available in the pool.
 \fB\fBfreeing\fR\fR
 .ad
 .RS 20n
-After a file system or snapshot is destroyed, the space it was using is
-returned to the pool asynchronously. \fB\fBfreeing\fR\fR is the amount of
-space remaining to be reclaimed. Over time \fB\fBfreeing\fR\fR will decrease
-while \fB\fBfree\fR\fR increases.
+\fB\fBfreeing\fR\fR is the amount of pool space remaining to be reclaimed.
+After a dataset or snapshot is destroyed, the space it was using is
+returned to the pool asynchronously.
+Space reclamation due to active deletion of "large"
+(bigger than 64GB by default) file(s) is also done asynchronously.
+Over time \fB\fBfreeing\fR\fR will decrease while \fB\fBfree\fR\fR increases.
 .RE
 
 .sp

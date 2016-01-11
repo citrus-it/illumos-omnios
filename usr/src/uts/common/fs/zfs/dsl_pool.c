@@ -657,10 +657,12 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	dsl_pool_undirty_space(dp, dp->dp_dirty_pertxg[txg & TXG_MASK], txg);
 
 	/*
-	 * Reset the long range free counter after we're done syncing user data
+	 * Update the long range free counters after
+	 * we're done syncing user data
 	 */
 	if (spa_sync_pass(dp->dp_spa) == 1) {
 		mutex_enter(&dp->dp_lock);
+		dp->dp_long_freeing_total -= dp->dp_long_free_dirty_total;
 		dp->dp_long_free_dirty_total = 0;
 		mutex_exit(&dp->dp_lock);
 	}

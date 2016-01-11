@@ -717,14 +717,22 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 	if (length == DMU_OBJECT_END || offset + length > object_size)
 		length = object_size - offset;
 
+	mutex_enter(&dp->dp_lock);
+	dp->dp_long_freeing_total += length;
+	mutex_exit(&dp->dp_lock);
+
 	while (length != 0) {
 		uint8_t free_dirty_pct;
 		uint64_t chunk_end, chunk_begin, chunk_len;
 		dmu_tx_t *tx;
 
-		if (dmu_dnode_fs_unmounting(dn))
-			return (SET_ERROR(EINTR));
+		if (dmu_dnode_fs_unmounting(dn)) {
+			mutex_enter(&dp->dp_lock);
+			dp->dp_long_freeing_total -= length;
+			mutex_exit(&dp->dp_lock);
 
+			return (SET_ERROR(EINTR));
+		}
 		chunk_end = chunk_begin = offset + length;
 
 		/* move chunk_begin backwards to the beginning of this chunk */
@@ -767,6 +775,9 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 		err = dmu_tx_assign(tx, TXG_WAIT);
 		if (err) {
 			dmu_tx_abort(tx);
+			mutex_enter(&dp->dp_lock);
+			dp->dp_long_freeing_total -= length - chunk_len;
+			mutex_exit(&dp->dp_lock);
 			return (err);
 		}
 		dnode_free_range(dn, chunk_begin, chunk_len, tx);
