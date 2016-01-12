@@ -19,6 +19,21 @@
 	(conn)->callback(conn, ev, \
 	(uintptr_t)ev_arg, (conn)->callback_arg)
 
+/*
+ * KRRP TCP-level connection timeout default (60000 ms).
+ * Note that TCP's own default is 5min or 300,000ms.
+ */
+#define	KRRP_TCP_ABORT_THRESHOLD_DEFAULT 60000
+
+/*
+ * The value is specified in milliseconds and does not
+ * have any effect on an already created KRRP connection(s)
+ * should be in range: 100 ... UINT32_MAX
+ *
+ * Note: use with caution
+ */
+uint32_t krrp_tcp_abort_threshold = 0;
+
 typedef struct {
 	kmutex_t	mtx;
 	kcondvar_t	cv;
@@ -587,7 +602,9 @@ krrp_conn_post_configure(krrp_conn_t *conn, krrp_error_t *error)
 	if (rc != 0)
 		goto err;
 
-	value = 60000;
+	/* Do not allow to set it less 100 to exclude any side-effect */
+	value = krrp_tcp_abort_threshold > 100 ?
+	    krrp_tcp_abort_threshold : KRRP_TCP_ABORT_THRESHOLD_DEFAULT;
 	rc = ksocket_setsockopt(conn->ks, IPPROTO_TCP, TCP_ABORT_THRESHOLD,
 	    (const void *) &value, sizeof (value), CRED());
 	if (rc != 0)
