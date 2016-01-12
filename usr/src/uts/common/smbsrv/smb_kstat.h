@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -101,6 +101,17 @@ typedef struct smbsrv_kstats {
 	uint32_t		ks_maxreqs;	/* Max number of reqs */
 	uint32_t		ks_padding;
 } smbsrv_kstats_t;
+
+/* Array indices in ks_clsh (short for client-or-share) */
+#define	SMBSRV_CLSH_OTHER	0
+#define	SMBSRV_CLSH_READ	1
+#define	SMBSRV_CLSH_WRITE	2
+#define	SMBSRV_CLSH__NREQ	3
+#define	SMBSRV_CLSH__NAMES	{ "other", "read", "write" }
+
+typedef struct smbsrv_clsh_kstats {
+	smb_kstat_req_t	ks_clsh[SMBSRV_CLSH__NREQ];
+} smbsrv_clsh_kstats_t;
 
 #pragma pack()
 

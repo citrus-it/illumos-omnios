@@ -698,7 +698,7 @@ cmd_done:
 	ASSERT((sr->reply.chain_offset & 7) == 0);
 
 	/*
-	 * Record some statistics: latency, rx bytes, tx bytes
+	 * Record some statistics:  latency, rx bytes, tx bytes
 	 * per:  server, session & kshare.
 	 */
 	{
@@ -707,6 +707,14 @@ cmd_done:
 		int64_t		txb;
 		smb_disp_stats_t	*client_sds;
 		smb_disp_stats_t	*share_sds;
+		int			cmd_type;
+
+		if (sr->smb2_cmd_code == SMB2_READ) {
+			cmd_type = SMBSRV_CLSH_READ;
+		} else if (sr->smb2_cmd_code == SMB2_WRITE) {
+			cmd_type = SMBSRV_CLSH_WRITE;
+		} else
+			cmd_type = SMBSRV_CLSH_OTHER;
 
 		dt = gethrtime() - sr->sr_time_start;
 		rxb = (int64_t)(sr->command.chain_offset - sr->smb2_cmd_hdr);
@@ -716,14 +724,15 @@ cmd_done:
 		atomic_add_64(&sds->sdt_rxb, rxb);
 		atomic_add_64(&sds->sdt_txb, txb);
 
-		client_sds = &session->s_stats;
+		client_sds = &session->s_stats[cmd_type];
 		smb_latency_add_sample(&client_sds->sdt_lat, dt);
 		atomic_add_64(&client_sds->sdt_rxb, rxb);
 		atomic_add_64(&client_sds->sdt_txb, txb);
 
 		if ((sr->tid_tree != NULL) &&
 		    (sr->tid_tree->t_kshare != NULL)) {
-			share_sds = &sr->tid_tree->t_kshare->shr_stats;
+			share_sds =
+			    &sr->tid_tree->t_kshare->shr_stats[cmd_type];
 			smb_latency_add_sample(&share_sds->sdt_lat, dt);
 			atomic_add_64(&share_sds->sdt_rxb, rxb);
 			atomic_add_64(&share_sds->sdt_txb, txb);

@@ -147,9 +147,9 @@
 	"%30s  %02X   %3.0f  %1.3e  %1.3e  %1.3e  %1.3e  %1.3e\n"
 
 #define	SMBSRV_CLNT_SHARE_BANNER	\
-	"rbytes/s   tbytes/s     req/s     rt-mean   rt-stddev\n"
+	"%30s  rbytes/s   tbytes/s     req/s     rt-mean   rt-stddev\n"
 #define	SMBSRV_CLNT_SHARE_FORMAT	\
-	"%1.3e  %1.3e  %1.3e  %1.3e  %1.3e\n"
+	"%30s  %1.3e  %1.3e  %1.3e  %1.3e  %1.3e\n"
 
 
 typedef enum {
@@ -178,7 +178,7 @@ typedef struct smbstat_wrk_snapshot {
 /* Per-Client or Per-Share statistics. */
 typedef struct smbstat_clsh_snapshot {
 	hrtime_t	cs_snaptime;
-	smb_kstat_req_t	cs_data;
+	smbsrv_clsh_kstats_t	cs_data;
 } smbstat_clsh_snapshot_t;
 
 typedef struct smbstat_req_info {
@@ -233,7 +233,7 @@ typedef struct smbstat_srv_info {
 	/*
 	 * Latency & Throughput on specified client or share
 	 */
-	smbstat_req_info_t	si_clsh;
+	smbstat_req_info_t	si_clsh[SMBSRV_CLSH__NREQ];
 } smbstat_srv_info_t;
 
 static void smbstat_init(void);
@@ -647,20 +647,24 @@ static void
 smbstat_print_client_or_share(void)
 {
 	smbstat_req_info_t	*prq;
+	int	idx;
 
 	if (smbstat_opt_clsh == NULL)
 		return;
 
-	(void) printf(SMBSRV_CLNT_SHARE_BANNER);
+	(void) printf(SMBSRV_CLNT_SHARE_BANNER, "       ");
 
-	prq = &smbstat_srv_info.si_clsh;
+	prq = &smbstat_srv_info.si_clsh[0];
 
+	for (idx = 0; idx < SMBSRV_CLSH__NREQ; idx++, prq++) {
 	(void) printf(SMBSRV_CLNT_SHARE_FORMAT,
+	    prq->ri_name,
 	    smbstat_zero(prq->ri_rbs),
 	    smbstat_zero(prq->ri_tbs),
 	    smbstat_zero(prq->ri_rqs),
 	    prq->ri_mean,
 	    prq->ri_stddev);
+	}
 }
 
 
@@ -877,9 +881,12 @@ smbstat_wrk_current_snapshot(void)
 static void
 smbstat_clsh_init(void)
 {
+	static const char	*kr_names[] = SMBSRV_CLSH__NAMES;
 	char	ks_name[KSTAT_STRLEN];
 	char 	*prefix = "";
+	smbstat_req_info_t *info;
 	int	instance = -1;
+	int	i;
 
 	if (smbstat_opt_clsh == NULL)
 		return;
@@ -900,6 +907,12 @@ smbstat_clsh_init(void)
 	if (smbstat_clsh_ksp == NULL) {
 		smbstat_fail(1, gettext("cannot retrieve smbsrv %s kstat\n"),
 		    ks_name);
+	}
+
+	info = smbstat_srv_info.si_clsh;
+	for (i = 0; i < SMBSRV_CLSH__NREQ; i++) {
+		(void) strlcpy(info[i].ri_name, kr_names[i],
+		    sizeof (info[i].ri_name));
 	}
 }
 
@@ -928,6 +941,7 @@ smbstat_clsh_snapshot(void)
 		    smbstat_clsh_ksp->ks_name);
 
 	curr->cs_snaptime = smbstat_clsh_ksp->ks_snaptime;
+
 	bcopy(smbstat_clsh_ksp->ks_data, &curr->cs_data,
 	    sizeof (curr->cs_data));
 }
@@ -940,16 +954,20 @@ smbstat_clsh_process(void)
 {
 	smbstat_clsh_snapshot_t	*curr, *prev;
 	boolean_t		firstcall;
+	int	idx;
 
 	curr = smbstat_clsh_current_snapshot();
 	prev = smbstat_clsh_previous_snapshot();
 	firstcall = (prev->cs_snaptime == 0);
 
-	smbstat_srv_process_one_req(
-	    &smbstat_srv_info.si_clsh,
-	    &curr->cs_data,
-	    &prev->cs_data,
-	    firstcall);
+
+	for (idx = 0; idx < SMBSRV_CLSH__NREQ; idx++) {
+		smbstat_srv_process_one_req(
+		    &smbstat_srv_info.si_clsh[idx],
+		    &curr->cs_data.ks_clsh[idx],
+		    &prev->cs_data.ks_clsh[idx],
+		    firstcall);
+	}
 }
 
 /*
@@ -1277,7 +1295,6 @@ smbstat_srv_process_one_req(
 	info->ri_stddev /= NANOSEC;
 	info->ri_mean /= NANOSEC;
 }
-
 
 /*
  * smbstat_srv_current_snapshot

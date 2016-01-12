@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_door.h>
@@ -741,8 +741,10 @@ smb_kshare_export(smb_server_t *sv, smb_kshare_t *shr)
 void
 kshare_stats_init(smb_server_t *sv, smb_kshare_t *ks)
 {
+	static const char	*kr_names[] = SMBSRV_CLSH__NAMES;
 	char			ks_name[KSTAT_STRLEN];
-	smb_kstat_req_t		*ksr;
+	smbsrv_clsh_kstats_t	*ksr;
+	int			idx;
 
 	/*
 	 * Create raw kstats for shares with a name composed as:
@@ -753,7 +755,7 @@ kshare_stats_init(smb_server_t *sv, smb_kshare_t *ks)
 
 	ks->shr_ksp = kstat_create_zone(SMBSRV_KSTAT_MODULE, 0,
 	    ks_name, SMBSRV_KSTAT_CLASS, KSTAT_TYPE_RAW,
-	    sizeof (smb_kstat_req_t), 0, sv->sv_zid);
+	    sizeof (smbsrv_clsh_kstats_t), 0, sv->sv_zid);
 
 	if (ks->shr_ksp == NULL)
 		return;
@@ -764,9 +766,12 @@ kshare_stats_init(smb_server_t *sv, smb_kshare_t *ks)
 	/*
 	 * In-line equivalent of smb_dispatch_stats_init
 	 */
-	smb_latency_init(&ks->shr_stats.sdt_lat);
-	ksr = (smb_kstat_req_t *)ks->shr_ksp->ks_data;
-	(void) strlcpy(ksr->kr_name, ks_name, KSTAT_STRLEN);
+	ksr = (smbsrv_clsh_kstats_t *)ks->shr_ksp->ks_data;
+	for (idx = 0; idx < SMBSRV_CLSH__NREQ; idx++) {
+		smb_latency_init(&ks->shr_stats[idx].sdt_lat);
+		(void) strlcpy(ksr->ks_clsh[idx].kr_name, kr_names[idx],
+		    KSTAT_STRLEN);
+	}
 
 	kstat_install(ks->shr_ksp);
 }
@@ -774,8 +779,10 @@ kshare_stats_init(smb_server_t *sv, smb_kshare_t *ks)
 void
 kshare_stats_fini(smb_kshare_t *ks)
 {
+	int idx;
 
-	smb_latency_destroy(&ks->shr_stats.sdt_lat);
+	for (idx = 0; idx < SMBSRV_CLSH__NREQ; idx++)
+		smb_latency_destroy(&ks->shr_stats[idx].sdt_lat);
 }
 
 /*
@@ -786,31 +793,36 @@ smb_kshare_kstat_update(kstat_t *ksp, int rw)
 {
 	smb_kshare_t *kshare;
 	smb_disp_stats_t *sds;
+	smbsrv_clsh_kstats_t	*clsh;
 	smb_kstat_req_t	*ksr;
+	int i;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
 	kshare = ksp->ks_private;
 	ASSERT(kshare->shr_magic == SMB_SHARE_MAGIC);
-	sds = &kshare->shr_stats;
+	sds = kshare->shr_stats;
 
-	ksr = (smb_kstat_req_t *)ksp->ks_data;
+	clsh = (smbsrv_clsh_kstats_t *)ksp->ks_data;
+	ksr = clsh->ks_clsh;
 
-	ksr->kr_rxb = sds->sdt_rxb;
-	ksr->kr_txb = sds->sdt_txb;
-	mutex_enter(&sds->sdt_lat.ly_mutex);
-	ksr->kr_nreq = sds->sdt_lat.ly_a_nreq;
-	ksr->kr_sum = sds->sdt_lat.ly_a_sum;
-	ksr->kr_a_mean = sds->sdt_lat.ly_a_mean;
-	ksr->kr_a_stddev = sds->sdt_lat.ly_a_stddev;
-	ksr->kr_d_mean = sds->sdt_lat.ly_d_mean;
-	ksr->kr_d_stddev = sds->sdt_lat.ly_d_stddev;
-	sds->sdt_lat.ly_d_mean = 0;
-	sds->sdt_lat.ly_d_nreq = 0;
-	sds->sdt_lat.ly_d_stddev = 0;
-	sds->sdt_lat.ly_d_sum = 0;
-	mutex_exit(&sds->sdt_lat.ly_mutex);
+	for (i = 0; i < SMBSRV_CLSH__NREQ; i++, ksr++, sds++) {
+		ksr->kr_rxb = sds->sdt_rxb;
+		ksr->kr_txb = sds->sdt_txb;
+		mutex_enter(&sds->sdt_lat.ly_mutex);
+		ksr->kr_nreq = sds->sdt_lat.ly_a_nreq;
+		ksr->kr_sum = sds->sdt_lat.ly_a_sum;
+		ksr->kr_a_mean = sds->sdt_lat.ly_a_mean;
+		ksr->kr_a_stddev = sds->sdt_lat.ly_a_stddev;
+		ksr->kr_d_mean = sds->sdt_lat.ly_d_mean;
+		ksr->kr_d_stddev = sds->sdt_lat.ly_d_stddev;
+		sds->sdt_lat.ly_d_mean = 0;
+		sds->sdt_lat.ly_d_nreq = 0;
+		sds->sdt_lat.ly_d_stddev = 0;
+		sds->sdt_lat.ly_d_sum = 0;
+		mutex_exit(&sds->sdt_lat.ly_mutex);
+	}
 
 	return (0);
 }
