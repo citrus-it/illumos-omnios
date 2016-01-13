@@ -264,9 +264,15 @@ int
 krrp_sess_run(krrp_sess_t *sess, boolean_t only_once, krrp_error_t *error)
 {
 	int rc = -1;
+	boolean_t fatal_error = B_FALSE;
 	boolean_t stream_is_not_defined = B_FALSE;
 
 	mutex_enter(&sess->mtx);
+
+	if (sess->error.krrp_errno != 0) {
+		(void) memcpy(error, &sess->error, sizeof (krrp_error_t));
+		goto out;
+	}
 
 	if (sess->type == KRRP_SESS_RECEIVER && only_once) {
 		krrp_error_set(error, KRRP_ERRNO_SESS, EINVAL);
@@ -312,6 +318,14 @@ krrp_sess_run(krrp_sess_t *sess, boolean_t only_once, krrp_error_t *error)
 		goto out;
 	}
 
+	/*
+	 * Need to store error to session, to be able to
+	 * return it again, because an error that might
+	 * occur bellow cannot be fixed without
+	 * recreation of session.
+	 */
+	fatal_error = B_TRUE;
+
 	if (sess->type == KRRP_SESS_COMPOUND) {
 		rc = krrp_stream_run(sess->stream_write,
 		    sess->data_write_queue,
@@ -352,6 +366,12 @@ krrp_sess_run(krrp_sess_t *sess, boolean_t only_once, krrp_error_t *error)
 	sess->running = B_TRUE;
 
 out:
+	if (rc != 0 && fatal_error) {
+		ASSERT(error->krrp_errno != 0);
+
+		sess->error.krrp_errno = error->krrp_errno;
+		sess->error.unix_errno = error->unix_errno;
+	}
 	mutex_exit(&sess->mtx);
 
 	if (rc == 0 && sess->type == KRRP_SESS_RECEIVER)
