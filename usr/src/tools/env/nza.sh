@@ -270,7 +270,7 @@ fi
 if [ -z "$PERL_ARCH" ] ; then
 	for a in i86pc-solaris-64int i86pc-solaris-thread-multi-64int \
 	    i86pc-solaris-thread-multi-64 ; do
-		if [ -d /usr/perl5/$PERL_VERSION/lib/$a ] ; then
+		if [ -d ${ADJUNCT_PROTO}/usr/perl5/$PERL_VERSION/lib/$a ] ; then
 			export PERL_ARCH=$a
 			break
 		fi
