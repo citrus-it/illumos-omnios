@@ -466,17 +466,18 @@ krrp_sess_throttle_conn(krrp_sess_t *sess, size_t limit,
 {
 	int rc = -1;
 
-	if (!krrp_sess_is_running(sess)) {
-		krrp_error_set(error, KRRP_ERRNO_SESS, ENOTACTIVE);
-		goto out;
-	}
-
 	if (sess->type != KRRP_SESS_SENDER) {
 		krrp_error_set(error, KRRP_ERRNO_SESS, EINVAL);
 		goto out;
 	}
 
-	krrp_conn_throttle_set(sess->conn, limit);
+	if (sess->conn == NULL) {
+		krrp_error_set(error, KRRP_ERRNO_CONN, ENOENT);
+		goto out;
+	}
+
+	krrp_conn_throttle_set(sess->conn, limit,
+	    !krrp_sess_is_running(sess));
 	rc = 0;
 
 out:

@@ -102,7 +102,8 @@ void krrp_conn_destroy(krrp_conn_t *conn);
 void krrp_conn_register_callback(krrp_conn_t *conn,
     krrp_conn_cb_t *ev_cb, void *cb_arg);
 
-void krrp_conn_throttle_set(krrp_conn_t *conn, size_t new_limit);
+void krrp_conn_throttle_set(krrp_conn_t *conn, size_t new_limit,
+    boolean_t only_set);
 
 void krrp_conn_run(krrp_conn_t *conn, krrp_queue_t *ctrl_tx_queue,
     krrp_pdu_engine_t *data_pdu_engine,

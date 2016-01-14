@@ -419,8 +419,16 @@ krrp_conn_throttle(krrp_throttle_t *throttle, size_t send_sz)
 	mutex_exit(&throttle->mtx);
 }
 
+/*
+ * This function is called on a krrp session that is either
+ * already running or not yet. Using the 'only_set' (2nd arg)
+ * the caller explicitly controls whether to just set
+ * the limiting rate, or (re)set the rate and start (or continue)
+ * throttling the traffic right away
+ */
 void
-krrp_conn_throttle_set(krrp_conn_t *conn, size_t new_limit)
+krrp_conn_throttle_set(krrp_conn_t *conn, size_t new_limit,
+    boolean_t only_set)
 {
 	boolean_t require_enable = B_FALSE;
 	krrp_throttle_t *throttle = &conn->throttle;
@@ -436,13 +444,18 @@ krrp_conn_throttle_set(krrp_conn_t *conn, size_t new_limit)
 		krrp_conn_throttle_disable(throttle);
 	else {
 		mutex_enter(&throttle->mtx);
+
+		/*
+		 * limit == 0 means that throttle-logic
+		 * is not active.
+		 */
 		if (throttle->limit == 0)
 			require_enable = B_TRUE;
 
 		throttle->limit = new_limit;
 		mutex_exit(&throttle->mtx);
 
-		if (require_enable)
+		if (require_enable && !only_set)
 			krrp_conn_throttle_enable(throttle);
 	}
 }
