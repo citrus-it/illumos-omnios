@@ -1,0 +1,2677 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2015, Nexenta Systems Inc. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/test/smf@$(PKGVERS)
+set name=pkg.description value="NFS Test Suite"
+set name=pkg.summary value="Share Mount Functional Tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir path=opt/smf-tests
+dir path=opt/smf-tests/bin
+dir path=opt/smf-tests/include
+dir path=opt/smf-tests/tests
+dir path=opt/smf-tests/tests/manifests
+dir path=opt/smf-tests/tests/manifests/validate
+dir path=opt/smf-tests/tests/svc.startd
+dir path=opt/smf-tests/tests/svc.startd/context
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_001
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_002
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_003
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_004
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_005
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_006
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_010
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_012
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_013
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_014
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_015
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_016
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_018
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_019
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_020
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_021
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_022
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_023
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_024
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_025
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_026
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_027
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_029
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_031
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_035
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_036
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_037
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_038
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_039
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_040
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_041
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_042
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_043
+dir path=opt/smf-tests/tests/svc.startd/context/assertion_044
+dir path=opt/smf-tests/tests/svc.startd/depends
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_002
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_003
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_005
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_006
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_008
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_009
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_011
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_012
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_013
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_014
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_025
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_026
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_027
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_028
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_029
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_030
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_031
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_033
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_034
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_035
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_036
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_037
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_038
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_039
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_040
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_041
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_042
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_043
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_044
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_045
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_046
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_047
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_048
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_051
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_052
+dir path=opt/smf-tests/tests/svc.startd/depends/assertion_053
+dir path=opt/smf-tests/tests/svc.startd/include
+dir path=opt/smf-tests/tests/svc.startd/methods
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_001
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_002
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_003
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_004
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_005
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_006
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_007
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_008
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_009
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_010
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_011
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_012
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_013
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_014
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_015
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_016
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_017
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_018
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_019
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_020
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_021
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_022
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_023
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_024
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_025
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_026
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_027
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_028
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_029
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_030
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_033
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_034
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_035
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_036
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_037
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_038
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_039
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_040
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_041
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_042
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_043
+dir path=opt/smf-tests/tests/svc.startd/methods/assertion_044
+dir path=opt/smf-tests/tests/svcadm
+dir path=opt/smf-tests/tests/svcadm/clear
+dir path=opt/smf-tests/tests/svcadm/degraded
+dir path=opt/smf-tests/tests/svcadm/delegate
+dir path=opt/smf-tests/tests/svcadm/disable
+dir path=opt/smf-tests/tests/svcadm/enable
+dir path=opt/smf-tests/tests/svcadm/maintenance
+dir path=opt/smf-tests/tests/svcadm/refresh
+dir path=opt/smf-tests/tests/svcadm/restart
+dir path=opt/smf-tests/tests/svccfg
+dir path=opt/smf-tests/tests/svccfg/add
+dir path=opt/smf-tests/tests/svccfg/addpg
+dir path=opt/smf-tests/tests/svccfg/apply
+dir path=opt/smf-tests/tests/svccfg/delpg
+dir path=opt/smf-tests/tests/svccfg/delprop
+dir path=opt/smf-tests/tests/svccfg/editprop
+dir path=opt/smf-tests/tests/svccfg/end
+dir path=opt/smf-tests/tests/svccfg/exit
+dir path=opt/smf-tests/tests/svccfg/import
+dir path=opt/smf-tests/tests/svccfg/import-export
+dir path=opt/smf-tests/tests/svccfg/import-export/dependency
+dir path=opt/smf-tests/tests/svccfg/import-export/dependent
+dir path=opt/smf-tests/tests/svccfg/import-export/instance
+dir path=opt/smf-tests/tests/svccfg/import-export/invalid
+dir path=opt/smf-tests/tests/svccfg/import-export/lists
+dir path=opt/smf-tests/tests/svccfg/import-export/property_group
+dir path=opt/smf-tests/tests/svccfg/import-export/propval
+dir path=opt/smf-tests/tests/svccfg/import-export/stability
+dir path=opt/smf-tests/tests/svccfg/import-export/template
+dir path=opt/smf-tests/tests/svccfg/inventory
+dir path=opt/smf-tests/tests/svccfg/list
+dir path=opt/smf-tests/tests/svccfg/listpg
+dir path=opt/smf-tests/tests/svccfg/listprop
+dir path=opt/smf-tests/tests/svccfg/listsnap
+dir path=opt/smf-tests/tests/svccfg/quit
+dir path=opt/smf-tests/tests/svccfg/security
+dir path=opt/smf-tests/tests/svccfg/security/include
+dir path=opt/smf-tests/tests/svccfg/security/security_auths
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_001
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_002
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_003
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_004
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_005
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_006
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_007
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_008
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_012
+dir path=opt/smf-tests/tests/svccfg/security/security_profiles
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_001
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_002
+dir \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_003
+dir path=opt/smf-tests/tests/svccfg/select
+dir path=opt/smf-tests/tests/svccfg/setprop
+dir path=opt/smf-tests/tests/svccfg/templates
+dir path=opt/smf-tests/tests/svccfg/templates/include
+dir path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name
+dir path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description
+dir path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name
+dir path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required
+dir path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target
+dir path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name
+dir path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility
+dir path=opt/smf-tests/tests/svccfg/templates/validation
+dir path=opt/smf-tests/tests/svccfg/unselect
+dir path=opt/smf-tests/tests/svccfg/validate
+file path=opt/smf-tests/README mode=0444
+file path=opt/smf-tests/STC.INFO mode=0444
+file path=opt/smf-tests/STF.INFO mode=0444
+file path=opt/smf-tests/bin/base32 mode=0555
+file path=opt/smf-tests/bin/checkenv_def mode=0555
+file path=opt/smf-tests/bin/errorinject mode=0555
+file path=opt/smf-tests/bin/name_gen mode=0555
+file path=opt/smf-tests/bin/ps_start mode=0555
+file path=opt/smf-tests/bin/service_app mode=0555
+file path=opt/smf-tests/bin/service_checkrun mode=0555
+file path=opt/smf-tests/bin/service_countcall mode=0555
+file path=opt/smf-tests/bin/service_create mode=0555
+file path=opt/smf-tests/bin/service_dumpstate mode=0555
+file path=opt/smf-tests/bin/service_getpids mode=0555
+file path=opt/smf-tests/bin/service_lastcall mode=0555
+file path=opt/smf-tests/bin/service_offsetcall mode=0555
+file path=opt/smf-tests/bin/smftest mode=0555
+file path=opt/smf-tests/bin/state_transit mode=0555
+file path=opt/smf-tests/bin/stf_description mode=0444
+file path=opt/smf-tests/include/create_piece.pm mode=0555
+file path=opt/smf-tests/include/gen_xml_manifest.pm mode=0555
+file path=opt/smf-tests/include/gltest.kshlib mode=0555
+file path=opt/smf-tests/include/piece_types.pm mode=0555
+file path=opt/smf-tests/include/siglist_impl.h mode=0555
+file path=opt/smf-tests/include/svc.startd_config.kshlib mode=0555
+file path=opt/smf-tests/include/svc.startd_fileops.kshlib mode=0555
+file path=opt/smf-tests/include/svc_conversion_sys.kshlib mode=0555
+file path=opt/smf-tests/include/write_piece.pm mode=0555
+file path=opt/smf-tests/tests/config.env mode=0444
+file path=opt/smf-tests/tests/manifests/stf_description mode=0444
+file path=opt/smf-tests/tests/manifests/validate/config.env mode=0444
+file path=opt/smf-tests/tests/manifests/validate/gen_manifest_test mode=0555
+file path=opt/smf-tests/tests/manifests/validate/runtest mode=0555
+file path=opt/smf-tests/tests/manifests/validate/stf_description mode=0444
+file path=opt/smf-tests/tests/stf_description mode=0444
+file path=opt/smf-tests/tests/svc.startd/config.env mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/add_testaccount mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_001/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_001/context_001 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_001/service_001.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_001/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_002/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_002/context_002 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_002/service_002.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_002/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_003/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_003/context_003 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_003/service_003.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_003/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_004/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_004/context_004 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_004/service_004.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_004/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_005/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_005/context_005 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_005/service_005.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_005/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_006/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_006/context_006 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_006/service_006.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_006/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_010/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_010/context_010 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_010/service_010.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_010/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_012/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_012/context_012 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_012/service_012.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_012/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_013/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_013/context_013 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_013/service_013.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_013/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_014/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_014/context_014 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_014/service_014.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_014/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_015/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_015/context_015 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_015/service_015.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_015/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_016/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_016/context_016 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_016/service_016.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_016/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_018/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_018/context_018 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_018/service_018.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_018/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_019/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_019/context_019 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_019/service_019.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_019/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_020/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_020/context_020 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_020/service_020.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_020/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_021/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_021/context_021 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_021/service_021.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_021/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_022/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_022/context_022 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_022/service_022.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_022/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_023/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_023/context_023 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_023/service_023.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_023/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_024/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_024/context_024 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_024/service_024.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_024/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_025/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_025/context_025 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_025/service_025.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_025/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_026/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_026/context_026 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_026/service_026.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_026/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_027/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_027/context_027 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_027/service_027.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_027/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_029/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_029/context_029 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_029/service_029.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_029/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_031/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_031/context_031 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_031/service_031.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_031/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_035/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_035/context_035 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_035/service_035.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_035/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_036/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_036/context_036 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_036/service_036.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_036/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_037/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_037/context_037 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_037/service_037.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_037/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_038/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_038/context_038 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_038/service_038.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_038/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_039/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_039/context_039 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_039/service_039.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_039/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_040/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_040/context_040 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_040/service_040.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_040/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_041/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_041/context_041 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_041/service_041.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_041/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_042/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_042/context_042 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_042/service_042.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_042/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_043/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_043/context_043 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_043/service_043.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_043/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_044/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_044/context_044 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/assertion_044/service_044.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/assertion_044/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/config.env mode=0444
+file path=opt/smf-tests/tests/svc.startd/context/remove_testaccount mode=0555
+file path=opt/smf-tests/tests/svc.startd/context/stf_description mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_002/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_002/depends_002 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_002/service_002.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_002/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_003/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_003/depends_003 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_003/service_003.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_003/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_005/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_005/depends_005 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_005/service_005.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_005/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_006/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_006/depends_006 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_006/service_006.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_006/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_008/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_008/depends_008 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_008/service_008.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_008/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_009/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_009/depends_009 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_009/service_009.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_009/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_011/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_011/depends_011 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_011/service_011.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_011/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_012/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_012/depends_012 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_012/service_012.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_012/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_013/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_013/depends_013 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_013/service_013.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_013/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_014/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_014/depends_014 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_014/service_014.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_014/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_025/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_025/depends_025 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_025/service_025.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_025/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_026/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_026/depends_026 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_026/service_026.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_026/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_027/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_027/depends_027 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_027/service_027.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_027/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_028/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_028/depends_028 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_028/service_028.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_028/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_029/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_029/depends_029 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_029/service_029.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_029/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_030/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_030/depends_030 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_030/service_030.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_030/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_031/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_031/depends_031 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_031/service_031.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_031/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_033/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_033/depends_033 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_033/service_033.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_033/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_034/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_034/depends_034 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_034/service_034.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_034/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_035/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_035/depends_035 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_035/service_035.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_035/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_036/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_036/depends_036 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_036/service_036.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_036/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_037/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_037/depends_037 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_037/service_037.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_037/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_038/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_038/depends_038 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_038/service_038.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_038/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_039/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_039/depends_039 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_039/service_039.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_039/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_040/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_040/depends_040 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_040/service_040.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_040/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_041/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_041/depends_041 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_041/service_041.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_041/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_042/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_042/depends_042 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_042/service_042.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_042/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_043/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_043/depends_043 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_043/service_043.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_043/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_044/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_044/depends_044 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_044/service_044.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_044/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_045/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_045/depends_045 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_045/service_045.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_045/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_046/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_046/depends_046 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_046/service_046.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_046/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_047/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_047/depends_047 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_047/service_047.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_047/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_048/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_048/depends_048 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_048/service_048.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_048/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_051/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_051/depends_051 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_051/service_051.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_051/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_052/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_052/depends_052 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_052/service_052.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_052/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_053/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svc.startd/depends/assertion_053/depends_053_main \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_053/depends_053a \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_053/depends_053b \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svc.startd/depends/assertion_053/service_053a.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svc.startd/depends/assertion_053/service_053b.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/assertion_053/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/depends/stf_description mode=0444
+file path=opt/smf-tests/tests/svc.startd/include/stf_description mode=0444
+file path=opt/smf-tests/tests/svc.startd/include/svc.startd_common.kshlib \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_001/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_001/methods_001 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_001/service_001.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_001/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_002/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_002/methods_002 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_002/service_002.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_002/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_003/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_003/methods_003 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_003/service_003.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_003/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_004/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_004/methods_004 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_004/service_004.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_004/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_005/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_005/methods_005 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_005/service_005.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_005/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_006/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_006/methods_006 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_006/service_006.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_006/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_007/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_007/methods_007 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_007/service_007.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_007/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_008/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_008/methods_008 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_008/service_008.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_008/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_009/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_009/methods_009 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_009/service_009.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_009/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_010/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_010/methods_010 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_010/service_010.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_010/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_011/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_011/methods_011 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_011/service_011.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_011/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_012/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_012/methods_012 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_012/service_012.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_012/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_013/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_013/methods_013 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_013/service_013.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_013/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_014/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_014/methods_014 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_014/service_014.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_014/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_015/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_015/methods_015 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_015/service_015.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_015/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_016/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_016/methods_016 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_016/service_016.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_016/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_017/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_017/methods_017 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_017/service_017.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_017/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_018/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_018/methods_018 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_018/service_018.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_018/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_019/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_019/methods_019 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_019/service_019.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_019/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_020/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_020/methods_020 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_020/service_020.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_020/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_021/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_021/methods_021 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_021/service_021.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_021/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_022/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_022/methods_022 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_022/service_022.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_022/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_023/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_023/methods_023 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_023/service_023.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_023/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_024/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_024/methods_024 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_024/service_024.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_024/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_025/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_025/methods_025 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_025/service_025.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_025/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_026/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_026/methods_026 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_026/service_026.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_026/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_027/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_027/methods_027 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_027/service_027.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_027/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_028/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_028/methods_028 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_028/service_028.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_028/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_029/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_029/methods_029 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_029/service_029.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_029/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_030/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_030/methods_030 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_030/service_030.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_030/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_033/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_033/methods_033 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_033/service_033.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_033/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_034/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_034/methods_034 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_034/service_034.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_034/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_035/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_035/methods_035 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_035/service_035.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_035/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_036/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_036/methods_036 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_036/service_036.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_036/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_037/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_037/methods_037 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_037/service_037.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_037/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_038/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_038/methods_038 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_038/service_038.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_038/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_039/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_039/methods_039 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_039/service_039.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_039/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_040/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_040/methods_040 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_040/service_040.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_040/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_041/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_041/methods_041 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_041/service_041.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_041/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_042/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_042/methods_042 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_042/service_042.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_042/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_043/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_043/methods_043 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_043/service_043.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svc.startd/methods/assertion_043/service_043_startmethod \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_043/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_044/config.env \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_044/methods_044 \
+    mode=0555
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_044/service_044.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/assertion_044/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svc.startd/methods/stf_description mode=0444
+file path=opt/smf-tests/tests/svc.startd/stf_description mode=0444
+file path=opt/smf-tests/tests/svc.startd/svc.startd_cleanup mode=0555
+file path=opt/smf-tests/tests/svcadm/clear/stf_description mode=0444
+file path=opt/smf-tests/tests/svcadm/clear/svcadm_clear_001 mode=0555
+file path=opt/smf-tests/tests/svcadm/clear/svcadm_clear_002 mode=0555
+file path=opt/smf-tests/tests/svcadm/clear/svcadm_clear_003 mode=0555
+file path=opt/smf-tests/tests/svcadm/clear/svcadm_clear_004 mode=0555
+file path=opt/smf-tests/tests/svcadm/clear/svcadm_clear_005 mode=0555
+file path=opt/smf-tests/tests/svcadm/clear/svcadm_clear_006 mode=0555
+file path=opt/smf-tests/tests/svcadm/clear/svcadm_clear_007 mode=0555
+file path=opt/smf-tests/tests/svcadm/config.env mode=0444
+file path=opt/smf-tests/tests/svcadm/degraded/stf_description mode=0444
+file path=opt/smf-tests/tests/svcadm/degraded/svcadm_degraded_001 mode=0555
+file path=opt/smf-tests/tests/svcadm/degraded/svcadm_degraded_002 mode=0555
+file path=opt/smf-tests/tests/svcadm/degraded/svcadm_degraded_003 mode=0555
+file path=opt/smf-tests/tests/svcadm/degraded/svcadm_degraded_004 mode=0555
+file path=opt/smf-tests/tests/svcadm/degraded/svcadm_degraded_005 mode=0555
+file path=opt/smf-tests/tests/svcadm/delegate/stf_description mode=0444
+file path=opt/smf-tests/tests/svcadm/delegate/svcadm_delegate_001 mode=0555
+file path=opt/smf-tests/tests/svcadm/delegate/svcadm_delegate_002 mode=0555
+file path=opt/smf-tests/tests/svcadm/delegate/svcadm_delegate_003 mode=0555
+file path=opt/smf-tests/tests/svcadm/delegate/svcadm_delegate_004 mode=0555
+file path=opt/smf-tests/tests/svcadm/delegate/svcadm_delegate_005 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/stf_description mode=0444
+file path=opt/smf-tests/tests/svcadm/disable/svcadm_disable_001 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/svcadm_disable_002 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/svcadm_disable_003 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/svcadm_disable_004 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/svcadm_disable_005 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/svcadm_disable_006 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/svcadm_disable_007 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/svcadm_disable_008 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/svcadm_disable_009 mode=0555
+file path=opt/smf-tests/tests/svcadm/disable/template.xml mode=0444
+file path=opt/smf-tests/tests/svcadm/enable/stf_description mode=0444
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_001 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_002 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_003 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_004 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_005 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_006 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_007 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_008 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_009 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_010 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_011 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_012 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_013 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/svcadm_enable_014 mode=0555
+file path=opt/smf-tests/tests/svcadm/enable/template.xml mode=0444
+file path=opt/smf-tests/tests/svcadm/maintenance/stf_description mode=0444
+file path=opt/smf-tests/tests/svcadm/maintenance/svcadm_maintenance_001 \
+    mode=0555
+file path=opt/smf-tests/tests/svcadm/maintenance/svcadm_maintenance_002 \
+    mode=0555
+file path=opt/smf-tests/tests/svcadm/maintenance/svcadm_maintenance_003 \
+    mode=0555
+file path=opt/smf-tests/tests/svcadm/maintenance/svcadm_maintenance_004 \
+    mode=0555
+file path=opt/smf-tests/tests/svcadm/maintenance/svcadm_maintenance_005 \
+    mode=0555
+file path=opt/smf-tests/tests/svcadm/refresh/functions.kshlib mode=0444
+file path=opt/smf-tests/tests/svcadm/refresh/stf_description mode=0444
+file path=opt/smf-tests/tests/svcadm/refresh/svcadm_refresh_001 mode=0555
+file path=opt/smf-tests/tests/svcadm/refresh/svcadm_refresh_002 mode=0555
+file path=opt/smf-tests/tests/svcadm/refresh/svcadm_refresh_003 mode=0555
+file path=opt/smf-tests/tests/svcadm/refresh/svcadm_refresh_004 mode=0555
+file path=opt/smf-tests/tests/svcadm/refresh/svcadm_refresh_005 mode=0555
+file path=opt/smf-tests/tests/svcadm/refresh/svcadm_refresh_006 mode=0555
+file path=opt/smf-tests/tests/svcadm/refresh/svcadm_refresh_007 mode=0555
+file path=opt/smf-tests/tests/svcadm/refresh/template.xml mode=0444
+file path=opt/smf-tests/tests/svcadm/restart/functions.kshlib mode=0444
+file path=opt/smf-tests/tests/svcadm/restart/stf_description mode=0444
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_001 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_002 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_003 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_004 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_005 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_006 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_007 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_008 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_009 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_010 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/svcadm_restart_011 mode=0555
+file path=opt/smf-tests/tests/svcadm/restart/template.xml mode=0444
+file path=opt/smf-tests/tests/svcadm/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/add/add_001_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/add/add_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/add/add_004 mode=0555
+file path=opt/smf-tests/tests/svccfg/add/add_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/add/add_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/add/add_007 mode=0555
+file path=opt/smf-tests/tests/svccfg/add/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/addpg/addpg_001_delpg_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/addpg/addpg_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/addpg/addpg_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/addpg/addpg_004 mode=0555
+file path=opt/smf-tests/tests/svccfg/addpg/addpg_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/addpg/addpg_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/addpg/addpg_007 mode=0555
+file path=opt/smf-tests/tests/svccfg/addpg/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/apply/apply_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/apply/apply_001_manifest.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/apply/apply_001_profile.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/apply/apply_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/apply/apply_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/apply/apply_004 mode=0555
+file path=opt/smf-tests/tests/svccfg/apply/apply_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/apply/apply_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/apply/apply_007 mode=0555
+file path=opt/smf-tests/tests/svccfg/apply/apply_007_profile.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/apply/apply_008 mode=0555
+file path=opt/smf-tests/tests/svccfg/apply/apply_009_010 mode=0555
+file path=opt/smf-tests/tests/svccfg/apply/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/apply/svccfg_apply_setup mode=0555
+file path=opt/smf-tests/tests/svccfg/config.env mode=0444
+file path=opt/smf-tests/tests/svccfg/delpg/delpg_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/delpg/delpg_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/delpg/delpg_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/delpg/delpg_004 mode=0555
+file path=opt/smf-tests/tests/svccfg/delpg/delpg_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/delpg/delpg_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/delpg/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/delprop/delprop_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/delprop/delprop_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/delprop/delprop_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/delprop/delprop_004 mode=0555
+file path=opt/smf-tests/tests/svccfg/delprop/delprop_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/delprop/delprop_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/delprop/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/editprop/editprop_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/editprop/editprop_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/editprop/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/end/end_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/end/end_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/end/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/exit/exit_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/exit/exit_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/exit/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/config.env mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/cdata.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/delete.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/empty.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/grouping.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/override.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/path.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/property.in.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/import-export/dependency/restart_on.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/service.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/services \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/stability.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependency/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/cdata.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/delete.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/grouping.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/override.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/path.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/property.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/restart_on.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/service.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/services \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/stability.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/dependent/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/impexp_cleanup mode=0555
+file path=opt/smf-tests/tests/svccfg/import-export/impexp_lib mode=0555
+file path=opt/smf-tests/tests/svccfg/import-export/impexp_setup mode=0555
+file path=opt/smf-tests/tests/svccfg/import-export/instance/multiple.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/instance/services mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/instance/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/invalid/emptylist.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/invalid/emptyloctext.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/invalid/services mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/invalid/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/astring.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/boolean.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/count.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/fmri.in.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/host.in.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/hostname.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/integer.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/net_address_v4.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/net_address_v6.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/opaque.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/services mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/time.in.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/uri.in.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/lists/ustring.in.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/import-export/property_group/delete.in.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/import-export/property_group/multiple.in.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/import-export/property_group/property.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/property_group/services \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/import-export/property_group/stability.in.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/import-export/property_group/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/astring.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/boolean.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/count.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/fmri.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/host.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/hostname.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/integer.in.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/import-export/propval/net_address_v4.in.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/import-export/propval/net_address_v6.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/opaque.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/override.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/services mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/time.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/uri.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/propval/ustring.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/stability/evolving.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/stability/external.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/stability/obsolete.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/stability/services \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/stability/stable.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/stability/standard.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/stability/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/stability/unstable.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/standard.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/template/common_name.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/template/description.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/template/entities.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/template/loctexts.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/template/multiline.in.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/template/services mode=0444
+file path=opt/smf-tests/tests/svccfg/import-export/template/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_001.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_002.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_003_profile.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_004 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_006.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_007 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_008 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_008.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_009 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_009.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_010 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_011 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_011.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_012 mode=0555
+file path=opt/smf-tests/tests/svccfg/import/import_012a.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_012b.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/import_012c.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/import/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/import/svccfg_import_setup mode=0555
+file path=opt/smf-tests/tests/svccfg/inventory/inventory_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/inventory/inventory_001.out mode=0444
+file path=opt/smf-tests/tests/svccfg/inventory/inventory_001.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/inventory/inventory_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/inventory/inventory_002.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/inventory/inventory_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/inventory/inventory_004 mode=0555
+file path=opt/smf-tests/tests/svccfg/inventory/inventory_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/inventory/inventory_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/inventory/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/inventory/svccfg_inventory_setup \
+    mode=0555
+file path=opt/smf-tests/tests/svccfg/list/list_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/list/list_002-004 mode=0555
+file path=opt/smf-tests/tests/svccfg/list/list_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/list/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/listpg/listpg_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/listpg/listpg_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/listpg/listpg_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/listpg/listpg_004 mode=0555
+file path=opt/smf-tests/tests/svccfg/listpg/listpg_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/listpg/listpg_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/listpg/pg_data mode=0444
+file path=opt/smf-tests/tests/svccfg/listpg/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/listprop/listprop_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/listprop/listprop_002-004 mode=0555
+file path=opt/smf-tests/tests/svccfg/listprop/listprop_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/listprop/listprop_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/listprop/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/listsnap/listsnap_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/listsnap/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/quit/quit_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/quit/quit_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/quit/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/security/include/security.kshlib \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/security/include/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/security/security_auths/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_001/cleanup_auths_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_001/setup_auths_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_001/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_001/svccfg_security_auths_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_002/cleanup_auths_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_002/setup_auths_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_002/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_002/svccfg_security_auths_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_003/cleanup_auths_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_003/setup_auths_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_003/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_003/svccfg_security_auths_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_004/cleanup_auths_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_004/setup_auths_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_004/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_004/svccfg_security_auths_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_005/cleanup_auths_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_005/setup_auths_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_005/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_005/svccfg_security_auths_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_006/cleanup_auths_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_006/setup_auths_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_006/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_006/svccfg_security_auths_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_007/cleanup_auths_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_007/setup_auths_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_007/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_007/svccfg_security_auths_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_008/cleanup_auths_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_008/setup_auths_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_008/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_008/svccfg_security_auths_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_012/cleanup_auths_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_012/setup_auths_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_012/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_auths/svccfg_security_auths_012/svccfg_security_auths_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_001/cleanup_profiles_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_001/setup_profiles_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_001/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_001/svccfg_security_profiles_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_002/cleanup_profiles_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_002/setup_profiles_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_002/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_002/svccfg_security_profiles_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_003/cleanup_profiles_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_003/setup_profiles_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_003/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/security/security_profiles/svccfg_security_profiles_003/svccfg_security_profiles_003 \
+    mode=0555
+file path=opt/smf-tests/tests/svccfg/security/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/select/select_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/select/select_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/select/select_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/select/select_004 mode=0555
+file path=opt/smf-tests/tests/svccfg/select/select_005 mode=0555
+file path=opt/smf-tests/tests/svccfg/select/select_006 mode=0555
+file path=opt/smf-tests/tests/svccfg/select/select_007 mode=0555
+file path=opt/smf-tests/tests/svccfg/select/select_008 mode=0555
+file path=opt/smf-tests/tests/svccfg/select/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/setprop/setprop_001_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/setprop/setprop_003-008 mode=0555
+file path=opt/smf-tests/tests/svccfg/setprop/setprop_009 mode=0555
+file path=opt/smf-tests/tests/svccfg/setprop/setprop_011 mode=0555
+file path=opt/smf-tests/tests/svccfg/setprop/setprop_012 mode=0555
+file path=opt/smf-tests/tests/svccfg/setprop/setprop_013 mode=0555
+file path=opt/smf-tests/tests/svccfg/setprop/setprop_013.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/setprop/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/setprop/test_003-008.exp mode=0444
+file path=opt/smf-tests/tests/svccfg/setprop/test_011.exp mode=0444
+file path=opt/smf-tests/tests/svccfg/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/config.env mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/include/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/include/templates.kshlib \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_common_name_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/pg_pattern_loctext.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_common_name/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_description_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/pg_pattern_loctext.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_description/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_013 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_014 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/pg_pattern_name_015 \
+    mode=0555
+file path=opt/smf-tests/tests/svccfg/templates/pg_pattern_name/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/pg_pattern_required_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_required/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_local.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_restarter.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_service.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/pg_pattern_target_user.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_target/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/pg_pattern_type.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/pg_pattern_type_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/pg_pattern_type_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/pg_pattern_type_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/pg_pattern_type_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/pg_pattern_type_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/pg_pattern_type_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/pg_pattern_type_007 \
+    mode=0555
+file path=opt/smf-tests/tests/svccfg/templates/pg_pattern_type/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_013 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_014 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/prop_pattern_cardinality_015 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_cardinality/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_013 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_014 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_015 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_016 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_017 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_018 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_019 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_020 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_021 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_022 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_023 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_024 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_025 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_026 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_027 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_028 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_029 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_030 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_031 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/prop_pattern_choices_032 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_choices/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_common_name_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/prop_pattern_loctext.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_common_name/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/prop_pattern_constraint_013 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_constraints/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_description_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/prop_pattern_loctext.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_description/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_013 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/prop_pattern_name_014 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_name/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/prop_pattern_separator_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_separator/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/prop_pattern_type_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_type/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_loctext.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/prop_pattern_units_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_units/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value/prop_pattern_value.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value/prop_pattern_value_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value/prop_pattern_value_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value/prop_pattern_value_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value/prop_pattern_value_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value/prop_pattern_values.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_loctext.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/prop_pattern_value_common_name_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_common_name/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_loctext.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/prop_pattern_value_description_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_description/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_007 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_008 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_009 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_010 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_011 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_012 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_013 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_014 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/prop_pattern_value_name_015 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_value_name/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility/config.env \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility/prop_pattern_visibility.xml \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility/prop_pattern_visibility_001 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility/prop_pattern_visibility_002 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility/prop_pattern_visibility_003 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility/prop_pattern_visibility_004 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility/prop_pattern_visibility_005 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility/prop_pattern_visibility_006 \
+    mode=0555
+file \
+    path=opt/smf-tests/tests/svccfg/templates/prop_pattern_visibility/stf_description \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/templates_cleanup mode=0555
+file path=opt/smf-tests/tests/svccfg/templates/validation/gen_validate_test \
+    mode=0555
+file path=opt/smf-tests/tests/svccfg/templates/validation/gen_vi_test \
+    mode=0555
+file path=opt/smf-tests/tests/svccfg/templates/validation/runtest mode=0555
+file path=opt/smf-tests/tests/svccfg/templates/validation/stf_description \
+    mode=0444
+file \
+    path=opt/smf-tests/tests/svccfg/templates/validation/validation_combo_sets \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/templates/validation/validation_sets \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/unselect/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/unselect/unselect_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/unselect/unselect_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/unselect/unselect_003 mode=0555
+file path=opt/smf-tests/tests/svccfg/validate/stf_description mode=0444
+file path=opt/smf-tests/tests/svccfg/validate/svccfg_validate_setup mode=0555
+file path=opt/smf-tests/tests/svccfg/validate/validate_001 mode=0555
+file path=opt/smf-tests/tests/svccfg/validate/validate_001_bad.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/validate/validate_001_good.xml mode=0444
+file path=opt/smf-tests/tests/svccfg/validate/validate_002 mode=0555
+file path=opt/smf-tests/tests/svccfg/validate/validate_002_profile.xml \
+    mode=0444
+file path=opt/smf-tests/tests/svccfg/validate/validate_003 mode=0555
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

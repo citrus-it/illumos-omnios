@@ -24,4 +24,5 @@ depend fmri=system/test/lofitest type=require
 depend fmri=system/test/nfssharemnt type=require
 depend fmri=system/test/sharefstest type=require
 depend fmri=system/test/smbclient type=require
+depend fmri=system/test/smf type=require
 depend fmri=system/test/zfstest type=require

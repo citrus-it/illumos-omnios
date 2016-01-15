@@ -25,6 +25,7 @@ SUBDIRS=	comstar-tests	\
 		nfssharemnt-tests \
 		sharefs-tests	\
 		smbclient-tests	\
+		smf-tests	\
 		test-runner	\
 		util-tests	\
 		zfs-tests

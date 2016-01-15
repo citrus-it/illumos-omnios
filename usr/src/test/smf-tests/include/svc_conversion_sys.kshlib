@@ -1,0 +1,136 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+. ${STF_TOOLS}/contrib/include/smftest_svc_conversion.shlib
+
+
+#  Purpose:
+# 	Run basic service conversion sanity checks on all the
+# 	instances of the specified service.
+#
+#  Arguments: 
+# 	$1: Path to service manifest file
+#
+#  Algorithm:
+#    Reload service manifest
+#    foreach service instance 
+#      loop SVCCONV_NUM_RETRIES
+# 	- enables the service
+# 	- checks
+# 		- service is running
+# 	- disables the service
+# 	- checks
+# 		- exec method is no longer running (kill)
+# 		- stop exec method is run (non-kill stop method)
+#
+#      restores the services to their original state
+#    /foreach
+#
+svcconv_multiple_instances_test() {
+ 
+	 typeset fn_name="svcconv_multiple_instances_test"
+ 
+	 if [ $# -ne 1 ]; then
+		 smftest_log "--DIAG: ${fn_name}\n\tIncorrect number of arguments: $#\n\tUsage: ${fn_name} <manifest_path>"
+		 smftest_restore_service_state
+		 smftest_cleanup
+		 exit $STF_UNRESOLVED
+	 fi
+ 
+	 SVCCONV_MANIFEST=$1
+ 
+	 # validate manifest 
+	 smftest_validate_manifest $SVCCONV_MANIFEST
+	 smftest_check_retval "$?" "fatal"
+ 
+	 # do setup required...
+	 smftest_setup
+ 
+	 # extract svc name, instances, restarter and dependencies...
+	 SVCCONV_SERVICES=`smftest_get_svcname_from_manifest $SVCCONV_MANIFEST`
+	 smftest_check_retval "$?" "fatal"
+
+	 # multiple services can be defined in manifests...
+	 for SVCCONV_SERVICE in $SVCCONV_SERVICES
+	 do
+		 SVCCONV_SERVICE=`smftest_fix_fmri $SVCCONV_SERVICE`
+		 smftest_check_retval "$?" "fatal"
+ 
+		 SVCCONV_INSTANCES=`smftest_get_svc_instances $SVCCONV_MANIFEST $SVCCONV_SERVICE`
+		 smftest_check_retval "$?" "fatal"
+ 
+		 smftest_reload_service $SVCCONV_MANIFEST $SVCCONV_SERVICE disabled
+ 
+		 SVCCONV_NUM_INSTANCES=`echo $SVCCONV_INSTANCES | wc -w`
+		 if [ "$SVCCONV_NUM_INSTANCES" = "0" ]; then
+			 smftest_log "--DIAG: ${fn_name}\n\tNo instances defined!"
+			 smftest_restore_service_state
+			 smftest_cleanup
+			 exit $STF_FAIL
+		 fi
+ 
+		 for SVCCONV_INSTANCE in $SVCCONV_INSTANCES
+		 do
+			 smftest_log "--INFO: ${fn_name}\n\tinstance = $SVCCONV_INSTANCE"
+			 SVCCONV_INSTANCE_FMRI="${SVCCONV_SERVICE}:${SVCCONV_INSTANCE}"
+			 smftest_log "--INFO: ${fn_name}\n\tservice : $SVCCONV_INSTANCE_FMRI"
+ 
+			 SVCCONV_START_METHOD=`smftest_get_svc_start_method $SVCCONV_MANIFEST $SVCCONV_INSTANCE_FMRI`
+			 smftest_check_retval "$?" "fatal"
+			 SVCCONV_STOP_METHOD=`smftest_get_svc_stop_method $SVCCONV_MANIFEST $SVCCONV_INSTANCE_FMRI`
+			 smftest_check_retval "$?" "fatal"
+ 
+			 smftest_log "--INFO: ${fn_name}\n\t${SVCCONV_INSTANCE_FMRI} start method $SVCCONV_START_METHOD"
+			 smftest_log "--INFO: ${fn_name}\n\t${SVCCONV_INSTANCE_FMRI} stop method $SVCCONV_STOP_METHOD"
+ 
+			 if [ -z "$SVCCONV_NUM_RETRIES" ]; then
+				 SVCCONV_NUM_RETRIES=3
+			 fi
+ 
+			 smftest_log "--INFO: ${fn_name}\n\tTest loop to be executed $SVCCONV_NUM_RETRIES times"
+			 
+			 SVCCONV_TSS_COUNT=0
+			 while [ "$SVCCONV_TSS_COUNT" -lt "$SVCCONV_NUM_RETRIES" ]; do
+				 smftest_log \
+				     "--INFO: ${fn_name}\n\tIteration through test loop: $SVCCONV_TSS_COUNT"
+				 smftest_check_start_method_run $SVCCONV_INSTANCE_FMRI $SVCCONV_START_METHOD
+ 
+				 SVCCONV_SVC_STATE=`svcs -H $SVCCONV_INSTANCE_FMRI`
+				 smftest_log "--INFO: ${fn_name}\n\tState of $SVCCONV_INSTANCE_FMRI is $SVCCONV_SVC_STATE"
+ 
+				 smftest_check_stop_method_run $SVCCONV_INSTANCE_FMRI $SVCCONV_STOP_METHOD
+ 
+				 SVCCONV_SVC_STATE=`svcs -H $SVCCONV_INSTANCE_FMRI`
+				 smftest_log "--INFO: ${fn_name}\n\tState of $SVCCONV_INSTANCE_FMRI is $SVCCONV_SVC_STATE"
+				 SVCCONV_TSS_COUNT=`expr $SVCCONV_TSS_COUNT + 1`
+			 done
+		 done
+	 done
+ 
+	 smftest_restore_service_state
+ 
+	 smftest_cleanup
+}

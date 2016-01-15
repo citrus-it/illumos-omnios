@@ -1,0 +1,279 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# Test integer property type
+#
+001:common_name:template:DEFAULT:C,Default template name
+001:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+001:prop_pattern:pg_pattern:foo:name=foo_prop,type=integer,required=true
+001:property_group:service:DEFAULT:name=foo,type=framework
+001:create_default_instance:service:DEFAULT:false
+001:valid:propval:property_group:foo:name=foo_prop,type=integer,value=10
+001:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+001:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=ustring,value=foo val
+001:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=host,value=hostfoo
+001:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=hostname,value=hostfoo
+001:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v4,value=10.0.0.1
+001:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v6,value=fe80::203:baff:fe41:605b
+001:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=boolean,value=true
+001:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=fmri,value=svc:/system/console-login:default
+
+#
+# Test astring property type
+#
+002:common_name:template:DEFAULT:C,Default template name
+002:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+002:prop_pattern:pg_pattern:foo:name=foo_prop,type=astring,required=true
+002:property_group:service:DEFAULT:name=foo,type=framework
+002:create_default_instance:service:DEFAULT:false
+002:valid:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+002:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=integer,value=10
+002:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=ustring,value=foo val
+002:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=host,value=hostfoo
+002:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=hostname,value=hostfoo
+002:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v4,value=10.0.0.1
+002:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v6,value=fe80::203:baff:fe41:605b
+002:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=boolean,value=true
+002:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=fmri,value=svc:/system/console-login:default
+
+#
+# Test ustring property type
+#
+003:common_name:template:DEFAULT:C,Default template name
+003:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+003:prop_pattern:pg_pattern:foo:name=foo_prop,type=ustring,required=true
+003:property_group:service:DEFAULT:name=foo,type=framework
+003:create_default_instance:service:DEFAULT:false
+003:valid:propval:property_group:foo:name=foo_prop,type=ustring,value=foo val
+003:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+003:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=integer,value=10
+003:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=host,value=hostfoo
+003:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=hostname,value=hostfoo
+003:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v4,value=10.0.0.1
+003:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v6,value=fe80::203:baff:fe41:605b
+003:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=boolean,value=true
+003:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=fmri,value=svc:/system/console-login:default
+
+#
+# Test host property type
+#
+004:common_name:template:DEFAULT:C,Default template name
+004:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+004:prop_pattern:pg_pattern:foo:name=foo_prop,type=host,required=true
+004:property_group:service:DEFAULT:name=foo,type=framework
+004:create_default_instance:service:DEFAULT:false
+004:valid:propval:property_group:foo:name=foo_prop,type=host,value=hostfoo
+004:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+004:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=integer,value=10
+004:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=ustring,value=foo val
+004:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=hostname,value=hostfoo
+004:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v4,value=10.0.0.1
+004:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v6,value=fe80::203:baff:fe41:605b
+004:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=boolean,value=true
+004:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=fmri,value=svc:/system/console-login:default
+
+#
+# Test hostname property type
+#
+005:common_name:template:DEFAULT:C,Default template name
+005:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+005:prop_pattern:pg_pattern:foo:name=foo_prop,type=hostname,required=true
+005:property_group:service:DEFAULT:name=foo,type=framework
+005:create_default_instance:service:DEFAULT:false
+005:valid:propval:property_group:foo:name=foo_prop,type=hostname,value=hostfoo
+005:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+005:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=integer,value=10
+005:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=ustring,value=foo val
+005:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=host,value=hostfoo
+005:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v4,value=10.0.0.1
+005:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v6,value=fe80::203:baff:fe41:605b
+005:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=boolean,value=true
+005:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=fmri,value=svc:/system/console-login:default
+
+#
+# Test net_address_v4 property type
+#
+006:common_name:template:DEFAULT:C,Default template name
+006:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+006:prop_pattern:pg_pattern:foo:name=foo_prop,type=net_address_v4,required=true
+006:property_group:service:DEFAULT:name=foo,type=framework
+006:create_default_instance:service:DEFAULT:false
+006:valid:propval:property_group:foo:name=foo_prop,type=net_address_v4,value=10.0.0.1
+006:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+006:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=integer,value=10
+006:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=ustring,value=foo val
+006:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=host,value=hostfoo
+006:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=hostname,value=hostfoo
+006:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v6,value=fe80::203:baff:fe41:605b
+006:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=boolean,value=true
+006:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=fmri,value=svc:/system/console-login:default
+
+#
+# Test net_address_v6 property type
+#
+007:common_name:template:DEFAULT:C,Default template name
+007:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+007:prop_pattern:pg_pattern:foo:name=foo_prop,type=net_address_v6,required=true
+007:property_group:service:DEFAULT:name=foo,type=framework
+007:create_default_instance:service:DEFAULT:false
+007:valid:propval:property_group:foo:name=foo_prop,type=net_address_v6,value=fe80::203:baff:fe41:605b
+007:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+007:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=integer,value=10
+007:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=ustring,value=foo val
+007:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=host,value=hostfoo
+007:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=hostname,value=hostfoo
+007:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v4,value=10.0.0.1
+007:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=boolean,value=true
+007:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=fmri,value=svc:/system/console-login:default
+
+#
+# Test boolean property type
+#
+008:common_name:template:DEFAULT:C,Default template name
+008:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+008:prop_pattern:pg_pattern:foo:name=foo_prop,type=boolean,required=true
+008:property_group:service:DEFAULT:name=foo,type=framework
+008:create_default_instance:service:DEFAULT:false
+008:valid:propval:property_group:foo:name=foo_prop,type=boolean,value=true
+008:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+008:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=integer,value=10
+008:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=ustring,value=foo val
+008:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=host,value=hostfoo
+008:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=hostname,value=hostfoo
+008:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v4,value=10.0.0.1
+008:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v6,value=fe80::203:baff:fe41:605b
+008:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=fmri,value=svc:/system/console-login:default
+
+#
+# Test fmri property type
+#
+009:common_name:template:DEFAULT:C,Default template name
+009:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+009:prop_pattern:pg_pattern:foo:name=foo_prop,type=fmri,required=true
+009:property_group:service:DEFAULT:name=foo,type=framework
+009:create_default_instance:service:DEFAULT:false
+009:valid:propval:property_group:foo:name=foo_prop,type=fmri,value=svc:/system/console-login:default
+009:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+009:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=integer,value=10
+009:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=ustring,value=foo val
+009:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=host,value=hostfoo
+009:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=hostname,value=hostfoo
+009:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v4,value=10.0.0.1
+009:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=net_address_v6,value=fe80::203:baff:fe41:605b
+009:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo:name=foo_prop,type=boolean,value=true
+
+#
+# Test pg_pattern thats required but doesn't exist
+#
+010:common_name:template:DEFAULT:C,Default template name
+010:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+010:valid:property_group:service:DEFAULT:name=foo,type=framework
+010:create_default_instance:service:DEFAULT:false
+010:invalid:SCF_TERR_MISSING_PG:property_group:service:DEFAULT:name=bar,type=framework
+
+#
+# Test prop_pattern that is required but doesn't exist
+#
+011:common_name:template:DEFAULT:C,Default template name
+011:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+011:prop_pattern:pg_pattern:foo:name=foo_prop,type=astring,required=true
+011:property_group:service:DEFAULT:name=foo,type=framework
+011:create_default_instance:service:DEFAULT:false
+011:valid:propval:property_group:foo:name=foo_prop,type=astring,value=fooval
+011:invalid:SCF_TERR_MISSING_PROP:propval:property_group:foo:name=bar_prop,type=astring,value=fooval
+
+#
+# Test pg_pattern type match and mismatch
+#
+012:common_name:template:DEFAULT:C,Default template name
+012:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=false
+012:valid:property_group:service:DEFAULT:name=foo,type=framework
+012:create_default_instance:service:DEFAULT:false
+012:invalid:SCF_TERR_WRONG_PG_TYPE:property_group:service:DEFAULT:name=foo,type=application
+
+#
+# Test cardinality validity
+#
+013:common_name:template:DEFAULT:C,Default template name
+013:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+013:prop_pattern:pg_pattern:foo:name=foo_prop,type=astring,required=true
+013:cardinality:prop_pattern:foo_prop:min=2,max=4
+013:property_group:service:DEFAULT:name=foo,type=framework
+013:create_default_instance:service:DEFAULT:false
+013:property:property_group:foo:name=foo_prop,type=astring
+013:valid:astring_list:property:foo_prop:foo1,foo2
+013:valid:astring_list:property:foo_prop:foo1,foo2,foo3
+013:valid:astring_list:property:foo_prop:foo1,foo2,foo3,foo4
+013:invalid:SCF_TERR_CARDINALITY_VIOLATION:astring_list:property:foo_prop:foo1
+013:invalid:SCF_TERR_CARDINALITY_VIOLATION:astring_list:property:foo_prop:foo1,foo2,foo3,foo4,foo5
+
+#
+# Test constraints ranges
+#
+014:common_name:template:DEFAULT:C,Default template name
+014:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+014:prop_pattern:pg_pattern:foo:name=foo_prop,type=integer,required=true
+014:constraints:prop_pattern:foo_prop:ident=foo_prop_constraints
+014:range:constraints:foo_prop_constraints:min=5,max=200
+014:property_group:service:DEFAULT:name=foo,type=framework
+014:create_default_instance:service:DEFAULT:false
+014:valid:propval:property_group:foo:name=foo_prop,type=integer,value=10
+014:invalid:SCF_TERR_RANGE_VIOLATION:propval:property_group:foo:name=foo_prop,type=integer,value=3
+014:invalid:SCF_TERR_RANGE_VIOLATION:propval:property_group:foo:name=foo_prop,type=integer,value=250
+
+#
+# Test constraints values
+#
+015:common_name:template:DEFAULT:C,Default template name
+015:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+015:prop_pattern:pg_pattern:foo:name=foo_prop,type=astring,required=true
+015:constraints:prop_pattern:foo_prop:ident=foo_prop_constraints
+015:value:constraints:foo_prop_constraints:name=constraint_1
+015:value:constraints:foo_prop_constraints:name=constraint_2
+015:value:constraints:foo_prop_constraints:name=constraint_3
+015:property_group:service:DEFAULT:name=foo,type=framework
+015:create_default_instance:service:DEFAULT:false
+015:valid:propval:property_group:foo:name=foo_prop,type=astring,value=constraint_1
+015:valid:propval:property_group:foo:name=foo_prop,type=astring,value=constraint_2
+015:valid:propval:property_group:foo:name=foo_prop,type=astring,value=constraint_3
+015:invalid:SCF_TERR_VALUE_CONSTRAINT_VIOLATED:propval:property_group:foo:name=foo_prop,type=astring,value=constraint_4
+015:invalid:SCF_TERR_VALUE_CONSTRAINT_VIOLATED:propval:property_group:foo:name=foo_prop,type=astring,value=constraint
+015:invalid:SCF_TERR_VALUE_CONSTRAINT_VIOLATED:propval:property_group:foo:name=foo_prop,type=astring,value=bogus
+
+#
+# Unique values
+#
+016:common_name:template:DEFAULT:C,Default template name
+016:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=true
+016:prop_pattern:pg_pattern:foo:name=foo_prop,type=integer,required=true
+016:pg_pattern:template:DEFAULT:name=foonotype,target=this,required=false
+016:pg_pattern:template:DEFAULT:type=foononame,target=this,required=false
+016:property_group:service:DEFAULT:name=foo,type=framework
+016:create_default_instance:service:DEFAULT:false
+016:invalid:ERR_UNIQUE_NAME_TYPE:pg_pattern:template:DEFAULT:name=foo,type=framework,target=this,required=false
+016:invalid:ERR_UNIQUE_NAME:pg_pattern:template:DEFAULT:name=foonotype,target=this,required=false
+016:invalid:ERR_UNIQUE_TYPE:pg_pattern:template:DEFAULT:type=foononame,target=this,required=false

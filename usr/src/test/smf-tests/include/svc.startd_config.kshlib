@@ -1,0 +1,635 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# any of the *_wait_* functions that take a timeout will use this value
+# if none is supplied by the caller.
+typeset lib_wait_time=${DEFAULT_WAIT_TIME:-30}
+
+
+#############################################################################
+# Function Name: verify_daemon
+# Purpose:
+#	verify that the startd is executing
+# Arguments: none
+# returns:
+#	true if the master starter is executing
+#############################################################################
+function verify_daemon {
+	typeset ret_value=0
+
+	typeset -f check_gl_env >/dev/null
+	typeset thiszone=`zonename`
+	if [ $? -ne 0 ]; then
+		test -n "`pgrep -z $thiszone svc.startd`"
+		ret_value=$?
+		if [ $ret_value -ne 0 ]; then
+			ret_value=2
+		fi
+	else
+		check_gl_env
+		ret_value=$?
+	fi
+	if [ $ret_value -eq 2 ]; then
+		if [ `/usr/xpg4/bin/id -u` = 0 ]; then
+			(exec 1>/dev/sysmsg 2>/dev/sysmsg;
+			/lib/svc/bin/svc.startd)
+		fi
+		sleep 5
+		test -n "`pgrep -z $thiszone svc.startd`"
+		ret_value=$?
+	fi
+	return $ret_value
+}
+
+
+#############################################################################
+# Function Name: feature_test
+# Purpose:
+# *cough* verify *cough* the availability of certain features for testing
+# in the starter. This is based on the existence of variables set in the
+# environment. All the passed 'features' need to be set in order for the
+# test to be useful.
+# Arguments:
+#	...	- each feature to test
+# Returns:
+#	true if all the features passed exist.
+# Output:
+#	text stating what features are missing
+#
+#############################################################################
+function feature_test {
+	typeset output=
+	typeset lv=
+
+	while [ -n "$1" ]; do
+		eval "lv=${1}_AVAILABLE"
+		eval "lv=\$$lv"
+		if [ "$lv" != 1 ]; then
+			output="$output $1"
+		fi
+		shift
+	done
+	if [ -n "$output" ]; then
+		echo "$output"
+		return 1
+	fi
+	return 0
+}
+
+
+#############################################################################
+# Function Name: fmri_to_assign
+# Purpose:
+#	break an frmi up into a string of service= and instance=
+# Return:
+#	Ignore
+# Output:
+#	string of the service=<service>;instance=<instance> or empty.
+# Note:
+#	this is ugly.
+#
+#############################################################################
+function fmri_to_assign {
+	print $1 | /usr/xpg4/bin/sed -n \
+	  's@\(svc:\)*/*\(/localhost/\)*\(.*\):\(.*\)@service=\3;instance=\4@p'
+}
+
+
+#############################################################################
+# Function Name: service_count_method
+# Purpose:
+#	Count the invocation of a certain method.
+# Arguments:
+#	$1 - service to count
+#	$2 - method to count
+# Return:
+#	count of invocations.
+#
+#############################################################################
+function service_count_method {
+	typeset service=
+	typeset instance=
+	typeset call=$2
+	typeset statef=`svcprop -p cfg/state $1`
+	statef=${statef:+-f $statef}
+	typeset nsec=0
+	typeset lastcall=
+
+	# translate FMRI to service= and instance=
+	eval `fmri_to_assign $1`
+	if [ -z "$service" -o -z "$instance" ]; then
+		print -- "--INFO: invalid FMRI($1) passed in"
+		return 255
+	fi
+
+	service_countcall -s $service -i $instance $statef
+	return $?
+}
+
+
+#############################################################################
+# Function Name: service_check_method
+# Purpose
+#	Check the invocation of a certain method was the last invoked method
+# Arguments:
+#	$1 - FMRI of service
+#	$2 - method to check
+# Returns:
+#	0 - method was invoked; 1 otherwise
+#
+#############################################################################
+function service_check_method {
+	typeset service=
+	typeset instance=
+	typeset call=$2
+	typeset statef=`svcprop -p cfg/state $1`
+	statef=${statef:+-f $statef}
+	typeset nsec=0
+	typeset lastcall=
+
+	# translate FMRI to service= and instance=
+	eval `fmri_to_assign $1`
+	if [ -z "$service" -o -z "$instance" ]; then
+		print -- "--INFO: invalid FMRI($1) passed in"
+		return 255
+	fi
+
+	lastcall=`service_lastcall -s $service -i $instance $statef`
+	if [ "$lastcall" = "$call" ]; then
+		return 0
+	fi
+	return 1
+}
+
+
+#############################################################################
+# Function Name: service_wait_method
+# Purpose:
+#	Wait for a certain method to be called from the test service
+# Arguments:
+#	$1 - FMRI of service
+#	$2 - method to wait for
+#	$3 - [ optional ] timeout
+# Returns:
+#	0 - method was invoked; 1 otherwise
+#
+#############################################################################
+function service_wait_method {
+	typeset fmri="$1"
+	typeset call=$2
+	typeset wait_time=${3:-$lib_wait_time}
+	typeset nsec=0
+	typeset lastcall=
+
+	while [ $nsec -le $wait_time ]; do
+		service_check_method "$fmri" $call
+		if [ $? -eq 0 ]; then
+			return 0
+		fi
+		sleep 1
+		nsec=$((nsec + 1))
+	done
+	return 1
+}
+
+
+#############################################################################
+# Function Name: manifest_generate
+# Purpose:
+#	generate a manifest file to stdout from the manifest template
+#	it pattern replaces KEY=<value> pairs passed in on the command line
+# Arguments:
+#	[ <KEY0>=<VAL0> ] ... [ <KEYN>=<VALN> ]
+# Return:
+#	Don't Care
+# Output:
+#	text of new file
+# XXX: should this function be changed to take input from stdout? It's kind
+# of asymmetric.
+#
+#############################################################################
+function manifest_generate {
+	typeset file=$1
+	typeset tfile=/tmp/mgfile$$
+	typeset tfile2=/tmp/mgfile2.$$
+	typeset keyval=
+	typeset key=
+	typeset val=
+
+	shift
+	cat $file > $tfile
+	while [ -n "$1" ]; do
+		keyval="$1"
+		eval `echo $keyval | sed 's/\([^=]*\)=\(.*\)/key="\1";val="\2"/'`
+		sed -e "s!$key!$val!g" $tfile > $tfile2
+		mv $tfile2 $tfile
+		shift
+	done
+	cat $tfile
+	rm -f $tfile $tfile2
+}
+
+#############################################################################
+# Function Name: manifest_zone_clean
+# Purpose:
+# 	verify the manifest file is setup correctly for a zone based on
+# 	known zone setting differences.  Ignore any keywords that are
+# 	given.
+# Aruments:
+# 	keyword0 ... keywordn
+# Return:
+# 	Don't Care
+# Output:
+# 	none
+#############################################################################
+function manifest_zone_clean {
+	typeset file=$1
+	typeset tfile=/tmp/mgfile$$
+	typeset tfile2=/tmp/mgfile2.$$
+
+	if [ "`/bin/zonename`" == "global" ]; then
+		return
+	fi
+
+	set -A zone_in "limit_privileges=\"all"
+	set -A zone_out "limit_privileges=\"zone"
+
+	shift
+	keywords=$@
+	
+	n=0
+	cat $file > $tfile
+	while [ -n "${zone_in[$n]}" ]; do
+		ignore=0
+		for keyw in $keywords
+		do
+			echo ${zone_in[$n]} | grep -w $keyw > /dev/null 2>&1
+			if [ $? -eq 0 ]
+			then
+				ignore=1
+				break
+			fi
+		done
+		if [ $ignore -eq 0 ]; then
+			eval sed -e 's/${zone_in[$n]}/${zone_out[$n]}/g \
+			    $tfile' > $tfile2
+			mv $tfile2 $tfile
+		fi
+		n=`expr $n + 1`
+	done
+
+	mv $tfile $file
+	rm -f $tfile2
+}
+
+
+#############################################################################
+# Function Name: property_alter
+# Purpose:
+#	Alter/create a service's property in the repository. This property
+#	will be set to the astring type, unless you state otherwise
+#	the new value may be specified as: 'type: (<value>)', which makes it
+#	of that type.
+# Arguments:
+#	$1 - FMRI who's property we want to tweak
+#	$2 - property to tweak
+#	$3 - <NEW VALUE> - optional.
+# Returns:
+#	return code from svccfg.
+#
+#############################################################################
+function property_alter {
+	typeset fmri="$1"
+	typeset property="$2"
+	typeset newvalue="$3"
+
+	if [ $# -lt 2 ]; then
+		echo --DIAG: property_alter: insufficient parameters
+		return 1
+	fi
+
+	if [ -z "$newvalue" ]; then
+		svccfg -f - <<-EOM
+		select $fmri
+		delprop $property
+		end
+		EOM
+	else
+		# XXX: hackish WRT parenthesis
+		echo $newvalue | grep ')$' >/dev/null
+		if [ $? -ne 0 ]; then
+			newvalue="astring: \"$newvalue\""
+		fi
+		svccfg -f - <<-EOM
+		select $fmri
+		setprop $property = $newvalue
+		end
+		EOM
+	fi
+
+	return $?
+}
+
+
+#############################################################################
+# Function Name: propgroup_remove
+# Purpose:
+#	remove a specified property group
+# Arguments:
+#	$1 - FMRI of service who's property to remove
+#	$2 - property group to remove
+# Returns:
+#	return code from svccfg
+#
+#############################################################################
+function propgroup_remove {
+	typeset fmri="$1"
+	typeset pg="$2"
+
+	if [ -z "$fmri" -o -z "$pg" ]; then
+		return 1
+	fi
+	svccfg -f - <<-EOM
+	select $fmri
+	delpg $pg
+	end
+	EOM
+	return $?
+}
+
+
+#############################################################################
+# Function Name: service_dependency_add
+# Purpose:
+#	add a dependency to a service
+#	if any of the dependency FMRI's start with file:/ then the dependency
+#	will be recorded as a path type dependency.
+# Arguments:
+#	$1 - Name of FMRI to place dependency under
+#	$2 - dependency group name (for removal later)
+#	$3 - dependency grouping - require_(all|any), exclude_(all|any)
+#	$4 - restart_on semantics - error
+#	$5... - dependency FMRI's
+# Returns:
+#	non zero if the dependency could not be added for any reason
+#
+#############################################################################
+function service_dependency_add {
+	typeset function=service_dependency_add
+	typeset log=/tmp/log_depadd.$$
+
+	if [ $# -lt 5 ]; then
+		print -- "--DIAG: not enough arguments for $function"
+		return 1
+	fi
+
+	typeset fmri="$1"
+	typeset depname="$2"
+	typeset depgrouping="$3"
+	typeset deprestarton="$4"
+	typeset depstring=""
+	typeset deptype="service"
+	shift 4
+
+	while [ -n "$1" ]; do
+		if [ -n "$depstring" ]; then
+			depstring="$depstring $1"
+		else
+			depstring="$1"
+		fi
+		if [ "${1%:/*}" = "file" ]; then
+			deptype="path"
+		fi
+		shift
+	done
+	svccfg >$log 2>&1 <<-EOM
+	select $fmri
+	addpg $depname dependency
+	setprop $depname/grouping = astring: ("$depgrouping")
+	setprop $depname/restart_on = astring: ("$deprestarton")
+	setprop $depname/type = astring: ("$deptype")
+	setprop $depname/entities = fmri: ("$depstring")
+	end
+	EOM
+	if [ $? -ne 0 ]; then
+		print -- "--DIAG: could not add dependency; reason:"
+		print -- "  \"$(cat $log)\""
+		rm -f $log
+		return 1
+	fi
+	rm -f $log
+	return 0
+}
+
+
+#############################################################################
+# Function Name: service_dependency_remove
+# Purpose:
+#	remove a dependency from a service
+# Arguments:
+#	$1 - service fmri
+#	$2 - dependency name
+# Returns: non-zero if dependency group could not be removed
+#
+#############################################################################
+function service_dependency_remove {
+	typeset function=service_dependency_remove
+	typeset log=/tmp/logdep_rem.$$
+
+	if [ $# -ne 2 ]; then
+		print -- "--DIAG: wrong argument count for $function"
+		return 1
+	fi
+	svccfg >$log 2>&1 <<-EOM
+	select $1
+	delpg $2
+	end
+	EOM
+	if [ $? -ne 0 ]; then
+		print -- "--DIAG: could not remove dependency; reason:"
+		print -- "  \"$(cat $log)\""
+		rm -f $log
+		return 1
+	fi
+	rm -f $log
+	return 0
+}
+
+
+#############################################################################
+# Function Name: service_dependency_elt_remove
+# Purpose:
+#	remove a dependency element from a dependency
+# Arguments:
+#	$1 - service
+#	$2 - dependency group
+#	$3... - dependency strings to remove
+# Return:
+#	non-zero if the dependency elements could not be removed
+#
+#############################################################################
+function service_dependency_elt_remove {
+	typeset function=service_dependency_elt_remove
+	typeset log=/tmp/logdep_eltrem.$$
+
+	if [ $# -lt 3 ]; then
+		print -- "--DIAG: wrong argument count($#) for $function"
+		return 1
+	fi
+	typeset fmri=$1
+	typeset depgroup=$2
+	shift 2
+
+	typeset props=`svcprop -p $depgroup/entities $fmri 2>$log`
+
+	if [ $? -ne 0 ]; then
+		print -- "--DIAG: could not retrieve service information"
+		print -- "  reason: "$(cat $log)""
+		rm -f $log
+		return 1
+	fi
+	while [ -n "$1" ]; do
+		props=`echo $props | sed "s!$1!!"`
+		shift
+	done
+	svccfg >$log 2>&1 <<-EOM
+	select $fmri
+	setprop $depgroup/entities = fmri: ("$props")
+	end
+	EOM
+	if [ $? -ne 0 ]; then
+		print -- "--DIAG: could not write dependency entities($props)"
+		print -- " reason: \"$(cat $log)\""
+		rm -f $log
+		return 1
+	fi
+	rm -f $log
+	return 0
+}
+
+
+#############################################################################
+# Function Name: service_dependency_elt_add
+# Purpose:
+#	add a dependency element from a dependency
+# Arguments:
+#	$1 - service
+#	$2 - dependency group
+#	$3... - dependency fmris to add
+# Return:
+#	non-zero if the dependency element could not be added
+#
+#############################################################################
+function service_dependency_elt_add {
+	typeset function=service_dependency_elt_add
+	typeset log=/tmp/logdep_eltrem.$$
+
+	if [ $# -lt 3 ]; then
+		print -- "--DIAG: wrong argument count($#) for $function"
+		return 1
+	fi
+	typeset fmri=$1
+	typeset depgroup=$2
+	shift 2
+	typeset props=`svcprop -p $depgroup/entities $fmri 2>$log`
+
+	if [ $? -ne 0 ]; then
+		print -- "--DIAG: could not retrieve service information"
+		print -- "  reason: "$(cat $log)""
+		rm -f $log
+		return 1
+	fi
+	while [ -n "$1" ]; do
+		props="$props $1"
+		shift
+	done
+
+	typeset newprops=""
+	for prop in $props; do
+		newprops="\"$prop\" $newprops"
+	done
+	svccfg >$log 2>&1 <<-EOM
+	select $fmri
+	setprop $depgroup/entities = fmri: ($newprops)
+	end
+	EOM
+	if [ $? -ne 0 ]; then
+		print -- "--DIAG: could not write dependency entities($props)"
+		print -- " reason: \"$(cat $log)\""
+		rm -f $log
+		return 1
+	fi
+	rm -f $log
+	return 0
+}
+
+
+#############################################################################
+# Function Name: grep_logline_entry
+# Purpose:
+#	get a specific log line entry from the service log.
+#	if a log file is not specified it will get the entry from the
+#	cfg/log property group of the service instance.
+# Arguments:
+#	$1 - service
+#	$2 - instance
+#	$3 - method
+#	$4 - entry
+#	$5 - logfile [ optional ]
+# Returns:
+#	non-zero if the line was not found
+# Output:
+#	the last line where the elements matched the term
+#
+#############################################################################
+function grep_logline_entry {
+	typeset function=grep_logline_entry
+	typeset service="$1"
+	typeset instance="$2"
+	typeset method="$3"
+	typeset entry="$4"
+	typeset logfile="$5"
+
+	if [ $# -lt 4 ]; then
+		print -- "--DIAG: $function: insufficient arguments($#)"
+		return 1
+	fi
+	if [ -z "$logfile" ]; then
+		logfile=`svcprop -p cfg/log $service:$instance`
+	fi
+
+	if [ -z "$logfile" ]; then
+		print -- "--DIAG: $function: could not get logfile"
+		return 1
+	fi
+
+	text=`sed -n -e "s!.*<$entry service=\"$service\" instance=\"$instance\" method=\"$method\" $entry=\"\(.*\)\".*!\1!p" $logfile | tail -1`
+	if [ -n "$text" ]; then
+		echo $text
+		return 0
+	fi
+	return 1
+}

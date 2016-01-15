@@ -1,0 +1,200 @@
+#!/usr/bin/expect
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+# 
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# 
+# This expect script contains tests for setprop_011
+#
+
+source $env(STF_TOOLS)/include/stf.explib
+
+set RESULT $STF_PASS
+
+set service [lindex $argv 0]
+
+set argc [llength $argv]
+
+if {$argc == 2} {
+	set instance [lindex $argv 1]
+	set prompt $service:$instance
+	set test_type "instance"
+} else {
+	set prompt $service
+	set test_type "service"
+}
+
+set timeout 5
+
+
+send_user "\n\n"
+
+spawn svccfg
+expect {
+	timeout {
+		send_user "\n"
+		send_user "Failed to get svccfg prompt\n"
+		send_user "RSLT (setup): UNRESOLVED\n"
+		exit $STF_UNRESOLVED
+	}
+	"svc:> " 
+}
+
+
+send "select $service\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Failed to select service $service\n"
+		send_user "RSLT (setup): UNRESOLVED\n"
+		exit $STF_UNRESOLVED
+	}
+	"svc:/$service> " 
+}
+
+if {$argc == 2} {
+	send "select $instance\r"
+	expect  {
+		timeout {
+			send_user "\n"
+			send_user "Failed to select instance $instance\n"
+			send_user "RSLT (setup): UNRESOLVED\n"
+			exit $STF_UNRESOLVED
+		}
+	"svc:/$prompt> " 
+	}
+}
+
+# Setup by adding property group
+
+send "addpg foo framework\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Failed to create pg foo\n"
+		send_user "RSLT ($assertion): UNRESOLVED\n"
+		exit $STF_UNRESOLVED
+	}
+	"svc:/$prompt> "
+}
+
+
+set assertion svccfg_setprop_011
+
+send_user "\n\n"
+send_user "INFO: Testing assertion $assertion\n"
+
+set total 13
+set count 0
+
+set good_array(0) "true"
+set bad_array(0) "bogus"
+set type_array(0) "boolean"
+set good_array(1) "true"
+set bad_array(1) "bogus_data"
+set type_array(1) "boolean"
+set good_array(2) "true"
+set bad_array(2) "12345"
+set type_array(2) "boolean"
+
+set good_array(3) "100"
+set bad_array(3) bogus
+set type_array(3) "integer"
+set good_array(4) "100"
+set bad_array(4) "bogus"
+set type_array(4) "integer"
+set good_array(5) "100"
+set bad_array(5) "bogus data"
+set type_array(5) "integer"
+set good_array(6) "100"
+set bad_array(6) 12:45
+set type_array(6) "integer"
+set good_array(7) "100"
+set bad_array(7) 123.456
+set type_array(7) "integer"
+
+set good_array(8) "100"
+set bad_array(8) bogus
+set type_array(8) "count"
+set good_array(9) "100"
+set bad_array(9) "bogus"
+set type_array(9) "count"
+set good_array(10) "100"
+set bad_array(10) "bogus data"
+set type_array(10) "count"
+set good_array(11) "100"
+set bad_array(11) 12:45
+set type_array(11) "count"
+set good_array(12) "100"
+set bad_array(12) 123.456
+set type_array(12) "count"
+
+
+
+while {$count < $total} {
+
+	send "setprop foo/good_$count = $type_array($count) ($good_array($count))\r"
+	expect  {
+		timeout {
+			send_user "\n"
+			send_user "Failed to set property foo/good_$count\n"
+			send_user "RSLT: FAIL\n"
+			set RESULT $STF_FAIL
+		}
+		"svc:/$prompt> "
+	}
+	set count [ expr $count + 1 ]
+}
+
+set count 0
+
+while {$count < $total} {
+
+	send "setprop foo/good_$count = $type_array($count) ($bad_array($count))\r"
+	expect  {
+		timeout {
+			send_user "\n"
+			send_user "Failed to get expected error message when attempting setprop on good_$count\n"
+			send_user "RSLT: FAIL\n"
+			set RESULT  $STF_FAIL
+		}
+		"Invalid $type_array($count) value *\r\nsvc:/$prompt> "
+	}
+
+	send "listprop foo/good_$count\r"
+	expect  {
+		timeout {
+			send_user "\n"
+			send_user "Unexpected value of prop foo/good_$count given\n" 
+			send_user "RSLT: FAIL\n"
+			set RESULT  $STF_FAIL
+		}
+		"*foo/good_$count * $type_array($count) * $good_array($count)*"
+	}
+
+	set count [ expr $count + 1 ]
+}
+
+exit $RESULT

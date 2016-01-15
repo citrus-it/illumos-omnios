@@ -1,0 +1,139 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+# 
+
+The SMF Test Suite README
+
+
+CONTENTS
+
+1. Building & Installation
+      1.1 Installing from Packages
+      1.2 Uninstalling the Test Suite Package
+      1.3 Building the Test Suite (optional)
+      1.4 System Requirements
+2. Running the tests
+      2.1 Configuring and running the tests
+3. Unconfigure the suite
+4. Special requirements 
+      4.1 Zones Test
+
+
+
+================================================================================
+
+1. Building & Installation
+
+1.1 Installing from Packages
+
+   o In the majority of cases, the test suite can be installed from
+     packages.  The package is called system-test-smf and its default
+     installation directory is /opt/smf-tests.  Installation is via
+     the standard Solaris package installation tool pkgadd(1m).
+
+     To install system-test-smf simply use platform pkg tools.
+
+   o It is recommended that you install the packages from scratch, rather
+     than on top of an existing installation.
+
+1.2 Uninstalling the Test Suite Package
+
+   o Prior to uninstalling the system-test-smf package, you may want to
+     run stf_unconfigure from the top level directory.  Typically, this
+     will be "/opt/smf-tests".  Unconfiguring the test suite is
+     recommended if you have previously run the suite, and especially so,
+     if you have run the test suite in non-global zones.  For more detail
+     on how to unconfigure the suite see section 3.1.
+
+   o To uninstall the package, use the platform pkg tool
+
+1.3 Building the Test Suite (optional)
+
+   o This method uses the standard STF techniques to create a Solaris
+     package, which will be installed under the base directory
+     "/opt/smf-tests".
+ 
+     Briefly, this build and installation is performed as follows:
+
+         # set path to STF bin directory
+         % PATH=<path-to-STF>/bin/`uname -p`:$PATH
+         % export PATH
+
+         # WS_ROOT is the root of the workspace containing the
+         # SMF test suite source code
+         #
+         % cd <WS_ROOT>/usr/src/test/smf-tests
+         % stf_build package
+         % cd <WS_ROOT>/packages/`uname -p`
+
+1.4 System Requirements
+
+   o Beginning with version 1.7 of this test suite, snv_102 or greater is
+     required to successfully build and execute all tests.
+
+================================================================================
+
+2. Running the tests
+
+2.1 Configuring and running the tests
+
+2.1.1 Configure the tests
+
+   o Configuration of the test suite is completed with the stf_configure
+     command.
+ 
+         % cd /opt/smf-tests; stf_configure
+
+  o For stf_configure options refer to the STF User's Guide.
+
+2.1.2 Run the tests
+
+   o To execute all of the modes on current system platform:
+
+         % cd /opt/smf-tests; stf_execute
+
+   o To execute only test cases in a specific directory:
+
+         % cd /opt/smf-tests/<test directory>; stf_execute
+
+   o For other stf_execute options, refer to the STF User's Guide.
+
+================================================================================
+
+3. Unconfigure the suite.
+
+   o Use the STF unconfigure tool.
+
+         % cd /opt/smf-tests; stf_unconfigure  
+
+================================================================================
+
+4. Special Requirements
+
+4.1 Zones test
+   o  This suite includes a zones test to verify SMF services are properly 
+      handled in non-global zones.  The test requires the Solaris package
+      management scripts (pkgadd, pkgrm etc) and will not work with the IPS 
+      packaging mechanism.

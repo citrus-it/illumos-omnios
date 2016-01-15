@@ -1,0 +1,302 @@
+#! /usr/bin/ksh -p
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"@(#)security.kshlib	1.2	08/05/22 SMI"
+#
+
+readonly lib=security.kshlib
+
+#
+# Function:	user_attr_mod
+# Purpose:	Modify the user's entry in the /etc/user_attr file
+# Parameters:
+#	input:	action = { add | delete }
+#			whether to add or delete the user's entry from user_attr
+#		type = { auths | profiles }
+#			whether the entry to add is an auth or a profile
+#		data = the actual auth or profile to add or delete
+#
+function user_attr_mod {
+	typeset func="user_attr_mod"
+
+	typeset action="${1}"
+	typeset type="${2}"
+	typeset data="${3}"
+
+	typeset tmpfile=${STF_RESULTS:-/tmp}/user_attr_mod.$$
+	typeset userattr=/etc/user_attr
+	typeset backup_file=/etc/user_attr.user_attr_mod.stf_backup
+
+	if [[ "${action}" == "add" ]]; then
+		# If there is already an entry for the user in /etc/user_attr
+		# we will fail to add the new auth
+		entry=$(grep -v ^# /etc/user_attr | grep ${LOGNAME} 2>/dev/null)
+		if [[ $? -eq 0 ]] || [[ -n "${entry}" ]]; then
+			echo "--DIAG: [${lib}:$func] User ${LOGNAME} is already
+	present in ${userattr}"
+			return $STF_UNRESOLVED
+		fi ### [[ -n ${entry} ]]
+
+		# If we are here, we need to add a new entry to /etc/user_attr
+		# We first keep a backup, then add the new entry
+		entry=""
+		cp -f /dev/null ${tmpfile}
+		cp -f ${userattr} ${backup_file}
+
+		entry="${LOGNAME}::::${type}=${data}"
+		echo ${entry} >> ${userattr}
+
+		echo "--INFO: [${lib}:$func] Entry added to ${userattr}:
+	${entry}"
+		#
+		rm -f ${tmpfile}
+		return $STF_PASS
+		
+	elif [[ "${action}" == "delete" ]]; then
+		# First check if an STF-created backup file exists,
+		# and, if found, copy it over.
+		if [[ -s ${backup_file} ]]; then
+			cp -f ${backup_file} /etc/user_attr
+			rm -f ${backup_file}
+			return $STF_PASS
+		fi
+
+		# If we are here, a backup file was not found.
+		# We must forcibly delete the entry for the user
+		entry=$(grep -v ^# /etc/user_attr | grep ${LOGNAME} | \
+			grep "${data}" 2>/dev/null)
+		# if user not found in /etc/user_attr, return PASS
+		[[ $? -ne 0 ]] | [[ -z "${entry}" ]] && return $STF_PASS
+
+		# User found.  Delete entry
+		cp /dev/null ${tmpfile}
+		grep -v "${entry}" /etc/user_attr > ${tmpfile}
+
+		if [[ -s ${tmpfile} ]]; then
+			cp -f ${tmpfile} /etc/user_attr
+		fi
+		#
+		rm -f ${tmpfile}
+		return $STF_PASS
+
+	else	# action != add && action != delete => invalid action
+		echo "--DIAG: [${lib}:${func}] ${action}: Invalid action"
+		return $STF_UNRESOLVED
+	fi
+
+} ### user_attr_mod
+
+
+#
+# Function:	setup_repository
+# Purpose:	Add to the repository all data needed for the test
+# Parameters:
+#	input:  none
+#		Assumes that the following variables have been set and exported
+#		by the test invoking this function
+#			GL_TEST_SERVICE
+#			GL_TEST_INSTANCE
+#			GL_TEST_SVCPG, GL_TEST_SVCPG_TYPE
+#			GL_TEST_INSTPG, GL_TEST_INSTPG_TYPE
+#			GL_TEST_USERNAME
+#	output:	none
+#
+function setup_repository {
+	func=setup_repository
+
+	# Forcibly delete the test instance and service
+	svccfg delete svc:/${GL_TEST_SERVICE}:${GL_TEST_INSTANCE} \
+		> /dev/null 2>&1
+	svccfg delete svc:/${GL_TEST_SERVICE} > /dev/null 2>&1
+
+	# Add all the required data to the repository
+	#
+	# (a) Add a service, (b) add 5 pgs to service: method, dependency,
+	#     application, framework and user-defined type (c) Add one property
+	#     named 'createdby' to each pg, with the value "root"
+	# (d) Add an instance to the service, (e) add 5 pgs: method, dependency,
+	#     application, framework and user-defined type, (f) add one property
+	#     to each pg, with the value "root"
+	#
+	svccfg -f - 2>&1 <<EOF
+#
+# Service and service-pg addition
+add ${GL_TEST_SERVICE}
+select ${GL_TEST_SERVICE}
+#
+addpg ${GL_TEST_SVCPG}_method method
+addpg ${GL_TEST_SVCPG}_dependency dependency
+addpg ${GL_TEST_SVCPG}_application application
+addpg ${GL_TEST_SVCPG}_framework framework
+addpg ${GL_TEST_SVCPG}_userdefined ${GL_TEST_SVCPG_TYPE}
+#
+setprop ${GL_TEST_SVCPG}_method/createdby = astring: "root"
+setprop ${GL_TEST_SVCPG}_dependency/createdby = astring: "root"
+setprop ${GL_TEST_SVCPG}_application/createdby = astring: "root"
+setprop ${GL_TEST_SVCPG}_framework/createdby = astring: "root"
+setprop ${GL_TEST_SVCPG}_userdefined/createdby = astring: "root"
+#
+# Instance and instance pg addition
+#
+add ${GL_TEST_INSTANCE}
+select ${GL_TEST_INSTANCE}
+#
+addpg ${GL_TEST_INSTPG}_method method
+addpg ${GL_TEST_INSTPG}_dependency dependency
+addpg ${GL_TEST_INSTPG}_application application
+addpg ${GL_TEST_INSTPG}_framework framework
+addpg ${GL_TEST_INSTPG}_userdefined ${GL_TEST_SVCPG_TYPE}
+#
+setprop ${GL_TEST_INSTPG}_method/createdby = astring: "root"
+setprop ${GL_TEST_INSTPG}_dependency/createdby = astring: "root"
+setprop ${GL_TEST_INSTPG}_application/createdby = astring: "root"
+setprop ${GL_TEST_INSTPG}_framework/createdby = astring: "root"
+setprop ${GL_TEST_INSTPG}_userdefined/createdby = astring: "root"
+#
+quit
+EOF
+
+	rc=$?
+
+	if [[ $rc -ne 0 ]]; then
+		result=$STF_UNRESOLVED
+		echo "--DIAG: [${lib}:$func]
+		Error adding test data to repository"
+		# Forcibly delete everything under the test service and exit
+		svccfg delete ${GL_TEST_SERVICE}
+	fi
+
+	return $result
+
+} ### setup_repository
+
+
+#
+# Function:	cleanup_repository
+# Purpose:	Cleanup all data added by setup_repository
+# Parameters:
+#	input:  none
+#		Assumes that the following variables have been set and exported
+#		by the test invoking this function
+#			GL_TEST_SERVICE
+#			GL_TEST_INSTANCE
+#			GL_TEST_SVCPG, GL_TEST_SVCPG_TYPE
+#			GL_TEST_INSTPG, GL_TEST_INSTPG_TYPE
+#			GL_TEST_USERNAME
+#	output:	none
+#
+function cleanup_repository {
+	func=cleanup_repository
+
+	# Delete the tested service, instance and pgs from the repository
+	svccfg list ${GL_TEST_SERVICE}\* 2>/dev/null | \
+		egrep -s "${GL_TEST_SERVICE}"
+	rc=$?
+
+	if [[ $rc -eq 0 ]]; then
+		svccfg delete ${GL_TEST_SERVICE}
+
+		[[ $? -ne 0 ]] && {
+			result=$STF_UNRESOLVED
+			echo "--DIAG: [${lib}:$func] failed to delete service:\
+		${GL_TEST_SERVICE}"
+		}
+	fi
+
+	# cleanup never fails
+	return 0
+
+} ### cleanup_repository
+
+#
+# Function:	cleanup_repository_with_return
+# Purpose:	Remove various entities from the repository, returning
+#		success or failure
+# Parameters:
+#	input:  none
+#		Assumes that the following variables have been set and exported
+#		by the test invoking this function
+#			GL_TEST_SERVICE
+#			GL_TEST_INSTANCE
+#			GL_TEST_SVCPG, GL_TEST_SVCPG_TYPE
+#			GL_TEST_INSTPG, GL_TEST_INSTPG_TYPE
+#			GL_TEST_USERNAME
+#	output:	none
+#
+function cleanup_repository_with_return {
+	func="cleanup_repository_with_return"
+
+	# (a) Select service, (b) select instance (c) delete properties from 
+	#     5 types of inst-pgs (d) delete inst-pgs of 5 types, (e) unselect
+	# (f) delete instance, (g) delete properties from 5 types of svc-pgs
+	# (h) delete svc-pgs of 5 types, (j) unselect (k) delete service
+	#
+	svccfg -f - 2>&1 <<EOF
+#
+# Service and service-pg addition
+select svc:/${GL_TEST_SERVICE}:${GL_TEST_INSTANCE}
+#
+delprop ${GL_TEST_INSTPG}_method/createdby
+delprop ${GL_TEST_INSTPG}_dependency/createdby
+delprop ${GL_TEST_INSTPG}_application/createdby
+delprop ${GL_TEST_INSTPG}_framework/createdby
+delprop ${GL_TEST_INSTPG}_userdefined/createdby
+#
+delpg ${GL_TEST_INSTPG}_method
+delpg ${GL_TEST_INSTPG}_dependency
+delpg ${GL_TEST_INSTPG}_application
+delpg ${GL_TEST_INSTPG}_framework
+delpg ${GL_TEST_INSTPG}_userdefined
+#
+unselect
+delete ${GL_TEST_INSTANCE}
+#
+delprop ${GL_TEST_SVCPG}_method/createdby
+delprop ${GL_TEST_SVCPG}_dependency/createdby
+delprop ${GL_TEST_SVCPG}_application/createdby
+delprop ${GL_TEST_SVCPG}_framework/createdby
+delprop ${GL_TEST_SVCPG}_userdefined/createdby
+#
+delpg ${GL_TEST_SVCPG}_method
+delpg ${GL_TEST_SVCPG}_dependency
+delpg ${GL_TEST_SVCPG}_application
+delpg ${GL_TEST_SVCPG}_framework
+delpg ${GL_TEST_SVCPG}_userdefined
+#
+quit
+EOF
+
+	rc=$?
+
+	if [[ $rc -ne 0 ]]; then
+		result=$STF_UNRESOLVED
+		echo "--DIAG: [${lib}:$func]
+	Error deleting repository data"
+	fi
+
+	return $result
+
+} ### cleanup_repository_with_return

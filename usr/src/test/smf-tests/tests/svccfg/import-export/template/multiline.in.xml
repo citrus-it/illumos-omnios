@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+
+<!--
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+-->
+
+<service_bundle type='manifest' name='multiline'>
+
+<service
+	name='multiline'
+	type='service'
+	version='1'>
+
+	<template>
+		<common_name>
+			<loctext xml:lang='en_GB'>
+    Lissener hispert me, "What is it? Be they terning be they moving?"
+
+    I hispert back, "Its broakin machines they aint moving." It wernt
+nothing like when you dig up old rottin machines out of the groun these
+were in ther parper working place nor nothing rottin they wer some kynd
+of iron dint rot it wer all shyning all catching that shaky glimmer.
+Some of them ther shels ben broak open you cud see girt shyning weals
+like jynt mil stoans only smoov. Id all ways usit the word shyning same
+as any 1 else myt. The sun is shyning or the moon is shyning. Youwl see
+a shyning on the water or a womans hair. When you talk of the Little
+Shyning Man its jus the middl word of what hes callt there aint no real
+meaning to it. Suddn when I seen the shyning of them broakin machines I
+begun to get some idear of the shyning of the Littl Man. Tears begun
+streaming down my face and my froat akit.
+
+    Lissener hispert, "Whats the matter?"
+
+    I hispert back, "O what we ben! And what we come to!"
+			</loctext>
+		</common_name>
+		<description>
+			<loctext xml:lang='en_GB'>
+As he lay there dying, he reflected that God had been rather mean. Here
+he&apos;d been so faithful to his belief, never wished for food when he was
+starving, or a lover when he was lonely - and he&apos;d been so lonely. He
+felt cheated, as if God had taken advantage of him. He felt somehow that
+God hadn&apos;t been a very good sport.
+But a few minutes before he died he happened to glance back at the rest
+of the zoo, at the rest of the world.
+He leaped to his feet, shocked at what he saw.
+For he saw that God hadn&apos;t answered his wish at all.
+And he realized that had he not taken his own life, God would have
+granted one of his great wishes, because He hadn&apos;t made the flowers
+giant. He&apos;d merely made the cage, the giraffes - and the man, very
+small.
+			</loctext>
+		</description>
+	</template>
+</service>
+
+</service_bundle>

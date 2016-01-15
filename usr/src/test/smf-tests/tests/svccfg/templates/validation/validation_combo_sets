@@ -1,0 +1,106 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# Test integer property type
+#
+001:common_name:template:DEFAULT:C,Default template name
+001:pg_pattern:template:DEFAULT:name=foo001,type=framework,target=this,required=true
+001:prop_pattern:pg_pattern:foo001:name=foo_prop001,type=integer,required=true
+001:property_group:service:DEFAULT:name=foo001,type=framework
+001:create_default_instance:service:DEFAULT:false
+001:valid:propval:property_group:foo001:name=foo_prop001,type=integer,value=10
+001:invalid:SCF_TERR_WRONG_PROP_TYPE:propval:property_group:foo001:name=foo_prop001,type=astring,value=fooval
+
+#
+# Test pg_pattern thats required but doesn't exist
+#
+002:common_name:template:DEFAULT:C,Default template name
+002:pg_pattern:template:DEFAULT:name=foo002,type=framework,target=this,required=true
+002:create_default_instance:service:DEFAULT:false
+002:valid:property_group:service:DEFAULT:name=foo002,type=framework
+002:invalid:SCF_TERR_MISSING_PG:property_group:service:DEFAULT:name=bar,type=framework
+
+#
+# Test prop_pattern that is required but doesn't exist
+#
+003:common_name:template:DEFAULT:C,Default template name
+003:pg_pattern:template:DEFAULT:name=foo003,type=framework,target=this,required=true
+003:prop_pattern:pg_pattern:foo003:name=foo_prop003,type=astring,required=true
+003:property_group:service:DEFAULT:name=foo003,type=framework
+003:create_default_instance:service:DEFAULT:false
+003:valid:propval:property_group:foo003:name=foo_prop003,type=astring,value=fooval
+003:invalid:SCF_TERR_MISSING_PROP:propval:property_group:foo003:name=bar_prop,type=astring,value=fooval
+
+#
+# Test pg_pattern type match and mismatch
+#
+004:common_name:template:DEFAULT:C,Default template name
+004:pg_pattern:template:DEFAULT:name=foo004,type=framework,target=this,required=false
+004:create_default_instance:service:DEFAULT:false
+004:valid:property_group:service:DEFAULT:name=foo004,type=framework
+004:invalid:SCF_TERR_WRONG_PG_TYPE:property_group:service:DEFAULT:name=foo004,type=application
+
+#
+# Test cardinality validity
+#
+005:common_name:template:DEFAULT:C,Default template name
+005:pg_pattern:template:DEFAULT:name=foo005,type=framework,target=this,required=true
+005:prop_pattern:pg_pattern:foo005:name=foo_prop005,type=astring,required=true
+005:cardinality:prop_pattern:foo_prop005:min=2,max=4
+005:property_group:service:DEFAULT:name=foo005,type=framework
+005:property:property_group:foo005:name=foo_prop005,type=astring
+005:create_default_instance:service:DEFAULT:false
+005:valid:astring_list:property:foo_prop005:foo1,foo2,foo3
+005:invalid:SCF_TERR_CARDINALITY_VIOLATION:astring_list:property:foo_prop005:foo1
+
+#
+# Test constraints ranges
+#
+006:common_name:template:DEFAULT:C,Default template name
+006:pg_pattern:template:DEFAULT:name=foo006,type=framework,target=this,required=true
+006:prop_pattern:pg_pattern:foo006:name=foo_prop006,type=integer,required=true
+006:constraints:prop_pattern:foo_prop006:ident=foo_prop_constraints006
+006:range:constraints:foo_prop_constraints006:min=5,max=200
+006:property_group:service:DEFAULT:name=foo006,type=framework
+006:create_default_instance:service:DEFAULT:false
+006:valid:propval:property_group:foo006:name=foo_prop006,type=integer,value=10
+006:invalid:SCF_TERR_RANGE_VIOLATION:propval:property_group:foo006:name=foo_prop006,type=integer,value=3
+
+#
+# Test constraints values
+#
+007:common_name:template:DEFAULT:C,Default template name
+007:pg_pattern:template:DEFAULT:name=foo007,type=framework,target=this,required=true
+007:prop_pattern:pg_pattern:foo007:name=foo_prop007,type=astring,required=true
+007:constraints:prop_pattern:foo_prop007:ident=foo_prop_constraints007
+007:value:constraints:foo_prop_constraints007:name=constraint_1
+007:value:constraints:foo_prop_constraints007:name=constraint_2
+007:value:constraints:foo_prop_constraints007:name=constraint_3
+007:property_group:service:DEFAULT:name=foo007,type=framework
+007:create_default_instance:service:DEFAULT:false
+007:valid:propval:property_group:foo007:name=foo_prop007,type=astring,value=constraint_1
+007:invalid:SCF_TERR_VALUE_CONSTRAINT_VIOLATED:propval:property_group:foo007:name=foo_prop007,type=astring,value=bogus

@@ -1,0 +1,346 @@
+#!/usr/bin/expect
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+# 
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# 
+# This expect script contains tests for setprop_003 - setprop_007
+#
+
+source $env(STF_TOOLS)/include/stf.explib
+
+set RESULT $STF_PASS
+
+
+set service [lindex $argv 0]
+
+set argc [llength $argv]
+
+if {$argc == 2} {
+	set instance [lindex $argv 1]
+	set prompt $service:$instance
+	set test_type "instance"
+} else {
+	set prompt $service
+	set test_type "service"
+}
+
+set usage "Usage:*Set the name property of the pg property group of the currently selected*" 
+
+set timeout 5
+
+spawn svccfg
+expect {
+	timeout {
+		send_user "\n"
+		send_user "Failed to get svccfg prompt\n"
+		send_user "RSLT (setup): UNRESOLVED\n"
+		exit $STF_UNRESOLVED
+	}
+	"svc:> " 
+}
+
+
+send "select $service\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Failed to select service $service\n"
+		send_user "RSLT (setup): UNRESOLVED\n"
+		exit $STF_UNRESOLVED
+	}
+	"svc:/$service> " 
+}
+
+
+if {$argc == 2} {
+	send "select $instance\r"
+	expect  {
+		timeout {
+			send_user "\n"
+			send_user "Failed to select instance $instance\n"
+			send_user "RSLT (setup): UNRESOLVED\n"
+			exit $STF_UNRESOLVED
+		}
+	"svc:/$prompt> " 
+	}
+}
+
+
+set assertion svccfg_setprop_003
+
+send_user "\n\n"
+send_user "INFO: Testing assertion $assertion ($test_type)\n"
+send "setprop foobar = integer (3)\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected error message not issued.\n"
+		send_user "RSLT: FAIL\n"
+		set RESULT $STF_FAIL
+	}
+	"Property names must contain a `/'." {
+		send_user "RSLT: PASS\n"
+	}
+}
+
+send "listprop\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected listprop to display no properties"
+		send_user "RSLT: FAIL\n"
+		set RESULT  $STF_FAIL
+
+	}
+	"svc:/$prompt> "
+}
+
+
+set assertion svccfg_setprop_004
+
+send_user "\n\n"
+send_user "INFO: Testing assertion $assertion ($test_type)\n"
+send "setprop foo/new_prop = invalid_type (foo)\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected error message not issued.\n"
+		send_user "RSLT: FAIL\n"
+		set RESULT $STF_FAIL
+	}
+	"Unknown type `invalid_type'."  {
+		send_user "RSLT: PASS\n"
+	}
+}
+
+send "listprop\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected listprop to display no properties"
+		send_user "RSLT: FAIL\n"
+		set RESULT  $STF_FAIL
+
+	}
+	"svc:/$prompt> "
+}
+
+# Setup for svccfg_setuprop_005
+
+send "addpg foo framework\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Failed to create pg foo\n"
+		send_user "RSLT ($assertion): UNRESOLVED\n"
+		exit $STF_UNRESOLVED
+	}
+	"svc:/$prompt> " 
+}
+
+
+send "listprop\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected listprop to display no properties"
+		send_user "RSLT: FAIL\n"
+		exit $STF_UNRESOLVED
+
+	}
+	"foo  framework\r\nsvc:/$prompt> " 
+}
+
+
+
+set assertion svccfg_setprop_005
+
+#
+# For each test of a bad value the type must be defined in "type_array"
+# and the bad value must be defined in the "badvalue_array"
+#
+set total 3
+set count 0
+
+set type_array(0)	"integer"
+set badvalue_array(0)	"badinteger"
+set type_array(1)	"boolean"
+set badvalue_array(1)	"badboolean"
+set type_array(2)	"count"
+set badvalue_array(2)	"badcount"
+
+while {$count < $total} {
+
+	send_user "\n\n"
+	send_user "INFO: Testing assertion $assertion, test $count ($test_type)\n"
+	send "setprop foo/bad = $type_array($count) ($badvalue_array($count))\r"
+	expect  {
+		timeout {
+			send_user "\n"
+			send_user "Expected error message not issued.\n"
+			send_user "RSLT: FAIL\n"
+			set RESULT $STF_FAIL
+		}
+		"Invalid $type_array($count) value `$badvalue_array($count)'." {
+			send_user "RSLT: PASS\n"
+		}
+	}
+
+	set count [ expr $count + 1]
+}
+
+
+set assertion svccfg_setprop_006
+
+send_user "\n\n"
+send_user "INFO: Testing assertion $assertion ($test_type)\n"
+send "setprop foo/bar = integer 3\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected error message not issued.\n"
+		send_user "RSLT: FAIL\n"
+		set RESULT $STF_FAIL
+	}
+	$usage {
+		send_user "RSLT: PASS\n"
+	}
+}
+
+send "listprop\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected listprop to display no properties"
+		send_user "RSLT: FAIL\n"
+		set RESULT  $STF_FAIL
+
+	}
+	"svc:/$prompt> "
+}
+
+set assertion svccfg_setprop_007
+
+
+set total 5
+set count 0
+
+set command(0)	"setprop\r"
+set command(1)	"setprop foo/bar integer (3)\r" 
+set command(2)	"setprop foo/bar=integer(3) \"extraoption\"\r" 
+set command(3)	"setprop foo/bar=integer(3) 12000\r" 
+set command(4)	"setprop foo/bar=integer(3) one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty\r" 
+
+while {$count < $total} {
+
+	send_user "\n\n"
+	send_user "INFO: Testing assertion $assertion, test $count ($test_type)\n"
+	send $command($count)
+
+	expect  {
+		timeout {
+			send_user "\n"
+			send_user "Expected error message not issued.\n"
+			send_user "RSLT: FAIL\n"
+			set RESULT $STF_FAIL
+		}
+		$usage {
+			send_user "RSLT: PASS\n"
+		}
+	}
+
+	set count [ expr $count + 1]
+}
+
+
+send "listprop\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected listprop to display no properties"
+		send_user "RSLT: FAIL\n"
+		set RESULT  $STF_FAIL
+
+	}
+	"svc:/$prompt> "
+}
+
+send "delpg foo\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Failed to create pg foo\n"
+		send_user "RSLT ($assertion): UNRESOLVED\n"
+		exit $STF_UNRESOLVED
+	}
+	"svc:/$prompt> " 
+}
+
+
+send "listprop\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected listprop to display no properties"
+		send_user "RSLT: FAIL\n"
+		exit $STF_UNRESOLVED
+
+	}
+	"svc:/$prompt> " 
+}
+
+set assertion svccfg_setprop_008
+
+send_user "\n\n"
+send_user "INFO: Testing assertion $assertion ($test_type)\n"
+send "setprop foo/new_prop = (foo)\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected error message not issued.\n"
+		send_user "RSLT: FAIL\n"
+		set RESULT $STF_FAIL
+	}
+	$usage  {
+		send_user "RSLT: PASS\n"
+	}
+}
+
+send "listprop\r"
+expect  {
+	timeout {
+		send_user "\n"
+		send_user "Expected listprop to display no properties"
+		send_user "RSLT: FAIL\n"
+		set RESULT  $STF_FAIL
+
+	}
+	"svc:/$prompt> "
+}
+
+exit $RESULT
+
+

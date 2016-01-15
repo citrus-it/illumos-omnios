@@ -1,0 +1,358 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# First STF library
+. ${STF_TOOLS}/include/stf.kshlib
+
+# Load GL library
+. ${STF_SUITE}/include/gltest.kshlib
+
+# Load svc.startd library for manifest_generate
+. ${STF_SUITE}/include/svc.startd_config.kshlib
+
+readonly ME=$(whence -p ${0})
+readonly MYLOC=$(dirname ${ME})
+
+cleanup() {
+	manifest_purgemd5 $registration_file
+
+	service_cleanup ${test_service}
+
+	rm -f $OUTFILE $ERRFILE $LOGFILE $STATEFILE $registration_file
+
+	exit $RESULT
+}
+
+#
+# Function:	verify_multi
+# 
+# Synopsis:	verify_multi service prop value...
+#
+#
+# Description:
+#	Verify the values in multi value properties.  One condition of
+#	this function is that none of the values can contain white space.
+#
+verify_multi() {
+	vm_serv=$1
+	vm_prop=$2
+	shift 2
+	vm_prop_count=$#
+	vm_desired="$*"
+
+	# Get properties from the repository
+	#
+	$SVCPROP -p $vm_prop $vm_serv > /dev/null
+	if [ $? -ne 0 ] ; then
+		echo "--DIAG : Can't get properties for $vm_prop"
+		RESULT=$STF_FAIL
+		return
+	fi
+	vm_actual=`$SVCPROP -p $vm_prop $vm_serv | sed -e 's/\\\//g'`
+	vm_actual_count=`echo $vm_actual | wc -w`
+
+	# Did we get the correct number?
+	#
+	if [ "$vm_prop_count" -ne "$vm_actual_count" ] ; then
+		echo "--DIAG : $vm_prop has wrong number of properties."
+		echo "         Expected: $vm_desired"
+		echo "         Actual: $vm_actual"
+		RESULT=$STF_FAIL
+		return
+	fi
+
+	# Verify the values
+	#
+	for vm_d in $vm_desired ; do
+		vm_found=0
+		for vm_a in $vm_actual ; do
+			if [ "$vm_d" = "$vm_a" ] ; then
+				vm_found=1
+			fi
+		done
+		if [ $vm_found -eq 0 ] ; then
+			echo "--DIAG : $vm_d is missing from $vm_prop"
+			RESULT=$STF_FAIL
+		fi
+	done
+}
+
+# Function:	verify_prop
+#
+# Synopsis:	verify_prop service prop type value...
+#
+# Description:
+#	Scan the svccfg listprop output for the specified service looking
+#	for prop.  prop should be of the form pg_name/prop_name.  If the
+#	property is found, the type and value are verified.
+#
+verify_prop() {
+	ISNOT=""
+	QUIET=0
+	if [ "$1" != "POS" -a "$1" != "NEG" ] ; then
+		exp_result=0
+	else
+		if [ "$1" == "POS" ] ; then
+			exp_result=0
+		else
+			ISNOT="is not"
+			exp_result=1
+		fi
+		shift
+	fi
+
+	if [ "$1" == "QUIET" ]
+	then
+		QUIET=1
+		shift
+	fi
+
+	vp_serv=$1
+	vp_prop=$2
+	vp_type=$3
+	shift 3
+	vp_value="$*"
+	if [ -z $vp_value ]
+	then
+		vp_value=\"\"
+	fi
+
+	if [ $QUIET -eq 0 ]
+	then
+		echo "--INFO: Validate the property group pattern $vp_prop"
+		echo "	with type $vp_type and values of :"
+		for v in $vp_value
+		do
+			echo "		$v"
+		done
+		echo "	$ISNOT in service $vp_serv"
+	fi
+	$SVCPROP -c $vp_serv | \
+		sed -e 's/\\//g' | \
+		/usr/xpg4/bin/awk '
+			BEGIN	{
+					Ec=1
+					PropSeen = 0
+			}
+			$1 == prop {
+				PropSeen = 1
+				if ($2 != type) {
+					printf "wrong type\n"
+					exit 1
+				}
+				# Check ws separated value
+				# elements
+				#
+				value_count = split(value, v, " ")
+				for (i = 1; i <= NF - 2; i++) {
+					if (i > value_count) {
+						printf "value_count = %d i = %d \n", value_count, i
+						exit 1
+					}
+					fn = i + 2
+					if ($fn != v[i]) {
+						printf "val[%d]\n", i
+						exit 1
+					}
+				}
+				if (i < NF - 2) {
+					printf "NF\n"
+					exit 1
+				} else {
+					Ec=0
+					exit Ec
+				}
+			}
+			END	{
+				if (PropSeen == 0) {
+					printf "no property\n"
+				}
+				exit Ec
+			}
+		' prop=$vp_prop type=$vp_type value="${vp_value}"
+	ret=$?
+	if [ $exp_result -eq 0 -a $ret -ne 0 ] ; then
+		echo "--DIAG : Prop. verification failure for \"${vp_prop}\"" \
+			"\"${vp_type}\""
+		RESULT=$STF_FAIL
+	else 
+		if [ $exp_result -eq 1 -a $ret -eq 0 ] ; then
+			echo "--DIAG : Prop. verification failure for \"${vp_prop}\"" \
+				"\"${vp_type}\", expected not to be present"
+			RESULT=$STF_FAIL
+		fi
+	fi
+}
+
+# Function:     validate_fail
+#
+# Synopsis:     validate_fail manifest fail_msg
+#
+# Description:
+#       This function validates a manifest, and expects the validation to
+#       fail.  The error output of the validate command is checked to be
+#       sure that it contains fail_msg
+#
+validate_fail()
+{
+	vf_man="$1"
+	vf_msg="$2"
+
+	# Make sure the manifest exists.
+
+	if [ ! -f $vf_man ] ; then
+		echo "\"${vf_man}\" is missing"
+		RESULT=$STF_UNRESOLVED
+		return
+	fi
+
+	# Attempt to validate the manifest
+
+	$SVCCFG validate $vf_man >$OUTFILE 2>$ERRFILE
+	if [ $? -eq 0 ] ; then
+		echo "-- DIAG: [${assertion}]
+		$SVCCFG validate expected to fail, but did not."
+
+		RESULT=$STF_FAIL
+		return
+	fi
+
+	if [ ! -s $ERRFILE ] ; then
+		echo "-- DIAG: [${assertion}]
+		$SVCCFG validate did not send output to stderr"
+
+		RESULT=$STF_FAIL
+		return
+	fi
+
+	# Make sure the we failed for the correct reason
+
+	grep "$vf_msg" $ERRFILE > /dev/null 2>&1
+	if [ $? -ne 0 ] ; then
+		echo "Validate failed for wrong reason"
+		echo "Error output follows"
+
+		RESULT=$STF_FAIL
+		cat $ERRFILE
+	fi
+}
+
+# Function:	verify_import
+#
+# Sysnopsis:	verify_import pos/neg manifest outlog errlog
+#
+# Description:
+# 	Will do the import and determine if a failure occurred if it does then
+# 	dump out the error and log the result
+#
+verify_import()
+{
+	#
+	# By default the import is considered possitive, so if no
+	# positve or negative value is provided then pass_fail is pos
+	#
+	if [ `echo $1 | tr '[:lower:]' '[:upper:]'` == "NEG" ]; then
+		echo "--INFO: Verify the import fails"
+		pass_fail=-1
+		shift
+	else
+		echo "--INFO: Verify the import succeeds"
+		pass_fail=0
+		if [ `echo $1 | tr '[:lower:]' '[:upper:]'` == "POS" ]; then
+			shift
+		fi
+	fi
+
+	impmanifest=$1
+	servicename=$2
+	outlog=${3:-$OUTFILE}
+	errlog=${4:-$ERRFILE}
+
+	$SVCCFG -v import -V $impmanifest > $outlog 2> $errlog
+	ret=$?
+
+	grep "Successful import" $errlog > /dev/null 2>&1
+	successimport=$?
+
+	#
+	# Clear out the success messages
+	#
+	errcnt=`grep -v 'Taking \"initial\" snapshot' $errlog |
+	    	grep -v 'Taking \"last-import\" snapshot' |
+	    	grep -v Refreshed | grep -v 'Successful import' |
+	    	grep -v "^Warning:" | wc -l`
+
+	if [ $ret -eq $pass_fail ]; then
+		if [ $successimport -ne 0 -o $errcnt -ne 0 ]; then
+			echo "-- DIAG: " \
+			    "expect import to succeed but returned $ret"
+
+			echo "$outlog :"
+			cat $outlog
+			echo "$errlog :"
+			cat $errlog
+
+			RESULT=$STF_FAIL
+			return 1
+		fi
+	else
+		if [ $pass_fail -eq -1 ]; then
+			$SVCS -a | grep $servicename > /dev/null 2>&1
+			svc_exists=$?
+			if [ $successimport -eq 0 -o $errcnt -eq 0 -o \
+			    $svc_exists -eq 0 ]; then
+				echo "-- DIAG: "\
+				    "expected failure but import did not fail"
+
+				echo "$outlog :"
+				cat $outlog
+				echo "$errlog :"
+				cat $errlog
+
+				RESULT=$STF_FAIL
+				return 1
+			fi
+		else
+			echo "-- DIAG: "\
+			    "expected failure but import did not fail"
+
+			echo "$outlog :"
+			cat $outlog
+			echo "$errlog :"
+			cat $errlog
+
+			RESULT=$STF_FAIL
+			return 1
+		fi
+	fi
+
+	echo "$outlog :"
+	cat $outlog
+	echo "$errlog :"
+	cat $errlog
+
+	return 0
+}

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+
+<!--
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+-->
+
+<service_bundle type="manifest" name="bundle_methods_015">
+<service name="TEST_SERVICE" type="service" version="1">
+<instance name="TEST_INSTANCE" enabled="false">
+<exec_method type="method" name="start"
+	exec="%{cfg/cmd} -l %{cfg/log} -f %{cfg/state} -s %s -i %i -m %m"
+	timeout_seconds="100" />
+<exec_method type="method" name="stop"
+	exec="%{cfg/cmd} -l %{cfg/log} -f %{cfg/state} -s %s -i %i -m %m"
+	timeout_seconds="100" />
+<property_group name="cfg" type="application">
+<property name="cmd" type="astring">
+<astring_list>
+<value_node value="SERVICE_APP" />
+</astring_list>
+</property>
+<property name="log" type="astring">
+<astring_list>
+<value_node value="LOGFILE" />
+</astring_list>
+</property>
+<property name="state" type="astring">
+<astring_list>
+<value_node value="STATEFILE" />
+</astring_list>
+</property>
+</property_group>
+</instance>
+</service>
+</service_bundle>

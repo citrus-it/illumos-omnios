@@ -1,0 +1,89 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+# 
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This ksh library file contains common ksh utility functions to be used by
+# tests in this directory and is intended to be "sourced" by said tests.
+#
+
+# Wait for the start/stop method to be executed
+function wait_process {
+        count=0
+
+	typeset wait_file=${1}
+	typeset timeout=${2:-10} # default timeout = 10 seconds
+
+        while [ $count -lt $timeout ]; do
+
+                echo "--INFO: [$assertion]
+	Looking for $wait_file ..."
+
+		if [ -r $wait_file ]; then
+			echo "--INFO: [$assertion] 
+		$wait_file found"
+			return 0
+		else
+			sleep 1
+		fi
+                count=`expr $count + 1`
+        done
+
+        #If test process not started by service in given time
+        #then fail and return 1
+
+        if [ $count -ge $timeout ]; then
+		return 1
+	fi
+
+	echo "--INFO: [$assertion]
+		$wait_file found"
+	return 0
+}
+
+# Wait for the start method
+function wait_process_start {
+	wait_process ${1:-$start_file} ${2:-$startstop_timeout}
+}
+
+# Wait for the stop method
+function wait_process_stop {
+	wait_process ${1:-$stop_file} ${2:-$startstop_timeout}
+}
+
+
+# This function is to cleanup leftovers after test execution
+function cleanup_leftovers {
+	typeset targets="$@"
+	typeset service_to_clean="${1}"
+	typeset files_to_clean="${targets##$service_to_clean }"
+	
+	service_cleanup $service_to_clean
+	/usr/bin/rm -f $files_to_clean
+}
+
+#
+### END
+#

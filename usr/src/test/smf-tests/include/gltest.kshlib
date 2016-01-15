@@ -1,0 +1,1023 @@
+#! /usr/bin/ksh -p
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#typeset -ft $(typeset +f)
+
+. ${STF_TOOLS}/include/stf.kshlib
+lib_wait_time=${DEFAULT_WAIT_TIME:-30}
+
+library=gltest.kshlib
+
+########################################################################
+# Function name: extract_assertion_info
+#
+# Purpose:
+#	Print out in a standard format, to stdout (and thus to the journal
+#	file) the assertion information.  This information is pulled from the
+#	standard assertion comment.
+#
+# Arguments:
+#	$1 = the file where the header information is.  Typically this
+#	  is the test case source file.
+#
+# Return:  0 (always succeeds).
+#
+########################################################################
+function extract_assertion_info
+{
+
+	nawk -v comment_arg=$1 '
+
+	BEGIN {
+		in_assertion		= 0;
+		turn_off_printing 	= 0;
+	}
+
+	#
+	# End of the .spec content.
+	#
+	/^# +end +__stf_assertion/ {
+		in_assertion = 0;
+		next;
+	}
+
+	#
+	# Beginning of the .spec content.
+	#
+	/^# +start +__stf_assertion__/ {
+		in_assertion = 1;
+		next;
+	}
+
+	#
+	#
+	/^.+ASSERTION:/ && (in_assertion) {
+		a=substr($0, index($0, "ASSERTION:") + length("ASSERTION:"));
+		printf("--ASRT: %s\n\n", a);
+		turn_off_printing = 1;
+		next;
+	}
+
+	#
+	# Actual assertion statement. STC calls this the description and 
+	# requires one for every ASSERTION:.
+	#
+	/^.+DESCRIPTION:/ && (in_assertion) {
+		a=substr($0, index($0, "DESCRIPTION:") + length("DESCRIPTION:"));
+		printf("--DESC: %s\n", a);
+		turn_off_printing = 0;
+		next;
+	}
+
+	#
+	# List of interfaces targeted by the current assertion. STC requires 
+	# one of these for every ASSERTION:
+	#
+	/^.+INTERFACES:/ && (in_assertion) {
+		in_assertion = 0;
+	}
+
+	/^.+STRATEGY:/ && (in_assertion) {
+		in_assertion = 0;
+	}
+
+	#
+	# Body of the assertion comments.
+	#
+	(in_assertion) && length && !(turn_off_printing) {
+		a=substr($0,index($0,"#")+1);
+		printf("%s\n", a);
+	}
+	(in_assertion) && (turn_off_printing)  {
+		next;
+	}
+
+	' $1
+}
+
+########################################################################
+#
+# Function name: service_exists
+#
+# Purpose:
+#	Verify that a service is defined within the repository
+#
+# Arguments:
+#	$1 = name of the service or service:instance to check
+#
+# Return:
+#	0 if service exists
+#	1 if the service does not exist
+#	2 if the arguments passed were invalid
+#
+########################################################################
+function service_exists {
+
+	typeset func_name=service_exists
+
+	[[ $# -ne 1 ]] && {
+		echo "--DIAG: [$func_name]"
+		echo "function requires one argument - $# passed"
+		return 2
+	}
+
+	typeset service=$1
+
+	/usr/sbin/svccfg select $service > /dev/null 2>&1
+	ret=$?
+	return $ret
+}
+
+########################################################################
+#
+# Function name: service_check_state
+#
+# Purpose:
+#	Check if a service state is the state passed in 
+#
+# Arguments:
+#	[ -q ] don't complain if the state isn't reached
+#	$1 = name of the service:instance to check
+#	$2 = state to check for  (can be online, offline, degraded,
+#		maintenance, disabled, uninitialized)
+#
+# Return:
+#	0: if service is as asked
+#	1: if the service is not in the requested state
+#	2: an error occurred during the function
+#
+########################################################################
+function service_check_state {
+
+	typeset func_name=service_check_state
+	typeset quiet=
+
+	if [ -n "$1" -a "$1" = "-q" ]; then
+		quiet=1
+		shift
+	fi
+
+	[[ $# -ne 2 ]] && {
+		echo "--DIAG: [$func_name]"
+		echo "function requires two arguments - $# passed"
+		
+		return 2
+	}
+
+	typeset svcinst=$1
+	typeset statetocheck=$2
+
+	typeset state=
+
+	service_exists $svcinst || {
+		echo "--DIAG: [$func_name]"
+		echo "entity $svcinst does not exist"
+
+		return 2
+	}
+
+	state=`svcprop -p restarter/state $svcinst`
+	[[ -z $state ]] && {
+		echo "--DIAG: [$func_name]"
+		echo "svcprop did not return a state for instance $svcinst"
+		return 2
+	}
+
+	if [ "$state" != "$statetocheck" ]; then
+		[ -z "$quiet" ] && echo "--DIAG: [$func_name]"\
+		    "instance $service returned state $state, not $statetocheck"
+		
+		return 1
+	fi
+
+	return 0
+}
+
+
+########################################################################
+#
+# Function name: service_wait_state
+#
+# Purpose:
+#	Wait for a service to enter a certain state
+#
+# Arguments:
+#	$1 = name of a service:instance to check
+#	$2 = state that the service should transition to
+#	$3 (optional) = timeout to wait for the service to transition
+#		to the state.
+#
+# Return:
+#	0 if the service reaches the state by the timeout
+#	non-zero otherwise
+#
+########################################################################
+function service_wait_state {
+
+	typeset func_name=service_wait_state
+
+	[[ $# -ne 2 && $# -ne 3 ]] && {
+		echo "--DIAG: [$func_name]"
+		echo "function requires two or three arguments - $# passed"
+		
+		return 2
+	}
+
+	typeset svcinst=$1
+	typeset state=$2
+	typeset wait_time=${3:-$lib_wait_time}
+	typeset nsec=0
+
+	while [ $nsec -le $wait_time ]; do
+		service_check_state -q $svcinst $state
+		[[ $? -eq 0 ]] && {
+			echo "--INFO: [$func_name]"
+			echo "instance $svcinst transitioned to state $state"
+			return 0
+		}
+		sleep 1
+		nsec=$((nsec + 1))
+	done
+	echo "--INFO: [$func_name]"
+	echo "instance $svcinst did not transition to state $state"
+	echo "within $wait_time seconds"
+	return 1
+}
+
+########################################################################
+#
+# Function name: update_result
+#
+# Purpose:
+#	This function accepts two results and determines what the overall
+#	result should be.  The first argument is the new result and the
+#	second argument is the current overall result.  The new result
+#	may or may not change the overall results.  For instance, if
+#	the current overall result is FAIL and the new result is 
+#	UNRESOLVED than the overall result remains FAIL.
+#	
+# Arguments:
+#	$1 = the new result
+#	$2 = the current overall result
+#
+# Return:
+#	Always returns 0 as an exit status.
+#	"Returns" the current overall result by echo'ing.  Therefore
+#	this routine should be used as follows (for example):
+#
+#	RESULT=$(update_result $STF_UNRESOLVED $RESULT)
+#
+########################################################################
+function update_result
+{
+	typeset result_1=$1
+	typeset result_2=$2
+
+	[[ ${result_1} -eq $STF_FAIL ]] &&
+		result_2=$STF_FAIL
+	[[ ${result_1} -eq $STF_UNRESOLVED ]] && {
+		[[ ${result_2} -ne $STF_FAIL ]] &&
+			result_2=$STF_UNRESOLVED
+	}
+	echo $result_2
+	return 0
+}
+
+########################################################################
+#
+# Function name: print_result
+#
+# Purpose:
+#	Print out a result message "RSLT: result"
+#
+# Arguments:
+#	$1 - the result to print out (e.g. "PASS")
+#
+# Return:
+#	Always returns 0
+#
+########################################################################
+function print_result
+{
+	typeset result=$1
+
+	case $result in
+		$STF_PASS) echo "--RSLT: PASS" ;;
+		$STF_FAIL) echo "--RSLT: FAIL" ;;
+		$STF_UNRESOLVED) echo "--RSLT: UNRESOLVED" ;;
+		*) echo "--RSLT: UNKNONWN" ;;
+	esac
+
+	return 0
+}
+
+########################################################################
+#
+# Function name: service_delete
+#
+# Purpose:
+#	Deletes services and/or service instance from the repository
+#
+# Arguments:
+#	$1, $2, . . . - list of entities to delete
+#
+# Return:
+#	0 - deletion successful
+#	non-zero - deletion unsuccessful
+#
+########################################################################
+function service_delete
+{
+	typeset func_name=service_delete
+
+	[[ $# -eq 0 ]] && {
+		echo "--DIAG: [$func_name]"
+		echo "function requires at least one service, none passed"
+		
+		return 1
+	}
+
+	typeset service=
+	typeset ret=
+
+	for service in $@; do
+		service_exists $service
+		[[ $? -eq 0 ]] && {
+			svccfg delete $service >/dev/null 2>&1 
+			ret=$?
+			[[ $ret -ne 0 ]]  && {
+				echo "--DIAG: [$func_name]"
+				echo "svccfg delete failed"
+
+				return $ret
+			}
+		}
+	done
+	return 0
+}
+
+########################################################################
+#
+# Function name: service_cleanup
+#
+# Purpose:
+#	Disable instances and remove them from the repository.  If
+#	no instances are specified (i.e. only a service is specified)
+#	all instances of that service are removed as well as the service.
+#
+# Arguments:
+#	$1: The service to delete it's instances and, if no instances
+#	    are specified, to delete the service
+#	$2: A list of instances to specify (the service will not be deleted)
+#
+# Return:
+#	0 - all deletions were successful
+#	1 - the deletion was not successful
+#
+########################################################################
+function service_cleanup
+{
+	typeset func_name=service_cleanup
+	typeset service=$1
+
+	typeset delete_service=0
+	typeset instance_list=
+	typeset instance=
+	typeset service_fmri=
+	typeset fully_qualified=
+
+	if [ $# -eq 0 ]; then
+		echo "--DIAG: [$func_name]"
+		echo "function requires at least one service, none passed"
+
+		return 1
+	fi
+
+	if [ $# -eq 1 ]; then
+		service_exists $service
+		[[ $? -ne 0 ]] && 
+			return 0
+
+		instance_list=$(svcs -a -H -o FMRI | grep $service)
+		fully_qualified=true
+		delete_service=1
+	else
+		shift 
+		instance_list=$@
+	fi
+
+
+	for instance in $instance_list; do
+		if [ -z "$fully_qualified" ]; then
+			service_fmri=svc:/$service:$instance
+		else
+			service_fmri=$instance
+		fi
+		service_exists $service_fmri
+		if [ $? -eq 0 ]; then
+
+			typeset state=
+			typeset log=
+
+			svcadm disable $service_fmri
+			if [ $? -ne 0 ]; then
+				echo "--DIAG: [$func_name]"
+				echo "$service_fmri not transitioned to"
+				echo "disabled state"
+
+				return 1
+			fi
+
+			# clear maintenance state if it's set.  This
+			# should clean up processes.
+			typeset atstate=$(svcprop -p restarter/state \
+					$service_fmri)
+			if [ "$atstate" = "maintenance" ]; then
+				svcadm clear $service_fmri
+			fi
+
+			atstate=$(svcprop -p restarter/state $service_fmri)
+			if [ "$atstate" != offline -a "$atstate" != unknown \
+				-a "$atstate" != maintenance \
+				-a "$atstate" != - ]; then
+				# Moan about it, but still continue
+				# This will leave stray processes but
+				# that's the cost.
+				service_wait_state $service_fmri disabled
+			fi
+			svccfg delete -f $service_fmri
+			if [ $? -ne 0 ]; then
+				echo "--DIAG: [$func_name]"
+				echo "failure deleting instance $service_fmri"
+
+				return 1
+			fi
+
+		fi
+	done
+	if [ $delete_service -ne 0 ]; then
+		svccfg delete -f $service 
+		if [ $? -ne 0 ]; then
+			echo "--DIAG: [$func_name]"
+			echo "failure deleting service $service"
+
+			return 1
+		fi
+	fi
+	return 0
+}
+
+
+########################################################################
+#
+# Function name: service_import
+#
+# Purpose:
+#	Import service using specified service registration file
+#
+# Arguments:
+#	$1: The name of the service that will be imported
+#	$2: The service registration file to import 
+#
+# Return:
+#	0 - import was successful
+#	1 - import was not successful
+#
+########################################################################
+function service_import
+{
+	typeset func_name=service_import
+	typeset service_name=$1
+	typeset service_file=$2
+
+	#
+	# Check arguments, verify service name and file are specified
+	#
+	if [ $# -ne 2 ]; then
+		echo "--DIAG: [$func_name]"
+		echo "function requires service name and reg file"
+
+		return 1
+	fi
+
+	#
+	# Import service
+	#
+	svccfg import $service_file > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "--DIAG: [$func_name]"
+		echo "svccfg import $service_file failed"
+
+		return 1
+	fi
+
+	#
+	# Verify service 
+	#
+	service_exists $service_name
+	if [ $? -ne 0 ]; then
+		echo "--DIAG: [$func_name]"
+		echo "Service $service_name does not exist after import"
+
+		return 1
+	fi
+
+	return 0
+}
+
+
+########################################################################
+#
+# Function name: check_gl_env
+#
+# Purpose:
+#	Determines if the GL environment is available.  This is
+#	to prevent the test from running if the environment is 
+#	unavailable or completely broken.
+#
+# Arguments: None
+#
+# Return:
+#	0 - if the repository exists
+#	non-zero - otherwise
+#
+########################################################################
+function check_gl_env
+{
+	typeset -i ret_value=0
+	typeset ret=
+
+	svccfg quit > /dev/null 2>&1
+	ret=$?
+	[[ $ret -ne 0 ]] && {
+		echo "--DIAG: [$library]"
+		echo "svccfg returned $ret, expected 0"
+
+		ret_value=1
+	}
+	test -n "`pgrep -z $(zonename) svc.startd`"
+	ret=$?
+	if [ $ret_value -eq 0 -a $ret -ne 0 ]; then
+		echo "--DIAG: [$library] svc.startd is not executing"
+
+		ret_value=2
+	fi
+	return $ret_value
+}
+
+##############################################################
+#
+# Function Name: filename_to_property
+#
+# Purpose:
+#	convert a filename into a property name used in
+#	the md5 checksum.
+#
+# Parameters:
+#	$1 - The filename to convert into a property value
+#
+# Returns:
+#	A string, corresponding to the property name.
+#
+##############################################################
+function filename_to_property {
+	typeset file=$1
+	typeset fc=${#file}
+	typeset nfile=
+	typeset sfile=
+	typeset ch=
+	typeset lch=
+
+	# strip first character
+	ch=${file##?}
+	lch=${file%$ch}
+	file=$ch
+	sfile=$file
+
+	if [ "$fc" -gt 255 ]; then
+		# do the .. thing
+		typeset atc=1
+
+		while [ $atc -lt 127 ]; do
+			ch=${sfile##?}
+			lch=${sfile%$ch}
+			sfile=$ch
+			nfile=$nfile$lch
+			atc=$((atc + 1))
+		done
+		nfile=$nfile..
+		while [ $atc -lt $((fc - 127)) ]; do
+			ch=${sfile##?}
+			lch=${sfile%$ch}
+			sfile=$ch
+			atc=$((atc + 1))
+		done
+		while [ $atc -lt $fc ]; do
+			ch=${sfile##?}
+			lch=${sfile%$ch}
+			sfile=$ch
+			nfile=$nfile$lch
+			atc=$((atc + 1))
+		done
+	fi
+	nfile=${nfile:-$file}
+	file=`print -n $nfile | /bin/tr -c '[-][:alnum:]' '-[_*]'`
+	echo $file
+}
+
+########################################################################
+# 
+# Function Name: manifest_purgemd5
+# Purpose:
+#   purge the md5 checksum from the repository if one exists
+# Arguments:
+#	$1 - the filename who's manifest to remove.
+#
+# Returns:
+#	Don't Care
+# XXX alert: SVCCFG_CHECKHASH currently controls the creation of
+#	hash. Completely undocumented (again!)
+#
+########################################################################
+function manifest_purgemd5 {
+	typeset file=$1
+	typeset fp=`filename_to_property $file`
+
+	svccfg -f - >/dev/null 2>&1 <<-EOM
+	select smf/manifest
+	delprop $fp
+	end
+	EOM
+}
+
+########################################################################
+#
+# Function Name: find_nontransient_pids
+# Purpose:
+#   find the non-transient pids for a process by name in a zone. If only
+#   one process is found then return that process; otherwise check for
+#   each process.
+# Arguments:
+#	$1 - the name of the process to initially pgrep.
+#
+# Returns:
+#	the number of pids found
+# Outputs:
+#	the pids that are remaining after the loop
+########################################################################
+function find_nontransient_pids {
+	typeset pids=$(pgrep -z $(zonename) $1)
+	typeset output=
+	typeset pid=
+
+	set -- $pids
+	typeset npids=$#
+	if [ $npids = 1 ]; then
+		echo $pids
+		return 1
+	fi
+
+	npids=0
+	for pid in $pids; do
+		typeset count=0
+		while [ $count -lt 5 ]; do
+			[ ! -d /proc/$pid ] && break
+			sleep 1
+			count=$((count + 1))
+		done
+		if [ $count -eq 10 ]; then
+			output="$output $pid"
+			npids=$((npids + 1))
+		fi
+	done
+	echo $output
+	return $npids
+}
+
+
+########################################################################
+#
+# Function Name: zone_create
+# Purpose:
+#	Create a zone with the supplied criteria.
+#
+# Arguments:
+#	$1 - The name of the local zone
+#	$2 - The directory of the zone
+#	$3 - "sparse" or "whole" type
+#
+# Returns:
+#	0 - Successfully created zone
+#	1 - Failed to create zone
+#
+# Outputs:
+#	none
+########################################################################
+function zone_create {
+
+	typeset zonename=$1
+	typeset zonepath=$2
+	typeset zonetype=$3
+	typeset zonecfg=/tmp/zone_create.$$
+	typeset zonesysid
+	typeset zonehostname
+	typeset status ret output
+
+	# Verify all arguments were given
+	if [[ -z "$zonename" || -z "$zonepath" || -z "$zonetype" ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "All arguments were not specified"
+
+		return 1
+	fi
+
+	# Create command file for zone creation
+	if [[ "$zonetype" == "sparse" ]]; then
+		cat > $zonecfg <<-EOM
+		create
+		set zonepath=$zonepath
+		set autoboot=true
+		commit
+		verify
+		exit
+		EOM
+	elif [[ "$zonetype" == "whole" ]]; then
+		cat > $zonecfg <<-EOM
+		create -b
+		set zonepath=$zonepath
+		set autoboot=true
+		commit
+		verify
+		exit
+		EOM
+	else
+		echo "--DIAG: [$func_name]"
+		echo "Zone type "$zonetype" is not whole or sparse"
+
+		return 1
+	fi
+
+	# Configure local zone
+	output=$(zonecfg -z $zonename -f $zonecfg 2>&1)
+	ret=$?
+	if [[ $ret -ne 0 ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "zonecfg failed with error code $ret"
+		echo "output='$output'"
+
+		return 1
+	fi
+
+	# Install local zone
+	output=$(zoneadm -z $zonename install 2>&1)
+	ret=$?
+	if [[ $ret -ne 0 ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "zoneadm install failed with error code $ret"
+		echo "output='$output'"
+
+		return 1
+	fi
+
+	# Auto configure the zone using sysidcfg
+	zonesysid=$zonepath/root/etc/sysidcfg
+	zonehostname="host$$"
+
+	cat > $zonesysid <<-!
+	terminal=xterm
+	system_locale=C
+	timezone=$TZ
+	security_policy=NONE
+	name_service=NONE
+	root_password=l1admin
+	network_interface=primary { hostname=$zonehostname }
+	!
+
+	# Boot local zone
+	zone_boot $zonename > /dev/null 2>&1
+	ret=$?
+	if [[ $ret -ne 0 ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "Failed to boot $zonename: return code $ret"
+		echo "output='$output'"
+
+		return 1
+	fi
+
+	# Cleanup
+	rm -f $zonecfg
+
+	return 0
+}
+
+
+
+
+########################################################################
+#
+# Function Name: zone_halt
+# Purpose:
+#	Halt the specified zone 
+#
+# Arguments:
+#	$1 - The name of the local zone
+#
+# Returns:
+#	0 - Successfully halted zone
+#	1 - Failed to halt zone
+#
+# Outputs:
+#	none
+########################################################################
+function zone_halt {
+	
+	typeset zonename=$1
+	typeset status ret output
+
+	# Verify zone name was given 
+	if [[ -z "$zonename" ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "Zone name was not supplied"
+
+		return 1
+	fi
+
+	# Check the status of the zone, if running, halt it
+	status=$(zoneadm list -cv | egrep $zonename | awk '{print $3}')
+
+	if [[ "$status" == "running" ]]; then
+		output=$(zoneadm -z $zonename halt 2>&1)
+		ret=$?
+		if [[ $ret -ne 0 ]]; then
+			echo "--DIAG: [$func_name]"
+			echo "Failed to halt $zonename: ret='$ret'"
+			echo "output='$output'"
+
+			return 1
+		fi
+	fi
+
+	# Verify zone is in the "installed" state
+	status=$(zoneadm list -cv | egrep $zonename | awk '{print $3}')
+
+	if [[ "$status" != "installed" ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "Zone status unexpected: $status"
+
+		return 1
+	fi
+
+	return 0
+}
+
+
+########################################################################
+#
+# Function Name: zone_boot
+# Purpose:
+#	Boot the specified zone 
+#
+# Arguments:
+#	$1 - The name of the local zone
+#
+# Returns:
+#	0 - Successfully booted zone
+#	1 - Failed to boot zone
+#
+# Outputs:
+#	none
+########################################################################
+function zone_boot {
+	
+	typeset zonename=$1
+	typeset status ret output
+
+	# Verify zone name was given 
+	if [[ -z "$zonename" ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "Zone name was not supplied"
+
+		return 1
+	fi
+
+	# Check the status of the zone, if not running, boot it
+	status=$(zoneadm list -cv | egrep $zonename | awk '{print $3}')
+
+	if [[ "$status" != "running" ]]; then
+		output=$(zoneadm -z $zonename boot 2>&1)
+		ret=$?
+		if [[ $ret -ne 0 ]]; then
+			echo "--DIAG: [$func_name]"
+			echo "Failed to boot $zonename: ret='$ret'"
+			echo "output='$output'"
+
+			return 1
+		fi
+
+		# Sleep to allow zone to fully come up
+		sleep 180
+
+
+		# Verify zone is in the "running" state
+		status=$(zoneadm list -cv | egrep $zonename | awk '{print $3}')
+
+		if [[ "$status" != "running" ]]; then
+			echo "--DIAG: [$func_name]"
+			echo "Zone status unexpected: $status"
+
+			return 1
+		fi
+	fi
+
+	return 0
+}
+
+
+########################################################################
+#
+# Function Name: zone_cleanup
+# Purpose:
+#	Destroy the zone with the supplied criteria.
+#
+# Arguments:
+#	$1 - The name of the local zone
+#
+# Returns:
+#	0 - Successfully removed zone
+#	1 - Failed to remove zone
+#
+# Outputs:
+#	none
+########################################################################
+function zone_cleanup {
+	
+	typeset zonename=$1
+	typeset zonesysid
+	typeset status ret output
+
+	# Verify all arguments were given
+	if [[ -z "$zonename" ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "All arguments were not supplied"
+
+		return 1
+	fi
+
+	# Halt the zone
+	zone_halt $zonename
+	if [[ $ret -ne 0 ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "Failed to halt $zonename: ret='$ret'"
+		echo "output='$output'"
+
+		return 1
+	fi
+
+	# Uninstall the zone
+	output=$(zoneadm -z $zonename uninstall -F 2>&1)
+	ret=$?
+	if [[ $ret -ne 0 ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "Failed to uninstall $zonename: ret='$ret'"
+		echo "output='$output'"
+
+		return 1
+	fi
+
+	# Delete the zone configuration
+	output=$(zonecfg -z $zonename delete -F 2>&1)
+	ret=$?
+	if [[ $ret -ne 0 ]]; then
+		echo "--DIAG: [$func_name]"
+		echo "Failed to delete $zonename: ret='$ret'"
+		echo "output='$output'"
+
+		return 1
+	fi
+
+	return 0
+}

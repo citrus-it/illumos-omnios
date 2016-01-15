@@ -1,0 +1,7 @@
+pg_one 		astring		P
+pg_two 		boolean		p
+pg_three 	integer	
+pg_four 	count		P
+pg_five		ustring		p
+pg_six		time
+pg_seven	opaque		P

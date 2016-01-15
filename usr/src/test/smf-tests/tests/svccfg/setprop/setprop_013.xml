@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+
+<!--
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+-->
+
+<service_bundle type='manifest' name='export'>
+  <service name='svccfg_setprop_013_service' type='service' version='0'>
+    <property_group name='svccfg_setprop_013_svcpg' type='application'>
+      <property name='svccfg_setprop_013_astringprop' type='astring'>
+        <astring_list>
+          <value_node value='first svc prop'/>
+          <value_node value='second svc prop'/>
+        </astring_list>
+      </property>
+      <property name='svccfg_setprop_013_countprop' type='count'>
+        <count_list>
+          <value_node value='1'/>
+          <value_node value='2'/>
+          <value_node value='3'/>
+          <value_node value='4'/>
+          <value_node value='5'/>
+        </count_list>
+      </property>
+    </property_group>
+    <instance name='svccfg_setprop_013_instance' enabled='false'>
+      <property_group name='svccfg_setprop_013_instpg' type='application'>
+        <property name='svccfg_setprop_013_astringprop' type='astring'>
+          <astring_list>
+            <value_node value='first inst prop'/>
+            <value_node value='second inst prop'/>
+          </astring_list>
+        </property>
+        <property name='svccfg_setprop_013_countprop' type='count'>
+          <count_list>
+            <value_node value='11'/>
+            <value_node value='12'/>
+            <value_node value='13'/>
+            <value_node value='14'/>
+            <value_node value='15'/>
+          </count_list>
+        </property>
+      </property_group>
+    </instance>
+  </service>
+</service_bundle>
