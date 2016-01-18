@@ -1,0 +1,8 @@
+svc:/svccfg_inventory_001:instance_003
+svc:/svccfg_inventory_001:instance_002
+svc:/svccfg_inventory_001:instance_001
+svc:/svccfg_inventory_002:instance_003
+svc:/svccfg_inventory_002:instance_002
+svc:/svccfg_inventory_002:instance_001
+svc:/svccfg_inventory_001
+svc:/svccfg_inventory_002
