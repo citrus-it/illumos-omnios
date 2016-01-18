@@ -583,7 +583,6 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_iokstat_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_cos_props_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_vdev_props_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_perfmon.perfmon_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_trim_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
@@ -591,7 +590,6 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	cv_init(&spa->spa_proc_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_scrub_io_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_suspend_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&spa->spa_perfmon.perfmon_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_trim_update_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_trim_done_cv, NULL, CV_DEFAULT, NULL);
 
@@ -682,18 +680,11 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 
 	spa_cos_init(spa);
 
-	wrc_init(&spa->spa_wrc, spa);
+	spa_special_init(spa);
 
-	bzero(&spa->spa_avg_stat, sizeof (spa_avg_stat_t));
-	spa->spa_avg_stat_rotor = 0;
-	spa->spa_special_to_normal_ratio = 100;
-	spa->spa_dedup_percentage = 100;
-	spa->spa_dedup_rotor = 0;
-
-	spa->spa_perfmon.perfmon_thread = NULL;
-	spa->spa_perfmon.perfmon_thr_exit = B_FALSE;
 	spa->spa_min_ashift = INT_MAX;
 	spa->spa_max_ashift = 0;
+	wrc_init(&spa->spa_wrc, spa);
 
 	/*
 	 * As a pool is being created, treat all features as disabled by
@@ -742,6 +733,8 @@ spa_remove(spa_t *spa)
 
 	wrc_fini(&spa->spa_wrc);
 
+	spa_special_fini(spa);
+
 	spa_cos_fini(spa);
 
 	autosnap_fini(spa);
@@ -775,7 +768,6 @@ spa_remove(spa_t *spa)
 	cv_destroy(&spa->spa_proc_cv);
 	cv_destroy(&spa->spa_scrub_io_cv);
 	cv_destroy(&spa->spa_suspend_cv);
-	cv_destroy(&spa->spa_perfmon.perfmon_cv);
 	cv_destroy(&spa->spa_trim_update_cv);
 	cv_destroy(&spa->spa_trim_done_cv);
 
@@ -793,7 +785,6 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_iokstat_lock);
 	mutex_destroy(&spa->spa_cos_props_lock);
 	mutex_destroy(&spa->spa_vdev_props_lock);
-	mutex_destroy(&spa->spa_perfmon.perfmon_lock);
 	mutex_destroy(&spa->spa_trim_lock);
 
 	kmem_free(spa, sizeof (spa_t));

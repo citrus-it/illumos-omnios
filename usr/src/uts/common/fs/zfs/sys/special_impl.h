@@ -38,7 +38,7 @@ struct spa_specialclass {
 typedef enum {
 	SPA_SPECIAL_SELECTION_MIN,
 	SPA_SPECIAL_SELECTION_LATENCY,
-	SPA_SPECIAL_SELECTION_THROUGHPUT,
+	SPA_SPECIAL_SELECTION_UTILIZATION,
 	SPA_SPECIAL_SELECTION_QUEUE,
 	SPA_SPECIAL_SELECTION_MAX
 } spa_special_selection_t;
@@ -60,10 +60,11 @@ typedef enum {
  * wait_len:     number of commands waiting in the queues that
  *               have not been sent to the class yet
  * queue_len:    total number of commands in the queues
- * run_time:     time for an operation to complete after it
- *               has been dequeued from the wait queue
- * wait_time:    time for which operations are queued before they are run
- * service_time: time to queue and complete an I/O operation
+ * run_time:     time in microseconds for an operation to complete
+ *               after it has been dequeued from the wait queue
+ * wait_time:    time in microseconds for which operations are
+ *               queued before they are run
+ * service_time: time in microseconds to queue and complete an I/O operation
  * count:        number of vdev's per class
  */
 typedef struct cos_acc_stat {
@@ -80,7 +81,12 @@ typedef struct cos_acc_stat {
 } cos_acc_stat_t;
 
 /*
- * spa cumulative statistics
+ * spa cumulative statistics:
+ *
+ * utilization, %
+ * latency,     microseconds
+ * throughput,  KB/s
+ * count:       number of accumulated statistics
  */
 typedef struct spa_acc_stat {
 	uint64_t special_utilization;

@@ -396,13 +396,19 @@ struct spa {
 	spa_perfmon_data_t	spa_perfmon;
 
 	/*
-	 * ratio of writes to special class vs writes to normal class;
-	 * if the ratio is N, then N-1 writes go to special and 1 to normal
-	 * the ratio is adjusted dynamically by the factor specified below
-	 * depending on the relation between average perf param for normal and
-	 * special classes; the parameters are either latency or throughput
+	 * Percentage of total write traffic routed to the special class when
+	 * the latter is working as writeback cache.
+	 * Note that this value is continuously recomputed at runtime based on
+	 * the configured load-balancing mechanism (see spa_special_selection)
+	 * For instance, 0% would mean that special class is not to be used
+	 * for new writes, etc.
 	 */
 	uint64_t spa_special_to_normal_ratio;
+
+	/*
+	 * last re-routing delta value for the spa_special_to_normal_ratio
+	 */
+	int64_t spa_special_to_normal_delta;
 
 	/* target percentage of data to be considered for dedup */
 	int spa_dedup_percentage;

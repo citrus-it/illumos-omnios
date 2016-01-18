@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -84,6 +84,58 @@
  * be provided soon
  */
 
+/*
+ * Initial percentage of total write traffic routed to the
+ * special vdev when the latter is working as writeback cache.
+ * See spa->spa_special_to_normal_ratio.
+ * Changing this variable affects only new or imported pools
+ * Valid range: 0% - 100%
+ */
+uint64_t spa_special_to_normal_ratio = 50;
+
+/*
+ * Re-routing delta - the default value that gets added to
+ * or subtracted from the spa->spa_special_to_normal_ratio
+ * the setting below works as initial step that gets
+ * reduced as we close on the load balancing optimum
+ */
+int64_t spa_special_to_normal_delta = 15;
+
+/*
+ * Initialize special vdev load balancing wares when the pool gets
+ * created or imported
+ */
+void
+spa_special_init(spa_t *spa)
+{
+	mutex_init(&spa->spa_perfmon.perfmon_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&spa->spa_perfmon.perfmon_cv, NULL, CV_DEFAULT, NULL);
+
+	bzero(&spa->spa_avg_stat, sizeof (spa_avg_stat_t));
+
+	spa->spa_special_to_normal_ratio = spa_special_to_normal_ratio;
+	spa->spa_special_to_normal_delta = 0;
+	spa->spa_dedup_percentage = 100;
+	spa->spa_avg_stat_rotor = 0;
+	spa->spa_dedup_rotor = 0;
+
+	spa->spa_perfmon.perfmon_thread = NULL;
+	spa->spa_perfmon.perfmon_thr_exit = B_FALSE;
+}
+
+/*
+ * The spa_special_fini function is symmetric to the spa_special_init
+ * (above)
+ * and is called when the pool gets destroyed or exported.
+ */
+void
+spa_special_fini(spa_t *spa)
+{
+	spa->spa_perfmon.perfmon_thread = NULL;
+	cv_destroy(&spa->spa_perfmon.perfmon_cv);
+	mutex_destroy(&spa->spa_perfmon.perfmon_lock);
+}
+
 /* existing special class desriptors */
 spa_specialclass_t specialclass_desc[SPA_NUM_SPECIALCLASSES] = {
 	{ SPA_SPECIALCLASS_ZIL,	0 },
@@ -111,7 +163,6 @@ spa_enable_special(spa_t *spa, boolean_t usesc)
 
 	spa->spa_usesc = usesc;
 }
-
 
 /*
  * Determine whether we should consider writing data to special vdevs
@@ -166,8 +217,8 @@ spa_special_space_perc(spa_t *spa, uint64_t perc)
 }
 
 /*
- * Checks whether allocated space on a special device
- * crossed either high or low watermarks.
+ * Checks whether used space on a special device
+ * has exceeded either low or high watermarks.
  */
 static void
 spa_check_watermarks(spa_t *spa)
@@ -210,7 +261,7 @@ spa_check_watermarks(spa_t *spa)
 		}
 
 		/*
-		 * correction_rate is used by the spa_special_load_adjust()
+		 * correction_rate is used by the spa_special_adjust_routing()
 		 * the coefficient changes proportionally to the space on the
 		 * special vdev utilized beyond low watermark:
 		 *	from 0% - when we are below low watermark
@@ -337,9 +388,13 @@ spa_meta_is_dual(spa_t *spa, uint64_t zpl_meta_to_special, dmu_object_type_t ot)
  * are made normal, as there is no reason to differentiate
  */
 spa_special_selection_t spa_special_selection =
-    SPA_SPECIAL_SELECTION_THROUGHPUT;
+    SPA_SPECIAL_SELECTION_UTILIZATION;
 
-/* Tunable: factor used to adjust the ratio up/down */
+/*
+ * Tunable: factor used to adjust the ratio up/down
+ * Range: 0 - 100
+ * Units: percents
+ */
 uint64_t spa_special_factor = 5;
 
 /*
@@ -463,7 +518,6 @@ spa_select_class(spa_t *spa, zio_t *zio)
 			    !spa->spa_wrc.wrc_isfault;
 			if (match) {
 				match = spa_refine_data_placement(spa);
-
 				DTRACE_PROBE1(wrc_data_placement,
 				    boolean_t, match);
 			}
@@ -481,14 +535,28 @@ spa_select_class(spa_t *spa, zio_t *zio)
 	return (spa_normal_class(spa));
 }
 
+/*
+ * Tunable: enables or disables automatic spa special selection
+ * logic and set static routing value for spa_special_to_normal_ratio
+ *
+ * Range: 0 - 100 (disables automatic logic and set static routing)
+ * or
+ * Default value: UINT64_MAX (enables automatic logic)
+ */
 uint64_t spa_static_routing_percentage = UINT64_MAX;
-uint64_t spa_special_latency_limit = 15;
 
 /*
- * spa_special_load_adjust() tunables that control re-balancing of the
+ * Tunable: minimal delta between the current class-averaged latencies
+ * Range: 0 - 100
+ * Units: Percents
+ */
+uint64_t spa_min_latency_delta = 15;
+
+/*
+ * spa_special_adjust_routing() tunables that control re-balancing of the
  * write traffic between the two spa classes: special and normal.
  *
- * Specific SPA_SPECIAL_SELECTION_THROUGHPUT mechanism here includes
+ * Specific SPA_SPECIAL_SELECTION_UTILIZATION mechanism here includes
  * the following steps executed by the spa_perfmon_thread():
  * 1) sample vdev utilization
  * 2) every so many (spa_rotor_load_adjusting) samples: aggregate on a
@@ -498,11 +566,17 @@ uint64_t spa_special_latency_limit = 15;
  *    where "vdev_idle" and "vdev_busy" are the corresponding per-class
  *    boundaries specified below:
  */
-int spa_special_vdev_busy = 70;
-int spa_normal_vdev_busy = 70;
-int spa_fairly_busy_delta = 10;
-int spa_special_vdev_idle = 30;
-int spa_normal_vdev_idle = 30;
+
+/*
+ * class-averaged "busy" and "idle" constants
+ * E.g., special class is considered idle when its average utilization
+ * is at or below spa_special_class_idle
+ */
+static int spa_special_class_busy = 70;
+static int spa_normal_class_busy = 70;
+static int spa_fairly_busy_delta = 10;
+static int spa_special_class_idle = 30;
+static int spa_normal_class_idle = 30;
 
 static boolean_t
 spa_class_is_busy(int ut, int busy)
@@ -524,12 +598,126 @@ spa_class_is_fairly_busy(int ut, int busy)
 	return (ut > busy - spa_fairly_busy_delta);
 }
 
+/*
+ * This specific load-balancer implements the following strategy:
+ * when selecting between normal and special classes, bias "more"
+ * load to the class with a smaller average latency
+ */
 static void
-spa_special_load_adjust(spa_t *spa)
+spa_special_adjust_routing_latency(spa_t *spa)
+{
+	/*
+	 * average perf counters
+	 * computed for the current spa_perfmon_thread iteration
+	 */
+	spa_avg_stat_t *stat = &spa->spa_avg_stat;
+
+	/*
+	 * class latencies:
+	 * normal and special, min and max
+	 */
+	uint64_t norm_svct = stat->normal_latency;
+	uint64_t spec_svct = stat->special_latency;
+	uint64_t svct_min = MIN(norm_svct, spec_svct);
+	uint64_t svct_max = MAX(norm_svct, spec_svct);
+
+	/* no rebalancing: do nothing if idle */
+	if (norm_svct == 0 && spec_svct == 0)
+		return;
+
+	/*
+	 * normalized difference between the per-class average latencies
+	 */
+	uint64_t svct_delta = 100 * (svct_max - svct_min) / svct_max;
+
+	/*
+	 * do nothing if the difference between class-averaged latencies
+	 * is less than configured
+	 */
+	if (svct_delta < spa_min_latency_delta)
+		return;
+
+	/*
+	 * current special to normal load balancing ratio and its
+	 * current "delta" - note that both values are recomputed below
+	 */
+	int64_t ratio = spa->spa_special_to_normal_ratio;
+	int64_t ratio_delta = spa->spa_special_to_normal_delta;
+
+	/*
+	 * Recompute special-to-normal load balancing ratio:
+	 * 1) given non-zero rerouting delta, consider the current
+	 *    class-average latencies to possibly change the re-balancing
+	 *    direction; halve the delta to close on the local optimum
+	 * 2) otherwise, reset rerouting delta depending again
+	 *    on the relationship between average latencies
+	 *    (2nd and 3rd if)
+	 */
+	if ((norm_svct > spec_svct && ratio_delta < 0) ||
+	    (norm_svct < spec_svct && ratio_delta > 0))
+		ratio_delta /= -2;
+	else if (norm_svct > spec_svct && ratio_delta == 0)
+		ratio_delta = spa_special_to_normal_delta;
+	else if (norm_svct < spec_svct && ratio_delta == 0)
+		ratio_delta = -spa_special_to_normal_delta;
+
+	ratio += ratio_delta;
+	ratio = MAX(MIN(ratio, 100), 0);
+	spa->spa_special_to_normal_delta = ratio_delta;
+	spa->spa_special_to_normal_ratio = ratio;
+}
+
+static void
+spa_special_adjust_routing_utilization(spa_t *spa)
+{
+	/*
+	 * average perf counters
+	 * computed for the current spa_perfmon_thread iteration
+	 */
+	spa_avg_stat_t *stat = &spa->spa_avg_stat;
+
+	/* class utilizations: normal and special */
+	uint64_t norm_util = stat->normal_utilization;
+	uint64_t spec_util = stat->special_utilization;
+
+	/*
+	 * current special to normal load balancing ratio and its
+	 * current "delta" - note that both values are recomputed below
+	 *
+	 * the first two 'if's below deal with the idle/busy situation,
+	 * while the remaining two rebalance between classes as long as
+	 * the "other" class is not idle
+	 */
+	int64_t ratio = spa->spa_special_to_normal_ratio;
+	int64_t ratio_delta = spa->spa_special_to_normal_delta;
+
+	/* 1. special is fairly busy while normal is idle */
+	if (spa_class_is_fairly_busy(spec_util, spa_special_class_busy) &&
+	    spa_class_is_idle(norm_util, spa_normal_class_idle))
+		ratio_delta = -spa_special_factor;
+	/* 2. normal is fairly busy while special is idle */
+	else if (spa_class_is_fairly_busy(norm_util, spa_normal_class_busy) &&
+	    spa_class_is_idle(spec_util, spa_special_class_idle))
+		ratio_delta = spa_special_factor;
+	/* 3. normal is not busy and special is not idling as well */
+	else if (!spa_class_is_busy(norm_util, spa_normal_class_busy) &&
+	    !spa_class_is_idle(spec_util, spa_special_class_idle))
+		ratio_delta = -spa_special_factor;
+	/* 4. special is not busy and normal is not idling as well */
+	else if (!spa_class_is_busy(spec_util, spa_special_class_busy) &&
+	    !spa_class_is_idle(norm_util, spa_normal_class_idle))
+		ratio_delta = spa_special_factor;
+
+	ratio += ratio_delta;
+	ratio = MAX(MIN(ratio, 100), 0);
+	spa->spa_special_to_normal_delta = ratio_delta;
+	spa->spa_special_to_normal_ratio = ratio;
+}
+
+static void
+spa_special_adjust_routing(spa_t *spa)
 {
 	spa_avg_stat_t *stat = &spa->spa_avg_stat;
-	int special_vdev_busy = spa_special_vdev_busy;
-	int normal_vdev_busy = spa_normal_vdev_busy;
 
 	/*
 	 * setting this spa_static_routing_percentage to a value
@@ -553,92 +741,28 @@ spa_special_load_adjust(spa_t *spa)
 		goto out;
 	}
 
-	if (spa->spa_watermark == SPA_WM_LOW) {
-		/*
-		 * Adjust special/normal load balancing ratio by taking into
-		 * account used space vs. configurable watermarks.
-		 * (see spa_check_watermarks() for details)
-		 * Note that new writes are *not* routed to special vdev
-		 * when used above SPA_WM_HIGH
-		 */
-		special_vdev_busy = special_vdev_busy *
-		    ((100 - spa->spa_special_vdev_correction_rate) / 100);
-		normal_vdev_busy = normal_vdev_busy *
-		    ((100 + spa->spa_special_vdev_correction_rate) / 100);
-		if (normal_vdev_busy > 100)
-			normal_vdev_busy = 100;
-	}
-
 	ASSERT(SPA_SPECIAL_SELECTION_VALID(spa_special_selection));
+
 	switch (spa_special_selection) {
 	case SPA_SPECIAL_SELECTION_LATENCY:
-		/*
-		 * bias selection toward class with smaller
-		 * average latency
-		 */
-		if (stat->normal_latency == 0 && stat->special_latency == 0)
-			break;
-		/*
-		 * Normalized delta between the current
-		 * class-averaged latencies
-		 */
-		uint64_t diff = 0;
-		uint64_t new_special_to_normal_ratio =
-		    spa->spa_special_to_normal_ratio;
-
-		if (stat->normal_latency > stat->special_latency) {
-			diff = (stat->normal_latency - stat->special_latency) *
-			    100 / stat->normal_latency;
-			new_special_to_normal_ratio += MIN(spa_special_factor,
-			    100 - spa->spa_special_to_normal_ratio);
-		} else if (stat->normal_latency < stat->special_latency) {
-			diff = (stat->special_latency - stat->normal_latency) *
-			    100 / stat->special_latency;
-			new_special_to_normal_ratio -= MIN(spa_special_factor,
-			    spa->spa_special_to_normal_ratio);
-		}
-
-		if (diff > spa_special_latency_limit) {
-			spa->spa_special_to_normal_ratio =
-			    new_special_to_normal_ratio;
-		}
+		spa_special_adjust_routing_latency(spa);
 		break;
-	case SPA_SPECIAL_SELECTION_THROUGHPUT:
-		/* special is not busy and normal is not idling as well */
-		if (!spa_class_is_busy(stat->special_utilization,
-		    special_vdev_busy) &&
-		    !spa_class_is_idle(stat->normal_utilization,
-		    spa_normal_vdev_idle)) {
-			spa->spa_special_to_normal_ratio +=
-			    MIN(spa_special_factor,
-			    100 - spa->spa_special_to_normal_ratio);
-		/* normal is not busy and special is not idling as well */
-		} else if (!spa_class_is_busy(stat->normal_utilization,
-		    normal_vdev_busy) &&
-		    !spa_class_is_idle(stat->special_utilization,
-		    spa_special_vdev_idle))  {
-			spa->spa_special_to_normal_ratio -=
-			    MIN(spa_special_factor,
-			    spa->spa_special_to_normal_ratio);
-		/* special is fairly busy while normal is idle */
-		} else if (spa_class_is_fairly_busy(stat->special_utilization,
-		    special_vdev_busy) &&
-		    spa_class_is_idle(stat->normal_utilization,
-		    spa_normal_vdev_idle)) {
-			spa->spa_special_to_normal_ratio -=
-			    MIN(spa_special_factor,
-			    spa->spa_special_to_normal_ratio);
-		/* normal is fairly busy while special is idle */
-		} else if (spa_class_is_fairly_busy(stat->normal_utilization,
-		    normal_vdev_busy) &&
-		    spa_class_is_idle(stat->special_utilization,
-		    spa_special_vdev_idle)) {
-			spa->spa_special_to_normal_ratio +=
-			    MIN(spa_special_factor,
-			    100 - spa->spa_special_to_normal_ratio);
-		}
+	case SPA_SPECIAL_SELECTION_UTILIZATION:
+		spa_special_adjust_routing_utilization(spa);
 		break;
 	}
+
+	/*
+	 * Adjust special/normal load balancing ratio by taking
+	 * into account used space vs. configurable watermarks.
+	 * (see spa_check_watermarks() for details)
+	 * Note that new writes are *not* routed to special
+	 * vdev when used above SPA_WM_HIGH
+	 */
+	if (spa->spa_watermark == SPA_WM_LOW)
+		spa->spa_special_to_normal_ratio -=
+		    spa->spa_special_to_normal_ratio *
+		    spa->spa_special_vdev_correction_rate / 100;
 
 out:
 #ifdef _KERNEL
@@ -695,13 +819,17 @@ spa_vdev_walk_stats(vdev_t *pvd, spa_load_cb func,
 /*
  * Tunable: period (spa_avg_stat_update_ticks per tick)
  * for adjusting load distribution
+ * Range: 1-UINT64_MAX
+ * Units: period
  */
 uint64_t spa_rotor_load_adjusting = 1;
 
 /*
- * Tunable:
- * TRUE: weighted average over spa_rotor_load_adjusting period
- * FALSE: (default): regular average
+ * Tunable: weighted average over period
+ * Range: 0-1
+ * Units: boolean
+ * 1: weighted average over spa_rotor_load_adjusting period
+ * 0: (default): regular average
  */
 boolean_t spa_rotor_use_weight = B_FALSE;
 
@@ -820,11 +948,14 @@ spa_vdev_process_stat(vdev_t *vd, cos_acc_stat_t *cos_acc)
 		    vdev_aux->wlastupdate;
 
 		if (wlastupdate_delta != 0) {
+			/* busy: proportion of the time as a percentage */
 			utilization = 100 * rtime_delta / wlastupdate_delta;
 			if (utilization > 100)
 				utilization = 100;
+			/* throughput: KiloBytes per second */
 			throughput = NANOSEC * (nread_delta + nwritten_delta) /
 			    wlastupdate_delta / 1024;
+			/* input/output operations per second */
 			iops = NANOSEC * (reads_delta + writes_delta) /
 			    wlastupdate_delta;
 			run_len = rlentime_delta / wlastupdate_delta;
@@ -833,6 +964,7 @@ spa_vdev_process_stat(vdev_t *vd, cos_acc_stat_t *cos_acc)
 		}
 
 		if (iops != 0) {
+			/* latency: microseconds */
 			run_time = 1000 * run_len / iops;
 			wait_time = 1000 * wait_len / iops;
 			service_time = run_time + wait_time;
@@ -1001,7 +1133,8 @@ spa_special_dedup_adjust(spa_t *spa)
 
 /*
  * Tunable: period (~10ms per tick) for updating spa vdev stats
- *
+ * Range: 1 - UINT64_MAX
+ * Units: 10 * milliseconds
  * For most recent cases "75" is optimal value.
  * The recommended range is: 50...200
  */
@@ -1038,7 +1171,7 @@ spa_perfmon_thread(spa_t *spa)
 
 		/* we can adjust load and dedup at the same time */
 		if (rotor % spa_rotor_load_adjusting == 0) {
-			spa_special_load_adjust(spa);
+			spa_special_adjust_routing(spa);
 			bzero(&spa_acc, sizeof (spa_acc_stat_t));
 		}
 		if (spa->spa_dedup_best_effort)
