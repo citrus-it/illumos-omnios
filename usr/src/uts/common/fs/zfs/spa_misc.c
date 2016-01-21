@@ -1905,17 +1905,24 @@ dva_get_dsize_sync(spa_t *spa, const dva_t *dva)
 	return (dsize);
 }
 
+/*
+ * This function walks over the all DVAs of the given BP and
+ * adds up their sizes.
+ */
 uint64_t
 bp_get_dsize_sync(spa_t *spa, const blkptr_t *bp)
 {
+	/*
+	 * SPECIAL-BP has two DVAs, but DVA[0] in this case is a
+	 * temporary DVA, and after migration only the DVA[1]
+	 * contains valid data. Therefore, we start walking for
+	 * these BPs from DVA[1].
+	 */
+	int start_dva = BP_IS_SPECIAL(bp) ? 1 : 0;
 	uint64_t dsize = 0;
-	boolean_t spec_bp;
 
-	spec_bp = BP_IS_SPECIAL(bp);
-	for (int d = 0; d < BP_GET_NDVAS(bp); d++) {
+	for (int d = start_dva; d < BP_GET_NDVAS(bp); d++) {
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
-		if (spec_bp)
-			break;
 	}
 
 	return (dsize);
@@ -1924,17 +1931,11 @@ bp_get_dsize_sync(spa_t *spa, const blkptr_t *bp)
 uint64_t
 bp_get_dsize(spa_t *spa, const blkptr_t *bp)
 {
-	uint64_t dsize = 0;
-	boolean_t spec_bp;
+	uint64_t dsize;
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
-	spec_bp = BP_IS_SPECIAL(bp);
-	for (int d = 0; d < BP_GET_NDVAS(bp); d++) {
-		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
-		if (spec_bp)
-			break;
-	}
+	dsize = bp_get_dsize_sync(spa, bp);
 
 	spa_config_exit(spa, SCL_VDEV, FTAG);
 

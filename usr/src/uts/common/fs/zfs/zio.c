@@ -632,6 +632,14 @@ zio_root(spa_t *spa, zio_done_func_t *done, void *private, enum zio_flag flags)
 void
 zfs_blkptr_verify(spa_t *spa, const blkptr_t *bp)
 {
+	/*
+	 * SPECIAL-BP has two DVAs, but DVA[0] in this case is a
+	 * temporary DVA, and after migration only the DVA[1]
+	 * contains valid data. Therefore, we start walking for
+	 * these BPs from DVA[1].
+	 */
+	int start_dva = BP_IS_SPECIAL(bp) ? 1 : 0;
+
 	if (!DMU_OT_IS_VALID(BP_GET_TYPE(bp))) {
 		zfs_panic_recover("blkptr at %p has invalid TYPE %llu",
 		    bp, (longlong_t)BP_GET_TYPE(bp));
@@ -670,7 +678,7 @@ zfs_blkptr_verify(spa_t *spa, const blkptr_t *bp)
 	 * allows the birth time of log blocks (and dmu_sync()-ed blocks
 	 * that are in the log) to be arbitrarily large.
 	 */
-	for (int i = 0; i < BP_GET_NDVAS(bp); i++) {
+	for (int i = start_dva; i < BP_GET_NDVAS(bp); i++) {
 		uint64_t vdevid = DVA_GET_VDEV(&bp->blk_dva[i]);
 		if (vdevid >= spa->spa_root_vdev->vdev_children) {
 			zfs_panic_recover("blkptr at %p DVA %u has invalid "
