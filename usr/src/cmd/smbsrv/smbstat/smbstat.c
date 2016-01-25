@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -928,7 +928,8 @@ smbstat_clsh_snapshot(void)
 		    smbstat_clsh_ksp->ks_name);
 
 	curr->cs_snaptime = smbstat_clsh_ksp->ks_snaptime;
-	bcopy(smbstat_srv_ksp->ks_data, &curr->cs_data, sizeof (curr->cs_data));
+	bcopy(smbstat_clsh_ksp->ks_data, &curr->cs_data,
+	    sizeof (curr->cs_data));
 }
 
 /*
