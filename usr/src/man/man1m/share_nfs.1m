@@ -157,6 +157,22 @@ is specified, the default values associated with the global tag in
 .Pa /etc/nfs/nfslog.conf
 are used. Support of NFS server logging is only available for NFS Version 2 and
 Version 3 requests.
+.It Sy nohide
+By default, if server exports two filesystems, one of which is mounted as a
+child of the other, NFS Version 2 and Version 3 clients must mount both
+filesystems explicitly in order to access them. If a client only mounts the
+parent, it will see an empty directory at the location where the other
+filesystem is mounted.
+.Pp
+Setting the
+.Sy nohide
+option on a filesystem causes it to no longer be hidden in this manner, and the
+client will be able to move from the parent filesystem to this one without
+noticing the change. However, some NFS clients or applications may not function
+correctly when this option is used. In particular, files on different underlying
+filesystems may appear to have the same inode numbers. The
+.Sy nohide
+option only applies to NFS Version 2 and Version 3 requests.
 .It Sy none Ns = Ns Ar access_list
 Access is not allowed to any client that matches the access list. The exception
 is when the access list is an asterisk (*), in which case
