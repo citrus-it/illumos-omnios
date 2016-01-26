@@ -26,7 +26,7 @@
  * Copyright (c) 2012 by Frederik Wessels. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Prasad Joshi (sTec). All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <assert.h>
@@ -5790,13 +5790,12 @@ vdev_get_callback(zpool_handle_t *zhp, void *data)
 	zprop_get_cbdata_t *cb = &vcb->vcb_zprop_get_cbdata;
 	char value[MAXNAMELEN];
 	zprop_list_t *pl;
-	nvlist_t *nvl = NULL;
 
 	(void) zpool_find_vdev(zhp, vcb->vcb_vdev, &avail_space,
 	    &l2cache, NULL, NULL);
 	for (pl = cb->cb_proplist; pl != NULL; pl = pl->pl_next) {
 		if ((err = vdev_get_prop(zhp, vcb->vcb_vdev,
-		    pl->pl_prop, value, sizeof (value), &nvl)) != 0)
+		    pl->pl_prop, value, sizeof (value))) != 0)
 			return (err);
 
 		/* don't show L2ARC prop for non L2ARC dev, can't set anyway */

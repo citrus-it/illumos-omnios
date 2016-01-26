@@ -20,10 +20,10 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <ctype.h>
@@ -4308,15 +4308,13 @@ vdev_get_all_props(zpool_handle_t *zhp, uint64_t vdev_guid, nvlist_t **nvp)
 
 int
 vdev_get_prop(zpool_handle_t *zhp,  const char *vdev, vdev_prop_t prop,
-    char *buf, size_t len, nvlist_t **nvp)
+    char *buf, size_t len)
 {
 	uint64_t vdev_guid;
 	uint64_t intval;
 	const char *strval;
 	nvlist_t *nvl;
 	char errbuf[1024];
-
-	assert(nvp != NULL);
 
 	(void) snprintf(errbuf, sizeof (errbuf),
 	    dgettext(TEXT_DOMAIN, "cannot get property for '%s'"),
@@ -4330,9 +4328,8 @@ vdev_get_prop(zpool_handle_t *zhp,  const char *vdev, vdev_prop_t prop,
 		return (-1);
 	}
 
-	if (*nvp == NULL && vdev_get_all_props(zhp, vdev_guid, nvp) != 0)
+	if (vdev_get_all_props(zhp, vdev_guid, &nvl) != 0)
 		return (-1);
-	nvl = *nvp;
 
 	switch (vdev_prop_get_type(prop)) {
 	case PROP_TYPE_STRING:
@@ -4358,6 +4355,7 @@ vdev_get_prop(zpool_handle_t *zhp,  const char *vdev, vdev_prop_t prop,
 			intval = vdev_prop_default_numeric(prop);
 		if (vdev_prop_index_to_string(prop, intval, &strval) != 0) {
 			(void) zfs_error(zhp->zpool_hdl, EZFS_BADPROP, errbuf);
+			nvlist_free(nvl);
 			return (-1);
 		}
 		(void) strlcpy(buf, strval, len);
@@ -4366,6 +4364,8 @@ vdev_get_prop(zpool_handle_t *zhp,  const char *vdev, vdev_prop_t prop,
 	default:
 		abort();
 	}
+
+	nvlist_free(nvl);
 
 	return (0);
 }

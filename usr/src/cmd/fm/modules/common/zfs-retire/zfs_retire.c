@@ -22,7 +22,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -257,7 +257,6 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	uint_t s, nspares;
 	char *dev_name;
 
-	nvlist_t *vdev_props;
 	char dspr_group[MAXPATHLEN];
 	char sspr_group[MAXPATHLEN];
 
@@ -284,22 +283,19 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	dev_name = zpool_vdev_name(NULL, zhp, vdev, B_FALSE);
 
 	/* Get spare group of the vdev to be replaced, remember if none */
-	if ((vdev_get_prop(zhp, dev_name, VDEV_PROP_SPAREGROUP, dspr_group,
-	    MAXPATHLEN, &vdev_props))) {
+	if (vdev_get_prop(zhp, dev_name, VDEV_PROP_SPAREGROUP, dspr_group,
+	    sizeof (dspr_group)) != 0 || strcmp("-", dspr_group) == 0)
 		unassigned = B_TRUE;
-		nvlist_free(vdev_props);
-	}
 
 	/*
 	 * See if any of the spares are in the sought spare group, use one,
 	 * if unsuccessful, try to find a device not assigned to any group,
 	 * and if there are none of those, fail
 	 */
-	for (s = 0, vdev_props = NULL;
-	    s < nspares && !done && !unassigned; s++) {
+	for (s = 0; s < nspares && !done && !unassigned; s++) {
 		uint64_t wholedisk = 0;
 		char *spare_path;
-		char spare_name[PATH_MAX];
+		char spare_name[MAXPATHLEN];
 
 		if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
 		    &spare_path) != 0)
@@ -313,7 +309,7 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 			spare_name[strlen(spare_name) - 2] = '\0';
 
 		if ((vdev_get_prop(zhp, spare_name, VDEV_PROP_SPAREGROUP,
-		    sspr_group, MAXPATHLEN, &vdev_props) == 0) &&
+		    sspr_group, sizeof (sspr_group)) == 0) &&
 		    (strncmp(dspr_group, sspr_group, MAXPATHLEN) == 0)) {
 			/* found spare in the the same group */
 			(void) nvlist_add_nvlist_array(replacement,
@@ -324,21 +320,16 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 				done = B_TRUE;
 			}
 		}
-
-		if (vdev_props) {
-			nvlist_free(vdev_props);
-			vdev_props = NULL;
-		}
 	}
 
 	/*
 	 * Try to replace each spare that does not belong to a spare group,
 	 * ending when we successfully replace it.
 	 */
-	for (s = 0, vdev_props = NULL; s < nspares && !done; s++) {
+	for (s = 0; s < nspares && !done; s++) {
 		uint64_t wholedisk = 0;
 		char *spare_path;
-		char spare_name[PATH_MAX];
+		char spare_name[MAXPATHLEN];
 
 		if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
 		    &spare_path) != 0)
@@ -351,7 +342,7 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 			spare_name[strlen(spare_name) - 2] = '\0';
 
 		if ((vdev_get_prop(zhp, spare_name, VDEV_PROP_SPAREGROUP,
-		    sspr_group, MAXPATHLEN, &vdev_props) == 0) &&
+		    sspr_group, sizeof (sspr_group)) == 0) &&
 		    (strcmp("-", sspr_group) == 0)) {
 			/* found spare with sparegroup property not set */
 			(void) nvlist_add_nvlist_array(replacement,
@@ -360,11 +351,6 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 			if (zpool_vdev_attach(zhp, dev_name, spare_name,
 			    replacement, B_TRUE) == 0)
 				done = B_TRUE;
-		}
-
-		if (vdev_props) {
-			nvlist_free(vdev_props);
-			vdev_props = NULL;
 		}
 	}
 

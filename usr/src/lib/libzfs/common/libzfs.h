@@ -24,7 +24,7 @@
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBZFS_H
@@ -505,7 +505,7 @@ extern boolean_t zpool_prop_align_right(zpool_prop_t);
 extern int vdev_set_proplist(zpool_handle_t *, const char *, nvlist_t *);
 extern int vdev_get_proplist(libzfs_handle_t *, char *, zprop_list_t **);
 extern int vdev_get_prop(zpool_handle_t *,  const char *, vdev_prop_t,
-    char *, size_t len, nvlist_t **);
+    char *, size_t len);
 
 /*
  * Functions to manage cos properties
