@@ -1536,6 +1536,9 @@ does not have special device
 .Pq special vdev .
 The default value is
 .Sy off .
+This property cannot be enabled together with the
+.Sy dedup
+property.
 .It Sy xattr Ns = Ns Sy on Ns | Ns Sy off
 Controls whether extended attributes are enabled for this file system. The
 default value is

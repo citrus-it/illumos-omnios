@@ -60,6 +60,7 @@
 #include "zfs_prop.h"
 #include "libzfs_impl.h"
 #include "zfs_deleg.h"
+#include "zfs_errno.h"
 
 static int userquota_propname_decode(const char *propname, boolean_t zoned,
     zfs_userquota_prop_t *typep, char *domain, int domainlen, uint64_t *ridp);
@@ -1487,6 +1488,19 @@ zfs_setprop_error(libzfs_handle_t *hdl, zfs_prop_t prop, int err,
 		}
 		break;
 
+	case EKZFS_WRCCONFLICT:
+		if (prop == ZFS_PROP_WRC_MODE || prop == ZFS_PROP_DEDUP) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "WRC and deduplication cannot be "
+			    "activate simultaneously on the "
+			    "same dataset"));
+			(void) zfs_error(hdl, EZFS_WRCNOTSUP, errbuf);
+		} else {
+			(void) zfs_standard_error(hdl, err, errbuf);
+		}
+
+		break;
+
 	case EOVERFLOW:
 		/*
 		 * This platform can't address a volume this big.
@@ -1518,18 +1532,18 @@ zfs_setprop_error(libzfs_handle_t *hdl, zfs_prop_t prop, int err,
 			    "state, nothing to do"));
 			(void) zfs_error(hdl, EZFS_WRCALREADY, errbuf);
 			break;
-		case EOPNOTSUPP:
+		case EKZFS_WRCNOTSUP:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "feature flag 'wrcache' is not enabled or "
 			    "special device (special vdev) is not present"));
 			(void) zfs_error(hdl, EZFS_WRCNOTSUP, errbuf);
 			break;
-		case EAFNOSUPPORT:
+		case EKZFS_WRCCHILD:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "a child dataset has this property enabled"));
 			(void) zfs_error(hdl, EZFS_WRCCHILD, errbuf);
 			break;
-		case EPFNOSUPPORT:
+		case EKZFS_WRCPARENT:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "a parent dataset has this property enabled"));
 			(void) zfs_error(hdl, EZFS_WRCPARENT, errbuf);

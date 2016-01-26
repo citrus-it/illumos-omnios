@@ -40,6 +40,7 @@
 #include <sys/wrcache.h>
 
 #include "zfs_prop.h"
+#include "zfs_errno.h"
 
 #define	ZPROP_INHERIT_SUFFIX "$inherit"
 #define	ZPROP_RECVD_SUFFIX "$recvd"
@@ -862,19 +863,37 @@ dsl_prop_wrc_mode_check_child_cb(dsl_pool_t *dp,
     dsl_dataset_t *ds, void *arg)
 {
 	int err;
-	dsl_dataset_t *ds_root = arg;
+	zfs_prop_t *prop = arg;
 	objset_t *os = NULL;
 
-	/* Skip root-ds */
-	if (ds->ds_object == ds_root->ds_object)
-		return (0);
-
 	err = dmu_objset_from_ds(ds, &os);
-	if (err)
+	if (err != 0)
 		return (err);
 
-	if (os->os_wrc_mode != ZFS_WRC_MODE_OFF)
-		return (EAFNOSUPPORT);
+	if (*prop == ZFS_PROP_DEDUP) {
+		/*
+		 * User tries to set ZFS_PROP_DEDUP.
+		 * In this case we just check that
+		 * the target DS and its children
+		 * do not use writecache
+		 */
+		if (os->os_wrc_mode != ZFS_WRC_MODE_OFF)
+			return (SET_ERROR(EKZFS_WRCCONFLICT));
+	} else {
+		ASSERT3U(*prop, ==, ZFS_PROP_WRC_MODE);
+
+		/*
+		 * User tries to set ZFS_PROP_WRC_MODE.
+		 * In this case we need check that
+		 * the target DS and its children
+		 * do not use writecache and dedup
+		 */
+		if (os->os_wrc_mode != ZFS_WRC_MODE_OFF)
+			return (SET_ERROR(EKZFS_WRCCHILD));
+
+		if (os->os_dedup_checksum != ZIO_CHECKSUM_OFF)
+			return (SET_ERROR(EKZFS_WRCCONFLICT));
+	}
 
 	return (0);
 }
@@ -883,6 +902,7 @@ static int
 dsl_prop_wrc_mode_check(dsl_dataset_t *ds, objset_t *os)
 {
 	int err = 0;
+	zfs_prop_t prop = ZFS_PROP_WRC_MODE;
 
 	if (os->os_wrc_mode != ZFS_WRC_MODE_OFF) {
 		/*
@@ -891,7 +911,7 @@ dsl_prop_wrc_mode_check(dsl_dataset_t *ds, objset_t *os)
 		 * the parent
 		 */
 		if (os->os_wrc_root_ds_obj != ds->ds_object)
-			return (SET_ERROR(EPFNOSUPPORT));
+			return (SET_ERROR(EKZFS_WRCPARENT));
 	} else {
 		/*
 		 * Is not allowed to change wrc_mode for parent
@@ -899,7 +919,7 @@ dsl_prop_wrc_mode_check(dsl_dataset_t *ds, objset_t *os)
 		 */
 		err = dmu_objset_find_dp(ds->ds_dir->dd_pool,
 		    ds->ds_dir->dd_object,
-		    dsl_prop_wrc_mode_check_child_cb, ds,
+		    dsl_prop_wrc_mode_check_child_cb, &prop,
 		    DS_FIND_CHILDREN);
 	}
 
@@ -936,13 +956,41 @@ dsl_props_set_check(void *arg, dmu_tx_t *tx)
 	version = spa_version(ds->ds_dir->dd_pool->dp_spa);
 	while ((elem = nvlist_next_nvpair(dpsa->dpsa_props, elem)) != NULL) {
 		const char *prop_name = nvpair_name(elem);
+		zfs_prop_t prop = zfs_name_to_prop(prop_name);
 
 		if (strlen(prop_name) >= ZAP_MAXNAMELEN) {
 			dsl_dataset_rele(ds, FTAG);
 			return (SET_ERROR(ENAMETOOLONG));
 		}
 
-		if (zfs_name_to_prop(prop_name) == ZFS_PROP_WRC_MODE) {
+		/*
+		 * Deduplication and WRC cannot be used together
+		 * This code returns error also for case when
+		 * WRC is ON, DEDUP is off and a user tries
+		 * to do DEDUP=off, because in this case the code
+		 * will be more complex, but benefit is too small
+		 */
+		if (prop == ZFS_PROP_DEDUP) {
+			if (os->os_wrc_root_ds_obj != 0) {
+				dsl_dataset_rele(ds, FTAG);
+				return (SET_ERROR(EKZFS_WRCCONFLICT));
+			}
+
+			/*
+			 * Need to be sure that children DS
+			 * do not use writecache
+			 */
+			err = dmu_objset_find_dp(ds->ds_dir->dd_pool,
+			    ds->ds_dir->dd_object,
+			    dsl_prop_wrc_mode_check_child_cb, &prop,
+			    DS_FIND_CHILDREN);
+			if (err != 0) {
+				dsl_dataset_rele(ds, FTAG);
+				return (err);
+			}
+		}
+
+		if (prop == ZFS_PROP_WRC_MODE) {
 			uint64_t wrc_mode_new = 0;
 			data_type_t elem_type = nvpair_type(elem);
 

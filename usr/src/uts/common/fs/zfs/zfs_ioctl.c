@@ -194,6 +194,7 @@
 #include "zfs_prop.h"
 #include "zfs_deleg.h"
 #include "zfs_comutil.h"
+#include "zfs_errno.h"
 
 extern struct modlfs zfs_modlfs;
 
@@ -2694,6 +2695,7 @@ zfs_set_prop_nvlist(const char *dsname, zprop_source_t source, nvlist_t *nvl,
 	boolean_t set_worm = B_FALSE;
 	boolean_t set_wrc_mode = B_FALSE;
 	boolean_t wrc_walk_locked = B_FALSE;
+	boolean_t set_dedup = B_FALSE;
 
 	if ((rv = spa_open(dsname, &spa, FTAG)) != 0)
 		return (rv);
@@ -2715,6 +2717,12 @@ retry:
 		 */
 		if (prop == ZFS_PROP_WRC_MODE)
 			set_wrc_mode = B_TRUE;
+
+		/*
+		 *
+		 */
+		if (prop == ZFS_PROP_DEDUP)
+			set_dedup = B_TRUE;
 
 		/* decode the property value */
 		propval = pair;
@@ -2799,6 +2807,21 @@ retry:
 	if (nvl != retrynvl && !nvlist_empty(retrynvl)) {
 		nvl = retrynvl;
 		goto retry;
+	}
+
+	/*
+	 * Deduplication and WRC cannot be used together
+	 * This code returns error also for case when
+	 * WRC is ON, DEDUP is off and a user tries
+	 * to do DEDUP=off, because in this case the code
+	 * will be more complex, but benefit is too small
+	 */
+	if (set_wrc_mode && set_dedup) {
+		nvlist_free(genericnvl);
+		nvlist_free(retrynvl);
+		spa_close(spa, FTAG);
+
+		return (SET_ERROR(EKZFS_WRCCONFLICT));
 	}
 
 	/*
@@ -4324,7 +4347,7 @@ zfs_check_settable(const char *dsname, nvpair_t *pair, cred_t *cr)
 
 			/* WRC cannot be used without special-vdev */
 			if (!wrc_feature_enabled || !spa_has_special(spa))
-				return (SET_ERROR(EOPNOTSUPP));
+				return (SET_ERROR(EKZFS_WRCNOTSUP));
 
 			/*
 			 * We do not want to have races, because on
