@@ -365,11 +365,11 @@ cow_mapin(struct as *as, caddr_t uaddr, caddr_t kaddr, struct page **cached_ppp,
 
 	*lenp = 0;
 	if (cow) {
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+		AS_LOCK_ENTER(as, RW_WRITER);
 		seg = as_findseg(as, uaddr, 0);
 		if ((seg == NULL) || ((base = seg->s_base) > uaddr) ||
 		    (uaddr + total) > base + seg->s_size) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (EINVAL);
 		}
 		/*
@@ -377,10 +377,10 @@ cow_mapin(struct as *as, caddr_t uaddr, caddr_t kaddr, struct page **cached_ppp,
 		 * But to be safe, we check against segvn.
 		 */
 		if (seg->s_ops != &segvn_ops) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (ENOTSUP);
 		} else if ((SEGOP_GETTYPE(seg, uaddr) & MAP_PRIVATE) == 0) {
-			AS_LOCK_EXIT(as, &as->a_lock);
+			AS_LOCK_EXIT(as);
 			return (ENOTSUP);
 		}
 	}
@@ -485,7 +485,7 @@ tryagain:
 		++i;
 	}
 	if (cow) {
-		AS_LOCK_EXIT(as, &as->a_lock);
+		AS_LOCK_EXIT(as);
 	}
 	if (first && res == FC_NOMAP) {
 		/*
@@ -503,7 +503,7 @@ tryagain:
 		size = total;
 		res = as_fault(as->a_hat, as, uaddr, size, F_INVAL, S_READ);
 		if (cow)
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			AS_LOCK_ENTER(as, RW_WRITER);
 		goto tryagain;
 	}
 	switch (res) {
