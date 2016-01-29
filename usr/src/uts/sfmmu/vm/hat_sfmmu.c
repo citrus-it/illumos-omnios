@@ -81,7 +81,6 @@
 #include <sys/mem_config.h>
 #include <sys/mem_cage.h>
 #include <vm/vm_dep.h>
-#include <vm/xhat_sfmmu.h>
 #include <sys/fpu/fpusystm.h>
 #include <vm/mach_kpm.h>
 #include <sys/callb.h>
@@ -1351,8 +1350,6 @@ hat_init(void)
 	}
 #endif
 
-	(void) xhat_init();
-
 	uhme_hash_pa = va_to_pa(uhme_hash);
 	khme_hash_pa = va_to_pa(khme_hash);
 
@@ -1540,7 +1537,6 @@ hat_alloc(struct as *as)
 	sfmmup->sfmmu_free = 0;
 	sfmmup->sfmmu_rmstat = 0;
 	sfmmup->sfmmu_clrbin = sfmmup->sfmmu_clrstart;
-	sfmmup->sfmmu_xhat_provider = NULL;
 	cv_init(&sfmmup->sfmmu_tsb_cv, NULL, CV_DEFAULT, NULL);
 	sfmmup->sfmmu_srdp = NULL;
 	SF_RGNMAP_ZERO(sfmmup->sfmmu_region_map);
@@ -1920,7 +1916,6 @@ hat_free_start(struct hat *sfmmup)
 {
 	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as));
 	ASSERT(sfmmup != ksfmmup);
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 
 	sfmmup->sfmmu_free = 1;
 	if (sfmmup->sfmmu_scdp != NULL) {
@@ -1935,7 +1930,6 @@ hat_free_end(struct hat *sfmmup)
 {
 	int i;
 
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 	ASSERT(sfmmup->sfmmu_free == 1);
 	ASSERT(sfmmup->sfmmu_ttecnt[TTE8K] == 0);
 	ASSERT(sfmmup->sfmmu_ttecnt[TTE64K] == 0);
@@ -1984,7 +1978,6 @@ hat_free_end(struct hat *sfmmup)
 void
 hat_swapin(struct hat *hat)
 {
-	ASSERT(hat->sfmmu_xhat_provider == NULL);
 }
 
 /*
@@ -2009,7 +2002,6 @@ hat_swapout(struct hat *sfmmup)
 	};			/* free list of TSBs */
 	struct free_tsb *freelist, *last, *next;
 
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 	SFMMU_STAT(sf_swapout);
 
 	/*
@@ -2032,8 +2024,6 @@ hat_swapout(struct hat *sfmmup)
 		hmeblkp = hmebp->hmeblkp;
 		pr_hblk = NULL;
 		while (hmeblkp) {
-
-			ASSERT(!hmeblkp->hblk_xhat_bit);
 
 			if ((hmeblkp->hblk_tag.htag_id == sfmmup) &&
 			    !hmeblkp->hblk_shw_bit && !hmeblkp->hblk_lckcnt) {
@@ -2136,7 +2126,6 @@ hat_dup(struct hat *hat, struct hat *newhat, caddr_t addr, size_t len,
 	int i;
 	extern uint_t get_color_start(struct as *);
 
-	ASSERT(hat->sfmmu_xhat_provider == NULL);
 	ASSERT((flag == 0) || (flag == HAT_DUP_ALL) || (flag == HAT_DUP_COW) ||
 	    (flag == HAT_DUP_SRD));
 	ASSERT(hat != ksfmmup);
@@ -2206,8 +2195,7 @@ hat_memload_region(struct hat *hat, caddr_t addr, struct page *pp,
 	uint_t attr, uint_t flags, hat_region_cookie_t rcookie)
 {
 	uint_t rid;
-	if (rcookie == HAT_INVALID_REGION_COOKIE ||
-	    hat->sfmmu_xhat_provider != NULL) {
+	if (rcookie == HAT_INVALID_REGION_COOKIE) {
 		hat_do_memload(hat, addr, pp, attr, flags,
 		    SFMMU_INVALID_SHMERID);
 		return;
@@ -2239,13 +2227,6 @@ hat_do_memload(struct hat *hat, caddr_t addr, struct page *pp,
 	if (PP_ISFREE(pp)) {
 		panic("hat_memload: loading a mapping to free page %p",
 		    (void *)pp);
-	}
-
-	if (hat->sfmmu_xhat_provider) {
-		/* no regions for xhats */
-		ASSERT(!SFMMU_IS_SHMERID_VALID(rid));
-		XHAT_MEMLOAD(hat, addr, pp, attr, flags);
-		return;
 	}
 
 	ASSERT((hat == ksfmmup) || AS_LOCK_HELD(hat->sfmmu_as));
@@ -2295,11 +2276,6 @@ hat_devload(struct hat *hat, caddr_t addr, size_t len, pfn_t pfn,
 	int use_lgpg = 0;
 
 	ASSERT(hat != NULL);
-
-	if (hat->sfmmu_xhat_provider) {
-		XHAT_DEVLOAD(hat, addr, len, pfn, attr, flags);
-		return;
-	}
 
 	ASSERT(!(flags & ~SFMMU_LOAD_ALLFLAG));
 	ASSERT(!(attr & ~SFMMU_LOAD_ALLATTR));
@@ -2446,8 +2422,7 @@ hat_memload_array_region(struct hat *hat, caddr_t addr, size_t len,
 	hat_region_cookie_t rcookie)
 {
 	uint_t rid;
-	if (rcookie == HAT_INVALID_REGION_COOKIE ||
-	    hat->sfmmu_xhat_provider != NULL) {
+	if (rcookie == HAT_INVALID_REGION_COOKIE) {
 		hat_do_memload_array(hat, addr, len, pps, attr, flags,
 		    SFMMU_INVALID_SHMERID);
 		return;
@@ -2481,12 +2456,6 @@ hat_do_memload_array(struct hat *hat, caddr_t addr, size_t len,
 
 	ASSERT(!((uintptr_t)addr & MMU_PAGEOFFSET));
 	SFMMU_VALIDATE_HMERID(hat, rid, addr, len);
-
-	if (hat->sfmmu_xhat_provider) {
-		ASSERT(!SFMMU_IS_SHMERID_VALID(rid));
-		XHAT_MEMLOAD_ARRAY(hat, addr, len, pps, attr, flags);
-		return;
-	}
 
 	if (hat->sfmmu_rmstat)
 		hat_resvstat(len, hat->sfmmu_as, addr);
@@ -3970,7 +3939,6 @@ hat_unlock(struct hat *sfmmup, caddr_t addr, size_t len)
 	caddr_t endaddr;
 
 	ASSERT(sfmmup != NULL);
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 
 	ASSERT((sfmmup == ksfmmup) || AS_LOCK_HELD(sfmmup->sfmmu_as));
 	ASSERT((len & MMU_PAGEOFFSET) == 0);
@@ -4054,7 +4022,6 @@ hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
 	}
 
 	ASSERT(sfmmup != NULL);
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 	ASSERT(sfmmup != ksfmmup);
 
 	srdp = sfmmup->sfmmu_srdp;
@@ -4766,7 +4733,6 @@ hat_probe(struct hat *sfmmup, caddr_t addr)
 	tte_t tte;
 
 	ASSERT(sfmmup != NULL);
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 
 	ASSERT((sfmmup == ksfmmup) || AS_LOCK_HELD(sfmmup->sfmmu_as));
 
@@ -4790,8 +4756,6 @@ hat_getpagesize(struct hat *sfmmup, caddr_t addr)
 {
 	tte_t tte;
 
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
-
 	if (sfmmup == ksfmmup) {
 		if (sfmmu_vatopfn(addr, sfmmup, &tte) == PFN_INVALID) {
 			return (-1);
@@ -4810,8 +4774,6 @@ uint_t
 hat_getattr(struct hat *sfmmup, caddr_t addr, uint_t *attr)
 {
 	tte_t tte;
-
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 
 	if (sfmmup == ksfmmup) {
 		if (sfmmu_vatopfn(addr, sfmmup, &tte) == PFN_INVALID) {
@@ -4836,19 +4798,7 @@ hat_getattr(struct hat *sfmmup, caddr_t addr, uint_t *attr)
 void
 hat_setattr(struct hat *hat, caddr_t addr, size_t len, uint_t attr)
 {
-	if (hat->sfmmu_xhat_provider) {
-		XHAT_SETATTR(hat, addr, len, attr);
-		return;
-	} else {
-		/*
-		 * This must be a CPU HAT. If the address space has
-		 * XHATs attached, change attributes for all of them,
-		 * just in case
-		 */
-		ASSERT(hat->sfmmu_as != NULL);
-		if (hat->sfmmu_as->a_xhat != NULL)
-			xhat_setattr_all(hat->sfmmu_as, addr, len, attr);
-	}
+	ASSERT(hat->sfmmu_as != NULL);
 
 	sfmmu_chgattr(hat, addr, len, attr, SFMMU_SETATTR);
 }
@@ -4860,19 +4810,7 @@ hat_setattr(struct hat *hat, caddr_t addr, size_t len, uint_t attr)
 void
 hat_chgattr(struct hat *hat, caddr_t addr, size_t len, uint_t attr)
 {
-	if (hat->sfmmu_xhat_provider) {
-		XHAT_CHGATTR(hat, addr, len, attr);
-		return;
-	} else {
-		/*
-		 * This must be a CPU HAT. If the address space has
-		 * XHATs attached, change attributes for all of them,
-		 * just in case
-		 */
-		ASSERT(hat->sfmmu_as != NULL);
-		if (hat->sfmmu_as->a_xhat != NULL)
-			xhat_chgattr_all(hat->sfmmu_as, addr, len, attr);
-	}
+	ASSERT(hat->sfmmu_as != NULL);
 
 	sfmmu_chgattr(hat, addr, len, attr, SFMMU_CHGATTR);
 }
@@ -4883,19 +4821,7 @@ hat_chgattr(struct hat *hat, caddr_t addr, size_t len, uint_t attr)
 void
 hat_clrattr(struct hat *hat, caddr_t addr, size_t len, uint_t attr)
 {
-	if (hat->sfmmu_xhat_provider) {
-		XHAT_CLRATTR(hat, addr, len, attr);
-		return;
-	} else {
-		/*
-		 * This must be a CPU HAT. If the address space has
-		 * XHATs attached, change attributes for all of them,
-		 * just in case
-		 */
-		ASSERT(hat->sfmmu_as != NULL);
-		if (hat->sfmmu_as->a_xhat != NULL)
-			xhat_clrattr_all(hat->sfmmu_as, addr, len, attr);
-	}
+	ASSERT(hat->sfmmu_as != NULL);
 
 	sfmmu_chgattr(hat, addr, len, attr, SFMMU_CLRATTR);
 }
@@ -5247,19 +5173,7 @@ hat_chgprot(struct hat *sfmmup, caddr_t addr, size_t len, uint_t vprot)
 	ASSERT((len & MMU_PAGEOFFSET) == 0);
 	ASSERT(((uintptr_t)addr & MMU_PAGEOFFSET) == 0);
 
-	if (sfmmup->sfmmu_xhat_provider) {
-		XHAT_CHGPROT(sfmmup, addr, len, vprot);
-		return;
-	} else {
-		/*
-		 * This must be a CPU HAT. If the address space has
-		 * XHATs attached, change attributes for all of them,
-		 * just in case
-		 */
-		ASSERT(sfmmup->sfmmu_as != NULL);
-		if (sfmmup->sfmmu_as->a_xhat != NULL)
-			xhat_chgprot_all(sfmmup->sfmmu_as, addr, len, vprot);
-	}
+	ASSERT(sfmmup->sfmmu_as != NULL);
 
 	CPUSET_ZERO(cpuset);
 
@@ -5694,20 +5608,7 @@ hat_unload_callback(
 	int issegkmap = ISSEGKMAP(sfmmup, addr);
 	demap_range_t dmr, *dmrp;
 
-	if (sfmmup->sfmmu_xhat_provider) {
-		XHAT_UNLOAD_CALLBACK(sfmmup, addr, len, flags, callback);
-		return;
-	} else {
-		/*
-		 * This must be a CPU HAT. If the address space has
-		 * XHATs attached, unload the mappings for all of them,
-		 * just in case
-		 */
-		ASSERT(sfmmup->sfmmu_as != NULL);
-		if (sfmmup->sfmmu_as->a_xhat != NULL)
-			xhat_unload_callback_all(sfmmup->sfmmu_as, addr,
-			    len, flags, callback);
-	}
+	ASSERT(sfmmup->sfmmu_as != NULL);
 
 	ASSERT((sfmmup == ksfmmup) || (flags & HAT_UNLOAD_OTHER) || \
 	    AS_LOCK_HELD(sfmmup->sfmmu_as));
@@ -5984,10 +5885,6 @@ hat_unload_callback(
 void
 hat_unload(struct hat *sfmmup, caddr_t addr, size_t len, uint_t flags)
 {
-	if (sfmmup->sfmmu_xhat_provider) {
-		XHAT_UNLOAD(sfmmup, addr, len, flags);
-		return;
-	}
 	hat_unload_callback(sfmmup, addr, len, flags, NULL);
 }
 
@@ -6327,7 +6224,6 @@ hat_sync(struct hat *sfmmup, caddr_t addr, size_t len, uint_t clearflag)
 	caddr_t endaddr;
 	cpuset_t cpuset;
 
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 	ASSERT((sfmmup == ksfmmup) || AS_LOCK_HELD(sfmmup->sfmmu_as));
 	ASSERT((len & MMU_PAGEOFFSET) == 0);
 	ASSERT((clearflag == HAT_SYNC_DONTZERO) ||
@@ -7133,14 +7029,11 @@ hat_pageunload(struct page *pp, uint_t forceflag)
 #endif
 	cpuset_t cpuset, tset;
 	int index, cons;
-	int xhme_blks;
 	int pa_hments;
 
 	ASSERT(PAGE_EXCL(pp));
 
-retry_xhat:
 	tmphme = NULL;
-	xhme_blks = 0;
 	pa_hments = 0;
 	CPUSET_ZERO(cpuset);
 
@@ -7172,16 +7065,6 @@ retry:
 		}
 
 		hmeblkp = sfmmu_hmetohblk(sfhme);
-		if (hmeblkp->hblk_xhat_bit) {
-			struct xhat_hme_blk *xblk =
-			    (struct xhat_hme_blk *)hmeblkp;
-
-			(void) XHAT_PAGEUNLOAD(xblk->xhat_hme_blk_hat,
-			    pp, forceflag, XBLK2PROVBLK(xblk));
-
-			xhme_blks = 1;
-			continue;
-		}
 
 		/*
 		 * If there are kernel mappings don't unload them, they will
@@ -7218,7 +7101,7 @@ retry:
 	 * we were called from hat_page_relocate() in which case we
 	 * leave the locked mappings which will be suspended later.
 	 */
-	ASSERT(!PP_ISMAPPED(origpp) || xhme_blks || pa_hments ||
+	ASSERT(!PP_ISMAPPED(origpp) || pa_hments ||
 	    (forceflag == SFMMU_KERNEL_RELOC));
 
 #ifdef VAC
@@ -7253,21 +7136,10 @@ retry:
 			}
 		}
 
-		ASSERT(!PP_ISMAPPED(origpp) || xhme_blks);
+		ASSERT(!PP_ISMAPPED(origpp));
 	}
 
 	sfmmu_mlist_exit(pml);
-
-	/*
-	 * XHAT may not have finished unloading pages
-	 * because some other thread was waiting for
-	 * mlist lock and XHAT_PAGEUNLOAD let it do
-	 * the job.
-	 */
-	if (xhme_blks) {
-		pp = origpp;
-		goto retry_xhat;
-	}
 
 	return (0);
 }
@@ -7549,8 +7421,6 @@ retry:
 		 * reach the range we are seeking, just ignore it.
 		 */
 		hmeblkp = sfmmu_hmetohblk(sfhme);
-		if (hmeblkp->hblk_xhat_bit)
-			continue;
 
 		if (hme_size(sfhme) < cons)
 			continue;
@@ -7710,12 +7580,6 @@ retry:
 	sfmmu_copytte(&sfhme->hme_tte, &tte);
 	if (TTE_IS_VALID(&tte) && TTE_IS_WRITABLE(&tte)) {
 		hmeblkp = sfmmu_hmetohblk(sfhme);
-
-		/*
-		 * xhat mappings should never be to a VMODSORT page.
-		 */
-		ASSERT(hmeblkp->hblk_xhat_bit == 0);
-
 		sfmmup = hblktosfmmu(hmeblkp);
 		addr = tte_to_vaddr(hmeblkp, tte);
 
@@ -7980,8 +7844,6 @@ hat_getpfnum(struct hat *hat, caddr_t addr)
 	 * the as lock.
 	 */
 
-	ASSERT(hat->sfmmu_xhat_provider == NULL);
-
 	if (hat == ksfmmup) {
 		if (IS_KMEM_VA_LARGEPAGE(addr)) {
 			ASSERT(segkmem_lpszc > 0);
@@ -8165,7 +8027,6 @@ void
 hat_map(struct hat *hat, caddr_t addr, size_t len, uint_t flags)
 {
 	ASSERT(hat != NULL);
-	ASSERT(hat->sfmmu_xhat_provider == NULL);
 }
 
 /*
@@ -8258,14 +8119,6 @@ again:
 		}
 
 		hmeblkp = sfmmu_hmetohblk(sfhme);
-		if (hmeblkp->hblk_xhat_bit) {
-			cnt++;
-			if (cnt > sh_thresh) {
-				sfmmu_mlist_exit(pml);
-				return (1);
-			}
-			continue;
-		}
 		if (hme_size(sfhme) != sz) {
 			continue;
 		}
@@ -8379,10 +8232,6 @@ hat_page_demote(page_t *pp)
 			hmeblkp = sfmmu_hmetohblk(sfhme);
 			if (hme_size(sfhme) != sz) {
 				continue;
-			}
-			if (hmeblkp->hblk_xhat_bit) {
-				cmn_err(CE_PANIC,
-				    "hat_page_demote: xhat hmeblk");
 			}
 			tset = sfmmu_pageunload(rootpp, sfhme, sz);
 			CPUSET_OR(cpuset, tset);
@@ -8511,8 +8360,6 @@ hat_get_mapped_size(struct hat *hat)
 	if (hat == NULL)
 		return (0);
 
-	ASSERT(hat->sfmmu_xhat_provider == NULL);
-
 	for (i = 0; i < mmu_page_sizes; i++)
 		assize += ((pgcnt_t)hat->sfmmu_ttecnt[i] +
 		    (pgcnt_t)hat->sfmmu_scdrttecnt[i]) * TTEBYTES(i);
@@ -8532,8 +8379,6 @@ hat_stats_enable(struct hat *hat)
 {
 	hatlock_t	*hatlockp;
 
-	ASSERT(hat->sfmmu_xhat_provider == NULL);
-
 	hatlockp = sfmmu_hat_enter(hat);
 	hat->sfmmu_rmstat++;
 	sfmmu_hat_exit(hatlockp);
@@ -8544,8 +8389,6 @@ void
 hat_stats_disable(struct hat *hat)
 {
 	hatlock_t	*hatlockp;
-
-	ASSERT(hat->sfmmu_xhat_provider == NULL);
 
 	hatlockp = sfmmu_hat_enter(hat);
 	hat->sfmmu_rmstat--;
@@ -8647,8 +8490,6 @@ hat_share(struct hat *sfmmup, caddr_t addr,
 	 */
 	if (!ISM_ALIGNED(ismshift, len))
 		return (EINVAL);
-
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 
 	/*
 	 * Allocate ism_ment for the ism_hat's mapping list, and an
@@ -8861,19 +8702,7 @@ hat_unshare(struct hat *sfmmup, caddr_t addr, size_t len, uint_t ismszc)
 	ASSERT(sfmmup != NULL);
 	ASSERT(sfmmup != ksfmmup);
 
-	if (sfmmup->sfmmu_xhat_provider) {
-		XHAT_UNSHARE(sfmmup, addr, len);
-		return;
-	} else {
-		/*
-		 * This must be a CPU HAT. If the address space has
-		 * XHATs attached, inform all XHATs that ISM segment
-		 * is going away
-		 */
-		ASSERT(sfmmup->sfmmu_as != NULL);
-		if (sfmmup->sfmmu_as->a_xhat != NULL)
-			xhat_unshare_all(sfmmup->sfmmu_as, addr, len);
-	}
+	ASSERT(sfmmup->sfmmu_as != NULL);
 
 	/*
 	 * Make sure that during the entire time ISM mappings are removed,
@@ -9327,8 +9156,6 @@ sfmmu_vac_conflict(struct hat *hat, caddr_t addr, page_t *pp)
 		if (IS_PAHME(sfhmep))
 			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
-		if (hmeblkp->hblk_xhat_bit)
-			continue;
 		tmphat = hblktosfmmu(hmeblkp);
 		sfmmu_copytte(&sfhmep->hme_tte, &tte);
 		ASSERT(TTE_IS_VALID(&tte));
@@ -9355,8 +9182,6 @@ sfmmu_vac_conflict(struct hat *hat, caddr_t addr, page_t *pp)
 		if (IS_PAHME(sfhmep))
 			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
-		if (hmeblkp->hblk_xhat_bit)
-			continue;
 		ASSERT(!hmeblkp->hblk_shared);
 		(void) sfmmu_pageunload(pp, sfhmep, TTE8K);
 	}
@@ -9504,8 +9329,6 @@ tst_tnc(page_t *pp, pgcnt_t npages)
 			if (IS_PAHME(sfhme))
 				continue;
 			hmeblkp = sfmmu_hmetohblk(sfhme);
-			if (hmeblkp->hblk_xhat_bit)
-				continue;
 
 			sfmmu_copytte(&sfhme->hme_tte, &tte);
 			ASSERT(TTE_IS_VALID(&tte));
@@ -9652,9 +9475,6 @@ sfmmu_page_cache(page_t *pp, int flags, int cache_flush_flag, int bcolor)
 		if (IS_PAHME(sfhme))
 			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhme);
-
-		if (hmeblkp->hblk_xhat_bit)
-			continue;
 
 		sfmmu_copytte(&sfhme->hme_tte, &tte);
 		ASSERT(TTE_IS_VALID(&tte));
@@ -13403,7 +13223,6 @@ faultcode_t
 hat_softlock(struct hat *hat, caddr_t addr, size_t *lenp, page_t **ppp,
     uint_t flags)
 {
-	ASSERT(hat->sfmmu_xhat_provider == NULL);
 	return (FC_NOSUPPORT);
 }
 
@@ -13438,8 +13257,6 @@ sfmmu_rm_large_mappings(page_t *pp, int ttesz)
 		if (IS_PAHME(sfhmep))
 			continue;
 		hmeblkp = sfmmu_hmetohblk(sfhmep);
-		if (hmeblkp->hblk_xhat_bit)
-			continue;
 		if (hme_size(sfhmep) == ttesz) {
 			/*
 			 * another mapping of the same size. don't clear index.
@@ -14024,7 +13841,6 @@ hat_join_region(struct hat *sfmmup,
 		return (HAT_INVALID_REGION_COOKIE);
 	}
 
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
 	ASSERT(sfmmup != ksfmmup);
 	ASSERT(AS_WRITE_HELD(sfmmup->sfmmu_as));
 	ASSERT(srdp->srd_refcnt > 0);
@@ -14330,12 +14146,6 @@ hat_leave_region(struct hat *sfmmup, hat_region_cookie_t rcookie, uint_t flags)
 	ASSERT((rgnp->rgn_flags & SFMMU_REGION_TYPE_MASK) == r_type);
 	ASSERT(!(rgnp->rgn_flags & SFMMU_REGION_FREE));
 	ASSERT(AS_LOCK_HELD(sfmmup->sfmmu_as));
-
-	ASSERT(sfmmup->sfmmu_xhat_provider == NULL);
-	if (r_type == SFMMU_REGION_HME && sfmmup->sfmmu_as->a_xhat != NULL) {
-		xhat_unload_callback_all(sfmmup->sfmmu_as, rgnp->rgn_saddr,
-		    rgnp->rgn_size, 0, NULL);
-	}
 
 	if (sfmmup->sfmmu_free) {
 		ulong_t rttecnt;
