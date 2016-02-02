@@ -24,7 +24,7 @@
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013, Saso Kiselkov. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -219,6 +219,7 @@ typedef enum {
 	ZPOOL_PROP_FORCETRIM,
 	ZPOOL_PROP_AUTOTRIM,
 	ZPOOL_PROP_SMALL_DATA_TO_METADEV,
+	ZPOOL_PROP_MINWATERMARK,
 	ZPOOL_NUM_PROPS
 } zpool_prop_t;
 

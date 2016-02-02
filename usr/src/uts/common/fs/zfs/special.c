@@ -230,7 +230,8 @@ spa_check_watermarks(spa_t *spa)
 	if (!spa_has_special(spa))
 		return;
 
-	if (spa->spa_lowat == 0 && spa->spa_hiwat == 0)
+	/* Control logic will not work if one of the value is 0 */
+	if (spa->spa_lowat == 0 || spa->spa_hiwat == 0)
 		return;
 
 	mc = spa_special_class(spa);

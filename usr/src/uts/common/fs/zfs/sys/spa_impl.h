@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2013 Saso Kiselkov. All rights reserved.
  */
 
@@ -369,6 +369,7 @@ struct spa {
 	boolean_t	spa_usesc;		/* enable special class */
 	spa_specialclass_t spa_specialclass;	/* class of special device */
 	uint64_t	spa_special_vdev_correction_rate;
+	uint64_t	spa_minwat;		/* min watermark percent */
 	uint64_t	spa_lowat;		/* low watermark percent */
 	uint64_t	spa_hiwat;		/* high watermark percent */
 	uint64_t	spa_lwm_space;		/* low watermark */

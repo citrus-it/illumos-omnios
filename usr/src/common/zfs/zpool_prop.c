@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/zio.h>
@@ -172,6 +172,11 @@ zpool_prop_init(void)
 	zprop_register_index(ZPOOL_PROP_ENABLESPECIAL, "enablespecial", 0,
 	    PROP_READONLY, ZFS_TYPE_POOL, "on | off", "ENABLESPECIAL",
 	    boolean_table);
+
+	/* pool's min watermark in percents (for write cache) */
+	zprop_register_number(ZPOOL_PROP_MINWATERMARK, "min-watermark",
+	    20, PROP_DEFAULT, ZFS_TYPE_POOL,
+	    "<watermark 0-100%>", "MINWATERMARK");
 
 	/* pool's low watermark in percents (for write cache) */
 	zprop_register_number(ZPOOL_PROP_LOWATERMARK, "low-watermark",

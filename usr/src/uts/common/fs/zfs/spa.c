@@ -23,7 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2013 Saso Kiselkov. All rights reserved.
  */
 
@@ -216,6 +216,8 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		    size - alloc, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_ENABLESPECIAL, NULL,
 		    (uint64_t)spa->spa_usesc, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_MINWATERMARK, NULL,
+		    spa->spa_minwat, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_HIWATERMARK, NULL,
 		    spa->spa_hiwat, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_LOWATERMARK, NULL,
@@ -444,7 +446,8 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 	int error = 0, reset_bootfs = 0;
 	uint64_t objnum = 0;
 	boolean_t has_feature = B_FALSE;
-	uint64_t lowat = spa->spa_lowat, hiwat = spa->spa_hiwat;
+	uint64_t lowat = spa->spa_lowat, hiwat = spa->spa_hiwat,
+	    minwat = spa->spa_minwat;
 
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(props, elem)) != NULL) {
@@ -681,6 +684,12 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				error = SET_ERROR(EINVAL);
 			break;
 
+		case ZPOOL_PROP_MINWATERMARK:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && (intval > 100))
+				error = SET_ERROR(EINVAL);
+			minwat = intval;
+			break;
 		case ZPOOL_PROP_LOWATERMARK:
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && (intval > 100))
@@ -705,7 +714,11 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 	}
 
 	/* check if low watermark is less than high watermark */
-	if (lowat > 0 && lowat >= hiwat)
+	if (lowat != 0 && lowat >= hiwat)
+		error = SET_ERROR(EINVAL);
+
+	/* check if min watermark is less than low watermark */
+	if (minwat != 0 && minwat >= lowat)
 		error = SET_ERROR(EINVAL);
 
 	if (!error && reset_bootfs) {
@@ -2786,6 +2799,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
+	spa->spa_minwat = zpool_prop_default_numeric(ZPOOL_PROP_MINWATERMARK);
 	spa->spa_dedup_lo_best_effort =
 	    zpool_prop_default_numeric(ZPOOL_PROP_DEDUP_LO_BEST_EFFORT);
 	spa->spa_dedup_hi_best_effort =
@@ -2824,6 +2838,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 
 		spa_prop_find(spa, ZPOOL_PROP_HIWATERMARK, &spa->spa_hiwat);
 		spa_prop_find(spa, ZPOOL_PROP_LOWATERMARK, &spa->spa_lowat);
+		spa_prop_find(spa, ZPOOL_PROP_MINWATERMARK, &spa->spa_minwat);
 		spa_prop_find(spa, ZPOOL_PROP_DEDUPMETA_DITTO,
 		    &spa->spa_ddt_meta_copies);
 		spa_prop_find(spa, ZPOOL_PROP_DDT_DESEGREGATION, &val);
@@ -3956,6 +3971,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 	spa->spa_failmode = zpool_prop_default_numeric(ZPOOL_PROP_FAILUREMODE);
 	spa->spa_autoexpand = zpool_prop_default_numeric(ZPOOL_PROP_AUTOEXPAND);
+	spa->spa_minwat = zpool_prop_default_numeric(ZPOOL_PROP_MINWATERMARK);
 	spa->spa_hiwat = zpool_prop_default_numeric(ZPOOL_PROP_HIWATERMARK);
 	spa->spa_lowat = zpool_prop_default_numeric(ZPOOL_PROP_LOWATERMARK);
 	spa->spa_ddt_meta_copies =
@@ -6666,6 +6682,9 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 				break;
 			case ZPOOL_PROP_DEDUPDITTO:
 				spa->spa_dedup_ditto = intval;
+				break;
+			case ZPOOL_PROP_MINWATERMARK:
+				spa->spa_minwat = intval;
 				break;
 			case ZPOOL_PROP_LOWATERMARK:
 				spa->spa_lowat = intval;

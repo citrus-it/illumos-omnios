@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -84,6 +84,8 @@ uint64_t wrc_mv_cancel_threshold_initial = 20;
 /* we are not sure if we need logic of threshold increment */
 uint64_t wrc_mv_cancel_threshold_step = 0;
 uint64_t wrc_mv_cancel_threshold_cap = 50;
+
+static boolean_t wrc_check_space(spa_t *spa);
 
 static void wrc_free_block(wrc_block_t *block);
 static void wrc_clean_tree(wrc_data_t *wrc_data, avl_tree_t *tree);
@@ -1436,7 +1438,12 @@ wrc_free_restore(spa_t *spa)
 	wrc_data->wrc_block_count = 0;
 }
 
-/* Autosnap confirmation callback */
+/*
+ * The bool returned from this function tells to autosnapper
+ * whether to take a new autosnapshot or not.
+ * The new autosnapshot is used as the right boundary for a new
+ * writecache migration window.
+ */
 /*ARGSUSED*/
 static boolean_t
 wrc_confirm_cb(const char *name, boolean_t recursive, uint64_t txg, void *arg)
@@ -1444,7 +1451,14 @@ wrc_confirm_cb(const char *name, boolean_t recursive, uint64_t txg, void *arg)
 	wrc_instance_t *wrc_instance = arg;
 	wrc_data_t *wrc_data = wrc_instance->wrc_data;
 
-	return (wrc_data->wrc_wait_for_window && !wrc_data->wrc_locked);
+	/*
+	 * The conditions are:
+	 * - no active writecache window currently
+	 * - writecache is not locked
+	 * - used space on special vdev is at or above min-watermark
+	 */
+	return (wrc_data->wrc_wait_for_window && !wrc_data->wrc_locked &&
+	    !wrc_check_space(wrc_data->wrc_spa));
 }
 
 uint64_t wrc_window_roll_delay = 0;
@@ -1464,13 +1478,30 @@ wrc_check_time(wrc_data_t *wrc_data)
 #endif
 }
 
+/*
+ * Returns B_TRUE if the percentage of used space on special vdev
+ * is below ZPOOL_PROP_MINWATERMARK ("min-watermark", MIN_WN),
+ * otherwise returns B_FALSE.
+ *
+ * Based on this return wrc_confirm_cb() caller either opens
+ * a new writecache window, or not. In the latter case, when
+ * the used space remains below min-watermark, writecache migration
+ * does not run.
+ *
+ * Similarly to low-watermark and high-watermark that control
+ * special vdev's used space and the rate of its utilization,
+ * the min-watermark is a pool's property that can be set via:
+ *
+ * 'zpool set min-watermark <pool name>'
+ *
+ */
 static boolean_t
 wrc_check_space(spa_t *spa)
 {
 	uint64_t percentage =
 	    spa_class_alloc_percentage(spa_special_class(spa));
 
-	return (percentage < spa->spa_lowat);
+	return (percentage < spa->spa_minwat);
 }
 
 /* Autosnap notification callback */
@@ -1501,12 +1532,7 @@ wrc_nc_cb(const char *name, boolean_t recursive, boolean_t autosnap,
 		return (result);
 	}
 
-	if (wrc_check_time(wrc_data) &&
-	    wrc_check_space(wrc_data->wrc_spa) &&
-	    !wrc_instance->fini_migration) {
-		/* Too soon to start a new window */
-		result = B_FALSE;
-	} else if (wrc_data->wrc_walking) {
+	if (wrc_data->wrc_walking) {
 		/* Current window already done, but is not closed yet */
 		result = B_FALSE;
 	} else if (wrc_data->wrc_locked) {
