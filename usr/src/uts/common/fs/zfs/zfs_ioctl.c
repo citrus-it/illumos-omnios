@@ -23,11 +23,11 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Portions Copyright 2011 Martin Matuska
  * Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1536,17 +1536,13 @@ zfsvfs_rele(zfsvfs_t *zfsvfs, void *tag)
 }
 
 
-#define	ZFS_EVENT_CHANNEL "com.nexenta:zfs"
-#define	ZFS_EC_STATUS	"status.zfs"
-#define	ZPOOL_EC_STATUS "status.zpool"
-
 /*
  * Publish events using GPEC subsystem
  */
 
 static evchan_t *zfs_channel = NULL;
 
-static void
+void
 zfs_event_post(const char *subclass, const char *operation, nvlist_t *ev_data)
 {
 

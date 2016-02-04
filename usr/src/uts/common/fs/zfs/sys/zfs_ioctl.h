@@ -20,8 +20,8 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_ZFS_IOCTL_H
@@ -384,6 +384,13 @@ typedef struct zfs_useracct {
 #define	ZFS_MIN_MINOR	(ZFSDEV_MAX_MINOR + 1)
 
 #define	ZPOOL_EXPORT_AFTER_SPLIT 0x1
+
+#define	ZFS_EVENT_CHANNEL "com.nexenta:zfs"
+#define	ZFS_EC_STATUS	"status.zfs"
+#define	ZPOOL_EC_STATUS "status.zpool"
+
+void zfs_event_post(const char *subclass,
+    const char *operation, nvlist_t *ev_data);
 
 #ifdef _KERNEL
 

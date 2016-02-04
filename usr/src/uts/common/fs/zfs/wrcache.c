@@ -58,6 +58,7 @@
 #include <sys/time.h>
 #include <sys/arc.h>
 #include <sys/zio_compress.h>
+#include <sys/zfs_ioctl.h>
 #ifdef _KERNEL
 #include <sys/ddi.h>
 #endif
@@ -1249,12 +1250,17 @@ static void
 wrc_instance_finalization(void *arg)
 {
 	wrc_instance_t *wrc_instance = arg;
+	nvlist_t *event;
 
 	ASSERT(wrc_instance->fini_done);
 
 	VERIFY3U(dsl_prop_inherit(wrc_instance->ds_name,
 	    zfs_prop_to_name(ZFS_PROP_WRC_MODE),
 	    ZPROP_SRC_INHERITED), ==, 0);
+
+	event = fnvlist_alloc();
+	fnvlist_add_string(event, "fsname", wrc_instance->ds_name);
+	zfs_event_post(ZFS_EC_STATUS, "wrc_done", event);
 }
 
 static void
