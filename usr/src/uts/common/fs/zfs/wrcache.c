@@ -1250,7 +1250,6 @@ static void
 wrc_instance_finalization(void *arg)
 {
 	wrc_instance_t *wrc_instance = arg;
-	nvlist_t *event;
 
 	ASSERT(wrc_instance->fini_done);
 
@@ -1258,9 +1257,12 @@ wrc_instance_finalization(void *arg)
 	    zfs_prop_to_name(ZFS_PROP_WRC_MODE),
 	    ZPROP_SRC_INHERITED), ==, 0);
 
+#ifdef _KERNEL
+	nvlist_t *event;
 	event = fnvlist_alloc();
 	fnvlist_add_string(event, "fsname", wrc_instance->ds_name);
 	zfs_event_post(ZFS_EC_STATUS, "wrc_done", event);
+#endif
 }
 
 static void
