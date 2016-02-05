@@ -4471,7 +4471,7 @@ zpool_slog_space(nvlist_t *nvroot)
 		    ZPOOL_CONFIG_VDEV_STATS, (uint64_t **)&vs, &n) == 0);
 
 		/* vdev can be non-leaf, so multiply by number of children */
-		nvlist_lookup_nvlist_array(newchild[c],
+		(void) nvlist_lookup_nvlist_array(newchild[c],
 		    ZPOOL_CONFIG_CHILDREN, &subchild, &n_subchildren);
 		space += n_subchildren * vs->vs_space;
 	}
