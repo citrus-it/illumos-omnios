@@ -599,6 +599,11 @@ mac_client_link_state(mac_client_impl_t *mcip)
  * Return the statistics of a MAC client. These statistics are different
  * then the statistics of the underlying MAC which are returned by
  * mac_stat_get().
+ *
+ * Note that for things based on the tx and rx stats, mac will end up clobbering
+ * those stats when the underlying set of rings in the srs changes. As such, we
+ * need to source not only the current set, but also the historical set when
+ * returning to the client, lest our counters appear to go backwards.
  */
 uint64_t
 mac_client_stat_get(mac_client_handle_t mch, uint_t stat)
@@ -607,13 +612,15 @@ mac_client_stat_get(mac_client_handle_t mch, uint_t stat)
 	mac_impl_t 		*mip = mcip->mci_mip;
 	flow_entry_t 		*flent = mcip->mci_flent;
 	mac_soft_ring_set_t 	*mac_srs;
-	mac_rx_stats_t		*mac_rx_stat;
-	mac_tx_stats_t		*mac_tx_stat;
+	mac_rx_stats_t		*mac_rx_stat, *old_rx_stat;
+	mac_tx_stats_t		*mac_tx_stat, *old_tx_stat;
 	int i;
 	uint64_t val = 0;
 
 	mac_srs = (mac_soft_ring_set_t *)(flent->fe_tx_srs);
 	mac_tx_stat = &mac_srs->srs_tx.st_stat;
+	old_rx_stat = &mcip->mci_misc_stat.mms_defunctrxlanestats;
+	old_tx_stat = &mcip->mci_misc_stat.mms_defuncttxlanestats;
 
 	switch (stat) {
 	case MAC_STAT_LINK_STATE:
@@ -645,12 +652,15 @@ mac_client_stat_get(mac_client_handle_t mch, uint_t stat)
 		break;
 	case MAC_STAT_OBYTES:
 		val = mac_tx_stat->mts_obytes;
+		val += old_tx_stat->mts_obytes;
 		break;
 	case MAC_STAT_OPACKETS:
 		val = mac_tx_stat->mts_opackets;
+		val += old_tx_stat->mts_opackets;
 		break;
 	case MAC_STAT_OERRORS:
 		val = mac_tx_stat->mts_oerrors;
+		val += old_tx_stat->mts_oerrors;
 		break;
 	case MAC_STAT_IPACKETS:
 		for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
@@ -659,6 +669,8 @@ mac_client_stat_get(mac_client_handle_t mch, uint_t stat)
 			val += mac_rx_stat->mrs_intrcnt +
 			    mac_rx_stat->mrs_pollcnt + mac_rx_stat->mrs_lclcnt;
 		}
+		val += old_rx_stat->mrs_intrcnt + old_rx_stat->mrs_pollcnt +
+		    old_rx_stat->mrs_lclcnt;
 		break;
 	case MAC_STAT_RBYTES:
 		for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
@@ -668,6 +680,8 @@ mac_client_stat_get(mac_client_handle_t mch, uint_t stat)
 			    mac_rx_stat->mrs_pollbytes +
 			    mac_rx_stat->mrs_lclbytes;
 		}
+		val += old_rx_stat->mrs_intrbytes + old_rx_stat->mrs_pollbytes +
+		    old_rx_stat->mrs_lclbytes;
 		break;
 	case MAC_STAT_IERRORS:
 		for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
@@ -675,6 +689,7 @@ mac_client_stat_get(mac_client_handle_t mch, uint_t stat)
 			mac_rx_stat = &mac_srs->srs_rx.sr_stat;
 			val += mac_rx_stat->mrs_ierrors;
 		}
+		val += old_rx_stat->mrs_ierrors;
 		break;
 	default:
 		val = mac_driver_stat_default(mip, stat);
@@ -1344,6 +1359,7 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	mcip->mci_p_unicast_list = NULL;
 	mcip->mci_direct_rx_fn = NULL;
 	mcip->mci_direct_rx_arg = NULL;
+	mcip->mci_vidcache = MCIP_VIDCACHE_INVALID;
 
 	mcip->mci_unicast_list = NULL;
 
@@ -4800,6 +4816,8 @@ mac_client_add_to_flow_list(mac_client_impl_t *mcip, flow_entry_t *flent)
 	 */
 	rw_enter(&mcip->mci_rw_lock, RW_WRITER);
 
+	mcip->mci_vidcache = MCIP_VIDCACHE_INVALID;
+
 	/* Add it to the head */
 	flent->fe_client_next = mcip->mci_flent_list;
 	mcip->mci_flent_list = flent;
@@ -4830,6 +4848,8 @@ mac_client_remove_flow_from_list(mac_client_impl_t *mcip, flow_entry_t *flent)
 	 * using mci_rw_lock
 	 */
 	rw_enter(&mcip->mci_rw_lock, RW_WRITER);
+	mcip->mci_vidcache = MCIP_VIDCACHE_INVALID;
+
 	while ((fe != NULL) && (fe != flent)) {
 		prev_fe = fe;
 		fe = fe->fe_client_next;
@@ -4858,6 +4878,14 @@ mac_client_check_flow_vid(mac_client_impl_t *mcip, uint16_t vid)
 {
 	flow_entry_t	*flent;
 	uint16_t	mci_vid;
+	uint32_t	cache = mcip->mci_vidcache;
+
+	/*
+	 * In hopes of not having to touch the mci_rw_lock, check to see if
+	 * this vid matches our cached result.
+	 */
+	if (MCIP_VIDCACHE_ISVALID(cache) && MCIP_VIDCACHE_VID(cache) == vid)
+		return (MCIP_VIDCACHE_BOOL(cache) ? B_TRUE : B_FALSE);
 
 	/* The mci_flent_list is protected by mci_rw_lock */
 	rw_enter(&mcip->mci_rw_lock, RW_WRITER);
@@ -4865,10 +4893,13 @@ mac_client_check_flow_vid(mac_client_impl_t *mcip, uint16_t vid)
 	    flent = flent->fe_client_next) {
 		mci_vid = i_mac_flow_vid(flent);
 		if (vid == mci_vid) {
+			mcip->mci_vidcache = MCIP_VIDCACHE_CACHE(vid, B_TRUE);
 			rw_exit(&mcip->mci_rw_lock);
 			return (B_TRUE);
 		}
 	}
+
+	mcip->mci_vidcache = MCIP_VIDCACHE_CACHE(vid, B_FALSE);
 	rw_exit(&mcip->mci_rw_lock);
 	return (B_FALSE);
 }

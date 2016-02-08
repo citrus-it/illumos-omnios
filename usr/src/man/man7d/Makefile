@@ -60,8 +60,6 @@ _MANFILES=	aac.7d		\
 		hid.7d		\
 		hme.7d		\
 		hubd.7d		\
-		hwahc.7d	\
-		hwarc.7d	\
 		hxge.7d		\
 		ib.7d		\
 		ibcm.7d		\
@@ -94,7 +92,6 @@ _MANFILES=	aac.7d		\
 		myri10ge.7d	\
 		null.7d		\
 		nulldriver.7d	\
-		nvme.7d		\
 		nxge.7d		\
 		ohci.7d		\
 		openprom.7d	\
@@ -144,13 +141,10 @@ _MANFILES=	aac.7d		\
 		usbsksp.7d	\
 		usbsprl.7d	\
 		usbvc.7d	\
-		uwba.7d		\
 		virtualkm.7d	\
 		vni.7d		\
 		vr.7d		\
 		wscons.7d	\
-		wusb_ca.7d	\
-		wusb_df.7d	\
 		xge.7d		\
 		yge.7d		\
 		zcons.7d	\
@@ -227,6 +221,7 @@ i386_MANFILES=	ahci.7d		\
 		npe.7d		\
 		ntxn.7d		\
 		nv_sata.7d	\
+		nvme.7d		\
 		pcn.7d		\
 		radeon.7d	\
 		ral.7d		\
@@ -251,15 +246,13 @@ _MANLINKS=	1394.7d		\
 	 	bscbus.7d	\
 	 	fdc.7d		\
 	 	firewire.7d	\
-	 	hwa1480_fw.7d	\
 	 	i2bsc.7d	\
 	 	kmem.7d		\
 	 	lo0.7d		\
 	 	ticots.7d	\
 	 	ticotsord.7d	\
 	 	urandom.7d	\
-	 	usb.7d		\
-	 	uwb.7d
+	 	usb.7d
 
 sparc_MANLINKS=	drmach.7d	\
 		ngdr.7d		\
@@ -291,10 +284,6 @@ ticots.7d	:= LINKSRC = ticlts.7d
 ticotsord.7d	:= LINKSRC = ticlts.7d
 
 usb.7d		:= LINKSRC = usba.7d
-
-uwb.7d		:= LINKSRC = uwba.7d
-
-hwa1480_fw.7d	:= LINKSRC = wusb_df.7d
 
 .KEEP_STATE:
 

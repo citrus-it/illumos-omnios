@@ -29,7 +29,7 @@ self int mask;
  */
 fbt:smbsrv::entry
 {
-  self->trace++;
+	self->trace++;
 }
 
 /*
@@ -38,10 +38,12 @@ fbt:smbsrv::entry
 fbt:smbsrv::entry
 /self->trace > 0 && self->mask == 0/
 {
-  printf("\t0x%x", arg0);
-  printf("\t0x%x", arg1);
-  printf("\t0x%x", arg2);
-  printf("\t0x%x", arg3);
+	printf("\t0x%x", arg0);
+	printf("\t0x%x", arg1);
+	printf("\t0x%x", arg2);
+	printf("\t0x%x", arg3);
+	printf("\t0x%x", arg4);
+	printf("\t0x%x", arg5);
 }
 
 /*
@@ -57,7 +59,7 @@ fbt::smb_strlwr:entry,
 fbt::smb_strupr:entry,
 fbt::smb_wcequiv_strlen:entry
 {
-  self->mask++;
+	self->mask++;
 }
 
 /*
@@ -72,16 +74,16 @@ fbt::smb_strlwr:return,
 fbt::smb_strupr:return,
 fbt::smb_wcequiv_strlen:return
 {
-  self->mask--;
+	self->mask--;
 }
 
 fbt:smbsrv::return
 /self->trace > 0 && self->mask == 0/
 {
-  printf("\t0x%x", arg1);
+	printf("\t0x%x", arg1);
 }
 
 fbt:smbsrv::return
 {
-  self->trace--;
+	self->trace--;
 }

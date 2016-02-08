@@ -896,10 +896,8 @@ out:
 
 err:
 	if (error != 0) {
-		if (exp->ex_flags != NULL)
-			free(exp->ex_tag);
-		if (exp->ex_log_buffer != NULL)
-			free(exp->ex_log_buffer);
+		free(exp->ex_tag);
+		free(exp->ex_log_buffer);
 		(void) fprintf(stderr,
 		    dgettext(TEXT_DOMAIN, "Cannot set log configuration: %s\n"),
 		    strerror(error));
@@ -1909,10 +1907,10 @@ nfs_enable_share(sa_share_t share)
 	}
 	/*
 	 * when we get here, we can do the exportfs system call and
-	 * initiate things. We probably want to enable the nfs.server
-	 * service first if it isn't running within SMF.
+	 * initiate things. We probably want to enable the
+	 * svc:/network/nfs/server service first if it isn't running.
 	 */
-	/* check nfs.server status and start if needed */
+	/* check svc:/network/nfs/server status and start if needed */
 	/* now add the share to the internal tables */
 	printarg(path, &export);
 	/*

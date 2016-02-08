@@ -21,10 +21,11 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2013, Joyent, Inc. All rights reserved.
+# Copyright 2014, Joyent, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -220,6 +221,7 @@ CHKHDRS=			\
 	emul64cmd.h		\
 	emul64var.h		\
 	epm.h			\
+	epoll.h			\
 	errno.h			\
 	errorq.h		\
 	errorq_impl.h		\
@@ -227,6 +229,7 @@ CHKHDRS=			\
 	ethernet.h		\
 	euc.h			\
 	eucioctl.h		\
+	eventfd.h		\
 	exacct.h		\
 	exacct_catalog.h	\
 	exacct_impl.h		\
@@ -514,6 +517,7 @@ CHKHDRS=			\
 	sid.h			\
 	siginfo.h		\
 	signal.h		\
+	signalfd.h		\
 	skein.h			\
 	sleepq.h		\
 	smbios.h		\
@@ -593,6 +597,7 @@ CHKHDRS=			\
 	time_std_impl.h		\
 	timeb.h			\
 	timer.h			\
+	timerfd.h		\
 	times.h			\
 	timex.h			\
 	timod.h			\
@@ -855,13 +860,6 @@ FMIOHDRS=			\
 
 FSHDRS=				\
 	autofs.h		\
-	cachefs_dir.h		\
-	cachefs_dlog.h		\
-	cachefs_filegrp.h	\
-	cachefs_fs.h		\
-	cachefs_fscache.h	\
-	cachefs_ioctl.h		\
-	cachefs_log.h		\
 	decomp.h		\
 	dv_node.h		\
 	sdev_impl.h		\
@@ -1024,13 +1022,6 @@ USBHDRS=	\
 	usba.h	\
 	usbai.h
 
-UWBHDRS=	\
-	uwb.h	\
-	uwbai.h
-
-UWBAHDRS=	\
-	uwba.h
-
 USBAUDHDRS=           \
 	usb_audio.h
 
@@ -1040,9 +1031,6 @@ USBHUBDHDRS=		\
 
 USBHIDHDRS=		\
 	hid.h
-
-USBHWARCHDRS=		\
-	hwarc.h
 
 USBMSHDRS=		\
 	usb_bulkonly.h	\
@@ -1212,7 +1200,6 @@ CHECKHDRS=						\
 	$(USBAUDHDRS:%.h=usb/clients/audio/%.check)   \
 	$(USBHUBDHDRS:%.h=usb/hubd/%.check)		\
 	$(USBHIDHDRS:%.h=usb/clients/hid/%.check)	\
-	$(USBHWARCHDRS:%.h=usb/clients/hwarc/%.check)	\
 	$(USBMSHDRS:%.h=usb/clients/mass_storage/%.check)	\
 	$(USBPRNHDRS:%.h=usb/clients/printer/%.check)   \
 	$(USBCDCHDRS:%.h=usb/clients/usbcdc/%.check)	\
@@ -1220,8 +1207,6 @@ CHECKHDRS=						\
 	$(USBWCMHDRS:%.h=usb/clients/usbinput/usbwcm/%.check)	\
 	$(UGENHDRS:%.h=usb/clients/ugen/%.check)   \
 	$(USBHDRS:%.h=usb/%.check)                      \
-	$(UWBHDRS:%.h=uwb/%.check)                      \
-	$(UWBAHDRS:%.h=uwb/uwba/%.check)                      \
 	$(I1394HDRS:%.h=1394/%.check)			\
 	$(RSMHDRS:%.h=rsm/%.check)			\
 	$(TSOLHDRS:%.h=tsol/%.check)			\
@@ -1368,13 +1353,13 @@ install_h:			\
 all_h: $(GENHDRS)
 
 priv_const.h: $(PRIVS_AWK) $(PRIVS_DEF)
-	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v privhfile=$@
+	$(AWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v privhfile=$@
 
 priv_names.h: $(PRIVS_AWK) $(PRIVS_DEF)
-	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v pubhfile=$@
+	$(AWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v pubhfile=$@
 
 usb/usbdevs.h: $(USBDEVS_AWK) $(USBDEVS_DATA)
-	$(NAWK) -f $(USBDEVS_AWK) $(USBDEVS_DATA) -H > $@
+	$(AWK) -f $(USBDEVS_AWK) $(USBDEVS_DATA) -H > $@
 
 LVMDERIVED_H:
 	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE) all_h

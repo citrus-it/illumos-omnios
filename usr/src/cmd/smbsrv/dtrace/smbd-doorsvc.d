@@ -29,7 +29,7 @@ self int mask;
  */
 pid$target:*smbd:smbd_door_dispatch_op:entry
 {
-  self->trace++;
+	self->trace++;
 }
 
 /*
@@ -43,10 +43,12 @@ pid$target:libsmb.so.1::entry,
 pid$target:libsmbfs.so.1::entry
 /self->trace > 0 && self->mask == 0/
 {
-  printf("\t0x%x", arg0);
-  printf("\t0x%x", arg1);
-  printf("\t0x%x", arg2);
-  printf("\t0x%x", arg3);
+	printf("\t0x%x", arg0);
+	printf("\t0x%x", arg1);
+	printf("\t0x%x", arg2);
+	printf("\t0x%x", arg3);
+	printf("\t0x%x", arg4);
+	printf("\t0x%x", arg5);
 }
 
 /*
@@ -60,7 +62,7 @@ pid$target::smb_strlwr:entry,
 pid$target::smb_strupr:entry,
 pid$target::smb_wcequiv_strlen:entry
 {
-  self->mask++;
+	self->mask++;
 }
 
 /*
@@ -73,7 +75,7 @@ pid$target::smb_strlwr:return,
 pid$target::smb_strupr:return,
 pid$target::smb_wcequiv_strlen:return
 {
-  self->mask--;
+	self->mask--;
 }
 
 pid$target:*smbd::return,
@@ -84,10 +86,10 @@ pid$target:libsmb.so.1::return,
 pid$target:libsmbfs.so.1::return
 /self->trace > 0 && self->mask == 0/
 {
-  printf("\t0x%x", arg1);
+	printf("\t0x%x", arg1);
 }
 
 pid$target:*smbd:smbd_door_dispatch_op:return
 {
-  self->trace--;
+	self->trace--;
 }

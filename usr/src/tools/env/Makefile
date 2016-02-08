@@ -24,8 +24,6 @@
 
 ENVFILES= \
 	nza \
-	developer \
-	gatekeeper \
 	illumos
 
 include ../Makefile.tools

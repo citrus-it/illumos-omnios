@@ -1024,7 +1024,11 @@ extern void	nfsstat_zone_fini(zoneid_t, void *);
  */
 struct exp_kstats {
 	kstat_t		*share_kstat;		/* Generic share kstat */
-	kstat_named_t	share_path;		/* Shared path */
+	struct {
+		kstat_named_t	path;		/* Shared path */
+		kstat_named_t	filesystem;	/* pseudo|real */
+	}		share_kstat_data;	/* Generic share kstat data */
+	char		*share_path;		/* Shared path string */
 	kstat_t		**aclprocio_v2_ptr;	/* NFS_ACL version 2 */
 	kstat_t		**aclprocio_v3_ptr;	/* NFS_ACL version 3 */
 	kstat_t		**rfsprocio_v2_ptr;	/* NFS version 2 */
@@ -1033,9 +1037,11 @@ struct exp_kstats {
 	kmutex_t	procio_lock;		/* protects all exp_kstats */
 };
 
-extern struct exp_kstats *exp_kstats_init(zoneid_t, int, const char *);
+extern struct exp_kstats *exp_kstats_init(zoneid_t, int, const char *, size_t,
+    bool_t);
 extern void exp_kstats_delete(struct exp_kstats *);
 extern void exp_kstats_fini(struct exp_kstats *);
+extern void exp_kstats_reset(struct exp_kstats *, const char *, size_t, bool_t);
 
 #endif	/* _KERNEL */
 

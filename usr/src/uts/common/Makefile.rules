@@ -208,7 +208,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/autofs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/cachefs/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/bootfs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1202,10 +1202,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/video/usbvc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/hwarc/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/hid/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1254,18 +1250,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/usbser/usbsprl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/wusb_df/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/hwa1480_fw/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/wusb_ca/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/usbecm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1303,14 +1287,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/usba/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/usba10/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/hwa/hwahc/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/uwb/uwba/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1489,7 +1465,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/vioblk/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/vioif/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
 #
 # krtld must refer to its own bzero/bcopy until the kernel is fully linked
 #
@@ -1789,7 +1764,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/autofs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/cachefs/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/bootfs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/ctfs/%.c
@@ -2500,9 +2475,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbskel/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/video/usbvc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/hwarc/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/hid/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -2539,15 +2511,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbser/usbser_keyspan/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbser/usbsprl/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/wusb_df/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/hwa1480_fw/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/wusb_ca/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbecm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -2576,12 +2539,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/usba/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/usba10/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/uwb/uwba/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/hwa/hwahc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/vuidmice/%.c

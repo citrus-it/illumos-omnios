@@ -1010,6 +1010,8 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 		/* Invalid Log Page */
 		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_GET_LOG_PAGE);
 		atomic_inc_32(&cmd->nc_nvme->n_inv_log_page);
+		if (cmd->nc_xfer != NULL)
+			bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EINVAL);
 
 	case NVME_CQE_SC_SPC_INV_FORMAT:

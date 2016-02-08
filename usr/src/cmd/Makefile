@@ -79,7 +79,6 @@ COMMON_SUBDIRS=		\
 	bc		\
 	bdiff		\
 	beadm		\
-	bfs		\
 	bnu		\
 	boot		\
 	busstat		\
@@ -257,6 +256,7 @@ COMMON_SUBDIRS=		\
 	mail		\
 	mailwrapper	\
 	mailx		\
+	make		\
 	makekey		\
 	man		\
 	mandoc		\
@@ -440,6 +440,7 @@ COMMON_SUBDIRS=		\
 	users		\
 	utmp_update	\
 	utmpd		\
+	uuidgen		\
 	valtools	\
 	vgrind		\
 	vi		\
@@ -455,7 +456,6 @@ COMMON_SUBDIRS=		\
 	whodo		\
 	wracct		\
 	write		\
-	wusbadm		\
 	xargs		\
 	xstr		\
 	yes		\
@@ -629,6 +629,7 @@ MSGSUBDIRS=		\
 	luxadm		\
 	lvm		\
 	mailx		\
+	make		\
 	man		\
 	mesg		\
 	mkdir		\
@@ -737,7 +738,6 @@ MSGSUBDIRS=		\
 	whodo		\
 	wracct		\
 	write		\
-	wusbadm		\
 	xargs		\
 	yppasswd	\
 	zdump		\

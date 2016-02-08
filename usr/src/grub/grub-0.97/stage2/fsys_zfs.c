@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  */
 
@@ -368,17 +368,23 @@ zio_read_data(blkptr_t *bp, void *buf, char *stack)
 			continue;
 
 		if (DVA_GET_GANG(&bp->blk_dva[i])) {
-			if (zio_read_gang(bp, &bp->blk_dva[i], buf, stack) == 0)
-				return (0);
+			if (zio_read_gang(bp, &bp->blk_dva[i], buf, stack) != 0)
+				continue;
 		} else {
 			/* read in a data block */
 			offset = DVA_GET_OFFSET(&bp->blk_dva[i]);
 			sector = DVA_OFFSET_TO_PHYS_SECTOR(offset);
-			if (devread(sector, 0, psize, buf) != 0)
-				return (0);
+			if (devread(sector, 0, psize, buf) == 0)
+				continue;
+		}
+
+		/* verify that the checksum matches */
+		if (zio_checksum_verify(bp, buf, psize) == 0) {
+			return (0);
 		}
 	}
 
+	grub_printf("could not read block due to EIO or ECKSUM\n");
 	return (1);
 }
 
@@ -496,11 +502,6 @@ zio_read(blkptr_t *bp, void *buf, char *stack)
 
 	if (zio_read_data(bp, buf, stack) != 0) {
 		grub_printf("zio_read_data failed\n");
-		return (ERR_FSYS_CORRUPT);
-	}
-
-	if (zio_checksum_verify(bp, buf, psize) != 0) {
-		grub_printf("checksum verification failed\n");
 		return (ERR_FSYS_CORRUPT);
 	}
 
@@ -1051,10 +1052,10 @@ static const char *spa_feature_names[] = {
 	"com.delphix:extensible_dataset",
 	"com.delphix:embedded_data",
 	"org.open-zfs:large_blocks",
+	"org.illumos:sha512",
 	"com.nexenta:meta_devices",
 	"com.nexenta:vdev_attributes",
 	"com.nexenta:class_of_storages",
-	"org.illumos:sha512",
 	NULL
 };
 

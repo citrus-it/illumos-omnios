@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 #
 
 # This file provides exceptions to the usual rules applied to ELF objects by
@@ -41,14 +42,12 @@
 
 # Directory hierarchies to skip completely
 SKIP		^usr/lib/libc/			# optimized libc
-SKIP		^usr/lib/mps/			# external libs
 SKIP		^usr/lib/rcm/			# 4426119
 SKIP		^usr/perl5/			# alan's taking care of these :-)
 SKIP		^usr/src/			# no objects in source code
 
 # Individual files that we don't examine
 SKIP		^boot/grub/bin/grub$
-SKIP		^usr/apache/libexec/mod_ipp.so$	# Apache loadable module
 # USIII specific extns. cause ldd noise on USII bld. m/c
 SKIP		^usr/lib/fps/sun4u/UltraSPARC.*/fptest$
 SKIP		^usr/MACH(lib)/lddstub$		# lddstub has no dependencies
@@ -100,12 +99,12 @@ UNDEF_REF	^usr/snadm/lib/libsvm\.so\.1$
 UNUSED_DEPS	^usr/lib/picl/plugins/		# require devtree dependencies
 UNUSED_DEPS	^usr/lib/libp	# profile libc makes libm an unused dep of libc
 
+# libm.so.2 dependency
+UNUSED_OBJ	unused object=.*MACH(libm)/libm_hwcap1\.so\.2
+
 # libnetsnmphelpers.so is empty in some net-snmp versions
 UNUSED_OBJ	unused object=.*/libnetsnmphelpers\.so\..*
 UNREF_OBJ	unreferenced object=.*/libnetsnmphelpers\.so\..*
-
-# libm.so.2 dependency
-UNUSED_OBJ	unused object=.*MACH(libm)/libm_hwcap1\.so\.2
 
 # Unused runpaths due to dlopen() use
 UNUSED_RPATH	/usr/lib/fs/autofs.*\ from\ .automountd
@@ -145,8 +144,8 @@ UNUSED_RPATH	/usr/lib.*\ from\ .*/usr/lib/mps
 UNUSED_RPATH	/usr/ccs/lib.*\ from\ .*/usr/lib/mps
 UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/libpython2\.6
 UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython2\.6
-UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/amd64/libpython2\.6
 UNUSED_RPATH	/usr/snadm/lib.*\ from\ .*/usr/snadm/lib/libspmicommon\.so\.1
+
 
 # Unused runpaths for reasons not captured above
 UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 	# future needs
@@ -188,8 +187,8 @@ UNREF_OBJ	/libgcc_s.*\ of\ .*libgmodule-2\.0\.so
 # Unreferenced object of objects we can't change for other reasons
 UNREF_OBJ	/libmapmalloc\.so\.1;\ unused\ dependency\ of	# interposer
 UNREF_OBJ	/libstdc\+\+\.so\.6;\ unused\ dependency\ of	# gcc build
-UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
 UNREF_OBJ	/libgcc_s\.so\.1.*\ of\ .*libstdc\+\+\.so\.6	# omnios gcc mix
+UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
 UNREF_OBJ	/lib.*\ of\ .*/lib/picl/plugins/		# picl
 UNREF_OBJ	/lib.*\ of\ .*kcfd				# interposer
 UNREF_OBJ	/libpkcs11\.so\.1; .*\ of\ .*libkmf\.so\.1	# interposed

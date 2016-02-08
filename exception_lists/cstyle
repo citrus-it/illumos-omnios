@@ -61,9 +61,10 @@ usr/src/cmd/krb5/ldap_util/kdb5_ldap_util.h
 usr/src/cmd/krb5/slave/kprop.c
 usr/src/cmd/krb5/slave/kprop.h
 usr/src/cmd/krb5/slave/kpropd.c
-usr/src/cmd/mandoc/arch.c
 usr/src/cmd/mandoc/att.c
 usr/src/cmd/mandoc/chars.c
+usr/src/cmd/mandoc/compat_fgetln.c
+usr/src/cmd/mandoc/compat_reallocarray.c
 usr/src/cmd/mandoc/config.h
 usr/src/cmd/mandoc/eqn.c
 usr/src/cmd/mandoc/eqn_html.c
@@ -86,6 +87,8 @@ usr/src/cmd/mandoc/man_term.c
 usr/src/cmd/mandoc/man_validate.c
 usr/src/cmd/mandoc/mandoc.c
 usr/src/cmd/mandoc/mandoc.h
+usr/src/cmd/mandoc/mandoc_aux.c
+usr/src/cmd/mandoc/manpath.c
 usr/src/cmd/mandoc/mdoc.c
 usr/src/cmd/mandoc/mdoc.h
 usr/src/cmd/mandoc/mdoc_argv.c
@@ -113,7 +116,6 @@ usr/src/cmd/mandoc/term.h
 usr/src/cmd/mandoc/term_ascii.c
 usr/src/cmd/mandoc/term_ps.c
 usr/src/cmd/mandoc/tree.c
-usr/src/cmd/mandoc/vol.c
 usr/src/common/bzip2/bzlib.h
 usr/src/common/bzip2/crctable.c
 usr/src/common/bzip2/randtable.c
@@ -123,6 +125,7 @@ usr/src/common/bzip2/bzlib.c
 usr/src/common/bzip2/decompress.c
 usr/src/common/bzip2/bzlib_private.h
 usr/src/common/bzip2/huffman.c
+usr/src/common/crypto/chacha/chacha.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.c
 usr/src/common/openssl/crypto/krb5/krb5_asn.h
 usr/src/grub/grub-0.97/stage2/builtins.c
@@ -130,6 +133,7 @@ usr/src/grub/grub-0.97/stage2/disk_io.c
 usr/src/grub/grub-0.97/stage2/pc_slice.h
 usr/src/grub/grub-0.97/stage2/gpt.h
 usr/src/grub/grub-0.97/stage2/shared.h
+usr/src/lib/libc/port/gen/arc4random_uniform.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/aes/aes_s2k.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/cksumtype_to_string.c
 usr/src/lib/gss_mechs/mech_krb5/crypto/coll_proof_cksum.c
@@ -885,6 +889,13 @@ usr/src/uts/common/io/bnxe/bnxe_tx.c
 usr/src/uts/common/io/bnxe/bnxe_workq.c
 usr/src/uts/common/io/bnxe/bnxe.h
 usr/src/uts/common/io/bnxe/version.h
+usr/src/uts/common/io/bge/bge_main2.c
+usr/src/uts/common/io/bge/bge_chip2.c
+usr/src/uts/common/io/bge/bge_mii.c
+usr/src/uts/common/io/bge/bge_kstats.c
+usr/src/uts/common/io/bge/bge_impl.h
+usr/src/uts/common/io/bge/bge_send.c
+usr/src/uts/common/io/bge/bge_hw.h
 usr/src/uts/common/io/e1000api/e1000_80003es2lan.c
 usr/src/uts/common/io/e1000api/e1000_80003es2lan.h
 usr/src/uts/common/io/e1000api/e1000_82540.c

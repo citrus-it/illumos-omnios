@@ -112,7 +112,9 @@ smb_inet_ntop(smb_inaddr_t *addr, char *buf, int size)
 	 * no longer uses leading zeros printing IPv4 addresses,
 	 * we need to handle IPv4 ourselves.  If we leave the
 	 * leading zeros, Windows clients get errors trying to
-	 * resolve those address strings to names.
+	 * resolve those address strings to names.  After:
+	 * https://www.illumos.org/issues/5980 is fixed,
+	 * this work-around can be removed.
 	 */
 	if (addr->a_family == AF_INET) {
 		uint8_t *p = (void *) &addr->a_ipv4;

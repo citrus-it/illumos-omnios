@@ -27,7 +27,6 @@
 
 #
 # Copyright (c) 2013, 2014 by Delphix. All rights reserved.
-#
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 

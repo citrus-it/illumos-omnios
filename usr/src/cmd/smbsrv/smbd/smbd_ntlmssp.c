@@ -287,7 +287,7 @@ smbd_ntlmssp_negotiate(authsvc_context_t *ctx)
 	 *
 	 * These AV pairs are like our name/value pairs, but have
 	 * numeric identifiers instead of names.  There are many
-	 * of these, but we put just the four most important:
+	 * of these, but we put only the four expected by Windows:
 	 *	NetBIOS computer name
 	 *	NetBIOS domain name
 	 *	DNS computer name

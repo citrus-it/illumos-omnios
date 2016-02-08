@@ -136,7 +136,8 @@ nfsstat_zone_fini_server(zoneid_t zoneid, kstat_named_t **svstatp)
  */
 static kstat_t **
 rfs_kstat_io_init(zoneid_t zoneid, const char *module, int instance,
-    const char *name, const kstat_named_t *tmpl, int count, kmutex_t *lock)
+    const char *name, const char *class, const kstat_named_t *tmpl, int count,
+    kmutex_t *lock)
 {
 	int i;
 	kstat_t **ret = kmem_alloc(count * sizeof (*ret), KM_SLEEP);
@@ -146,7 +147,7 @@ rfs_kstat_io_init(zoneid_t zoneid, const char *module, int instance,
 
 		(void) snprintf(namebuf, sizeof (namebuf), "%s_%s", name,
 		    tmpl[i].name);
-		ret[i] = kstat_create_zone(module, instance, namebuf, "misc",
+		ret[i] = kstat_create_zone(module, instance, namebuf, class,
 		    KSTAT_TYPE_IO, 1, 0, zoneid);
 		if (ret[i] != NULL) {
 			ret[i]->ks_lock = lock;
@@ -254,8 +255,8 @@ nfsstat_zone_init_rfsproc_v2(zoneid_t zoneid, struct nfs_version_stats *statsp)
 	mutex_init(&statsp->rfsprocio_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	statsp->rfsprocio_ptr = rfs_kstat_io_init(zoneid, "nfs", 0,
-	    "rfsprocio_v2", rfsproccnt_v2_tmpl, RFSPROCCNT_V2_COUNT,
-	    &statsp->rfsprocio_lock);
+	    "rfsprocio_v2", "rfsprocio_v2", rfsproccnt_v2_tmpl,
+	    RFSPROCCNT_V2_COUNT, &statsp->rfsprocio_lock);
 
 	if (zoneid == GLOBAL_ZONEID) {
 		rfsproccnt_v2_ptr = statsp->rfsproccnt_ptr;
@@ -332,8 +333,8 @@ nfsstat_zone_init_aclproc_v2(zoneid_t zoneid, struct nfs_version_stats *statsp)
 	mutex_init(&statsp->aclprocio_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	statsp->aclprocio_ptr = rfs_kstat_io_init(zoneid, "nfs_acl", 0,
-	    "aclprocio_v2", aclproccnt_v2_tmpl, ACLPROCCNT_V2_COUNT,
-	    &statsp->aclprocio_lock);
+	    "aclprocio_v2", "aclprocio_v2", aclproccnt_v2_tmpl,
+	    ACLPROCCNT_V2_COUNT, &statsp->aclprocio_lock);
 
 	if (zoneid == GLOBAL_ZONEID) {
 		aclproccnt_v2_ptr = statsp->aclproccnt_ptr;
@@ -442,8 +443,8 @@ nfsstat_zone_init_rfsproc_v3(zoneid_t zoneid, struct nfs_version_stats *statsp)
 	mutex_init(&statsp->rfsprocio_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	statsp->rfsprocio_ptr = rfs_kstat_io_init(zoneid, "nfs", 0,
-	    "rfsprocio_v3", rfsproccnt_v3_tmpl, RFSPROCCNT_V3_COUNT,
-	    &statsp->rfsprocio_lock);
+	    "rfsprocio_v3", "rfsprocio_v3", rfsproccnt_v3_tmpl,
+	    RFSPROCCNT_V3_COUNT, &statsp->rfsprocio_lock);
 
 	if (zoneid == GLOBAL_ZONEID) {
 		rfsproccnt_v3_ptr = statsp->rfsproccnt_ptr;
@@ -516,8 +517,8 @@ nfsstat_zone_init_aclproc_v3(zoneid_t zoneid, struct nfs_version_stats *statsp)
 	mutex_init(&statsp->aclprocio_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	statsp->aclprocio_ptr = rfs_kstat_io_init(zoneid, "nfs_acl", 0,
-	    "aclprocio_v3", aclproccnt_v3_tmpl, ACLPROCCNT_V3_COUNT,
-	    &statsp->aclprocio_lock);
+	    "aclprocio_v3", "aclprocio_v3", aclproccnt_v3_tmpl,
+	    ACLPROCCNT_V3_COUNT, &statsp->aclprocio_lock);
 
 	if (zoneid == GLOBAL_ZONEID) {
 		aclproccnt_v3_ptr = statsp->aclproccnt_ptr;
@@ -662,8 +663,8 @@ nfsstat_zone_init_rfsproc_v4(zoneid_t zoneid, struct nfs_version_stats *statsp)
 	mutex_init(&statsp->rfsprocio_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	statsp->rfsprocio_ptr = rfs_kstat_io_init(zoneid, "nfs", 0,
-	    "rfsprocio_v4", rfsproccnt_v4_tmpl, RFSPROCCNT_V4_COUNT,
-	    &statsp->rfsprocio_lock);
+	    "rfsprocio_v4", "rfsprocio_v4", rfsproccnt_v4_tmpl,
+	    RFSPROCCNT_V4_COUNT, &statsp->rfsprocio_lock);
 
 	if (zoneid == GLOBAL_ZONEID) {
 		rfsproccnt_v4_ptr = statsp->rfsproccnt_ptr;
@@ -825,7 +826,8 @@ nfsstat_zone_fini(zoneid_t zoneid, void *data)
  * Support for exp_kstats initialization and tear down
  */
 struct exp_kstats *
-exp_kstats_init(zoneid_t zoneid, int instance, const char *path)
+exp_kstats_init(zoneid_t zoneid, int instance, const char *path, size_t len,
+    bool_t pseudo)
 {
 	struct exp_kstats *exp_kstats;
 
@@ -834,18 +836,31 @@ exp_kstats_init(zoneid_t zoneid, int instance, const char *path)
 	mutex_init(&exp_kstats->procio_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	/*
-	 * Generic share kstat.  Currently it is used for exposing the shared
-	 * path only.
+	 * Generic share kstat.
 	 */
 	exp_kstats->share_kstat = kstat_create_zone("nfs", instance, "share",
-	    "misc", KSTAT_TYPE_NAMED, 1,
+	    "misc", KSTAT_TYPE_NAMED,
+	    sizeof (exp_kstats->share_kstat_data) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE, zoneid);
 	if (exp_kstats->share_kstat != NULL) {
-		exp_kstats->share_kstat->ks_data = &exp_kstats->share_path;
-		kstat_named_init(KSTAT_NAMED_PTR(exp_kstats->share_kstat),
-		    "path", KSTAT_DATA_STRING);
-		kstat_named_setstr(KSTAT_NAMED_PTR(exp_kstats->share_kstat),
-		    path);
+		len = strnlen(path, len);
+		exp_kstats->share_path = kmem_alloc(len + 1, KM_SLEEP);
+		bcopy(path, exp_kstats->share_path, len);
+		exp_kstats->share_path[len] = '\0';
+
+		exp_kstats->share_kstat->ks_data =
+		    &exp_kstats->share_kstat_data;
+
+		kstat_named_init(&exp_kstats->share_kstat_data.path, "path",
+		    KSTAT_DATA_STRING);
+		kstat_named_setstr(&exp_kstats->share_kstat_data.path,
+		    exp_kstats->share_path);
+
+		kstat_named_init(&exp_kstats->share_kstat_data.filesystem,
+		    "filesystem", KSTAT_DATA_STRING);
+		kstat_named_setstr(&exp_kstats->share_kstat_data.filesystem,
+		    pseudo ? "pseudo" : "real");
+
 		exp_kstats->share_kstat->ks_lock = &exp_kstats->procio_lock;
 		kstat_install(exp_kstats->share_kstat);
 	}
@@ -854,36 +869,36 @@ exp_kstats_init(zoneid_t zoneid, int instance, const char *path)
 	 * NFS_ACL version 2
 	 */
 	exp_kstats->aclprocio_v2_ptr = rfs_kstat_io_init(zoneid, "nfs_acl",
-	    instance, "share_v2", aclproccnt_v2_tmpl, ACLPROCCNT_V2_COUNT,
-	    &exp_kstats->procio_lock);
+	    instance, "share_v2", "aclprocio_v2", aclproccnt_v2_tmpl,
+	    ACLPROCCNT_V2_COUNT, &exp_kstats->procio_lock);
 
 	/*
 	 * NFS_ACL version 3
 	 */
 	exp_kstats->aclprocio_v3_ptr = rfs_kstat_io_init(zoneid, "nfs_acl",
-	    instance, "share_v3", aclproccnt_v3_tmpl, ACLPROCCNT_V3_COUNT,
-	    &exp_kstats->procio_lock);
+	    instance, "share_v3", "aclprocio_v3", aclproccnt_v3_tmpl,
+	    ACLPROCCNT_V3_COUNT, &exp_kstats->procio_lock);
 
 	/*
 	 * NFS version 2
 	 */
 	exp_kstats->rfsprocio_v2_ptr = rfs_kstat_io_init(zoneid, "nfs",
-	    instance, "share_v2", rfsproccnt_v2_tmpl, RFSPROCCNT_V2_COUNT,
-	    &exp_kstats->procio_lock);
+	    instance, "share_v2", "rfsprocio_v2", rfsproccnt_v2_tmpl,
+	    RFSPROCCNT_V2_COUNT, &exp_kstats->procio_lock);
 
 	/*
 	 * NFS version 3
 	 */
 	exp_kstats->rfsprocio_v3_ptr = rfs_kstat_io_init(zoneid, "nfs",
-	    instance, "share_v3", rfsproccnt_v3_tmpl, RFSPROCCNT_V3_COUNT,
-	    &exp_kstats->procio_lock);
+	    instance, "share_v3", "rfsprocio_v3", rfsproccnt_v3_tmpl,
+	    RFSPROCCNT_V3_COUNT, &exp_kstats->procio_lock);
 
 	/*
 	 * NFS version 4
 	 */
 	exp_kstats->rfsprocio_v4_ptr = rfs_kstat_io_init(zoneid, "nfs",
-	    instance, "share_v4", rfsproccnt_v4_tmpl, RFSPROCCNT_V4_COUNT,
-	    &exp_kstats->procio_lock);
+	    instance, "share_v4", "rfsprocio_v4", rfsproccnt_v4_tmpl,
+	    RFSPROCCNT_V4_COUNT, &exp_kstats->procio_lock);
 
 	return (exp_kstats);
 }
@@ -900,6 +915,7 @@ exp_kstats_delete(struct exp_kstats *exp_kstats)
 	if (exp_kstats->share_kstat != NULL) {
 		kstat_delete(exp_kstats->share_kstat);
 		exp_kstats->share_kstat = NULL;
+		strfree(exp_kstats->share_path);
 	}
 
 	/*
@@ -925,8 +941,10 @@ exp_kstats_fini(struct exp_kstats *exp_kstats)
 	/*
 	 * Generic share kstat
 	 */
-	if (exp_kstats->share_kstat != NULL)
+	if (exp_kstats->share_kstat != NULL) {
 		kstat_delete(exp_kstats->share_kstat);
+		strfree(exp_kstats->share_path);
+	}
 
 	/*
 	 * NFS_ACL kstats
@@ -944,4 +962,31 @@ exp_kstats_fini(struct exp_kstats *exp_kstats)
 	mutex_destroy(&exp_kstats->procio_lock);
 
 	kmem_free(exp_kstats, sizeof (*exp_kstats));
+}
+
+void
+exp_kstats_reset(struct exp_kstats *exp_kstats, const char *path, size_t len,
+    bool_t pseudo)
+{
+	char *old;
+	char *new;
+
+	if (exp_kstats->share_kstat == NULL)
+		return;
+
+	len = strnlen(path, len);
+	new = kmem_alloc(len + 1, KM_SLEEP);
+	bcopy(path, new, len);
+	new[len] = '\0';
+
+	mutex_enter(exp_kstats->share_kstat->ks_lock);
+	old = exp_kstats->share_path;
+	exp_kstats->share_path = new;
+	kstat_named_setstr(&exp_kstats->share_kstat_data.path,
+	    exp_kstats->share_path);
+	kstat_named_setstr(&exp_kstats->share_kstat_data.filesystem,
+	    pseudo ? "pseudo" : "real");
+	mutex_exit(exp_kstats->share_kstat->ks_lock);
+
+	strfree(old);
 }

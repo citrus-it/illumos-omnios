@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
 
 include $(SRC)/Makefile.master
@@ -218,31 +219,31 @@ CLOBBERFILES= $(PDIR) proto_list_$(PKGMACH) install-$(PKGMACH).out \
 # By default, PKGS will list all manifests.  To build and/or publish a
 # subset of packages, override this on the command line or in the
 # build environment and then reference (implicitly or explicitly) the all
-# or install targets.
+# or install targets.  Using ls -1 (that's a one) or print or echo to
+# get the list of manifests is a little hackish, but avoids having a
+# 900+ line file to explicitly list them all.
 #
-$(ENABLE_IPP_PRINTING)DISABLE_IPP_PRINTING = $(POUND_SIGN)
-
-$(DISABLE_IPP_PRINTING)REMOVE_MANIFESTS +=	\
-	-e 's/print-lp-ipp-ipp-listener.mf//'
-
-$(NZA_OPEN_ONLY)REMOVE_MANIFESTS +=		\
-	-e 's/driver-isal.mf//'			\
-	-e 's/network-aoe-target.mf//'
-
+# We want some manifests to optionally built based on environment
+# options, so those are excluded and optionally added back in.
+# We also want a relatively easy way to add files to the list of
+# manifests given special treatment.  Add any other special ones
+# to the SPECIAL_MANIFESTS vaiable.  It can contain wildcards in
+# regexp form, i.e. SUNW.* as one useful example.
 #
-# Construct a command sequence to list all manifests
-#
-LIST_MANIFESTS = cd manifests;
+SPECIAL_MANIFESTS = print-lp-ipp-ipp-listener.mf
+LIST_MANIFESTS_CMD = (cd manifests ; /usr/bin/ls -1 *.mf |\
+	$(SED) $(SPECIAL_MANIFESTS:%=-e '/^%$$/d') )
+MANIFESTS = $(LIST_MANIFESTS_CMD:sh)
 
-# Copy nza-closed manifests over
-$(NZA_KMODS)LIST_MANIFESTS += 						\
-	cp ../../../nza-closed/pkg/manifests/driver-isal.mf .;		\
-	cp ../../../nza-closed/pkg/manifests/network-aoe-target.mf .;	\
+# Conditionally add back lp-ipp
+$(ENABLE_IPP_PRINTING) MANIFESTS += print-lp-ipp-ipp-listener.mf
 
-# list manifests, remove some
-LIST_MANIFESTS += print *.mf | sed ${REMOVE_MANIFESTS}
-
-MANIFESTS = ${LIST_MANIFESTS:sh}
+# Conditionally add nza-closed manifests
+NZA_MANIFESTS =	driver-isal.mf network-aoe-target.mf
+NZA_MANIFESTS_CMD = \
+	( $(NZA_MANIFESTS:%=cp ../../nza-closed/pkg/manifests/% manifests;) )
+$(ENABLE_NZA_CLOSED) MANIFESTS += $(NZA_MANIFESTS) $(NZA_MANIFESTS_CMD:sh)
+CLOBBERFILES += $(NZA_MANIFESTS:%=manifests/%)
 
 PKGS= $(MANIFESTS:%.mf=%)
 DEP_PKGS= $(PKGS:%=$(PDIR)/%.dep)
@@ -590,7 +591,7 @@ $(PKGLISTS): $(PROC_PKGS)
 	r=$${sdotr%.+(?)}; s=$${sdotr#+(?).}; \
 	print "Generating $$r $$s package list"; \
 	$(RM) $(@); $(TOUCH) $(@); \
-	$(NAWK) 'BEGIN { \
+	$(AWK) 'BEGIN { \
 		if (ARGC < 2) { \
 			exit; \
 		} \
@@ -643,7 +644,7 @@ license-list: makesilent
 stage-licenses: license-list FRC
 	$(PKGDEBUG)$(MAKE) -e -f Makefile.lic \
 		PKGDEBUG=$(PKGDEBUG) LICROOT=$(PKGROOT)/licenses \
-		`$(NAWK) '{ \
+		`$(AWK) '{ \
 			print "$(PKGROOT)/licenses/" $$0; \
 			print "$(PKGROOT)/licenses/" $$0 ".descrip"; \
 		}' license-list` > /dev/null;

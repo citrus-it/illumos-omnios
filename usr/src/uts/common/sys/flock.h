@@ -32,6 +32,10 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
+ */
 
 #ifndef _SYS_FLOCK_H
 #define	_SYS_FLOCK_H
@@ -43,6 +47,9 @@
 #include <sys/callb.h>
 #include <sys/param.h>
 #include <sys/zone.h>
+#if defined(_KERNEL)
+#include <sys/file.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
@@ -223,6 +230,10 @@ typedef struct locklist {
 #define	FLK_QUERY_ACTIVE	0x1
 #define	FLK_QUERY_SLEEPING	0x2
 
+#if defined(_KERNEL)
+int	ofdlock(file_t *, int, struct flock64 *, int, u_offset_t);
+void	ofdcleanlock(file_t *);
+#endif
 int	reclock(struct vnode *, struct flock64 *, int, int, u_offset_t,
 		flk_callback_t *);
 int	chklock(struct vnode *, int, u_offset_t, ssize_t, int,

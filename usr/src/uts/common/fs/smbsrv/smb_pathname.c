@@ -68,17 +68,6 @@ smb_is_executable(char *path)
 }
 
 /*
- * Temporarily here.  Later, move this to fs/pathname.c
- */
-void
-pn_alloc_sz(struct pathname *pnp, size_t sz)
-{
-	pnp->pn_path = pnp->pn_buf = kmem_alloc(sz, KM_SLEEP);
-	pnp->pn_pathlen = 0;
-	pnp->pn_bufsize = sz;
-}
-
-/*
  * smb_pathname_reduce
  *
  * smb_pathname_reduce() takes a path and returns the smb_node for the

@@ -34,7 +34,7 @@ pid$target:libsmbns.so.1::entry,
 pid$target:libsmb.so.1::entry,
 pid$target:libads.so.1::entry
 {
-  self->trace++;
+	self->trace++;
 }
 
 /*
@@ -48,12 +48,12 @@ pid$target:libsmb.so.1::entry,
 pid$target:libads.so.1::entry
 /self->trace > 0 && self->mask == 0/
 {
-  printf("\t0x%x", arg0);
-  printf("\t0x%x", arg1);
-  printf("\t0x%x", arg2);
-  printf("\t0x%x", arg3);
-  printf("\t0x%x", arg4);
-  printf("\t0x%x", arg5);
+	printf("\t0x%x", arg0);
+	printf("\t0x%x", arg1);
+	printf("\t0x%x", arg2);
+	printf("\t0x%x", arg3);
+	printf("\t0x%x", arg4);
+	printf("\t0x%x", arg5);
 }
 
 /*
@@ -74,7 +74,7 @@ pid$target::smb_strlwr:entry,
 pid$target::smb_strupr:entry,
 pid$target::smb_wcequiv_strlen:entry
 {
-  self->mask++;
+	self->mask++;
 }
 
 /*
@@ -83,19 +83,19 @@ pid$target::smb_wcequiv_strlen:entry
 pid$target:libsmb.so.1:smb_trace:entry
 /self->trace > 0 && self->mask == 0/
 {
-  printf("%s", copyinstr(arg0));
+	printf("%s", copyinstr(arg0));
 }
 
 pid$target:libsmb.so.1:smb_syslog:entry
 /self->trace > 0 && self->mask == 0/
 {
-  printf("%s", copyinstr(arg1));
+	printf("%s", copyinstr(arg1));
 }
 
 pid$target:libc_hwcap1.so.1:syslog:entry
 /self->trace > 0 && self->mask == 0/
 {
-  printf("%s", copyinstr(arg1));
+	printf("%s", copyinstr(arg1));
 }
 
 /*
@@ -111,7 +111,7 @@ pid$target::smb_strlwr:return,
 pid$target::smb_strupr:return,
 pid$target::smb_wcequiv_strlen:return
 {
-  self->mask--;
+	self->mask--;
 }
 
 pid$target:*smbd::return,
@@ -122,7 +122,7 @@ pid$target:libsmb.so.1::return,
 pid$target:libads.so.1::return
 /self->trace > 0 && self->mask == 0/
 {
-  printf("\t0x%x", arg1);
+	printf("\t0x%x", arg1);
 }
 
 pid$target:*smbd::return,
@@ -132,5 +132,5 @@ pid$target:libsmbns.so.1::return,
 pid$target:libsmb.so.1::return,
 pid$target:libads.so.1::return
 {
-  self->trace--;
+	self->trace--;
 }

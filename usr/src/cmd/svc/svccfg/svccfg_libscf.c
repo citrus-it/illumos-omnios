@@ -7040,6 +7040,7 @@ lscf_service_import(void *v, void *pvt)
 	int fresh = 0;
 	scf_snaplevel_t *running;
 	int have_ge = 0;
+	boolean_t retried = B_FALSE;
 
 	const char * const ts_deleted = gettext("Temporary service svc:/%s "
 	    "was deleted unexpectedly.\n");
@@ -7095,6 +7096,7 @@ lscf_service_import(void *v, void *pvt)
 		return (UU_WALK_ERROR);
 	}
 
+retry:
 	if (scf_scope_add_service(imp_scope, imp_tsname, imp_tsvc) != 0) {
 		switch (scf_error()) {
 		case SCF_ERROR_CONNECTION_BROKEN:
@@ -7104,6 +7106,11 @@ lscf_service_import(void *v, void *pvt)
 			return (stash_scferror(lcbdata));
 
 		case SCF_ERROR_EXISTS:
+			if (!retried) {
+				lscf_delete(imp_tsname, 0);
+				retried = B_TRUE;
+				goto retry;
+			}
 			warn(gettext(
 			    "Temporary service \"%s\" must be deleted before "
 			    "this manifest can be imported.\n"), imp_tsname);
@@ -8367,6 +8374,7 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 		}
 #endif
 		goto out;
+
 	}
 
 	if (uu_error() != UU_ERROR_CALLBACK_FAILED)
@@ -10874,6 +10882,10 @@ int
 lscf_service_export(char *fmri, const char *filename, int flags)
 {
 	struct export_args args;
+	char *fmridup;
+	const char *scope, *svc, *inst;
+	size_t cblen = 3 * max_scf_name_len;
+	char *canonbuf = alloca(cblen);
 	int ret, err;
 
 	lscf_prep_hndl();
@@ -10881,6 +10893,29 @@ lscf_service_export(char *fmri, const char *filename, int flags)
 	bzero(&args, sizeof (args));
 	args.filename = filename;
 	args.flags = flags;
+
+	/*
+	 * If some poor user has passed an exact instance FMRI, of the sort
+	 * one might cut and paste from svcs(1) or an error message, warn
+	 * and chop off the instance instead of failing.
+	 */
+	fmridup = alloca(strlen(fmri) + 1);
+	(void) strcpy(fmridup, fmri);
+	if (strncmp(fmridup, SCF_FMRI_SVC_PREFIX,
+	    sizeof (SCF_FMRI_SVC_PREFIX) -1) == 0 &&
+	    scf_parse_svc_fmri(fmridup, &scope, &svc, &inst, NULL, NULL) == 0 &&
+	    inst != NULL) {
+		(void) strlcpy(canonbuf, "svc:/", cblen);
+		if (strcmp(scope, SCF_FMRI_LOCAL_SCOPE) != 0) {
+			(void) strlcat(canonbuf, "/", cblen);
+			(void) strlcat(canonbuf, scope, cblen);
+		}
+		(void) strlcat(canonbuf, svc, cblen);
+		fmri = canonbuf;
+
+		warn(gettext("Only services may be exported; ignoring "
+		    "instance portion of argument.\n"));
+	}
 
 	err = 0;
 	if ((ret = scf_walk_fmri(g_hndl, 1, (char **)&fmri,

@@ -81,6 +81,23 @@ struct	xdr_ops xdrmblk_ops = {
 	xdrmblk_putint32
 };
 
+/*
+ * The xdrmblk_params structure holds the internal data for the XDR stream.
+ * The x_private member of the XDR points to this structure.  The
+ * xdrmblk_params structure is dynamically allocated in xdrmblk_init() and
+ * freed in xdrmblk_destroy().
+ *
+ * The apos and rpos members of the xdrmblk_params structure are used to
+ * implement xdrmblk_getpos() and xdrmblk_setpos().
+ *
+ * In addition to the xdrmblk_params structure we store some additional
+ * internal data directly in the XDR stream structure:
+ *
+ * x_base	A pointer to the current mblk (that one we are currently
+ * 		working with).
+ * x_handy	The number of available bytes (either for read or for write) in
+ * 		the current mblk.
+ */
 struct xdrmblk_params {
 	int sz;
 	uint_t apos;	/* Absolute position of the current mblk */

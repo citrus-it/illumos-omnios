@@ -4004,6 +4004,12 @@ zfs_do_receive(int argc, char **argv)
 	/* check options */
 	while ((c = getopt(argc, argv, ":del:no:uvx:FsA")) != -1) {
 		switch (c) {
+		case 'o':
+			if (parseprop(exprops, optarg) != 0) {
+				err = 1;
+				goto recverror;
+			}
+			break;
 		case 'd':
 			flags.isprefix = B_TRUE;
 			break;
@@ -4016,12 +4022,6 @@ zfs_do_receive(int argc, char **argv)
 			break;
 		case 'n':
 			flags.dryrun = B_TRUE;
-			break;
-		case 'o':
-			if (parseprop(exprops, optarg) != 0) {
-				err = 1;
-				goto recverror;
-			}
 			break;
 		case 'u':
 			flags.nomount = B_TRUE;

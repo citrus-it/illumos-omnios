@@ -1727,7 +1727,8 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		/*
 		 * symlink names must be treated as data
 		 */
-		lnm = utf8_to_str(&args->ftype4_u.linkdata, &llen, NULL);
+		lnm = utf8_to_str((utf8string *)&args->ftype4_u.linkdata,
+		    &llen, NULL);
 
 		if (lnm == NULL) {
 			*cs->statusp = resp->status = NFS4ERR_INVAL;
@@ -3881,7 +3882,7 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	/*
 	 * treat link name as data
 	 */
-	(void) str_to_utf8(name, &resp->link);
+	(void) str_to_utf8(name, (utf8string *)&resp->link);
 
 	if (name != data)
 		kmem_free(name, MAXPATHLEN + 1);
@@ -3897,7 +3898,7 @@ static void
 rfs4_op_readlink_free(nfs_resop4 *resop)
 {
 	READLINK4res *resp = &resop->nfs_resop4_u.opreadlink;
-	utf8string *symlink = &resp->link;
+	utf8string *symlink = (utf8string *)&resp->link;
 
 	if (symlink->utf8string_val) {
 		UTF8STRING_FREE(*symlink)
@@ -8691,6 +8692,20 @@ finish:
 	return (NFS4_OK);
 }
 
+/*
+ * The NFSv4.0 LOCK operation does not support the blocking lock (at the
+ * NFSv4.0 protocol level) so the client needs to resend the LOCK request in a
+ * case the lock is denied by the NFSv4.0 server.  NFSv4.0 clients are prepared
+ * for that (obviously); they are sending the LOCK requests with some delays
+ * between the attempts.  See nfs4frlock() and nfs4_block_and_wait() for the
+ * locking and delay implementation at the client side.
+ *
+ * To make the life of the clients easier, the NFSv4.0 server tries to do some
+ * fast retries on its own (the for loop below) in a hope the lock will be
+ * available soon.  And if not, the client won't need to resend the LOCK
+ * requests so fast to check the lock availability.  This basically saves some
+ * network traffic and tries to make sure the client gets the lock ASAP.
+ */
 static int
 setlock(vnode_t *vp, struct flock64 *flock, int flag, cred_t *cred)
 {
@@ -8699,8 +8714,10 @@ setlock(vnode_t *vp, struct flock64 *flock, int flag, cred_t *cred)
 	int i;
 	clock_t delaytime;
 	int cmd;
+	int spin_cnt = 0;
 
 	cmd = nbl_need_check(vp) ? F_SETLK_NBMAND : F_SETLK;
+retry:
 	delaytime = MSEC_TO_TICK_ROUNDUP(rfs4_lock_delay);
 
 	for (i = 0; i < rfs4_maxlock_tries; i++) {
@@ -8722,10 +8739,52 @@ setlock(vnode_t *vp, struct flock64 *flock, int flag, cred_t *cred)
 		flk = *flock;
 		LOCK_PRINT(rfs4_debug, "setlock", F_GETLK, &flk);
 		if (VOP_FRLOCK(vp, F_GETLK, &flk, flag, 0, NULL, cred,
-		    NULL) == 0 && flk.l_type != F_UNLCK) {
-			*flock = flk;
-			LOCK_PRINT(rfs4_debug, "setlock(blocking lock)",
-			    F_GETLK, &flk);
+		    NULL) == 0) {
+			/*
+			 * There's a race inherent in the current VOP_FRLOCK
+			 * design where:
+			 * a: "other guy" takes a lock that conflicts with a
+			 * lock we want
+			 * b: we attempt to take our lock (non-blocking) and
+			 * the attempt fails.
+			 * c: "other guy" releases the conflicting lock
+			 * d: we ask what lock conflicts with the lock we want,
+			 * getting F_UNLCK (no lock blocks us)
+			 *
+			 * If we retry the non-blocking lock attempt in this
+			 * case (restart at step 'b') there's some possibility
+			 * that many such attempts might fail.  However a test
+			 * designed to actually provoke this race shows that
+			 * the vast majority of cases require no retry, and
+			 * only a few took as many as three retries.  Here's
+			 * the test outcome:
+			 *
+			 *	   number of retries    how many times we needed
+			 *				that many retries
+			 *	   0			79461
+			 *	   1			  862
+			 *	   2			   49
+			 *	   3			    5
+			 *
+			 * Given those empirical results, we arbitrarily limit
+			 * the retry count to ten.
+			 *
+			 * If we actually make to ten retries and give up,
+			 * nothing catastrophic happens, but we're unable to
+			 * return the information about the conflicting lock to
+			 * the NFS client.  That's an acceptable trade off vs.
+			 * letting this retry loop run forever.
+			 */
+			if (flk.l_type == F_UNLCK) {
+				if (spin_cnt++ < 10) {
+					/* No longer locked, retry */
+					goto retry;
+				}
+			} else {
+				*flock = flk;
+				LOCK_PRINT(rfs4_debug, "setlock(blocking lock)",
+				    F_GETLK, &flk);
+			}
 		}
 	}
 

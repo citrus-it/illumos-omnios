@@ -27,6 +27,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef _SYS_FLOCK_IMPL_H
@@ -90,6 +91,7 @@ struct lock_descriptor {
 	hrtime_t		l_blocker;	/* time when this lock */
 						/* started to prevent other */
 						/* locks from being set */
+	file_t			*l_ofd;		/* OFD-style reference */
 };
 
 typedef struct 	lock_descriptor	lock_descriptor_t;
@@ -211,7 +213,8 @@ graph_t *flk_get_lock_graph(vnode_t *, int);
 
 #define	SAME_OWNER(lock1, lock2)	\
 	(((lock1)->l_flock.l_pid == (lock2)->l_flock.l_pid) && \
-		((lock1)->l_flock.l_sysid == (lock2)->l_flock.l_sysid))
+		((lock1)->l_flock.l_sysid == (lock2)->l_flock.l_sysid) && \
+		((lock1)->l_ofd == (lock2)->l_ofd))
 
 #define	COLORED(vertex)		((vertex)->l_color == (vertex)->l_graph->mark)
 #define	COLOR(vertex)		((vertex)->l_color = (vertex)->l_graph->mark)

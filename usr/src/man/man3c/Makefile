@@ -14,6 +14,7 @@
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
@@ -39,6 +40,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	aiocancel.3c					\
 	 	aioread.3c					\
 	 	aiowait.3c					\
+		arc4random.3c					\
 	 	assert.3c					\
 	 	atexit.3c					\
 	 	atomic_add.3c					\
@@ -108,8 +110,12 @@ MANFILES= 	__fbufsize.3c					\
 	 	enable_extended_FILE_stdio.3c			\
 	 	encrypt.3c					\
 	 	end.3c						\
+	 	epoll_create.3c					\
+	 	epoll_ctl.3c					\
+	 	epoll_wait.3c					\
 	 	err.3c						\
 	 	euclen.3c					\
+		eventfd.3c					\
 	 	exit.3c						\
 	 	fattach.3c					\
 	 	fclose.3c					\
@@ -125,6 +131,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	fgetpos.3c					\
 	 	fgetwc.3c					\
 	 	floating_to_decimal.3c				\
+		flock.3c					\
 	 	flockfile.3c					\
 	 	fmtmsg.3c					\
 	 	fnmatch.3c					\
@@ -150,6 +157,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	getcwd.3c					\
 	 	getdate.3c					\
 	 	getdtablesize.3c				\
+		getentropy.3c					\
 	 	getenv.3c					\
 	 	getexecname.3c					\
 	 	getgrnam.3c					\
@@ -404,6 +412,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	sigfpe.3c					\
 	 	siginterrupt.3c					\
 	 	signal.3c					\
+		signalfd.3c					\
 	 	sigqueue.3c					\
 	 	sigsetops.3c					\
 	 	sigstack.3c					\
@@ -466,6 +475,7 @@ MANFILES= 	__fbufsize.3c					\
 	 	timer_delete.3c					\
 	 	timer_settime.3c				\
 	 	timeradd.3c					\
+		timerfd_create.3c				\
 	 	tmpfile.3c					\
 	 	tmpnam.3c					\
 	 	toascii.3c					\
@@ -559,6 +569,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	atoi.3c					\
 	 	atol.3c					\
 	 	atoll.3c				\
+		arc4random_buf.3c			\
+		arc4random_uniform.3c			\
 	 	atomic_add_16.3c			\
 	 	atomic_add_16_nv.3c			\
 	 	atomic_add_32.3c			\
@@ -727,12 +739,15 @@ MANLINKS=	FD_CLR.3c				\
 	 	endusershell.3c				\
 	 	endutent.3c				\
 	 	endutxent.3c				\
+	 	epoll_create1.3c			\
+	 	epoll_pwait.3c				\
 	 	erand48.3c				\
 	 	errno.3c				\
 	 	errx.3c					\
 	 	etext.3c				\
 	 	euccol.3c				\
 	 	eucscol.3c				\
+		explicit_bzero.3c			\
 	 	extended_to_decimal.3c			\
 	 	fconvert.3c				\
 	 	fcvt.3c					\
@@ -1152,6 +1167,7 @@ MANLINKS=	FD_CLR.3c				\
 	 	strcspn.3c				\
 	 	strdup.3c				\
 	 	strdupa.3c				\
+	 	strerror_l.3c				\
 	 	strerror_r.3c				\
 	 	strfmon_l.3c				\
 	 	strftime_l.3c				\
@@ -1198,6 +1214,8 @@ MANLINKS=	FD_CLR.3c				\
 	 	timer_gettime.3c			\
 	 	timerclear.3c				\
 	 	timercmp.3c				\
+		timerfd_gettime.3c			\
+		timerfd_settime.3c			\
 	 	timerisset.3c				\
 	 	timersub.3c				\
 	 	tmpnam_r.3c				\
@@ -1344,6 +1362,9 @@ llabs.3c				:= LINKSRC = abs.3c
 
 aiowrite.3c				:= LINKSRC = aioread.3c
 
+arc4random_buf.3c			:= LINKSRC = arc4random.3c
+arc4random_uniform.3c			:= LINKSRC = arc4random.3c
+
 atomic_add_16.3c			:= LINKSRC = atomic_add.3c
 atomic_add_16_nv.3c			:= LINKSRC = atomic_add.3c
 atomic_add_32.3c			:= LINKSRC = atomic_add.3c
@@ -1460,6 +1481,7 @@ atomic_swap_ushort.3c			:= LINKSRC = atomic_swap.3c
 bcmp.3c					:= LINKSRC = bstring.3c
 bcopy.3c				:= LINKSRC = bstring.3c
 bzero.3c				:= LINKSRC = bstring.3c
+explicit_bzero.3c			:= LINKSRC = bstring.3c
 
 btowc_l.3c				:= LINKSRC = btowc.3c
 
@@ -1569,6 +1591,9 @@ _end.3c					:= LINKSRC = end.3c
 _etext.3c				:= LINKSRC = end.3c
 edata.3c				:= LINKSRC = end.3c
 etext.3c				:= LINKSRC = end.3c
+
+epoll_create1.3c			:= LINKSRC = epoll_create.3c
+epoll_pwait.3c				:= LINKSRC = epoll_wait.3c
 
 errx.3c					:= LINKSRC = err.3c
 verr.3c					:= LINKSRC = err.3c
@@ -2141,6 +2166,7 @@ sig2str.3c				:= LINKSRC = str2sig.3c
 
 strcoll_l.3c				:= LINKSRC = strcoll.3c
 
+strerror_l.3c				:= LINKSRC = strerror.3c
 strerror_r.3c				:= LINKSRC = strerror.3c
 
 strfmon_l.3c				:= LINKSRC = strfmon.3c
@@ -2228,6 +2254,9 @@ timerclear.3c				:= LINKSRC = timeradd.3c
 timercmp.3c				:= LINKSRC = timeradd.3c
 timerisset.3c				:= LINKSRC = timeradd.3c
 timersub.3c				:= LINKSRC = timeradd.3c
+
+timerfd_gettime.3c				:= LINKSRC = timerfd_create.3c
+timerfd_settime.3c				:= LINKSRC = timerfd_create.3c
 
 tempnam.3c				:= LINKSRC = tmpnam.3c
 tmpnam_r.3c				:= LINKSRC = tmpnam.3c

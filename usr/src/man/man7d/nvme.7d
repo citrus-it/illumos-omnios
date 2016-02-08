@@ -39,7 +39,7 @@ file. The parameters are considered an unstable interface, subject to
 change without notice. The following properties are currently
 supported:
 .Bl -tag -width Va
-.It strict-version
+.It Va strict-version
 This can be set to 0 to allow
 .Nm
 to attach to devices supporting newer version of the NVMe
@@ -67,9 +67,9 @@ queue length if it is less.
 .
 .Sh FILES
 .Bl -tag -compact -width Pa
-.It Pa /dev/dsk/cntndnsn
+.It Pa /dev/dsk/cntnd0sn
 Block device minor nodes.
-.It Pa /dev/rdsk/cntndnsn
+.It Pa /dev/rdsk/cntnd0sn
 Raw block device minor nodes.
 .El
 .Lp
@@ -84,9 +84,6 @@ system.
 The target number, this corresponds to the namespace ID used by the
 hardware. Namespace ID 0 is reserved, hence target numbers start with
 1.
-.It Va dn
-Generally, each instance of the underlying hardware will have a
-logical unit number as well.
 .It Va sn
 This is the
 .Em slice

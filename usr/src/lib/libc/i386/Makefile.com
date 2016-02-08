@@ -89,6 +89,9 @@ FPASMOBJS=			\
 ATOMICOBJS=			\
 	atomic.o
 
+CHACHAOBJS=			\
+	chacha.o
+
 XATTROBJS=			\
 	xattr_common.o
 
@@ -113,6 +116,8 @@ GENOBJS=			\
 	_mul64.o		\
 	abs.o			\
 	alloca.o		\
+	arc4random.o		\
+	arc4random_uniform.o	\
 	byteorder.o		\
 	byteorder64.o		\
 	cuexit.o		\
@@ -226,6 +231,7 @@ COMSYSOBJS=			\
 	getpid.o		\
 	getpmsg.o		\
 	getppid.o		\
+	getrandom.o		\
 	getrlimit.o		\
 	getuid.o		\
 	gtty.o			\
@@ -407,10 +413,12 @@ PORTGEN=			\
 	euclen.o		\
 	event_port.o		\
 	execvp.o		\
+	explicit_bzero.o	\
 	fattach.o		\
 	fdetach.o		\
 	fdopendir.o		\
 	ffs.o			\
+	flock.o			\
 	fls.o			\
 	fmtmsg.o		\
 	ftime.o			\
@@ -421,6 +429,7 @@ PORTGEN=			\
 	getcwd.o		\
 	getdate_err.o		\
 	getdtblsize.o		\
+	getentropy.o		\
 	getenv.o		\
 	getexecname.o		\
 	getgrnam.o		\
@@ -895,6 +904,8 @@ PORTSYS=			\
 	chmod.o			\
 	chown.o			\
 	corectl.o		\
+	epoll.o			\
+	eventfd.o		\
 	exacctsys.o		\
 	execl.o			\
 	execle.o		\
@@ -932,6 +943,7 @@ PORTSYS=			\
 	sidsys.o		\
 	siginterrupt.o		\
 	signal.o		\
+	signalfd.o		\
 	sigpending.o		\
 	sigstack.o		\
 	stat.o			\
@@ -939,6 +951,7 @@ PORTSYS=			\
 	tasksys.o		\
 	time.o			\
 	time_util.o		\
+	timerfd.o		\
 	ucontext.o		\
 	unlink.o		\
 	ustat.o			\
@@ -951,6 +964,9 @@ PORTREGEX=			\
 	regex.o			\
 	wordexp.o
 
+PORTREGEX64=			\
+	glob64.o
+
 MOSTOBJS=			\
 	$(STRETS)		\
 	$(CRTOBJS)		\
@@ -958,6 +974,7 @@ MOSTOBJS=			\
 	$(FPOBJS)		\
 	$(FPASMOBJS)		\
 	$(ATOMICOBJS)		\
+	$(CHACHAOBJS)		\
 	$(XATTROBJS)		\
 	$(COMOBJS)		\
 	$(DTRACEOBJS)		\
@@ -972,6 +989,7 @@ MOSTOBJS=			\
 	$(PORTPRINT_C89)	\
 	$(PORTPRINT_W)		\
 	$(PORTREGEX)		\
+	$(PORTREGEX64)		\
 	$(PORTSTDIO)		\
 	$(PORTSTDIO64)		\
 	$(PORTSTDIO_C89)	\
@@ -1204,6 +1222,9 @@ $(SYSOBJS64:%=pics/%) := \
 $(PORTGEN64:%=pics/%) := \
 	CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
+$(PORTREGEX64:%=pics/%) := \
+	CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+
 $(PORTSTDIO64:%=pics/%) := \
 	CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
@@ -1224,6 +1245,8 @@ $(PORTSTDIO_C89:%=pics/%) := \
 
 $(PORTI18N_COND:%=pics/%) := \
 	CPPFLAGS += -D_WCS_LONGLONG
+
+pics/arc4random.o :=	CPPFLAGS += -I$(SRC)/common/crypto/chacha
 
 .KEEP_STATE:
 

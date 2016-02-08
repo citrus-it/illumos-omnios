@@ -212,7 +212,7 @@ pseudo_exportfs(vnode_t *vp, fid_t *fid, struct exp_visible *vis_head,
 	exi->exi_id = exi_id_get_next();
 	avl_add(&exi_id_tree, exi);
 	exi->exi_kstats = exp_kstats_init(getzoneid(), exi->exi_id,
-	    exi->exi_export.ex_path);
+	    kex->ex_path, vpathlen, TRUE);
 
 	return (exi);
 }

@@ -24,7 +24,8 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2014 by Delphix. All rights reserved.
  */
 
 /*
@@ -104,6 +105,7 @@
 #include <string.h>
 
 #define	PC_FAKE		-1UL			/* illegal pc value unequal 0 */
+#define	PANIC_BUFSIZE	1024
 
 static const char PT_EXEC_PATH[] = "a.out";	/* Default executable */
 static const char PT_CORE_PATH[] = "core";	/* Default core file */
@@ -1566,7 +1568,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		int state;
 		GElf_Sym sym;
 		uintptr_t panicstr;
-		char panicbuf[128];
+		char *panicbuf = mdb_alloc(PANIC_BUFSIZE, UM_SLEEP);
 		const siginfo_t *sip = &(psp->pr_lwp.pr_info);
 
 		char execname[MAXPATHLEN], buf[BUFSIZ];
@@ -1723,7 +1725,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    Pread(t->t_pshandle, &panicstr, sizeof (panicstr),
 			    sym.st_value) == sizeof (panicstr) &&
 			    Pread_string(t->t_pshandle, panicbuf,
-			    sizeof (panicbuf), panicstr) > 0) {
+			    PANIC_BUFSIZE, panicstr) > 0) {
 				mdb_printf("panic message: %s",
 				    panicbuf);
 			}
@@ -1738,6 +1740,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		default:
 			mdb_printf("unknown libproc Pstate: %d\n", Pstate(P));
 		}
+		mdb_free(panicbuf, PANIC_BUFSIZE);
 
 	} else if (pt->p_file != NULL) {
 		const GElf_Ehdr *ehp = &pt->p_file->gf_ehdr;
@@ -2109,7 +2112,7 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	{ "$i", NULL, "print signals that are ignored", pt_ignored },
 	{ "$l", NULL, "print the representative thread's lwp id", pt_lwpid },
 	{ "$L", NULL, "print list of the active lwp ids", pt_lwpids },
-	{ "$r", "?", "print general-purpose registers", pt_regs },
+	{ "$r", "?[-u]", "print general-purpose registers", pt_regs },
 	{ "$x", "?", "print floating point registers", pt_fpregs },
 	{ "$X", "?", "print floating point registers", pt_fpregs },
 	{ "$y", "?", "print floating point registers", pt_fpregs },
@@ -2129,7 +2132,7 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	{ "kill", NULL, "forcibly kill and release target", pt_kill },
 	{ "release", "[-a]",
 	    "release the previously attached process", pt_detach },
-	{ "regs", "?", "print general-purpose registers", pt_regs },
+	{ "regs", "?[-u]", "print general-purpose registers", pt_regs },
 	{ "fpregs", "?[-dqs]", "print floating point registers", pt_fpregs },
 	{ "setenv", "name=value", "set an environment variable", pt_setenv },
 	{ "stack", "?[cnt]", "print stack backtrace", pt_stack },

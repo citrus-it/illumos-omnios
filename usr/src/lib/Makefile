@@ -599,7 +599,7 @@ libdhcputil:	libgen libinetutil libdlpi
 libdiskmgt:	libdevid libdevinfo libadm libefi libkstat libsysevent
 $(INTEL_BLD)libdiskmgt: libfdisk
 libdladm:	libdevinfo libinetutil libscf librcm libexacct libkstat \
-		libcurses libpool
+		libpool
 libdll: 	libast
 libdlpi:	libinetutil libdladm
 libds:		libsysevent

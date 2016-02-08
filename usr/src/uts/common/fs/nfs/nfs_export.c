@@ -929,7 +929,8 @@ nfs_exportinit(void)
 	exi_root->exi_id = exi_id_get_next();
 	avl_add(&exi_id_tree, exi_root);
 	exi_root->exi_kstats = exp_kstats_init(getzoneid(), exi_root->exi_id,
-	    exi_root->exi_export.ex_path);
+	    exi_root->exi_export.ex_path, exi_root->exi_export.ex_pathlen,
+	    FALSE);
 
 	rw_exit(&exported_lock);
 
@@ -1670,18 +1671,13 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	if (ex != NULL) {
 		exi->exi_id = ex->exi_id;
 		exi->exi_kstats = ex->exi_kstats;
-		if (exi->exi_kstats->share_kstat != NULL) {
-			mutex_enter(exi->exi_kstats->share_kstat->ks_lock);
-			kstat_named_setstr(
-			    KSTAT_NAMED_PTR(exi->exi_kstats->share_kstat),
-			    exi->exi_export.ex_path);
-			mutex_exit(exi->exi_kstats->share_kstat->ks_lock);
-		}
 		ex->exi_kstats = NULL;
+		exp_kstats_reset(exi->exi_kstats, kex->ex_path,
+		    kex->ex_pathlen, FALSE);
 	} else {
 		exi->exi_id = exi_id_get_next();
 		exi->exi_kstats = exp_kstats_init(getzoneid(), exi->exi_id,
-		    exi->exi_export.ex_path);
+		    kex->ex_path, kex->ex_pathlen, FALSE);
 	}
 	avl_add(&exi_id_tree, exi);
 

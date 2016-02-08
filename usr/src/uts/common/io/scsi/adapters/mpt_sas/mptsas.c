@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
@@ -6535,10 +6535,15 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				mptsas_log(mpt, CE_NOTE,
 				    "mptsas_handle_topo_change: could not "
 				    "allocate memory. \n");
+			} else if (rval == DEV_INFO_FAIL_GUID) {
+				mptsas_log(mpt, CE_NOTE,
+				    "mptsas_handle_topo_change: could not "
+				    "get SATA GUID for target %d. \n",
+				    topo_node->devhdl);
 			}
 			/*
-			 * If rval is DEV_INFO_PHYS_DISK than there is nothing
-			 * else to do, just leave.
+			 * If rval is DEV_INFO_PHYS_DISK or indicates failure
+			 * then there is nothing else to do, just leave.
 			 */
 			if (rval != DEV_INFO_SUCCESS) {
 				return;

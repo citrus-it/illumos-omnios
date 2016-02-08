@@ -235,6 +235,19 @@ zpool_feature_init(void)
 	    "Support for blocks larger than 128KB.",
 	    ZFEATURE_FLAG_PER_DATASET, large_blocks_deps);
 
+	zfeature_register(SPA_FEATURE_SHA512,
+	    "org.illumos:sha512", "sha512",
+	    "SHA-512/256 hash algorithm.",
+	    ZFEATURE_FLAG_PER_DATASET, NULL);
+	zfeature_register(SPA_FEATURE_SKEIN,
+	    "org.illumos:skein", "skein",
+	    "Skein hash algorithm.",
+	    ZFEATURE_FLAG_PER_DATASET, NULL);
+	zfeature_register(SPA_FEATURE_EDONR,
+	    "org.illumos:edonr", "edonr",
+	    "Edon-R hash algorithm.",
+	    ZFEATURE_FLAG_PER_DATASET, NULL);
+
 	zfeature_register(SPA_FEATURE_META_DEVICES,
 	    "com.nexenta:meta_devices", "meta_devices",
 	    "Dedicated devices for metadata.", ZFEATURE_FLAG_READONLY_COMPAT, NULL);
@@ -248,17 +261,4 @@ zpool_feature_init(void)
 	zfeature_register(SPA_FEATURE_WRC,
 	    "com.nexenta:wrcache", "wrcache",
 	    "Write back cache support", 0, NULL);
-
-	zfeature_register(SPA_FEATURE_SHA512,
-	    "org.illumos:sha512", "sha512",
-	    "SHA-512/256 hash algorithm.",
-	    ZFEATURE_FLAG_PER_DATASET, NULL);
-	zfeature_register(SPA_FEATURE_SKEIN,
-	    "org.illumos:skein", "skein",
-	    "Skein hash algorithm.",
-	    ZFEATURE_FLAG_PER_DATASET, NULL);
-	zfeature_register(SPA_FEATURE_EDONR,
-	    "org.illumos:edonr", "edonr",
-	    "Edon-R hash algorithm.",
-	    ZFEATURE_FLAG_PER_DATASET, NULL);
 }

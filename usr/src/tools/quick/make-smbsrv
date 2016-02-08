@@ -143,12 +143,12 @@ do_kern() {
 do_lib1() {
 
 for lib in \
-    libavl \
-    libgss \
-    libkrb5 \
-    libcmdutils \
-    libsqlite \
-    libuutil
+  libavl \
+  libgss \
+  libkrb5 \
+  libcmdutils \
+  libsqlite \
+  libuutil
 do
   (cd $SRC/lib/$lib && $make $1)
 done

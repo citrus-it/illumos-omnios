@@ -103,12 +103,14 @@ extern size_t strxfrm_l(char *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
     size_t, locale_t);
 extern int strcasecmp_l(const char *, const char *, locale_t);
 extern int strncasecmp_l(const char *, const char *, size_t, locale_t);
+extern char *strerror_l(int, locale_t);
 
 #endif /* defined(_STRICT_SYMBOLS) || defined(_XPG7) */
 
 #if !defined(_STRICT_SYMBOLS)
 
 /* Note that some of these are also declared in strings.h for XPG4_2+ */
+extern void explicit_bzero(void *, size_t);
 extern int uucopy(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
 extern int uucopystr(const void *_RESTRICT_KYWD, void *_RESTRICT_KYWD, size_t);
 extern int ffs(int);

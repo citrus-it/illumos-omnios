@@ -22,9 +22,9 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2013 Saso Kiselkov. All rights reserved.
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -965,6 +965,7 @@ file path=usr/include/sys/elf_amd64.h
 file path=usr/include/sys/elf_notes.h
 file path=usr/include/sys/elftypes.h
 file path=usr/include/sys/epm.h
+file path=usr/include/sys/epoll.h
 file path=usr/include/sys/errno.h
 file path=usr/include/sys/errorq.h
 file path=usr/include/sys/errorq_impl.h
@@ -972,6 +973,7 @@ file path=usr/include/sys/esunddi.h
 file path=usr/include/sys/ethernet.h
 file path=usr/include/sys/euc.h
 file path=usr/include/sys/eucioctl.h
+file path=usr/include/sys/eventfd.h
 file path=usr/include/sys/exacct.h
 file path=usr/include/sys/exacct_catalog.h
 file path=usr/include/sys/exacct_impl.h
@@ -1020,13 +1022,6 @@ $(sparc_ONLY)file path=usr/include/sys/fpu/globals.h
 $(sparc_ONLY)file path=usr/include/sys/fpu/ieee.h
 file path=usr/include/sys/frame.h
 file path=usr/include/sys/fs/autofs.h
-file path=usr/include/sys/fs/cachefs_dir.h
-file path=usr/include/sys/fs/cachefs_dlog.h
-file path=usr/include/sys/fs/cachefs_filegrp.h
-file path=usr/include/sys/fs/cachefs_fs.h
-file path=usr/include/sys/fs/cachefs_fscache.h
-file path=usr/include/sys/fs/cachefs_ioctl.h
-file path=usr/include/sys/fs/cachefs_log.h
 file path=usr/include/sys/fs/decomp.h
 file path=usr/include/sys/fs/dv_node.h
 file path=usr/include/sys/fs/fifonode.h
@@ -1235,6 +1230,7 @@ $(i386_ONLY)file path=usr/include/sys/mc_amd.h
 $(i386_ONLY)file path=usr/include/sys/mc_intel.h
 $(i386_ONLY)file path=usr/include/sys/mca_amd.h
 $(i386_ONLY)file path=usr/include/sys/mca_x86.h
+file path=usr/include/sys/mcontext.h
 file path=usr/include/sys/md4.h
 file path=usr/include/sys/md5.h
 file path=usr/include/sys/md5_consts.h
@@ -1441,6 +1437,7 @@ file path=usr/include/sys/shm_impl.h
 file path=usr/include/sys/sid.h
 file path=usr/include/sys/siginfo.h
 file path=usr/include/sys/signal.h
+file path=usr/include/sys/signalfd.h
 file path=usr/include/sys/skein.h
 file path=usr/include/sys/sleepq.h
 file path=usr/include/sys/smbios.h
@@ -1532,6 +1529,7 @@ file path=usr/include/sys/time_impl.h
 file path=usr/include/sys/time_std_impl.h
 file path=usr/include/sys/timeb.h
 file path=usr/include/sys/timer.h
+file path=usr/include/sys/timerfd.h
 file path=usr/include/sys/times.h
 file path=usr/include/sys/timex.h
 file path=usr/include/sys/timod.h

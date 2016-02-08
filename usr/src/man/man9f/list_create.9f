@@ -106,7 +106,6 @@ functions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions provide a generic doubly-linked list implementation. To
 utilize it, simply embed a \fBlist_node_t\fR field in the structures
@@ -197,7 +196,6 @@ the items need not be on the same list, but extreme care must be used to ensure
 that both lists are protected from concurrent accesses and that the lists were
 initialized with identical size and offset parameters.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -213,6 +211,5 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBattributes\fR(5)

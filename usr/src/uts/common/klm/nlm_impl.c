@@ -394,8 +394,9 @@ nlm_gc(struct nlm_globals *g)
 				 */
 				if (nvp->nv_refcnt == 0 &&
 				    nvp->nv_vp->v_filocks == NULL &&
-				    nvp->nv_vp->v_shrlocks == NULL)
+				    nvp->nv_vp->v_shrlocks == NULL) {
 					nlm_vhold_destroy(hostp, nvp);
+				}
 
 				nvp = new_nvp;
 			}
@@ -1054,8 +1055,9 @@ nlm_vhold_release(struct nlm_host *hostp, struct nlm_vhold *nvp)
 	 */
 	if (nvp->nv_refcnt == 0 &&
 	    nvp->nv_vp->v_filocks == NULL &&
-	    nvp->nv_vp->v_shrlocks == NULL)
+	    nvp->nv_vp->v_shrlocks == NULL) {
 		nlm_vhold_destroy(hostp, nvp);
+	}
 
 	mutex_exit(&hostp->nh_lock);
 }
