@@ -55,6 +55,8 @@
 #include <sys/autosnap.h>
 #include <sys/bqueue.h>
 
+#include "zfs_errno.h"
+
 /* Set this tunable to TRUE to replace corrupt data with 0x2f5baddb10c */
 int zfs_send_corrupt_data = B_FALSE;
 int zfs_send_queue_length = 16 * 1024 * 1024;
@@ -1411,7 +1413,7 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 			/* Recv is impossible into DS that uses WRC */
 			if (os->os_wrc_mode != ZFS_WRC_MODE_OFF) {
 				dsl_dataset_rele(ds, FTAG);
-				return (SET_ERROR(ENOTSUP));
+				return (SET_ERROR(EKZFS_WRCNOTSUP));
 			}
 		}
 
@@ -1463,7 +1465,7 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 			/* Recv is impossible into DS that uses WRC */
 			if (os->os_wrc_mode != ZFS_WRC_MODE_OFF) {
 				dsl_dataset_rele(ds, FTAG);
-				return (SET_ERROR(ENOTSUP));
+				return (SET_ERROR(EKZFS_WRCNOTSUP));
 			}
 		}
 
@@ -3092,7 +3094,7 @@ dmu_recv_end_check(void *arg, dmu_tx_t *tx)
 
 		/* Recv is impossible into DS that uses WRC */
 		if (os->os_wrc_mode != ZFS_WRC_MODE_OFF)
-			return (SET_ERROR(ENOTSUP));
+			return (SET_ERROR(EKZFS_WRCNOTSUP));
 	}
 
 	if (!drc->drc_newfs) {

@@ -23,7 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
  * Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
  */
@@ -46,6 +46,7 @@
 #include <libzfs.h>
 #include <libzfs_core.h>
 
+#include "zfs_errno.h"
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
 #include "zfs_fletcher.h"
@@ -3610,6 +3611,11 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "destination %s space quota exceeded"), zc.zc_name);
 			(void) zfs_error(hdl, EZFS_NOSPC, errbuf);
+			break;
+		case EKZFS_WRCNOTSUP:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "wrcached datasets do not support recv"));
+			(void) zfs_error(hdl, EZFS_WRCNOTSUP, errbuf);
 			break;
 		default:
 			(void) zfs_standard_error(hdl, ioctl_errno, errbuf);
