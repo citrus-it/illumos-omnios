@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -9,6 +9,7 @@
  * - by using kmem_cache logic on the fly
  */
 
+#include "krrp_svc.h"
 #include "krrp_dblk.h"
 
 
@@ -68,9 +69,11 @@ krrp_dblk_engine_create(krrp_dblk_engine_t **result_engine,
 	return (0);
 }
 
-void
-krrp_dblk_engine_destroy(krrp_dblk_engine_t *engine)
+static void
+krrp_dblk_engine_destroy_impl(void *arg)
 {
+	krrp_dblk_engine_t *engine = arg;
+
 	mutex_enter(&engine->mtx);
 
 	while (engine->cur_dblk_cnt != 0)
@@ -91,6 +94,18 @@ krrp_dblk_engine_destroy(krrp_dblk_engine_t *engine)
 	mutex_destroy(&engine->mtx);
 
 	kmem_free(engine, sizeof (krrp_dblk_engine_t));
+}
+
+void
+krrp_dblk_engine_destroy(krrp_dblk_engine_t *engine)
+{
+	engine->destroying = B_TRUE;
+
+	/*
+	 * Destroy DBLK Engine asynchronously, because TCP/IP
+	 * stack might hold our dblks for a long time
+	 */
+	krrp_svc_dispatch_task(krrp_dblk_engine_destroy_impl, engine);
 }
 
 static int
@@ -347,7 +362,10 @@ krrp_dblk_free_cb(caddr_t void_dblk)
 		dblk_engine->notify_free.cnt =
 		    dblk_engine->notify_free.init_value;
 
-		dblk_engine->notify_free.cb(dblk_engine->notify_free.cb_arg);
+		if (!dblk_engine->destroying) {
+			dblk_engine->notify_free.cb(
+			    dblk_engine->notify_free.cb_arg);
+		}
 	}
 
 	cv_signal(&dblk_engine->cv);

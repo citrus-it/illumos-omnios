@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -8,15 +8,15 @@
  * Over network are transfered header and dblks.
  */
 
+#include "krrp_svc.h"
 #include "krrp_pdu.h"
 
 /* #define KRRP_PDU_DEBUG 1 */
 
 static struct {
-	taskq_t				*rele_taskq;
 	uint64_t			ref_cnt;
 	krrp_pdu_engine_t	*ctrl_pdu_engine;
-} krrp_global_pdu_engine_env = {NULL, 0, NULL};
+} krrp_global_pdu_engine_env = {0, NULL};
 
 static void krrp_pdu_rele_task(void *void_pdu);
 static void krrp_pdu_engine_notify_cb(void *void_pdu_engine);
@@ -29,11 +29,6 @@ krrp_pdu_engine_global_init()
 
 	VERIFY(krrp_global_pdu_engine_env.ref_cnt == 0);
 	VERIFY(krrp_global_pdu_engine_env.ctrl_pdu_engine == NULL);
-	VERIFY(krrp_global_pdu_engine_env.rele_taskq == NULL);
-
-	krrp_global_pdu_engine_env.rele_taskq = taskq_create(
-	    "krrp_pdu_rele_taskq", 3, minclsyspri, 128,
-	    16384, TASKQ_PREPOPULATE);
 
 	/*
 	 * CTRL PDU Engine that will be used by all sessions:
@@ -47,10 +42,6 @@ krrp_pdu_engine_global_init()
 	 */
 	rc = krrp_pdu_engine_create(&krrp_global_pdu_engine_env.ctrl_pdu_engine,
 	    B_TRUE, B_FALSE, 100, 1, 0, 2 * 1024, &error);
-	if (rc != 0) {
-		taskq_destroy(krrp_global_pdu_engine_env.rele_taskq);
-		krrp_global_pdu_engine_env.rele_taskq = NULL;
-	}
 
 	return (rc);
 }
@@ -63,9 +54,6 @@ krrp_pdu_engine_global_fini()
 
 	krrp_pdu_engine_destroy(krrp_global_pdu_engine_env.ctrl_pdu_engine);
 	krrp_global_pdu_engine_env.ctrl_pdu_engine = NULL;
-
-	taskq_destroy(krrp_global_pdu_engine_env.rele_taskq);
-	krrp_global_pdu_engine_env.rele_taskq = NULL;
 }
 
 void
@@ -135,12 +123,6 @@ krrp_pdu_engine_destroy(krrp_pdu_engine_t *engine)
 	krrp_dblk_engine_destroy(engine->dblk_engine);
 
 	mutex_enter(&engine->mtx);
-
-	/*
-	 * DBLK Engine has been destroyed
-	 * so all PDUs must be released
-	 */
-	VERIFY(engine->cur_pdu_cnt == 0);
 
 	cv_destroy(&engine->cv);
 
@@ -297,11 +279,7 @@ krrp_pdu_rele(krrp_pdu_t *pdu)
 		return;
 	}
 
-	if (taskq_dispatch(krrp_global_pdu_engine_env.rele_taskq,
-	    krrp_pdu_rele_task, pdu, TQ_SLEEP) == NULL) {
-		cmn_err(CE_WARN, "Failed to dispatch new connection");
-		krrp_pdu_rele_task(pdu);
-	}
+	krrp_svc_dispatch_task(krrp_pdu_rele_task, pdu);
 }
 
 static void

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _KRRP_DBLK_H
@@ -46,6 +46,7 @@ struct krrp_dblk_engine_s {
 	kmutex_t				mtx;
 	kcondvar_t				cv;
 
+	boolean_t				destroying;
 	krrp_dblk_alloc_func_t	*alloc_func;
 
 	kmem_cache_t			*dblk_cache;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_KRRP_SVC_H
@@ -44,7 +44,7 @@ typedef struct krrp_svc_s {
 	avl_tree_t			sessions;
 	krrp_server_t		*server;
 	krrp_pdu_engine_t	*ctrl_pdu_engine;
-	taskq_t				*new_conn_tasks;
+	taskq_t				*aux_taskq;
 	evchan_t			*ev_chan;
 } krrp_svc_t;
 
@@ -74,6 +74,8 @@ void krrp_svc_list_sessions(nvlist_t *out_nvl);
 
 int krrp_svc_ref_cnt_try_hold();
 void krrp_svc_ref_cnt_rele();
+
+void krrp_svc_dispatch_task(task_func_t func, void *arg);
 
 #ifdef __cplusplus
 }

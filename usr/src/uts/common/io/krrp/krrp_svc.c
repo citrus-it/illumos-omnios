@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -144,7 +144,13 @@ krrp_svc_enable(krrp_error_t *error)
 	if (rc != 0)
 		return (rc);
 
-	krrp_svc.new_conn_tasks = taskq_create("krrp_new_conn_taskq", 3,
+	/*
+	 * This taskq will process the following tasks:
+	 * - PDU rele
+	 * - DBLK engine destroy
+	 * - processing of new incoming connections
+	 */
+	krrp_svc.aux_taskq = taskq_create("krrp_aux_taskq", 10,
 	    minclsyspri, 128, 16384, TASKQ_DYNAMIC);
 
 	if (krrp_pdu_engine_global_init() != 0)
@@ -160,9 +166,9 @@ krrp_svc_enable(krrp_error_t *error)
 	return (0);
 
 err:
-	if (krrp_svc.new_conn_tasks != NULL) {
-		taskq_destroy(krrp_svc.new_conn_tasks);
-		krrp_svc.new_conn_tasks = NULL;
+	if (krrp_svc.aux_taskq != NULL) {
+		taskq_destroy(krrp_svc.aux_taskq);
+		krrp_svc.aux_taskq = NULL;
 	}
 
 	krrp_svc_lock(&krrp_svc);
@@ -203,7 +209,8 @@ krrp_svc_disable(krrp_error_t *error)
 	/* Wait until all our clients finished */
 	krrp_svc_ref_cnt_wait();
 
-	taskq_destroy(krrp_svc.new_conn_tasks);
+	taskq_wait(krrp_svc.aux_taskq);
+	taskq_destroy(krrp_svc.aux_taskq);
 
 	krrp_svc_unregister_all_sessions();
 
@@ -326,6 +333,13 @@ krrp_svc_post_uevent(const char *subclass, nvlist_t *attr_list)
 
 	if (rc != 0)
 		cmn_err(CE_WARN, "Failed to publish KRRP event (%d)", rc);
+}
+
+void
+krrp_svc_dispatch_task(task_func_t func, void *arg)
+{
+	VERIFY(taskq_dispatch(krrp_svc.aux_taskq,
+	    func, arg, TQ_SLEEP) != 0);
 }
 
 static void
@@ -471,12 +485,7 @@ krrp_svc_on_new_ks_cb(ksocket_t new_ks)
 		return;
 	}
 
-	if (taskq_dispatch(krrp_svc.new_conn_tasks, krrp_svc_new_conn_handler,
-	    (void *) conn, TQ_SLEEP) == NULL) {
-		cmn_err(CE_WARN, "Failed to dispatch new connection");
-		krrp_conn_destroy(conn);
-		krrp_svc_ref_cnt_rele();
-	}
+	krrp_svc_dispatch_task(krrp_svc_new_conn_handler, conn);
 }
 
 static void
