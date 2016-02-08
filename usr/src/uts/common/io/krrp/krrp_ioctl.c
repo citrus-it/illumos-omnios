@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sdt.h>
@@ -675,6 +675,7 @@ static int krrp_ioctl_sess_conn_throttle(nvlist_t *params,
 
 	if (limit < KRRP_MIN_CONN_THROTTLE && limit != 0) {
 		krrp_error_set(error, KRRP_ERRNO_THROTTLE, EINVAL);
+		rc = -1;
 		goto out;
 	}
 
