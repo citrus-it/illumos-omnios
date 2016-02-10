@@ -72,6 +72,12 @@ zpool_prop_init(void)
 		{ NULL }
 	};
 
+	/*
+	 * NOTE: When either adding or changing a property make sure
+	 * to update the zfs-tests zpool_get configuration file
+	 * at usr/src/test/zfs-tests/tests/functional/cli_root/zpool_get/zpool_get.cfg
+	 */
+
 	/* string properties */
 	zprop_register_string(ZPOOL_PROP_ALTROOT, "altroot", NULL, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "<path>", "ALTROOT");

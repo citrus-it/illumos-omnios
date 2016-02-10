@@ -177,6 +177,10 @@ extern const char *zfs_userquota_prop_prefixes[ZFS_NUM_USERQUOTA_PROPS];
  * end of this list to ensure that external consumers are not affected
  * by the change. If you make any changes to this list, be sure to update
  * the property table in usr/src/common/zfs/zpool_prop.c.
+ *
+ * NOTE: When either adding or changing a feature make sure
+ * to update the zfs-tests zpool_get configuration file
+ * at usr/src/test/zfs-tests/tests/functional/cli_root/zpool_get/zpool_get.cfg
  */
 typedef enum {
 	ZPOOL_PROP_NAME,

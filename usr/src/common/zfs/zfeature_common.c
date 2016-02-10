@@ -23,7 +23,7 @@
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
- * Copyright (c) 2015, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #ifdef _KERNEL
@@ -159,6 +159,12 @@ spa_feature_t cos_deps[] = { SPA_FEATURE_VDEV_PROPS, SPA_FEATURE_NONE };
 void
 zpool_feature_init(void)
 {
+
+	/*
+	 * NOTE: When either adding or changing a feature make sure
+	 * to update the zfs-tests zpool_get configuration file
+	 * at usr/src/test/zfs-tests/tests/functional/cli_root/zpool_get/zpool_get.cfg
+	 */
 	zfeature_register(SPA_FEATURE_ASYNC_DESTROY,
 	    "com.delphix:async_destroy", "async_destroy",
 	    "Destroy filesystems asynchronously.",
