@@ -209,12 +209,11 @@ krrp_svc_disable(krrp_error_t *error)
 	/* Wait until all our clients finished */
 	krrp_svc_ref_cnt_wait();
 
-	taskq_wait(krrp_svc.aux_taskq);
-	taskq_destroy(krrp_svc.aux_taskq);
-
 	krrp_svc_unregister_all_sessions();
 
 	krrp_pdu_engine_global_fini();
+
+	taskq_destroy(krrp_svc.aux_taskq);
 
 	krrp_svc_lock(&krrp_svc);
 	krrp_svc.state = KRRP_SVCS_DISABLED;
