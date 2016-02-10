@@ -16,7 +16,8 @@ extern "C" {
 
 typedef enum {
 	LIBKRRP_SESS_ERROR,
-	LIBKRRP_SRV_ERROR
+	LIBKRRP_SRV_ERROR,
+	LIBKRRP_SESS_STATUS_ERROR
 } libkrrp_error_type_t;
 
 #define	LIBKRRP_ERRDESCR_EXPAND(m_libkrrp_errno, m_unix_errno, m_descr, ...) \
