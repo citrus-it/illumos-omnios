@@ -133,9 +133,11 @@ typedef enum spa_watermark {
 } spa_watermark_t;
 
 /*
- * spa average utilization, latency and throughput for special/normal classes
+ * average utilization, latency and throughput
+ * for spa and special/normal classes
  */
 typedef struct spa_avg_stat {
+	uint64_t spa_utilization;
 	uint64_t special_utilization;
 	uint64_t normal_utilization;
 	uint64_t special_latency;

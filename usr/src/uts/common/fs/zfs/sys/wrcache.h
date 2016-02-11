@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SYS_WRCACHE_H
@@ -108,6 +108,15 @@ typedef struct wrc_instance {
 } wrc_instance_t;
 
 /*
+ * wrc statistics
+ */
+typedef struct wrc_stat {
+	uint64_t	wrc_spa_util;		/* spa average utilization */
+	clock_t		wrc_stat_lbolt;		/* last statistics update */
+	boolean_t	wrc_stat_update;	/* statstics update flag */
+} wrc_stat_t;
+
+/*
  * wrc_data is a global per ZFS pool structure contains all
  * information associated with write cache and
  * is attached to spa structure.
@@ -131,9 +140,10 @@ struct wrc_data {
 	uint64_t	wrc_roll_threshold;	/* max percent can be altered */
 	uint64_t	wrc_altered_limit;	/* max bytes can be altered */
 
-	uint64_t	wrc_block_count;	/* amount of blocks */
+	uint64_t	wrc_blocks_count;	/* amount of blocks */
 
 	taskq_t		*wrc_move_taskq;	/* pending blocks taskq */
+	uint64_t	wrc_move_threads;	/* taskq number of threads */
 
 	uint64_t	wrc_start_txg;		/* left boundary */
 	uint64_t	wrc_finish_txg;		/* right boundary */
@@ -149,7 +159,8 @@ struct wrc_data {
 	avl_tree_t	wrc_instances;
 	boolean_t	wrc_ready_to_use;
 
-	spa_t		*wrc_spa;
+	spa_t		*wrc_spa;		/* parent spa */
+	wrc_stat_t	wrc_stat;		/* wrc statistics */
 
 	uint64_t	wrc_fault_moves;	/* amount of fault moves */
 

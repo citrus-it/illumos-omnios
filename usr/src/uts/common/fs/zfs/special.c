@@ -1054,10 +1054,15 @@ spa_class_collect_stats(spa_t *spa, spa_acc_stat_t *spa_acc, uint64_t weight)
 		return;
 
 	/*
-	 * Locally accumulate (sum-up) per-class latency and utilization stats
-	 * At the end of each iteration the resulting sums are averaged /=
-	 * num-samples
+	 * Locally accumulate (sum-up) spa and per-class throughput, latency
+	 * and utilization stats. At the end of each iteration the resulting
+	 * sums are averaged /= num-samples
 	 */
+
+	spa_acc->spa_utilization +=
+	    weight * (special_acc.utilization + normal_acc.utilization) /
+	    (special_acc.count + normal_acc.count);
+
 	spa_acc->special_utilization +=
 	    weight * special_acc.utilization / special_acc.count;
 	spa_acc->special_latency +=
@@ -1093,6 +1098,9 @@ spa_load_stats_update(spa_t *spa, spa_acc_stat_t *spa_acc, uint64_t rotor)
 	spa_class_collect_stats(spa, spa_acc, weight);
 
 	if (residue == 0 && spa_acc->count != 0) {
+		spa_avg->spa_utilization =
+		    spa_acc->spa_utilization / spa_acc->count;
+
 		spa_avg->special_utilization =
 		    spa_acc->special_utilization / spa_acc->count;
 		spa_avg->normal_utilization =

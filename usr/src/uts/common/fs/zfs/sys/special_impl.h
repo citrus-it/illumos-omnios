@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -89,6 +89,7 @@ typedef struct cos_acc_stat {
  * count:       number of accumulated statistics
  */
 typedef struct spa_acc_stat {
+	uint64_t spa_utilization;
 	uint64_t special_utilization;
 	uint64_t normal_utilization;
 	uint64_t special_latency;
