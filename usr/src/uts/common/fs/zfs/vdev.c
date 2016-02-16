@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -534,6 +534,15 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
 	    &vd->vdev_wholedisk) != 0)
 		vd->vdev_wholedisk = -1ULL;
+
+	/*
+	 * Set the is_ssd property.  If it's not specified it means the media
+	 * is not SSD or the request failed and we assume it's not.
+	 */
+	if (nvlist_lookup_boolean(nv, ZPOOL_CONFIG_IS_SSD) == 0)
+		vd->vdev_is_ssd = B_TRUE;
+	else
+		vd->vdev_is_ssd = B_FALSE;
 
 	/*
 	 * Look for the 'not present' flag.  This will only be set if the device

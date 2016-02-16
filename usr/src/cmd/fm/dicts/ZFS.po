@@ -313,4 +313,36 @@ msgid "ZFS-8000-K4.impact"
 msgstr "The intent log(s) cannot be replayed."
 msgid "ZFS-8000-K4.action"
 msgstr "Either restore the affected device(s) and run 'zpool online',\n	    or ignore the intent log records by running 'zpool clear'."
+#
+# code: ZFS-8000-LR
+# keys: fault.fs.zfs.vdev.not_spared
+#
+msgid "ZFS-8000-LR.type"
+msgstr "Fault"
+msgid "ZFS-8000-LR.severity"
+msgstr "Major"
+msgid "ZFS-8000-LR.description"
+msgstr "A ZFS device failed and even though spare(s) exist in the pool,\n     a spare with 'sparegroup' property not set, matching media type and enclosure number was not found.  Refer to %s for more information."
+msgid "ZFS-8000-LR.response"
+msgstr "No automated response will be taken."
+msgid "ZFS-8000-LR.impact"
+msgstr "Pool redundancy may be compromised."
+msgid "ZFS-8000-LR.action"
+msgstr "Replace the failed device and run 'zpool clear'"
+#
+# code: ZFS-8000-M2
+# keys: fault.fs.zfs.vdev.fru_not_matched
+#
+msgid "ZFS-8000-M2.type"
+msgstr "Fault"
+msgid "ZFS-8000-M2.severity"
+msgstr "Major"
+msgid "ZFS-8000-M2.description"
+msgstr "A ZFS device failed which triggered a spare activation attempt.\n     Spare matching by FRU field(s) has failed.\n  Refer to %s for more information."
+msgid "ZFS-8000-M2.response"
+msgstr "No automated response will be taken."
+msgid "ZFS-8000-M2.impact"
+msgstr "Pool redundancy may be compromised."
+msgid "ZFS-8000-M2.action"
+msgstr "Inspect activated spare to confirm pool redundancy is intact."
 

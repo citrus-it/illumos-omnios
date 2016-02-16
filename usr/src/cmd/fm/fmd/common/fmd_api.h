@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_FMD_API_H
@@ -136,6 +137,15 @@ extern void *fmd_hdl_getspecific(fmd_hdl_t *);
 extern void fmd_hdl_opendict(fmd_hdl_t *, const char *);
 extern struct topo_hdl *fmd_hdl_topo_hold(fmd_hdl_t *, int);
 extern void fmd_hdl_topo_rele(fmd_hdl_t *, struct topo_hdl *);
+
+typedef struct fmd_hdl_topo_node_info {
+	const char *device;
+	nvlist_t *fru;
+	nvlist_t *resource;
+} fmd_hdl_topo_node_info_t;
+
+extern fmd_hdl_topo_node_info_t *fmd_hdl_topo_node_get_by_devid(
+    fmd_hdl_t *hdl, char *device);
 
 #define	FMD_NOSLEEP		0x0	/* do not sleep or retry on failure */
 #define	FMD_SLEEP		0x1	/* sleep or retry if alloc fails */

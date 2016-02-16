@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 #
 
 $mapfile_version 2
@@ -74,6 +75,7 @@ SYMBOL_SCOPE {
 	fmd_hdl_strfree			{ TYPE = function; FLAGS = extern };
 	fmd_hdl_subscribe		{ TYPE = function; FLAGS = extern };
 	fmd_hdl_topo_hold		{ TYPE = function; FLAGS = extern };
+	fmd_hdl_topo_node_get_by_devid	{ TYPE = function; FLAGS = extern };
 	fmd_hdl_topo_rele		{ TYPE = function; FLAGS = extern };
 	fmd_hdl_unregister		{ TYPE = function; FLAGS = extern };
 	fmd_hdl_unsubscribe		{ TYPE = function; FLAGS = extern };

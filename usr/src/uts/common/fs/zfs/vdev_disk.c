@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/zfs_context.h>
@@ -313,7 +313,7 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	struct dk_minfo *dkm = &dks.ud;
 	int error;
 	dev_t dev;
-	int otyp;
+	int otyp, vdev_ssd;
 	boolean_t validate_devid = B_FALSE;
 	ddi_devid_t devid;
 	uint64_t capacity = 0, blksz = 0, pbsize;
@@ -601,6 +601,16 @@ skip_open:
 		(void) ldi_ioctl(dvd->vd_lh, DKIOCSETWCE, (intptr_t)&wce,
 		    FKIOCTL, kcred, NULL);
 	}
+
+	if (ldi_ioctl(dvd->vd_lh, DKIOCSOLIDSTATE, (intptr_t)&vdev_ssd,
+	    FKIOCTL, kcred, NULL) != 0) {
+		vd->vdev_is_ssd = B_FALSE;
+		VDEV_DEBUG( "vdev_disk_open(\"%s\"): DKIOCSOLIDSTATE failed, "
+		    "assuming non-SSD media\n", vd->vdev_path);
+	} else {
+		vd->vdev_is_ssd = vdev_ssd ? B_TRUE : B_FALSE;
+	}
+
 	/*
 	 * We are done with vd_lh and vdev_tsd, release the vdev_tsd_lock
 	 */

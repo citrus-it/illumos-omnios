@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <dlfcn.h>
@@ -418,6 +419,39 @@ libzfs_fru_notself(libzfs_handle_t *hdl, const char *fru)
 		return (B_FALSE);
 
 	return (B_TRUE);
+}
+
+/*
+ * This function checks to see whether the two FRUs provided belong
+ * to the same enclosure
+ */
+boolean_t
+libzfs_fru_encl_cmp(const char *fru_a, const char *fru_b)
+{
+	int a, b;
+	char *encl_a, *encl_b;
+	const char *encl_str = "/ses-enclosure=";
+	size_t encl_str_len = strlen(encl_str);
+
+	encl_a = strstr(fru_a, encl_str);
+	encl_b = strstr(fru_b, encl_str);
+	/* if both ses-enclosure aren't there we consider that a match */
+	if (encl_a == NULL && encl_b == NULL)
+		return (B_TRUE);
+
+	/* if one FRU has a ses-enclosure field but the other one doesn't */
+	if (encl_a == NULL || encl_b == NULL)
+		return (B_FALSE);
+
+	encl_a += encl_str_len;
+	encl_b += encl_str_len;
+	if (sscanf(encl_a, "%d", &a) != 1 || sscanf(encl_b, "%d", &b) != 1)
+		return (B_FALSE);
+
+	if (a == b)
+		return (B_TRUE);
+
+	return (B_FALSE);
 }
 
 /*

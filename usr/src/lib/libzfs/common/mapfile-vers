@@ -53,6 +53,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	libzfs_fini;
 	libzfs_fru_compare;
 	libzfs_fru_devpath;
+	libzfs_fru_encl_cmp;
 	libzfs_fru_lookup;
 	libzfs_fru_notself;
 	libzfs_fru_refresh;

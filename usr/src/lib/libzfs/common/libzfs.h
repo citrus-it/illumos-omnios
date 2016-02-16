@@ -816,6 +816,7 @@ extern const char *libzfs_fru_lookup(libzfs_handle_t *, const char *);
 extern const char *libzfs_fru_devpath(libzfs_handle_t *, const char *);
 extern boolean_t libzfs_fru_compare(libzfs_handle_t *, const char *,
     const char *);
+extern boolean_t libzfs_fru_encl_cmp(const char *a, const char *b);
 extern boolean_t libzfs_fru_notself(libzfs_handle_t *, const char *);
 extern int zpool_fru_set(zpool_handle_t *, uint64_t, const char *);
 
