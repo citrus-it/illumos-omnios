@@ -300,8 +300,8 @@ generate_fault(fmd_hdl_t *hdl, nvlist_t *vdev, char *faultname)
 }
 
 typedef enum zr_config_fru_compare_flags {
-	FRU_CMP_FLAG_DISABLE	= (1u << 0),	/* disable FRU based matching */
-	FRU_CMP_FLAG_ENC		= (1u << 1),	/* ses-enclosure */
+	FRU_CMP_FLAG_DISABLE	= (1u << 0), /* disable FRU based matching */
+	FRU_CMP_FLAG_ENC	= (1u << 1)  /* ses-enclosure */
 } zr_config_fru_compare_flags_t;
 
 static uint8_t
