@@ -27,6 +27,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Prasad Joshi (sTec). All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>.
  */
 
 #include <assert.h>
@@ -3327,33 +3328,6 @@ zpool_do_list(int argc, char **argv)
 	return (ret);
 }
 
-static nvlist_t *
-zpool_get_vdev_by_name(nvlist_t *nv, char *name)
-{
-	nvlist_t **child;
-	uint_t c, children;
-	nvlist_t *match;
-	char *path;
-
-	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) != 0) {
-		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
-		if (strncmp(name, "/dev/dsk/", 9) == 0)
-			name += 9;
-		if (strncmp(path, "/dev/dsk/", 9) == 0)
-			path += 9;
-		if (strcmp(name, path) == 0)
-			return (nv);
-		return (NULL);
-	}
-
-	for (c = 0; c < children; c++)
-		if ((match = zpool_get_vdev_by_name(child[c], name)) != NULL)
-			return (match);
-
-	return (NULL);
-}
-
 static int
 zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 {
@@ -4178,7 +4152,7 @@ print_scan_status(pool_scan_stat_t *ps)
 	 */
 	if (ps->pss_state == DSS_FINISHED) {
 		uint64_t minutes_taken = (end - start) / 60;
-		char *fmt;
+		char *fmt = NULL;
 
 		if (ps->pss_func == POOL_SCAN_SCRUB) {
 			fmt = gettext("scrub repaired %s in %lluh%um with "
@@ -6287,7 +6261,7 @@ find_command_idx(char *command, int *idx)
 int
 main(int argc, char **argv)
 {
-	int ret;
+	int ret = 0;
 	int i;
 	char *cmdname;
 

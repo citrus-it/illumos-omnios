@@ -24,6 +24,7 @@
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
+ * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -334,7 +335,7 @@ typedef enum {
 	ZPOOL_STATUS_VERSION_OLDER,	/* older legacy on-disk version */
 	ZPOOL_STATUS_FEAT_DISABLED,	/* supported features are disabled */
 	ZPOOL_STATUS_RESILVERING,	/* device being resilvered */
-	ZPOOL_STATUS_OFFLINE_DEV,	/* device online */
+	ZPOOL_STATUS_OFFLINE_DEV,	/* device offline */
 	ZPOOL_STATUS_REMOVED_DEV,	/* removed device */
 
 	/*

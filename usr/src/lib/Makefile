@@ -354,7 +354,6 @@ MSGSUBDIRS=		\
 	madv		\
 	mpss		\
 	pam_modules	\
-	pysolaris	\
 	pyzfs		\
 	rpcsec_gss	\
 	$($(MACH)_MSGSUBDIRS)
