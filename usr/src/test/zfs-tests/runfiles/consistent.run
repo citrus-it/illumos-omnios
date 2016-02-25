@@ -348,6 +348,9 @@ tests = ['async_destroy_001_pos']
 [/opt/zfs-tests/tests/functional/grow_pool]
 tests = ['grow_pool_001_pos']
 
+[/opt/zfs-tests/tests/functional/grow_replicas]
+tests = ['grow_replicas_001_pos']
+
 [/opt/zfs-tests/tests/functional/history]
 tests = ['history_001_pos', 'history_002_pos', 'history_003_pos',
     'history_004_pos', 'history_005_neg', 'history_006_neg', 'history_007_pos',
