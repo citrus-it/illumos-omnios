@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012, 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -113,6 +113,13 @@ static int max_cached_ncmds = FCT_MAX_CACHED_CMDS;
 static fct_i_local_port_t *fct_iport_list = NULL;
 static kmutex_t fct_global_mutex;
 uint32_t fct_rscn_options = RSCN_OPTION_VERIFY;
+/*
+ * This is to keep fibre channel from hanging if syseventd is
+ * not working correctly and the queue fills. It is a tunable
+ * to allow the user to force event logging to always happen
+ * which is the default.
+ */
+static uint8_t fct_force_log = 0;  /* use DDI_SLEEP on ddi_log_sysevent */
 
 /*
  * For use during core examination. These counts are normally really low
@@ -2960,8 +2967,7 @@ fct_handle_rcvd_abts(fct_cmd_t *cmd)
 	    (fct_i_local_port_t *)port->port_fct_private;
 	fct_i_cmd_t		*icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 	fct_i_remote_port_t	*irp;
-	fct_cmd_t		*c = NULL,
-				*term_cmd;
+	fct_cmd_t		*c = NULL, *term_cmd;
 	fct_i_cmd_t		*ic = NULL;
 	int			found = 0;
 	int			i;
@@ -3482,6 +3488,7 @@ fct_log_local_port_event(fct_local_port_t *port, char *subclass)
 {
 	nvlist_t *attr_list;
 	int port_instance;
+	int rc, sleep = DDI_SLEEP;
 
 	if (!fct_dip)
 		return;
@@ -3502,8 +3509,15 @@ fct_log_local_port_event(fct_local_port_t *port, char *subclass)
 		goto error;
 	}
 
-	(void) ddi_log_sysevent(fct_dip, DDI_VENDOR_SUNW, EC_SUNFC,
-	    subclass, attr_list, NULL, DDI_SLEEP);
+	if (fct_force_log == 0) {
+		sleep = DDI_NOSLEEP;
+	}
+	rc = ddi_log_sysevent(fct_dip, DDI_VENDOR_SUNW, EC_SUNFC,
+	    subclass, attr_list, NULL, sleep);
+	if (rc != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: queue full event lost", __func__);
+		goto error;
+	}
 
 	nvlist_free(attr_list);
 	return;
@@ -3521,6 +3535,7 @@ fct_log_remote_port_event(fct_local_port_t *port, char *subclass,
 {
 	nvlist_t *attr_list;
 	int port_instance;
+	int rc, sleep = DDI_SLEEP;
 
 	if (!fct_dip)
 		return;
@@ -3551,8 +3566,15 @@ fct_log_remote_port_event(fct_local_port_t *port, char *subclass,
 		goto error;
 	}
 
-	(void) ddi_log_sysevent(fct_dip, DDI_VENDOR_SUNW, EC_SUNFC,
-	    subclass, attr_list, NULL, DDI_SLEEP);
+	if (fct_force_log == 0) {
+		sleep = DDI_NOSLEEP;
+	}
+	rc = ddi_log_sysevent(fct_dip, DDI_VENDOR_SUNW, EC_SUNFC,
+	    subclass, attr_list, NULL, sleep);
+	if (rc != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s:event dropped", __func__);
+		goto error;
+	}
 
 	nvlist_free(attr_list);
 	return;
