@@ -1105,7 +1105,7 @@ fct_dequeue_els(fct_i_remote_port_t *irp)
 
 fct_status_t
 fct_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
-				fct_cmd_t *cmd)
+    fct_cmd_t *cmd)
 {
 	fct_status_t ret;
 	fct_i_local_port_t	*iport;

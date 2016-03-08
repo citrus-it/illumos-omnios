@@ -62,7 +62,7 @@ sbd_ats_max_nblks(void)
 /*ARGSUSED*/
 static sbd_status_t
 sbd_ats_do_handling_before_io(scsi_task_t *task, struct sbd_lu *sl,
-	uint64_t lba, uint64_t count, uint32_t flags)
+    uint64_t lba, uint64_t count, uint32_t flags)
 {
 	sbd_status_t ret = SBD_SUCCESS;
 	ats_state_t *ats_state, *ats_state_ret;
@@ -149,7 +149,7 @@ exit:
 
 sbd_status_t
 sbd_ats_handling_before_io(scsi_task_t *task, struct sbd_lu *sl,
-	uint64_t lba, uint64_t count)
+    uint64_t lba, uint64_t count)
 {
 	return (sbd_ats_do_handling_before_io(task, sl, lba, count, 0));
 }

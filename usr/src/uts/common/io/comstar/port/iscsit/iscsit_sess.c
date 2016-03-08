@@ -55,7 +55,7 @@ typedef struct {
 
 static void
 sess_sm_event_locked(iscsit_sess_t *ist, iscsit_session_event_t event,
-iscsit_conn_t *ict);
+    iscsit_conn_t *ict);
 
 static void
 sess_sm_event_dispatch(iscsit_sess_t *ist, sess_event_ctx_t *ctx);

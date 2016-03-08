@@ -182,7 +182,7 @@ stmf_view_clear_config()
  */
 stmf_status_t
 stmf_session_create_lun_map(stmf_i_local_port_t *ilport,
-		stmf_i_scsi_session_t *iss)
+    stmf_i_scsi_session_t *iss)
 {
 	stmf_id_data_t *tg;
 	stmf_id_data_t *hg;
@@ -348,9 +348,8 @@ stmf_session_lu_unmapall(stmf_lu_t *lu)
  */
 stmf_status_t
 stmf_add_lu_to_session(stmf_i_local_port_t *ilport,
-		stmf_i_scsi_session_t	*iss,
-		stmf_lu_t *lu,
-		uint8_t *lu_nbr)
+    stmf_i_scsi_session_t	*iss,
+    stmf_lu_t *lu, uint8_t *lu_nbr)
 {
 	stmf_lun_map_t *sm = iss->iss_sm;
 	stmf_status_t ret;
@@ -393,9 +392,8 @@ stmf_add_lu_to_session(stmf_i_local_port_t *ilport,
 /* ARGSUSED */
 stmf_status_t
 stmf_remove_lu_from_session(stmf_i_local_port_t *ilport,
-		stmf_i_scsi_session_t *iss,
-		stmf_lu_t *lu,
-		uint8_t *lu_nbr)
+    stmf_i_scsi_session_t *iss,
+    stmf_lu_t *lu, uint8_t *lu_nbr)
 {
 	stmf_status_t ret;
 	stmf_i_lu_t *ilu;
@@ -428,7 +426,7 @@ stmf_remove_lu_from_session(stmf_i_local_port_t *ilport,
  */
 void
 stmf_update_sessions_per_ve(stmf_view_entry_t *ve,
-		stmf_lu_t *lu, int action)
+    stmf_lu_t *lu, int action)
 {
 	stmf_i_lu_t *ilu_tmp;
 	stmf_lu_t *lu_to_add;
@@ -495,8 +493,7 @@ stmf_update_sessions_per_ve(stmf_view_entry_t *ve,
  */
 void
 stmf_add_lus_to_session_per_vemap(stmf_i_local_port_t *ilport,
-		stmf_i_scsi_session_t *iss,
-		stmf_lun_map_t *vemap)
+    stmf_i_scsi_session_t *iss, stmf_lun_map_t *vemap)
 {
 	stmf_lu_t *lu;
 	stmf_i_lu_t *ilu;
@@ -520,8 +517,7 @@ stmf_add_lus_to_session_per_vemap(stmf_i_local_port_t *ilport,
 /* remove luns in view entry map from a session */
 void
 stmf_remove_lus_from_session_per_vemap(stmf_i_local_port_t *ilport,
-		stmf_i_scsi_session_t *iss,
-		stmf_lun_map_t *vemap)
+    stmf_i_scsi_session_t *iss, stmf_lun_map_t *vemap)
 {
 	stmf_lu_t *lu;
 	stmf_i_lu_t *ilu;
@@ -545,7 +541,7 @@ stmf_remove_lus_from_session_per_vemap(stmf_i_local_port_t *ilport,
 
 stmf_id_data_t *
 stmf_alloc_id(uint16_t id_size, uint16_t type, uint8_t *id_data,
-			uint32_t additional_size)
+    uint32_t additional_size)
 {
 	stmf_id_data_t *id;
 	int struct_size, total_size, real_id_size;
@@ -699,7 +695,7 @@ stmf_destroy_ve_map(stmf_lun_map_t *dst)
 
 int
 stmf_merge_ve_map(stmf_lun_map_t *src, stmf_lun_map_t *dst,
-		stmf_lun_map_t **pp_ret_map, stmf_merge_flags_t mf)
+    stmf_lun_map_t **pp_ret_map, stmf_merge_flags_t mf)
 {
 	int i;
 	int nentries;
@@ -771,7 +767,7 @@ stmf_merge_ve_map(stmf_lun_map_t *src, stmf_lun_map_t *dst,
  */
 stmf_status_t
 stmf_add_hg(uint8_t *hg_name, uint16_t hg_name_size,
-		int allow_special, uint32_t *err_detail)
+    int allow_special, uint32_t *err_detail)
 {
 	stmf_id_data_t *id;
 
@@ -796,7 +792,7 @@ stmf_add_hg(uint8_t *hg_name, uint16_t hg_name_size,
 /* add target group */
 stmf_status_t
 stmf_add_tg(uint8_t *tg_name, uint16_t tg_name_size,
-		int allow_special, uint32_t *err_detail)
+    int allow_special, uint32_t *err_detail)
 {
 	stmf_id_data_t *id;
 
@@ -875,8 +871,8 @@ stmf_add_ve_to_luid(stmf_id_data_t *luid, stmf_view_entry_t *ve)
 /* stmf_lock is already held, err_detail may be assigned if error happens */
 stmf_status_t
 stmf_add_view_entry(stmf_id_data_t *hg, stmf_id_data_t *tg,
-		uint8_t *lu_guid, uint32_t *ve_id, uint8_t *lun,
-		stmf_view_entry_t **conflicting, uint32_t *err_detail)
+    uint8_t *lu_guid, uint32_t *ve_id, uint8_t *lun,
+    stmf_view_entry_t **conflicting, uint32_t *err_detail)
 {
 	stmf_id_data_t *luid;
 	stmf_view_entry_t *ve;
@@ -1128,9 +1124,9 @@ stmf_get_ent_from_map(stmf_lun_map_t *sm, uint16_t lun_num)
 
 int
 stmf_add_ve(uint8_t *hgname, uint16_t hgname_size,
-		uint8_t *tgname, uint16_t tgname_size,
-		uint8_t *lu_guid, uint32_t *ve_id,
-		uint8_t *luNbr, uint32_t *err_detail)
+    uint8_t *tgname, uint16_t tgname_size,
+    uint8_t *lu_guid, uint32_t *ve_id,
+    uint8_t *luNbr, uint32_t *err_detail)
 {
 	stmf_id_data_t *hg;
 	stmf_id_data_t *tg;
@@ -1272,7 +1268,7 @@ stmf_remove_ve_by_id(uint8_t *guid, uint32_t veid, uint32_t *err_detail)
 
 int
 stmf_add_group(uint8_t *grpname, uint16_t grpname_size,
-		stmf_id_type_t group_type, uint32_t *err_detail)
+    stmf_id_type_t group_type, uint32_t *err_detail)
 {
 	stmf_status_t status;
 
@@ -1303,7 +1299,7 @@ stmf_add_group(uint8_t *grpname, uint16_t grpname_size,
  */
 int
 stmf_remove_group(uint8_t *grpname, uint16_t grpname_size,
-		stmf_id_type_t group_type, uint32_t *err_detail)
+    stmf_id_type_t group_type, uint32_t *err_detail)
 {
 	stmf_id_data_t *id;
 	stmf_id_data_t *idmemb;
@@ -1366,8 +1362,8 @@ stmf_remove_group(uint8_t *grpname, uint16_t grpname_size,
 
 int
 stmf_add_group_member(uint8_t *grpname, uint16_t grpname_size,
-		uint8_t	*entry_ident, uint16_t entry_size,
-		stmf_id_type_t entry_type, uint32_t *err_detail)
+    uint8_t	*entry_ident, uint16_t entry_size,
+    stmf_id_type_t entry_type, uint32_t *err_detail)
 {
 	stmf_id_data_t	*id_grp, *id_alltgt;
 	stmf_id_data_t	*id_member;
@@ -1464,8 +1460,8 @@ stmf_add_group_member(uint8_t *grpname, uint16_t grpname_size,
 
 int
 stmf_remove_group_member(uint8_t *grpname, uint16_t grpname_size,
-		uint8_t *entry_ident, uint16_t entry_size,
-		stmf_id_type_t entry_type, uint32_t *err_detail)
+    uint8_t *entry_ident, uint16_t entry_size,
+    stmf_id_type_t entry_type, uint32_t *err_detail)
 {
 	stmf_id_data_t	*id_grp, *id_alltgt;
 	stmf_id_data_t	*id_member;
@@ -1571,7 +1567,7 @@ stmf_targetident_to_ilport(uint8_t *target_ident, uint16_t ident_size)
 
 stmf_i_scsi_session_t *
 stmf_lookup_session_for_hostident(stmf_i_local_port_t *ilport,
-		uint8_t *host_ident, uint16_t ident_size)
+    uint8_t *host_ident, uint16_t ident_size)
 {
 	stmf_i_scsi_session_t *iss;
 	uint8_t *id;
@@ -1689,8 +1685,8 @@ stmf_validate_lun_view_entry(stmf_id_data_t *hg, stmf_id_data_t *tg,
 
 int
 stmf_validate_lun_ve(uint8_t *hgname, uint16_t hgname_size,
-		uint8_t *tgname, uint16_t tgname_size,
-		uint8_t *luNbr, uint32_t *err_detail)
+    uint8_t *tgname, uint16_t tgname_size,
+    uint8_t *luNbr, uint32_t *err_detail)
 {
 	stmf_id_data_t		*hg;
 	stmf_id_data_t		*tg;

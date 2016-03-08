@@ -455,7 +455,7 @@ srpt_ch_cleanup(srpt_channel_t *ch)
  */
 static void
 srpt_ch_rsp_comp(srpt_channel_t *ch, srpt_iu_t *iu,
-	ibt_wc_status_t wc_status)
+    ibt_wc_status_t wc_status)
 {
 	stmf_status_t	st = STMF_SUCCESS;
 
@@ -516,7 +516,7 @@ srpt_ch_rsp_comp(srpt_channel_t *ch, srpt_iu_t *iu,
  */
 static void
 srpt_ch_data_comp(srpt_channel_t *ch, stmf_data_buf_t *stmf_dbuf,
-	ibt_wc_status_t wc_status)
+    ibt_wc_status_t wc_status)
 {
 	srpt_ds_dbuf_t		*dbuf;
 	srpt_iu_t		*iu;
@@ -1049,7 +1049,7 @@ srpt_ch_srp_cmd(srpt_channel_t *ch, srpt_iu_t *iu)
  */
 static ibt_status_t
 srpt_ch_task_mgmt_abort(srpt_channel_t *ch, srpt_iu_t *iu,
-	uint64_t tag_to_abort)
+    uint64_t tag_to_abort)
 {
 	srpt_session_t	*session = ch->ch_session;
 	srpt_iu_t	*ss_iu;
@@ -1341,7 +1341,7 @@ repost_iu:
  */
 ibt_status_t
 srpt_ch_post_send(srpt_channel_t *ch, srpt_iu_t *iu, uint32_t len,
-	uint_t fence)
+    uint_t fence)
 {
 	ibt_status_t		status;
 	ibt_send_wr_t		wr;
@@ -1405,7 +1405,7 @@ srpt_ch_post_send(srpt_channel_t *ch, srpt_iu_t *iu, uint32_t len,
  */
 ibt_wrid_t
 srpt_ch_alloc_swqe_wrid(srpt_channel_t *ch,
-	srpt_swqe_type_t wqe_type, void *addr)
+    srpt_swqe_type_t wqe_type, void *addr)
 {
 	ibt_wrid_t	wrid;
 

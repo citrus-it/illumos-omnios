@@ -523,7 +523,7 @@ srpt_stp_destroy_port(srpt_target_port_t *tgt)
 /* ARGSUSED */
 static stmf_status_t
 srpt_stp_xfer_data(struct scsi_task *task, struct stmf_data_buf *dbuf,
-	uint32_t ioflags)
+    uint32_t ioflags)
 {
 	srpt_iu_t		*iu;
 	srpt_channel_t		*ch;
@@ -703,7 +703,7 @@ srpt_stp_xfer_data(struct scsi_task *task, struct stmf_data_buf *dbuf,
  */
 ibt_status_t
 srpt_stp_send_mgmt_response(srpt_iu_t *iu, uint8_t srp_rsp,
-	uint_t fence)
+    uint_t fence)
 {
 	srp_rsp_t	*rsp;
 	srp_rsp_data_t	*data;
@@ -756,8 +756,8 @@ srpt_stp_send_mgmt_response(srpt_iu_t *iu, uint8_t srp_rsp,
  */
 ibt_status_t
 srpt_stp_send_response(srpt_iu_t *iu, uint8_t scsi_status,
-	uint8_t flags, uint32_t resid, uint16_t sense_length,
-	uint8_t *sense_data, uint_t fence)
+    uint8_t flags, uint32_t resid, uint16_t sense_length,
+    uint8_t *sense_data, uint_t fence)
 {
 	srp_rsp_t	*rsp;
 	uint32_t	rsp_length;
@@ -978,7 +978,7 @@ srpt_stp_task_free(struct scsi_task *task)
 /* ARGSUSED */
 static stmf_status_t
 srpt_stp_abort(struct stmf_local_port *lport, int abort_cmd,
-	void *arg, uint32_t flags)
+    void *arg, uint32_t flags)
 {
 	struct scsi_task	*task;
 	srpt_iu_t		*iu;
@@ -1186,7 +1186,7 @@ srpt_stp_ctl(struct stmf_local_port *lport, int cmd, void *arg)
 /* ARGSUSED */
 static stmf_status_t
 srpt_stp_info(uint32_t cmd, struct stmf_local_port *lport,
-	void *arg, uint8_t *buf, uint32_t *bufsizep)
+    void *arg, uint8_t *buf, uint32_t *bufsizep)
 {
 	SRPT_DPRINTF_L3("stp_info, invoked");
 	return (STMF_SUCCESS);
@@ -1198,7 +1198,7 @@ srpt_stp_info(uint32_t cmd, struct stmf_local_port *lport,
 /* ARGSUSED */
 static void
 srpt_stp_event_handler(struct stmf_local_port *lport, int eventid,
-	void *arg, uint32_t flags)
+    void *arg, uint32_t flags)
 {
 	SRPT_DPRINTF_L3("stp_event_handler, invoked");
 }
@@ -1243,8 +1243,8 @@ srpt_stp_free_scsi_devid_desc(scsi_devid_desc_t *sdd)
  */
 srpt_session_t *
 srpt_stp_alloc_session(srpt_target_port_t *tgt,
-	uint8_t *i_id, uint8_t *t_id, uint8_t port,
-	char *local_gid, char *remote_gid)
+    uint8_t *i_id, uint8_t *t_id, uint8_t port,
+    char *local_gid, char *remote_gid)
 {
 	stmf_status_t		status;
 	srpt_session_t		*ss;
@@ -1362,8 +1362,8 @@ srpt_stp_free_session(srpt_session_t *session)
  */
 srpt_channel_t *
 srpt_stp_login(srpt_target_port_t *tgt, srp_login_req_t *login,
-	srp_login_rsp_t *login_rsp, srp_login_rej_t *login_rej,
-	uint8_t login_port, char *local_gid, char *remote_gid)
+    srp_login_rsp_t *login_rsp, srp_login_rej_t *login_rej,
+    uint8_t login_port, char *local_gid, char *remote_gid)
 {
 	uint32_t	reason;
 	uint32_t	req_it_ui_len;
@@ -1624,7 +1624,7 @@ srpt_stp_logout(srpt_channel_t *ch)
  */
 static void
 srpt_format_login_rej(srp_login_req_t *req, srp_login_rej_t *rej,
-	uint32_t reason)
+    uint32_t reason)
 {
 	rej->lrej_type   = SRP_IU_LOGIN_REJ;
 	rej->lrej_reason = h2b32(reason);
@@ -1638,7 +1638,7 @@ srpt_format_login_rej(srp_login_req_t *req, srp_login_rej_t *rej,
  */
 static void
 srpt_format_login_rsp(srp_login_req_t *req, srp_login_rsp_t *rsp,
-	uint8_t flags)
+    uint8_t flags)
 {
 	rsp->lrsp_type   = SRP_IU_LOGIN_RSP;
 	rsp->lrsp_req_limit_delta = h2b32((uint32_t)srpt_send_msg_depth);

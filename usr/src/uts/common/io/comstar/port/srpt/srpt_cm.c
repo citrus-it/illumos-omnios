@@ -62,8 +62,8 @@ extern srpt_ctxt_t  *srpt_ctxt;
  */
 static ibt_cm_status_t
 srpt_cm_req_hdlr(srpt_target_port_t *tgt, ibt_cm_event_t *event,
-	ibt_cm_return_args_t *ret_args, void *ret_priv_data,
-	ibt_priv_data_len_t ret_priv_data_len)
+    ibt_cm_return_args_t *ret_args, void *ret_priv_data,
+    ibt_priv_data_len_t ret_priv_data_len)
 {
 	ibt_cm_status_t		status;
 	ibt_cm_req_rcv_t	*req;
@@ -292,8 +292,8 @@ srpt_cm_failure_hdlr(ibt_cm_event_t *event)
  */
 ibt_cm_status_t
 srpt_cm_hdlr(void *cm_private, ibt_cm_event_t *event,
-	ibt_cm_return_args_t *ret_args, void *ret_priv_data,
-	ibt_priv_data_len_t ret_len_max)
+    ibt_cm_return_args_t *ret_args, void *ret_priv_data,
+    ibt_priv_data_len_t ret_len_max)
 {
 	ibt_cm_status_t		status = IBT_CM_ACCEPT;
 

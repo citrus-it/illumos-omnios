@@ -896,7 +896,7 @@ srpt_ioc_port_down(ibt_async_event_t *event)
 /* ARGSUSED */
 void
 srpt_ioc_ib_async_hdlr(void *clnt, ibt_hca_hdl_t hdl,
-	ibt_async_code_t code, ibt_async_event_t *event)
+    ibt_async_code_t code, ibt_async_event_t *event)
 {
 	srpt_channel_t		*ch;
 
@@ -1296,7 +1296,7 @@ srpt_ioc_init_profile(srpt_ioc_t *ioc)
 /* ARGSUSED */
 stmf_data_buf_t *
 srpt_ioc_ds_alloc_dbuf(struct scsi_task *task, uint32_t size,
-	uint32_t *pminsize, uint32_t flags)
+    uint32_t *pminsize, uint32_t flags)
 {
 	srpt_iu_t		*iu;
 	srpt_ioc_t		*ioc;
@@ -1359,7 +1359,7 @@ stmf_alloc_err:
 
 void
 srpt_ioc_ds_free_dbuf(struct stmf_dbuf_store *ds,
-	stmf_data_buf_t *dbuf)
+    stmf_data_buf_t *dbuf)
 {
 	srpt_ioc_t	*ioc;
 

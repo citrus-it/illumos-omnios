@@ -54,16 +54,16 @@ extern "C" {
  */
 chap_validation_status_type
 iscsit_radius_chap_validate(char *target_chap_name,
-		char *initiator_chap_name,
-		uint8_t *challenge,
-		uint32_t challenge_length,
-		uint8_t *target_response,
-		uint32_t response_length,
-		uint8_t identifier,
-		iscsi_ipaddr_t rad_svr_ip_addr,
-		uint32_t rad_svr_port,
-		uint8_t *rad_svr_shared_secret,
-		uint32_t rad_svr_shared_secret_len);
+    char *initiator_chap_name,
+    uint8_t *challenge,
+    uint32_t challenge_length,
+    uint8_t *target_response,
+    uint32_t response_length,
+    uint8_t identifier,
+    iscsi_ipaddr_t rad_svr_ip_addr,
+    uint32_t rad_svr_port,
+    uint8_t *rad_svr_shared_secret,
+    uint32_t rad_svr_shared_secret_len);
 #ifdef __cplusplus
 }
 #endif

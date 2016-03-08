@@ -542,7 +542,7 @@ sbd_pgr_meta_write(sbd_lu_t *slu)
 
 static sbd_pgr_key_t *
 sbd_pgr_key_alloc(scsi_devid_desc_t *lptid, scsi_transport_id_t *rptid,
-					int16_t lpt_len, int16_t rpt_len)
+    int16_t lpt_len, int16_t rpt_len)
 {
 	sbd_pgr_key_t *key;
 
@@ -660,7 +660,7 @@ sbd_pgr_remove_key(sbd_lu_t *slu, sbd_pgr_key_t *key)
  */
 static uint32_t
 sbd_pgr_remove_keys(sbd_lu_t *slu, sbd_it_data_t *my_it, sbd_pgr_key_t *my_key,
-				uint64_t svc_key, boolean_t match)
+    uint64_t svc_key, boolean_t match)
 {
 	sbd_pgr_t	*pgr  = slu->sl_pgr;
 	sbd_it_data_t	*it;
@@ -738,7 +738,7 @@ sbd_pgr_set_pgr_check_flag(sbd_lu_t *slu, boolean_t registered)
 
 static boolean_t
 sbd_pgr_key_compare(sbd_pgr_key_t *key, scsi_devid_desc_t *lpt,
-					stmf_remote_port_t *rpt)
+    stmf_remote_port_t *rpt)
 {
 	scsi_devid_desc_t *id;
 
@@ -762,7 +762,7 @@ sbd_pgr_key_compare(sbd_pgr_key_t *key, scsi_devid_desc_t *lpt,
 
 sbd_pgr_key_t *
 sbd_pgr_key_registered(sbd_pgr_t *pgr, scsi_devid_desc_t *lpt,
-					stmf_remote_port_t *rpt)
+    stmf_remote_port_t *rpt)
 {
 	sbd_pgr_key_t *key;
 
@@ -1158,7 +1158,7 @@ sbd_pgr_in_read_reservation(scsi_task_t *task, stmf_data_buf_t *initial_dbuf)
 
 static void
 sbd_pgr_in_report_capabilities(scsi_task_t *task,
-				stmf_data_buf_t *initial_dbuf)
+    stmf_data_buf_t *initial_dbuf)
 {
 	sbd_lu_t	*slu   = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_pgr_t	*pgr   =  slu->sl_pgr;
@@ -1196,7 +1196,7 @@ sbd_pgr_in_report_capabilities(scsi_task_t *task,
 
 static void
 sbd_pgr_in_read_full_status(scsi_task_t *task,
-				stmf_data_buf_t *initial_dbuf)
+    stmf_data_buf_t *initial_dbuf)
 {
 	sbd_lu_t	*slu   = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_pgr_t	*pgr   = slu->sl_pgr;
@@ -1434,7 +1434,7 @@ sbd_pgr_reg_done:
 
 static sbd_pgr_key_t *
 sbd_pgr_do_register(sbd_lu_t *slu, sbd_it_data_t *it, scsi_devid_desc_t *lpt,
-		stmf_remote_port_t *rpt, uint8_t keyflag, uint64_t svc_key)
+    stmf_remote_port_t *rpt, uint8_t keyflag, uint64_t svc_key)
 {
 	sbd_pgr_t		*pgr = slu->sl_pgr;
 	sbd_pgr_key_t		*key;
@@ -1534,7 +1534,7 @@ sbd_pgr_out_reserve(scsi_task_t *task)
 
 static void
 sbd_pgr_do_reserve(sbd_pgr_t *pgr, sbd_pgr_key_t *key, sbd_it_data_t *it,
-			stmf_scsi_session_t *ses, scsi_cdb_prout_t *pr_out)
+    stmf_scsi_session_t *ses, scsi_cdb_prout_t *pr_out)
 {
 	scsi_devid_desc_t	*lpt;
 	uint16_t		lpt_len;
@@ -1905,7 +1905,8 @@ sbd_pgr_out_register_and_move(scsi_task_t *task, stmf_data_buf_t *dbuf)
 }
 
 void
-sbd_pgr_remove_it_handle(sbd_lu_t *sl, sbd_it_data_t *my_it) {
+sbd_pgr_remove_it_handle(sbd_lu_t *sl, sbd_it_data_t *my_it)
+{
 	sbd_it_data_t *it;
 
 	rw_enter(&sl->sl_pgr->pgr_lock, RW_WRITER);

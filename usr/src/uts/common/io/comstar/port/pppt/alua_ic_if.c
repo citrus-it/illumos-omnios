@@ -1398,8 +1398,8 @@ done:
  */
 static int
 stmf_ic_scsi_devid_desc_marshal(nvlist_t *parent_nvl,
-	char *sdid_name,
-	scsi_devid_desc_t *sdid)
+    char *sdid_name,
+    scsi_devid_desc_t *sdid)
 {
 	int rc = 0;
 	nvlist_t *nvl = NULL;
@@ -1434,7 +1434,8 @@ done:
  */
 static int
 stmf_ic_remote_port_marshal(nvlist_t *parent_nvl, char *rport_name,
-	stmf_remote_port_t *rport) {
+    stmf_remote_port_t *rport)
+{
 
 	int rc = 0;
 	nvlist_t *nvl = NULL;

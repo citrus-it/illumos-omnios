@@ -354,7 +354,7 @@ sbd_close(dev_t dev, int flag, int otype, cred_t *credp)
 /* ARGSUSED */
 static int
 stmf_sbd_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
-	cred_t *credp, int *rval)
+    cred_t *credp, int *rval)
 {
 	stmf_iocdata_t		*iocd;
 	void			*ibuf	= NULL;

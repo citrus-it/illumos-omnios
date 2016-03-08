@@ -41,11 +41,11 @@
 static
 void
 set_radius_attrs(radius_packet_data_t *req,
-	char *target_chap_name,
-	unsigned char *target_response,
-	uint32_t response_length,
-	uint8_t *challenge,
-	uint32_t challenge_length);
+    char *target_chap_name,
+    unsigned char *target_response,
+    uint32_t response_length,
+    uint8_t *challenge,
+    uint32_t challenge_length);
 
 /*
  * See radius_auth.h.
@@ -53,16 +53,16 @@ set_radius_attrs(radius_packet_data_t *req,
 /* ARGSUSED */
 chap_validation_status_type
 iscsit_radius_chap_validate(char *target_chap_name,
-	char *initiator_chap_name,
-	uint8_t *challenge,
-	uint32_t challenge_length,
-	uint8_t *target_response,
-	uint32_t response_length,
-	uint8_t identifier,
-	iscsi_ipaddr_t rad_svr_ip_addr,
-	uint32_t rad_svr_port,
-	uint8_t *rad_svr_shared_secret,
-	uint32_t rad_svr_shared_secret_len)
+    char *initiator_chap_name,
+    uint8_t *challenge,
+    uint32_t challenge_length,
+    uint8_t *target_response,
+    uint32_t response_length,
+    uint8_t identifier,
+    iscsi_ipaddr_t rad_svr_ip_addr,
+    uint32_t rad_svr_port,
+    uint8_t *rad_svr_shared_secret,
+    uint32_t rad_svr_shared_secret_len)
 {
 	chap_validation_status_type validation_status;
 	char lbolt[64];
@@ -153,11 +153,11 @@ iscsit_radius_chap_validate(char *target_chap_name,
 /* See forward declaration. */
 static void
 set_radius_attrs(radius_packet_data_t *req,
-	char *target_chap_name,
-	unsigned char *target_response,
-	uint32_t response_length,
-	uint8_t *challenge,
-	uint32_t challenge_length)
+    char *target_chap_name,
+    unsigned char *target_response,
+    uint32_t response_length,
+    uint8_t *challenge,
+    uint32_t challenge_length)
 {
 	req->attrs[0].attr_type_code = RAD_USER_NAME;
 	(void) strncpy((char *)req->attrs[0].attr_value,

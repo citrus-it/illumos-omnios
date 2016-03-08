@@ -2369,7 +2369,7 @@ qlt_download_fw(qlt_state_t *qlt)
  */
 static fct_status_t
 qlt_load_risc_ram(qlt_state_t *qlt, uint32_t *host_addr,
-				uint32_t word_count, uint32_t risc_addr)
+    uint32_t word_count, uint32_t risc_addr)
 {
 	uint32_t words_sent = 0;
 	uint32_t words_being_sent;
@@ -3059,7 +3059,7 @@ qlt_handle_resp_queue_update(qlt_state_t *qlt)
 
 fct_status_t
 qlt_portid_to_handle(qlt_state_t *qlt, uint32_t id, uint16_t cmd_handle,
-				uint16_t *ret_handle)
+    uint16_t *ret_handle)
 {
 	fct_status_t ret;
 	mbox_cmd_t *mcp;
@@ -3126,7 +3126,7 @@ qlt_portid_to_handle(qlt_state_t *qlt, uint32_t id, uint16_t cmd_handle,
 /* ARGSUSED */
 fct_status_t
 qlt_fill_plogi_req(fct_local_port_t *port, fct_remote_port_t *rp,
-				fct_cmd_t *login)
+    fct_cmd_t *login)
 {
 	uint8_t *p;
 
@@ -3153,7 +3153,7 @@ qlt_fill_plogi_req(fct_local_port_t *port, fct_remote_port_t *rp,
 /* ARGSUSED */
 fct_status_t
 qlt_fill_plogi_resp(fct_local_port_t *port, fct_remote_port_t *rp,
-				fct_cmd_t *login)
+    fct_cmd_t *login)
 {
 	return (FCT_SUCCESS);
 }
