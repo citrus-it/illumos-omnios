@@ -42,9 +42,6 @@
 #include "zfs_prop.h"
 #include "zfs_errno.h"
 
-#define	ZPROP_INHERIT_SUFFIX "$inherit"
-#define	ZPROP_RECVD_SUFFIX "$recvd"
-
 static int
 dodefault(const char *propname, int intsz, int numints, void *buf)
 {
