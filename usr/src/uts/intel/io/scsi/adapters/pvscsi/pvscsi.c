@@ -26,6 +26,7 @@
 #include <sys/modctl.h>
 #include <sys/pci.h>
 #include <sys/scsi/scsi.h>
+#include <sys/scsi/adapters/mpapi_impl.h>
 #include <sys/sunddi.h>
 #include <sys/sysmacros.h>
 #include <sys/time.h>
@@ -343,8 +344,11 @@ pvscsi_config_one(dev_info_t *pdip, pvscsi_softc_t *pvs, int target,
 	dev_info_t	*dip;
 	int		inqrc;
 	int		ncompatible = 0;
+	nvlist_t	*attr;
 	pvscsi_device_t	*devnode;
 	struct scsi_inquiry inq;
+
+	ASSERT(DEVI_BUSY_OWNED(pdip));
 
 	/* Inquiry target */
 	inqrc = pvscsi_inquiry_target(pvs, target, &inq);
@@ -371,6 +375,15 @@ pvscsi_config_one(dev_info_t *pdip, pvscsi_softc_t *pvs, int target,
 			}
 
 			(void) ndi_devi_offline(devnode->pdip, NDI_DEVI_REMOVE);
+
+			/* Post MPAPI sysevent */
+			attr = fnvlist_alloc();
+			(void) nvlist_add_uint64_array(attr, "oid",
+			    &devnode->oid, 1);
+			(void) ddi_log_sysevent(pdip, DDI_VENDOR_SUNW,
+			    EC_SUN_MP, ESC_SUN_MP_LU_REMOVE, attr,
+			    NULL, DDI_SLEEP);
+			nvlist_free(attr);
 
 			list_remove(&pvs->devnodes, devnode);
 			kmem_free(devnode, sizeof (*devnode));
@@ -423,12 +436,21 @@ pvscsi_config_one(dev_info_t *pdip, pvscsi_softc_t *pvs, int target,
 	devnode->target = target;
 	devnode->pdip = dip;
 	devnode->parent = pdip;
+	devnode->oid = MP_STORE_MAJOR_TO_ID(ddi_driver_major(dip),
+	    MP_STORE_INST_TO_ID(ddi_get_instance(dip), 0));
 	list_insert_tail(&pvs->devnodes, devnode);
 
 	if (childp != NULL)
 		*childp = dip;
 
 	scsi_hba_nodename_compatible_free(nodename, compatible);
+
+	/* Post MPAPI sysevent */
+	attr = fnvlist_alloc();
+	(void) nvlist_add_uint64_array(attr, "oid", &devnode->oid, 1);
+	(void) ddi_log_sysevent(pdip, DDI_VENDOR_SUNW, EC_SUN_MP,
+	    ESC_SUN_MP_LU_ADD, attr, NULL, DDI_SLEEP);
+	nvlist_free(attr);
 
 	return (NDI_SUCCESS);
 
@@ -446,8 +468,10 @@ pvscsi_config_all(dev_info_t *pdip, pvscsi_softc_t *pvs)
 {
 	int		target;
 
-	for (target = 0; target < PVSCSI_MAXTGTS; target++)
+	for (target = 0; target < PVSCSI_MAXTGTS; target++) {
+		/* ndi_devi_enter is done in pvscsi_bus_config */
 		(void) pvscsi_config_one(pdip, pvs, target, NULL);
+	}
 
 	return (NDI_SUCCESS);
 }

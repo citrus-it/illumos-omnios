@@ -200,6 +200,7 @@ typedef struct pvscsi_softc {
 typedef struct pvscsi_device {
 	list_node_t	list;
 	int		target;
+	uint64_t	oid;
 	dev_info_t	*pdip;
 	dev_info_t	*parent;
 } pvscsi_device_t;
