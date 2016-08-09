@@ -697,7 +697,6 @@ MSGSUBDIRS=		\
 	sort		\
 	split		\
 	srptadm		\
-	ssh		\
 	stat		\
 	stmfadm		\
 	stmsboot	\
