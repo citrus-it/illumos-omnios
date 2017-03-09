@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Hayashi Naoyuki
  */
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
@@ -51,6 +52,13 @@ extern "C" {
 #define	FE_DOWNWARD	1
 #define	FE_UPWARD	2
 #define	FE_TOWARDZERO	3
+
+#elif defined(__aarch64)
+
+#define	FE_TONEAREST	0x0
+#define	FE_UPWARD	0x1
+#define	FE_DOWNWARD	0x2
+#define	FE_TOWARDZERO	0x3
 
 #endif
 
@@ -89,6 +97,15 @@ extern int fesetprec(int);
 #define	FE_UNDERFLOW	0x10
 #define	FE_INEXACT	0x20
 #define	FE_ALL_EXCEPT	0x3d
+
+#elif defined(__aarch64)
+#define	FE_INVALID	0x0001
+#define	FE_DIVBYZERO	0x0002
+#define	FE_OVERFLOW	0x0004
+#define	FE_UNDERFLOW	0x0008
+#define	FE_INEXACT	0x0010
+#define	FE_ALL_EXCEPT	(FE_DIVBYZERO | FE_INEXACT | FE_INVALID | \
+			FE_OVERFLOW | FE_UNDERFLOW)
 
 #endif
 
@@ -230,6 +247,8 @@ extern int feupdateenv(const fenv_t *);
 
 #if !defined(_STRICT_STDC) || defined(__EXTENSIONS__)
 extern void fex_merge_flags(const fenv_t *);
+extern int fetestexcept(int);
+extern int feclearexcept(int);
 #endif
 
 #ifdef __cplusplus

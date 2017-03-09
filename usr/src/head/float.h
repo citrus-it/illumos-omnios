@@ -22,9 +22,9 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2017 Hayashi Naoyuki
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -39,12 +39,12 @@
 extern "C" {
 #endif
 
-#if defined(__sparc)
+#if defined(__sparc) || defined(__aarch64)
 
 extern int __flt_rounds(void);
 #define	FLT_ROUNDS	__flt_rounds()
 
-#else /* defined(__sparc) */
+#else /* defined(__sparc) || defined(__aarch64) */
 
 extern int __fltrounds(void);
 
@@ -54,7 +54,7 @@ extern int __fltrounds(void);
 extern int __flt_rounds;
 #define	FLT_ROUNDS	__flt_rounds
 #endif	/* defined(__amd64) */
-#endif /* defined(__sparc) */
+#endif /* defined(__sparc) || defined(__aarch64) */
 
 /* Introduced in ISO/IEC 9899:1999 standard */
 #if defined(__EXTENSIONS__) || defined(_STDC_C99) || \
@@ -94,6 +94,8 @@ extern int __flt_rounds;
 #define	DECIMAL_DIG	36
 #elif defined(__i386) || defined(__amd64)
 #define	DECIMAL_DIG	21
+#elif defined(__aarch64)
+#define	DECIMAL_DIG	17
 #endif
 #endif /* defined(__EXTENSIONS__) || defined(_STDC_C99)... */
 
@@ -111,7 +113,7 @@ extern int __flt_rounds;
 #define	LDBL_MAX	1.1897314953572317650213E+4932L
 #define	LDBL_MAX_10_EXP	(+4932)
 
-#elif defined(__sparc)
+#elif defined(__sparc) || defined(__aarch64)
 
 /* Follows IEEE standards for 128-bit floating point */
 #define	LDBL_MANT_DIG	113
@@ -129,7 +131,6 @@ extern int __flt_rounds;
 #error "Unknown architecture!"
 
 #endif
-
 
 #ifdef	__cplusplus
 }
