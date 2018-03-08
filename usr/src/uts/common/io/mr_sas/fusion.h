@@ -98,6 +98,8 @@
 
 /* get the mapping information of LD */
 #define	MR_DCMD_LD_MAP_GET_INFO			0x0300e101
+/* Same for PD */
+#define MR_DCMD_SYSTEM_PD_MAP_GET_INFO		0x0200e102
 
 #ifndef	MPI2_POINTER
 #define	MPI2_POINTER	*

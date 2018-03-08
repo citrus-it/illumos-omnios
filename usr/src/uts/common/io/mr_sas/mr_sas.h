@@ -867,9 +867,60 @@ struct mrsas_ctrl_prop {
 	uint8_t		coercion_mode;
 	uint8_t		alarm_enable;
 
-	uint8_t		reserved_1[13];
-	uint32_t	on_off_properties;
-	uint8_t		reserved_4[28];
+	uint8_t		disable_auto_rebuild;
+	uint8_t		disable_battery_warn;
+	uint8_t		ecc_bucket_size;
+	uint16_t	ecc_bucket_leak_rate;
+	uint8_t		restore_hotspare_on_insertion;
+	uint8_t		expose_encl_devices;
+	uint8_t		maintain_pd_fail_history;
+	uint8_t		disallow_host_request_reordering;
+	uint8_t		abort_cc_on_error;
+	uint8_t		load_balance_mode;
+	uint8_t		disable_auto_detect_backplane;
+	uint8_t		snap_vdspace;
+
+	union {
+		struct {
+		    uint32_t	copy_back_disabled		: 1;
+		    uint32_t	smarter_enabled			: 1;
+		    uint32_t	pr_correct_unconfigured_areas	: 1;
+		    uint32_t	use_fde_only			: 1;
+		    uint32_t	disable_ncq			: 1;
+		    uint32_t	ssdsmarter_enabled		: 1;
+		    uint32_t	ssd_patrol_read_enabled		: 1;
+		    uint32_t	enable_spin_down_unconfigured	: 1;
+		    uint32_t	auto_enhanced_import		: 1;
+		    uint32_t	enable_secret_key_control	: 1;
+		    uint32_t	disable_online_ctrl_reset	: 1;
+		    uint32_t	allow_boot_with_pinned_cache	: 1;
+		    uint32_t	disable_spin_down_hs		: 1;
+		    uint32_t	enable_jbod			: 1;
+		    uint32_t	disable_cache_bypass		: 1;
+		    uint32_t	use_disk_activity_for_locate	: 1;
+		    uint32_t	enable_pi			: 1;
+		    uint32_t	prevent_pi_import		: 1;
+		    uint32_t	use_global_spares_for_emergency	: 1;
+		    uint32_t	use_unconf_good_for_emergency	: 1;
+		    uint32_t	use_emergency_sparesfor_smarter	: 1;
+		    uint32_t	force_sgpio_for_quad_only	: 1;
+		    uint32_t	enable_config_auto_balance	: 1;
+		    uint32_t	enable_virtual_cache		: 1;
+		    uint32_t	enable_auto_lock_recovery	: 1;
+		    uint32_t	disable_immediate_io		: 1;
+		    uint32_t	disable_t10_rebuild_assist	: 1;
+		    uint32_t	ignore64ld_restriction		: 1;
+		    uint32_t	enable_sw_zone			: 1;
+		    uint32_t	limit_max_rate_sata3g		: 1;
+		    uint32_t	reserved			: 2;
+	        } bits;
+	        uint32_t ref;
+	} on_off_properties;
+
+	uint8_t		auto_snap_vdspace;
+	uint8_t		view_space;
+	uint16_t	spin_down_time;
+	uint8_t		reserved_4[24];
 };
 
 
@@ -879,35 +930,35 @@ struct mrsas_ctrl_prop {
 struct mrsas_ctrl_info {
 	/* PCI device information */
 	struct {
-		uint16_t	vendor_id;
-		uint16_t	device_id;
-		uint16_t	sub_vendor_id;
-		uint16_t	sub_device_id;
-		uint8_t	reserved[24];
+		uint16_t		vendor_id;
+		uint16_t		device_id;
+		uint16_t		sub_vendor_id;
+		uint16_t		sub_device_id;
+		uint8_t			reserved[24];
 	} pci;
 
 	/* Host interface information */
 	struct {
-		uint8_t	PCIX		: 1;
-		uint8_t	PCIE		: 1;
-		uint8_t	iSCSI		: 1;
-		uint8_t	SAS_3G		: 1;
-		uint8_t	reserved_0	: 4;
-		uint8_t	reserved_1[6];
-		uint8_t	port_count;
-		uint64_t	port_addr[8];
+		uint8_t			PCIX		: 1;
+		uint8_t			PCIE		: 1;
+		uint8_t			iSCSI		: 1;
+		uint8_t			SAS_3G		: 1;
+		uint8_t			reserved_0	: 4;
+		uint8_t			reserved_1[6];
+		uint8_t			port_count;
+		uint64_t		port_addr[8];
 	} host_interface;
 
 	/* Device (backend) interface information */
 	struct {
-		uint8_t	SPI		: 1;
-		uint8_t	SAS_3G		: 1;
-		uint8_t	SATA_1_5G	: 1;
-		uint8_t	SATA_3G		: 1;
-		uint8_t	reserved_0	: 4;
-		uint8_t	reserved_1[6];
-		uint8_t	port_count;
-		uint64_t	port_addr[8];
+		uint8_t			SPI		: 1;
+		uint8_t			SAS_3G		: 1;
+		uint8_t			SATA_1_5G	: 1;
+		uint8_t			SATA_3G		: 1;
+		uint8_t			reserved_0	: 4;
+		uint8_t			reserved_1[6];
+		uint8_t			port_count;
+		uint64_t		port_addr[8];
 	} device_interface;
 
 	/* List of components residing in flash. All str are null terminated */
@@ -915,10 +966,10 @@ struct mrsas_ctrl_info {
 	uint32_t	image_component_count;
 
 	struct {
-		char	name[8];
-		char	version[32];
-		char	build_date[16];
-		char	built_time[16];
+		char			name[8];
+		char			version[32];
+		char			build_date[16];
+		char			built_time[16];
 	} image_component[8];
 
 	/*
@@ -930,10 +981,10 @@ struct mrsas_ctrl_info {
 	uint32_t	pending_image_component_count;
 
 	struct {
-		char	name[8];
-		char	version[32];
-		char	build_date[16];
-		char	build_time[16];
+		char			name[8];
+		char			version[32];
+		char			build_date[16];
+		char			build_time[16];
 	} pending_image_component[8];
 
 	uint8_t		max_arms;
@@ -956,7 +1007,7 @@ struct mrsas_ctrl_info {
 		uint32_t	reserved	: 28;
 	} hw_present;
 
-	uint32_t	current_fw_time;
+	uint32_t		current_fw_time;
 
 	/* Maximum data transfer sizes */
 	uint16_t		max_concurrent_cmds;
@@ -983,55 +1034,62 @@ struct mrsas_ctrl_info {
 	uint16_t		mem_uncorrectable_error_count;
 
 	/* Cluster information */
-	uint8_t		cluster_permitted;
-	uint8_t		cluster_active;
-	uint8_t		reserved_1[2];
+	uint8_t			cluster_permitted;
+	uint8_t			cluster_active;
+	uint16_t		max_strips_per_io;
 
 	/* Controller capabilities structures */
 	struct {
-		uint32_t	raid_level_0	: 1;
-		uint32_t	raid_level_1	: 1;
-		uint32_t	raid_level_5	: 1;
-		uint32_t	raid_level_1E	: 1;
-		uint32_t	reserved	: 28;
+		uint32_t	raid_level_0		: 1;
+		uint32_t	raid_level_1		: 1;
+		uint32_t	raid_level_5		: 1;
+		uint32_t	raid_level_1E		: 1;
+		uint32_t	raid_level_6		: 1;
+		uint32_t	reserved		: 27;
 	} raid_levels;
 
-	struct {
-		uint32_t	rbld_rate		: 1;
-		uint32_t	cc_rate			: 1;
-		uint32_t	bgi_rate		: 1;
-		uint32_t	recon_rate		: 1;
-		uint32_t	patrol_rate		: 1;
-		uint32_t	alarm_control		: 1;
-		uint32_t	cluster_supported	: 1;
-		uint32_t	bbu			: 1;
-		uint32_t	spanning_allowed	: 1;
-		uint32_t	dedicated_hotspares	: 1;
-		uint32_t	revertible_hotspares	: 1;
-		uint32_t	foreign_config_import	: 1;
-		uint32_t	self_diagnostic		: 1;
-		uint32_t	reserved		: 19;
+	union {
+		struct {
+		    uint32_t	rbld_rate		: 1;
+		    uint32_t	cc_rate			: 1;
+		    uint32_t	bgi_rate		: 1;
+		    uint32_t	recon_rate		: 1;
+		    uint32_t	patrol_rate		: 1;
+		    uint32_t	alarm_control		: 1;
+		    uint32_t	cluster_supported	: 1;
+		    uint32_t	bbu			: 1;
+		    uint32_t	spanning_allowed	: 1;
+		    uint32_t	dedicated_hotspares	: 1;
+		    uint32_t	revertible_hotspares	: 1;
+		    uint32_t	foreign_config_import	: 1;
+		    uint32_t	self_diagnostic		: 1;
+		    uint32_t	mixed_redundancy_arr	: 1;
+		    uint32_t	global_hot_spares	: 1;
+		    uint32_t	reserved		: 17;
+		} bits;
+		uint32_t ref;
 	} adapter_operations;
 
 	struct {
-		uint32_t	read_policy	: 1;
-		uint32_t	write_policy	: 1;
-		uint32_t	io_policy	: 1;
-		uint32_t	access_policy	: 1;
-		uint32_t	reserved	: 28;
+		uint32_t	read_policy		: 1;
+		uint32_t	write_policy		: 1;
+		uint32_t	io_policy		: 1;
+		uint32_t	access_policy		: 1;
+		uint32_t	disk_cache_policy	: 1;
+		uint32_t	reserved		: 27;
 	} ld_operations;
 
 	struct {
-		uint8_t	min;
-		uint8_t	max;
-		uint8_t	reserved[2];
+		uint8_t		min;
+		uint8_t		max;
+		uint8_t		reserved[2];
 	} stripe_size_operations;
 
 	struct {
-		uint32_t	force_online	: 1;
-		uint32_t	force_offline	: 1;
-		uint32_t	force_rebuild	: 1;
-		uint32_t	reserved	: 29;
+		uint32_t	force_online		: 1;
+		uint32_t	force_offline		: 1;
+		uint32_t	force_rebuild		: 1;
+		uint32_t	reserved		: 29;
 	} pd_operations;
 
 	struct {
@@ -1043,11 +1101,157 @@ struct mrsas_ctrl_info {
 		uint32_t	reserved		: 27;
 	} pd_mix_support;
 
+	uint8_t				ecc_bucket_count;
+
 	/* Include the controller properties (changeable items) */
-	uint8_t				reserved_2[12];
+	uint8_t				reserved_2[11];
 	struct mrsas_ctrl_prop		properties;
 
-	uint8_t				pad[0x800 - 0x640];
+	char				package_version[0x60];
+
+	uint64_t 			device_interface_port_addr2[8];
+	uint8_t 			reserved3[128];
+
+	struct {
+		uint16_t	min_pd_raid_level_0		: 4;
+		uint16_t	max_pd_raid_level_0		: 12;
+
+		uint16_t	min_pd_raid_level_1		: 4;
+		uint16_t	max_pd_raid_level_1		: 12;
+
+		uint16_t	min_pd_raid_level_5		: 4;
+		uint16_t	max_pd_raid_level_5		: 12;
+
+		uint16_t	min_pd_raid_level_1e		: 4;
+		uint16_t	max_pd_raid_level_1e		: 12;
+
+		uint16_t	min_pd_raid_level_6		: 4;
+		uint16_t	max_pd_raid_level_6		: 12;
+
+		uint16_t	min_pd_raid_level_10		: 4;
+		uint16_t	max_pd_raid_level_10		: 12;
+
+		uint16_t	min_pd_raid_level_50		: 4;
+		uint16_t	max_pd_raid_level_50		: 12;
+
+		uint16_t	min_pd_raid_level_60		: 4;
+		uint16_t	max_pd_raid_level_60		: 12;
+
+		uint16_t	min_pd_raid_level_1e_rlq0	: 4;
+		uint16_t	max_pd_raid_level_1e_rlq0	: 12;
+
+		uint16_t	min_pd_raid_level_1e0_rlq0	: 4;
+		uint16_t	max_pd_raid_level_1e0_rlq0	: 12;
+
+		uint16_t	reserved[6];
+	} pds_for_raid_levels;
+
+	uint16_t	max_pds;			/* 0x780 */
+	uint16_t	max_ded_hsps;			/* 0x782 */
+	uint16_t	max_global_hsps;		/* 0x784 */
+	uint16_t	ddf_size;			/* 0x786 */
+	uint8_t		max_lds_per_array;		/* 0x788 */
+	uint8_t		partitions_in_ddf;		/* 0x789 */
+	uint8_t		lock_key_binding;		/* 0x78a */
+	uint8_t		max_pits_per_ld;		/* 0x78b */
+	uint8_t		max_views_per_ld;		/* 0x78c */
+	uint8_t		max_target_id;			/* 0x78d */
+	uint16_t	max_bvl_vd_size;		/* 0x78e */
+
+	uint16_t	max_configurable_ssc_size;	/* 0x790 */
+	uint16_t	current_ssc_size;		/* 0x792 */
+
+	char		expander_fw_version[12];	/* 0x794 */
+
+	uint16_t	pfk_trial_time_remaining;	/* 0x7A0 */
+
+	uint16_t	cache_memory_size;		/* 0x7A2 */
+
+	union {						/* 0x7A4 */
+		struct {
+		    uint32_t	support_pi_controller		: 1;
+		    uint32_t	support_ld_pi_type1		: 1;
+		    uint32_t	support_ld_pi_type2		: 1;
+		    uint32_t	support_ld_pi_type3		: 1;
+		    uint32_t	support_ld_bbm_info		: 1;
+		    uint32_t	support_shield_state		: 1;
+		    uint32_t	block_ssd_write_cache_change	: 1;
+		    uint32_t	support_suspend_resume_bgops	: 1;
+		    uint32_t	support_emergency_spares	: 1;
+		    uint32_t	support_set_link_speed		: 1;
+		    uint32_t	support_boot_time_pfk_change	: 1;
+		    uint32_t	support_jbod			: 1;
+		    uint32_t	disable_online_pfk_change	: 1;
+		    uint32_t	support_perf_tuning		: 1;
+		    uint32_t	support_ssd_patrol_read		: 1;
+		    uint32_t	real_time_scheduler		: 1;
+
+		    uint32_t	support_reset_now		: 1;
+		    uint32_t	support_emulated_drives		: 1;
+		    uint32_t	headless_mode			: 1;
+		    uint32_t	dedicated_hot_spares_limited	: 1;
+
+		    uint32_t	support_uneven_spans		: 1;
+		    uint32_t	reserved			: 11;
+		} bits;
+		uint32_t ref;
+	} adapter_operations2;
+
+	uint8_t		driver_version[32];		/* 0x7A8 */
+	uint8_t		max_dapd_count_spinup60;	/* 0x7C8 */
+	uint8_t		temperature_roc;		/* 0x7C9 */
+	uint8_t		temperature_ctrl;		/* 0x7CA */
+	uint8_t		reserved4;			/* 0x7CB */
+	uint16_t	max_configurable_pds;		/* 0x7CC */
+
+	uint8_t		reserved5[2];			/* 0x7CD */
+
+	struct {
+		uint32_t	peer_is_present			: 1;
+		uint32_t	peer_is_incompatible		: 1;
+		uint32_t	hw_incompatible			: 1;
+		uint32_t	fw_version_mismatch		: 1;
+		uint32_t	ctrl_prop_incompatible		: 1;
+		uint32_t	premium_feature_mismatch	: 1;
+		uint32_t	reserved			: 26;
+	}	cluster;
+
+	char	cluster_id[16];		/* 0x7D4 */
+
+	char	reserved6[4];		/* 0x7E4 RESERVED FOR IOV */
+
+	union	{			/* 0x7E8 */
+		struct	{
+		    uint32_t	support_personality_change		: 2;
+		    uint32_t	support_thermal_poll_interval		: 1;
+		    uint32_t	support_disable_immediate_io		: 1;
+		    uint32_t	support_t10_rebuild_assist		: 1;
+		    uint32_t	support_max_ext_lds			: 1;
+		    uint32_t	support_crash_dump			: 1;
+		    uint32_t	support_sw_zone				: 1;
+		    uint32_t	support_debug_queue			: 1;
+		    uint32_t	support_nvcache_erase			: 1;
+		    uint32_t	support_force_to512e			: 1;
+		    uint32_t	support_hoq_rebuild			: 1;
+		    uint32_t	support_allowed_opsfor_drv_removal	: 1;
+		    uint32_t	support_drv_activity_lEDSetting		: 1;
+		    uint32_t	support_nvdram				: 1;
+		    uint32_t	support_force_flash			: 1;
+		    uint32_t	support_disable_ses_monitoring		: 1;
+		    uint32_t	support_cache_bypass_modes		: 1;
+		    uint32_t	support_securityon_jbod			: 1;
+		    uint32_t	discard_cache_during_ld_delete		: 1;
+		    uint32_t	support_ttylog_compression		: 1;
+		    uint32_t	support_cpld_update			: 1;
+		    uint32_t	support_disk_cache_setting_for_sys_pds	: 1;
+		    uint32_t	support_extended_sscsize		: 1;
+		    uint32_t	use_seq_num_jbod_fp			: 1;
+		    uint32_t	reserved				: 7;
+		} bits;
+		uint32_t ref;
+	} adapter_operations3;
+
+	uint8_t		pad[0x800 - 0x7EC];	/* 0x7EC */
 };
 
 /*
@@ -1241,12 +1445,6 @@ struct mrsas_ctrl_info {
 
 /* DCMD Message Frame MAILBOX0-11 */
 #define	DCMD_MBOX_SZ		12
-
-/*
- * on_off_property of mrsas_ctrl_prop
- * bit0-9, 11-31 are reserved
- */
-#define	DISABLE_OCR_PROP_FLAG   0x00000400 /* bit 10 */
 
 struct mrsas_register_set {
 	uint32_t	reserved_0[4];			/* 0000h */

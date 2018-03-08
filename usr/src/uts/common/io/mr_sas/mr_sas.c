@@ -3226,14 +3226,47 @@ get_ctrl_info(struct mrsas_instance *instance,
 
 		ctrl_info->ld_present_count = ddi_get16(
 		    cmd->frame_dma_obj.acc_handle, &ci->ld_present_count);
+		ctrl_info->ld_degraded_count = ddi_get16(
+		    cmd->frame_dma_obj.acc_handle, &ci->ld_degraded_count);
+		ctrl_info->ld_offline_count = ddi_get16(
+		    cmd->frame_dma_obj.acc_handle, &ci->ld_offline_count);
 
-		ctrl_info->properties.on_off_properties = ddi_get32(
+		ctrl_info->pd_disk_present_count = ddi_get16(
+		    cmd->frame_dma_obj.acc_handle, &ci->pd_disk_present_count);
+		ctrl_info->pd_disk_pred_failure_count = ddi_get16(
 		    cmd->frame_dma_obj.acc_handle,
-		    &ci->properties.on_off_properties);
+		    &ci->pd_disk_pred_failure_count);
+		ctrl_info->pd_disk_failed_count = ddi_get16(
+		    cmd->frame_dma_obj.acc_handle, &ci->pd_disk_failed_count);
+
+		ctrl_info->nvram_size = ddi_get16(
+		    cmd->frame_dma_obj.acc_handle, &ci->nvram_size);
+		ctrl_info->memory_size = ddi_get16(
+		    cmd->frame_dma_obj.acc_handle, &ci->memory_size);
+
 		ddi_rep_get8(cmd->frame_dma_obj.acc_handle,
 		    (uint8_t *)(ctrl_info->product_name),
 		    (uint8_t *)(ci->product_name), 80 * sizeof (char),
 		    DDI_DEV_AUTOINCR);
+
+		ddi_rep_get8(cmd->frame_dma_obj.acc_handle,
+		    (uint8_t *)(ctrl_info->package_version),
+		    (uint8_t *)(ci->package_version), 0x60 * sizeof (char),
+		    DDI_DEV_AUTOINCR);
+
+		ctrl_info->properties.on_off_properties.ref = ddi_get32(
+		    cmd->frame_dma_obj.acc_handle,
+		    &ci->properties.on_off_properties.ref);
+		ctrl_info->adapter_operations.ref = ddi_get32(
+		    cmd->frame_dma_obj.acc_handle,
+		    &ci->adapter_operations.ref);
+		ctrl_info->adapter_operations2.ref = ddi_get32(
+		    cmd->frame_dma_obj.acc_handle,
+		    &ci->adapter_operations2.ref);
+		ctrl_info->adapter_operations3.ref = ddi_get32(
+		    cmd->frame_dma_obj.acc_handle,
+		    &ci->adapter_operations3.ref);
+
 		/* should get more members of ci with ddi_get when needed */
 	} else {
 		dev_err(instance->dip, CE_WARN,
@@ -3554,22 +3587,54 @@ mrsas_init_adapter(struct mrsas_instance *instance)
 
 	if (!get_ctrl_info(instance, &ctrl_info)) {
 		instance->max_sectors_per_req = ctrl_info.max_request_size;
-		con_log(CL_ANN1, (CE_NOTE,
-		    "product name %s ld present %d",
-		    ctrl_info.product_name, ctrl_info.ld_present_count));
+		dev_err(dip, CE_CONT,
+		    "?%s (%dMiB, config:%x), "
+		    "logical drive(s): %d, physical drive(s): %d\n",
+		    ctrl_info.product_name, ctrl_info.memory_size,
+		    ctrl_info.properties.on_off_properties.ref,
+		    ctrl_info.ld_present_count,
+		    ctrl_info.pd_disk_present_count);
+
+		cond_log(CL_ANN, (dip, CE_CONT, "?Package Version: %s\n",
+		    ctrl_info.package_version));
+
+		cond_log(CL_ANN, (dip, CE_CONT,
+		    "?Adapter operations: %x %x %x\n",
+		    ctrl_info.adapter_operations.ref,
+		    ctrl_info.adapter_operations2.ref,
+		    ctrl_info.adapter_operations3.ref));
+
+		if (ctrl_info.ld_degraded_count > 0)
+			dev_err(dip, CE_WARN,
+			    "Controller has degraded logical drive(s): %d",
+			    ctrl_info.ld_degraded_count);
+
+		if (ctrl_info.ld_offline_count > 0)
+			dev_err(dip, CE_WARN,
+			    "Controller has offline logical drive(s): %d",
+			    ctrl_info.ld_offline_count);
+
+		if (ctrl_info.pd_disk_pred_failure_count > 0)
+			dev_err(dip, CE_WARN,
+			    "Controller has failing physical drive(s): %d",
+			    ctrl_info.pd_disk_pred_failure_count);
+
+		if (ctrl_info.pd_disk_failed_count > 0)
+			dev_err(dip, CE_WARN,
+			    "Controller has failed physical drive(s): %d",
+			    ctrl_info.pd_disk_failed_count);
 	} else {
 		instance->max_sectors_per_req = instance->max_num_sge *
 		    PAGESIZE / 512;
 	}
 
-	if (ctrl_info.properties.on_off_properties & DISABLE_OCR_PROP_FLAG)
+	if (ctrl_info.properties.on_off_properties.bits
+	    .disable_online_ctrl_reset)
 		instance->disable_online_ctrl_reset = 1;
 
 	return (DDI_SUCCESS);
 
 }
-
-
 
 static int
 mrsas_issue_init_mfi(struct mrsas_instance *instance)
