@@ -1994,7 +1994,7 @@ mrsas_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 
 	switch (scsi_hba_lookup_capstr(cap)) {
 	case SCSI_CAP_DMA_MAX:
-		if (instance->tbolt) {
+		if (instance->tbolt && !instance->gen3) {
 			/* Limit to 256k max transfer */
 			rval = mrsas_tbolt_max_cap_maxxfer;
 		} else {
@@ -4820,7 +4820,7 @@ mrsas_dma_alloc(struct mrsas_instance *instance, struct scsi_pkt *pkt,
 
 	tmp_dma_attr.dma_attr_sgllen = instance->max_num_sge;
 	tmp_dma_attr.dma_attr_addr_hi = 0xffffffffffffffffull;
-	if (instance->tbolt) {
+	if (instance->tbolt && !instance->gen3) {
 		/* OCR-RESET FIX */
 		tmp_dma_attr.dma_attr_count_max =
 		    (U64)mrsas_tbolt_max_cap_maxxfer;  /* limit to 256K */

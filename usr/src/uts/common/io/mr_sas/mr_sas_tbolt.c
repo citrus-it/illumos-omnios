@@ -1519,7 +1519,7 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 				    ((uint32_t)(pkt->pkt_cdbp[2]) << 24));
 			}
 
-			if (instance->tbolt &&
+			if (instance->tbolt && !instance->gen3 &&
 			    ((lba_count * 512) > mrsas_tbolt_max_cap_maxxfer)) {
 				dev_err(instance->dip, CE_WARN,
 				    "IO SECTOR COUNT exceeds "
