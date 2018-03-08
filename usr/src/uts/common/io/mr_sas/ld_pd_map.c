@@ -45,7 +45,7 @@ static void mr_update_load_balance_params(MR_FW_RAID_MAP_ALL *,
 
 typedef	U64	REGION_KEY;
 typedef	U32	REGION_LEN;
-extern int 	debug_level_g;
+extern int 	mrsas_debug_level;
 
 
 MR_LD_RAID

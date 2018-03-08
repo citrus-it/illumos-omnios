@@ -681,7 +681,8 @@ struct mrsas_function_template {
 #define	__func__ ""
 #endif
 
-#define	con_log(level, fmt) { if (debug_level_g >= level) cmn_err fmt; }
+#define	con_log(level, fmt) { if (mrsas_debug_level >= level) cmn_err fmt; }
+#define	cond_log(level, fmt) { if (mrsas_debug_level >= level) dev_err fmt; }
 
 /*
  * ### SCSA definitions ###

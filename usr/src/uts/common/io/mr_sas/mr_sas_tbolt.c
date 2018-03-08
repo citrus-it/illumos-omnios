@@ -50,10 +50,10 @@ U16 get_updated_dev_handle(PLD_LOAD_BALANCE_INFO, struct IO_REQUEST_INFO *);
 extern ddi_dma_attr_t mrsas_generic_dma_attr;
 extern uint32_t mrsas_tbolt_max_cap_maxxfer;
 extern struct ddi_device_acc_attr endian_attr;
-extern int	debug_level_g;
-extern unsigned int	enable_fp;
+extern int	mrsas_debug_level;
+extern unsigned int	mrsas_fp;
 volatile int dump_io_wait_time = 90;
-extern volatile int  debug_timeout_g;
+extern volatile int  mrsas_debug_timeout;
 extern int	mrsas_issue_pending_cmds(struct mrsas_instance *);
 extern int mrsas_complete_pending_cmds(struct mrsas_instance *instance);
 extern void	push_pending_mfi_pkt(struct mrsas_instance *,
@@ -1638,12 +1638,13 @@ mrsas_tbolt_build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 					fp_possible = io_info.fpOkForIo;
 			}
 
-			if (!enable_fp)
+			if (!mrsas_fp)
 				fp_possible = 0;
 
-			con_log(CL_ANN1, (CE_NOTE, "enable_fp %d  "
-			    "instance->fast_path_io %d fp_possible %d",
-			    enable_fp, instance->fast_path_io, fp_possible));
+			cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+			    "mrsas_fp %d instance->fast_path_io %d "
+			    "fp_possible %d",
+			    mrsas_fp, instance->fast_path_io, fp_possible));
 
 		if (fp_possible) {
 
@@ -1911,7 +1912,7 @@ tbolt_issue_cmd(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
 		    gethrtime(), (void *)cmd, (void *)instance,
 		    (void *)pkt, cmd->drv_pkt_time));
 		if (instance->adapterresetinprogress) {
-			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
+			cmd->drv_pkt_time = (uint16_t)mrsas_debug_timeout;
 			con_log(CL_ANN, (CE_NOTE,
 			    "TBOLT Reset the scsi_pkt timer"));
 		} else {
@@ -1953,8 +1954,8 @@ tbolt_issue_cmd_in_sync_mode(struct mrsas_instance *instance,
 	if (instance->adapterresetinprogress) {
 		cmd->drv_pkt_time = ddi_get16
 		    (cmd->frame_dma_obj.acc_handle, &hdr->timeout);
-		if (cmd->drv_pkt_time < debug_timeout_g)
-			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
+		if (cmd->drv_pkt_time < mrsas_debug_timeout)
+			cmd->drv_pkt_time = (uint16_t)mrsas_debug_timeout;
 		con_log(CL_ANN, (CE_NOTE, "tbolt_issue_cmd_in_sync_mode:"
 		    "RESET-IN-PROGRESS, issue cmd & return."));
 

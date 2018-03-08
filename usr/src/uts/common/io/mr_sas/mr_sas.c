@@ -96,17 +96,17 @@
  */
 static void	*mrsas_state = NULL;
 static volatile boolean_t	mrsas_relaxed_ordering = B_TRUE;
-volatile int	debug_level_g = CL_NONE;
-static volatile int	msi_enable = 1;
-static volatile int 	ctio_enable = 1;
+volatile int	mrsas_debug_level = CL_NONE;
+static volatile int	mrsas_msi = 1;
+static volatile int 	mrsas_ctio = 1;
 
 /* Default Timeout value to issue online controller reset */
-volatile int  debug_timeout_g  = 0xF0;		/* 0xB4; */
+volatile int  mrsas_debug_timeout  = 0xF0;		/* 0xB4; */
 /* Simulate consecutive firmware fault */
-static volatile int  debug_fw_faults_after_ocr_g  = 0;
+static volatile int  mrsas_debug_faults_after_ocr  = 0;
 #ifdef OCRDEBUG
 /* Simulate three consecutive timeout for an IO */
-static volatile int  debug_consecutive_timeout_after_ocr_g  = 0;
+static volatile int  mrsas_debug_consecutive_timeout_after_ocr  = 0;
 #endif
 
 #pragma weak scsi_hba_open
@@ -324,8 +324,7 @@ static struct ddi_device_acc_attr endian_attr = {
 };
 
 /* Use the LSI Fast Path for the 2208 (tbolt) commands. */
-unsigned int enable_fp = 1;
-
+unsigned int mrsas_fp = 1;
 
 /*
  * ************************************************************************** *
@@ -663,28 +662,28 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
 		    "mrsas-enable-msi", &data) == DDI_SUCCESS) {
 			if (strncmp(data, "no", 3) == 0) {
-				msi_enable = 0;
-				con_log(CL_ANN1, (CE_WARN,
-				    "msi_enable = %d disabled", msi_enable));
+				mrsas_msi = 0;
+				dev_err(dip, CE_NOTE,
+				    "mrsas_msi = %d, disabled", mrsas_msi);
 			}
 			ddi_prop_free(data);
 		}
 
-		dev_err(dip, CE_CONT, "?msi_enable = %d\n", msi_enable);
+		dev_err(dip, CE_CONT, "?mrsas_msi = %d\n", mrsas_msi);
 
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
 		    "mrsas-enable-fp", &data) == DDI_SUCCESS) {
 			if (strncmp(data, "no", 3) == 0) {
-				enable_fp = 0;
+				mrsas_fp = 0;
 				dev_err(dip, CE_NOTE,
-				    "enable_fp = %d, Fast-Path disabled.\n",
-				    enable_fp);
+				    "mrsas_fp = %d, Fast-Path disabled.\n",
+				    mrsas_fp);
 			}
 
 			ddi_prop_free(data);
 		}
 
-		dev_err(dip, CE_CONT, "?enable_fp = %d\n", enable_fp);
+		dev_err(dip, CE_CONT, "?mrsas_fp = %d\n", mrsas_fp);
 
 		/* Check for all supported interrupt types */
 		if (ddi_intr_get_supported_types(
@@ -698,7 +697,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "ddi_intr_get_supported_types() ret: 0x%x", intr_types));
 
 		/* Initialize and Setup Interrupt handler */
-		if (msi_enable && (intr_types & DDI_INTR_TYPE_MSIX)) {
+		if (mrsas_msi && (intr_types & DDI_INTR_TYPE_MSIX)) {
 			if (mrsas_add_intrs(instance, DDI_INTR_TYPE_MSIX) !=
 			    DDI_SUCCESS) {
 				dev_err(dip, CE_WARN,
@@ -706,7 +705,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				goto fail_attach;
 			}
 			instance->intr_type = DDI_INTR_TYPE_MSIX;
-		} else if (msi_enable && (intr_types & DDI_INTR_TYPE_MSI)) {
+		} else if (mrsas_msi && (intr_types & DDI_INTR_TYPE_MSI)) {
 			if (mrsas_add_intrs(instance, DDI_INTR_TYPE_MSI) !=
 			    DDI_SUCCESS) {
 				dev_err(dip, CE_WARN,
@@ -715,7 +714,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			}
 			instance->intr_type = DDI_INTR_TYPE_MSI;
 		} else if (intr_types & DDI_INTR_TYPE_FIXED) {
-			msi_enable = 0;
+			mrsas_msi = 0;
 			if (mrsas_add_intrs(instance, DDI_INTR_TYPE_FIXED) !=
 			    DDI_SUCCESS) {
 				dev_err(dip, CE_WARN,
@@ -735,14 +734,14 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
 		    "mrsas-enable-ctio", &data) == DDI_SUCCESS) {
 			if (strncmp(data, "no", 3) == 0) {
-				ctio_enable = 0;
-				con_log(CL_ANN1, (CE_WARN,
-				    "ctio_enable = %d disabled", ctio_enable));
+				mrsas_ctio = 0;
+				dev_err(dip, CE_NOTE,
+				    "mrsas_ctio = %d, disabled", mrsas_ctio);
 			}
 			ddi_prop_free(data);
 		}
 
-		dev_err(dip, CE_CONT, "?ctio_enable = %d\n", ctio_enable);
+		dev_err(dip, CE_CONT, "?mrsas_ctio = %d\n", mrsas_ctio);
 
 		/* setup the mfi based low level driver */
 		if (mrsas_init_adapter(instance) != DDI_SUCCESS) {
@@ -2342,8 +2341,8 @@ mrsas_isr(struct mrsas_instance *instance)
 	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 #ifdef OCRDEBUG
-	if (debug_consecutive_timeout_after_ocr_g == 1) {
-		con_log(CL_ANN1, (CE_NOTE,
+	if (mrsas_debug_consecutive_timeout_after_ocr == 1) {
+		cond_log(CL_ANN1, (instance->dip, CE_NOTE,
 		    "simulating consecutive timeout after ocr"));
 		return (DDI_INTR_CLAIMED);
 	}
@@ -2527,9 +2526,10 @@ push_pending_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 			/* Wait for specified interval	*/
 			cmd->drv_pkt_time = ddi_get16(
 			    cmd->frame_dma_obj.acc_handle, &hdr->timeout);
-			if (cmd->drv_pkt_time < debug_timeout_g)
-				cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
-				con_log(CL_ANN1, (CE_CONT,
+			if (cmd->drv_pkt_time < mrsas_debug_timeout)
+				cmd->drv_pkt_time =
+				    (uint16_t)mrsas_debug_timeout;
+				cond_log(CL_ANN1, (instance->dip, CE_CONT,
 				    "push_pending_pkt(): "
 				    "Called IO Timeout Value %x\n",
 				    cmd->drv_pkt_time));
@@ -2547,7 +2547,7 @@ push_pending_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 			    "time %llx",
 			    (void *)cmd, cmd->index, (void *)pkt,
 			    gethrtime()));
-			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
+			cmd->drv_pkt_time = (uint16_t)mrsas_debug_timeout;
 		}
 		if (pkt && instance->timeout_id == (timeout_id_t)-1) {
 			instance->timeout_id = timeout(io_timeout_checker,
@@ -2571,8 +2571,8 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 	int saved_level;
 	int cmd_count = 0;
 
-	saved_level = debug_level_g;
-	debug_level_g = CL_ANN1;
+	saved_level = mrsas_debug_level;
+	mrsas_debug_level = CL_ANN1;
 
 	dev_err(instance->dip, CE_NOTE,
 	    "mrsas_print_pending_cmds(): Called");
@@ -2627,7 +2627,7 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 	con_log(CL_ANN1, (CE_CONT, "mrsas_print_pending_cmds(): Done\n"));
 
 
-	debug_level_g = saved_level;
+	mrsas_debug_level = saved_level;
 
 	return (DDI_SUCCESS);
 }
@@ -2709,8 +2709,8 @@ mrsas_print_cmd_details(struct mrsas_instance *instance, struct mrsas_cmd *cmd,
 	    instance->mpi2_frame_pool_dma_obj.acc_handle;
 
 	if (detail == 0xDD) {
-		saved_level = debug_level_g;
-		debug_level_g = CL_ANN1;
+		saved_level = mrsas_debug_level;
+		mrsas_debug_level = CL_ANN1;
 	}
 
 
@@ -2763,7 +2763,7 @@ mrsas_print_cmd_details(struct mrsas_instance *instance, struct mrsas_cmd *cmd,
 	}
 
 	if (detail == 0xDD) {
-		debug_level_g = saved_level;
+		mrsas_debug_level = saved_level;
 	}
 }
 
@@ -2789,8 +2789,9 @@ mrsas_issue_pending_cmds(struct mrsas_instance *instance)
 			    (void *)cmd, cmd->index, cmd->drv_pkt_time));
 
 			/* Reset command timeout value */
-			if (cmd->drv_pkt_time < debug_timeout_g)
-				cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
+			if (cmd->drv_pkt_time < mrsas_debug_timeout)
+				cmd->drv_pkt_time =
+				    (uint16_t)mrsas_debug_timeout;
 
 			cmd->retry_count_for_ocr++;
 
@@ -3587,7 +3588,7 @@ mrsas_init_adapter_ppc(struct mrsas_instance *instance)
 		goto fail_fw_init;
 	mrsas_return_mfi_pkt(instance, cmd);
 
-	if (ctio_enable &&
+	if (mrsas_ctio &&
 	    (instance->func_ptr->read_fw_status_reg(instance) & 0x04000000)) {
 		con_log(CL_ANN, (CE_NOTE, "mr_sas: IEEE SGL's supported"));
 		instance->flag_ieee = 1;
@@ -6691,7 +6692,7 @@ issue_cmd_ppc(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
 		    gethrtime(), (void *)cmd, (void *)instance,
 		    (void *)pkt, cmd->drv_pkt_time));
 		if (instance->adapterresetinprogress) {
-			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
+			cmd->drv_pkt_time = (uint16_t)mrsas_debug_timeout;
 			con_log(CL_ANN1, (CE_NOTE, "Reset the scsi_pkt timer"));
 		} else {
 			push_pending_mfi_pkt(instance, cmd);
@@ -6727,8 +6728,8 @@ issue_cmd_in_sync_mode_ppc(struct mrsas_instance *instance,
 	if (instance->adapterresetinprogress) {
 		cmd->drv_pkt_time = ddi_get16(
 		    cmd->frame_dma_obj.acc_handle, &hdr->timeout);
-		if (cmd->drv_pkt_time < debug_timeout_g)
-			cmd->drv_pkt_time = (uint16_t)debug_timeout_g;
+		if (cmd->drv_pkt_time < mrsas_debug_timeout)
+			cmd->drv_pkt_time = (uint16_t)mrsas_debug_timeout;
 
 		con_log(CL_ANN1, (CE_NOTE, "sync_mode_ppc: "
 		    "issue and return in reset case\n"));
@@ -6987,7 +6988,7 @@ retry_reset:
 
 	/* Mark HBA as bad, if FW is fault after 3 continuous resets */
 	if (mfi_state_transition_to_ready(instance) ||
-	    debug_fw_faults_after_ocr_g == 1) {
+	    mrsas_debug_faults_after_ocr == 1) {
 		cur_abs_reg_val =
 		    instance->func_ptr->read_fw_status_reg(instance);
 		fw_state	= cur_abs_reg_val & MFI_STATE_MASK;
@@ -6996,7 +6997,7 @@ retry_reset:
 		con_log(CL_ANN1, (CE_NOTE,
 		    "mrsas_reset_ppc :before fake: FW is not ready "
 		    "FW state = 0x%x", fw_state));
-		if (debug_fw_faults_after_ocr_g == 1)
+		if (mrsas_debug_faults_after_ocr == 1)
 			fw_state = MFI_STATE_FAULT;
 #endif
 
