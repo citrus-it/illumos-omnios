@@ -3087,6 +3087,8 @@ retry_reset:
 			return (DDI_FAILURE);
 		}
 	}
+	if (!(status & DIAG_WRITE_ENABLE))
+		goto retry_reset;
 
 	/* Send reset command */
 	WR_TBOLT_HOST_DIAG(status | DIAG_TBOLT_RESET_ADAPTER, instance);
