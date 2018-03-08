@@ -46,6 +46,7 @@
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2017 Citrus IT Limited. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_MR_SAS_H_
@@ -62,8 +63,8 @@ extern "C" {
 /*
  * MegaRAID SAS2.0 Driver meta data
  */
-#define	MRSAS_VERSION				"6.503.00.00ILLUMOS-20170524"
-#define	MRSAS_RELDATE				"May 24, 2017"
+#define	MRSAS_VERSION				"6.503.00.00ILLUMOS-20180308"
+#define	MRSAS_RELDATE				"March 8, 2018"
 
 #define	MRSAS_TRUE				1
 #define	MRSAS_FALSE				0
@@ -84,7 +85,6 @@ extern "C" {
 		new_len = len; \
 	} \
 }
-
 
 /*
  * MegaRAID SAS2.0 supported controllers
