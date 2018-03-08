@@ -522,9 +522,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		subsysid = pci_config_get16(instance->pci_handle,
 		    PCI_CONF_SUBSYSID);
 
-		pci_config_put16(instance->pci_handle, PCI_CONF_COMM,
-		    (pci_config_get16(instance->pci_handle,
-		    PCI_CONF_COMM) | PCI_COMM_ME));
 		irq = pci_config_get8(instance->pci_handle,
 		    PCI_CONF_ILINE);
 
