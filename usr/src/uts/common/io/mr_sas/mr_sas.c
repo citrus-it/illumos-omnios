@@ -218,7 +218,6 @@ static struct mrsas_function_template mrsas_function_template_ppc = {
 	.init_adapter = mrsas_init_adapter_ppc
 };
 
-
 static struct mrsas_function_template mrsas_function_template_fusion = {
 	.read_fw_status_reg = tbolt_read_fw_status_reg,
 	.issue_cmd = tbolt_issue_cmd,
@@ -229,7 +228,6 @@ static struct mrsas_function_template mrsas_function_template_fusion = {
 	.intr_ack = tbolt_intr_ack,
 	.init_adapter = mrsas_init_adapter_tbolt
 };
-
 
 ddi_dma_attr_t mrsas_generic_dma_attr = {
 	DMA_ATTR_V0,		/* dma_attr_version */
@@ -350,8 +348,6 @@ _init(void)
 {
 	int ret;
 
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	ret = ddi_soft_state_init(&mrsas_state,
 	    sizeof (struct mrsas_instance), 0);
 
@@ -387,8 +383,6 @@ _init(void)
 int
 _info(struct modinfo *modinfop)
 {
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	return (mod_info(&modlinkage, modinfop));
 }
 
@@ -404,8 +398,6 @@ _fini(void)
 {
 	int ret;
 
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	if ((ret = mod_remove(&modlinkage)) != DDI_SUCCESS) {
 		con_log(CL_ANN1,
 		    (CE_WARN, "_fini: mod_remove() failed, error 0x%X", ret));
@@ -413,10 +405,8 @@ _fini(void)
 	}
 
 	scsi_hba_fini(&modlinkage);
-	con_log(CL_DLEVEL1, (CE_NOTE, "_fini: scsi_hba_fini() done."));
 
 	ddi_soft_state_fini(&mrsas_state);
-	con_log(CL_DLEVEL1, (CE_NOTE, "_fini: ddi_soft_state_fini() done."));
 
 	return (ret);
 }
@@ -471,8 +461,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	scsi_hba_tran_t		*tran;
 	ddi_dma_attr_t	tran_dma_attr;
 	struct mrsas_instance	*instance;
-
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	/* CONSTCOND */
 	ASSERT(NO_COMPETING_THREADS);
@@ -555,11 +543,10 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			pci_config_put16(instance->pci_handle,
 			    PCI_CONF_COMM, command);
 
-			con_log(CL_ANN, (CE_CONT, "mr_sas%d: "
-			    "enable bus-mastering", instance_no));
+			dev_err(dip, CE_CONT, "?Enable bus-mastering");
 		} else {
-			con_log(CL_DLEVEL1, (CE_CONT, "mr_sas%d: "
-			    "bus-mastering already set", instance_no));
+			cond_log(CL_ANN, (dip, CE_CONT,
+			    "?bus-mastering already set"));
 		}
 
 		/* initialize function pointers */
@@ -639,8 +626,8 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 		if (reglength > DEFAULT_MFI_MEM_SZ) {
 			reglength = DEFAULT_MFI_MEM_SZ;
-			con_log(CL_DLEVEL1, (CE_NOTE,
-			    "mr_sas: register length to map is 0x%lx bytes",
+			cond_log(CL_DLEVEL1, (dip, CE_NOTE,
+			    "register length to map is 0x%lx bytes",
 			    reglength));
 		}
 		if (ddi_regs_map_setup(instance->dip,
@@ -693,7 +680,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto fail_attach;
 		}
 
-		con_log(CL_DLEVEL1, (CE_NOTE,
+		cond_log(CL_DLEVEL1, (dip, CE_NOTE,
 		    "ddi_intr_get_supported_types() ret: 0x%x", intr_types));
 
 		/* Initialize and Setup Interrupt handler */
@@ -787,7 +774,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 			mutex_init(&instance->chip_mtx, NULL,
 			    MUTEX_DRIVER, DDI_INTR_PRI(instance->intr_pri));
-
 		}
 
 		instance->unroll.mutexs = 1;
@@ -810,7 +796,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				}
 
 				instance->unroll.soft_isr = 1;
-
 			}
 		}
 
@@ -820,8 +805,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		tran = scsi_hba_tran_alloc(dip, SCSI_HBA_CANSLEEP);
 
 		if (tran == NULL) {
-			dev_err(dip, CE_WARN,
-			    "scsi_hba_tran_alloc failed");
+			dev_err(dip, CE_WARN, "scsi_hba_tran_alloc failed");
 			goto fail_attach;
 		}
 
@@ -852,7 +836,6 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			mrsas_generic_dma_attr.dma_attr_flags |=
 			    DDI_DMA_RELAXED_ORDERING;
 
-
 		tran_dma_attr = mrsas_generic_dma_attr;
 		tran_dma_attr.dma_attr_sgllen = instance->max_num_sge;
 
@@ -865,8 +848,8 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto fail_attach;
 		}
 		instance->unroll.tranSetup = 1;
-		con_log(CL_ANN1,
-		    (CE_CONT, "scsi_hba_attach_setup()	done."));
+		cond_log(CL_ANN1,
+		    (dip, CE_CONT, "scsi_hba_attach_setup() done."));
 
 		/* create devctl node for cfgadm command */
 		if (ddi_create_minor_node(dip, "devctl",
@@ -915,7 +898,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto fail_attach;
 		}
 		instance->unroll.taskq = 1;
-		con_log(CL_ANN1, (CE_CONT, "ddi_taskq_create() done."));
+		cond_log(CL_ANN1, (dip, CE_CONT, "ddi_taskq_create() done."));
 
 		/* enable interrupt */
 		instance->func_ptr->enable_intr(instance);
@@ -926,8 +909,7 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto fail_attach;
 		}
 		instance->unroll.aenPend = 1;
-		con_log(CL_ANN1,
-		    (CE_CONT, "AEN started for instance %d.", instance_no));
+		cond_log(CL_ANN1, (dip, CE_CONT, "AEN started"));
 
 		/* Finally! We are on the air.	*/
 		ddi_report_dev(dip);
@@ -964,21 +946,19 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 		break;
 	case DDI_PM_RESUME:
-		con_log(CL_ANN, (CE_NOTE, "mr_sas: DDI_PM_RESUME"));
+		cond_log(CL_ANN, (dip, CE_NOTE, "DDI_PM_RESUME"));
 		break;
 	case DDI_RESUME:
-		con_log(CL_ANN, (CE_NOTE, "mr_sas: DDI_RESUME"));
+		cond_log(CL_ANN, (dip, CE_NOTE, "DDI_RESUME"));
 		break;
 	default:
-		con_log(CL_ANN,
-		    (CE_WARN, "mr_sas: invalid attach cmd=%x", cmd));
+		cond_log(CL_ANN, (dip, CE_WARN, "invalid attach cmd=%x", cmd));
 		return (DDI_FAILURE);
 	}
 
 
-	con_log(CL_DLEVEL1,
-	    (CE_NOTE, "mrsas_attach() return SUCCESS instance_num %d",
-	    instance_no));
+	cond_log(CL_ANN, (dip, CE_NOTE, "mrsas_attach() return SUCCESS"))
+
 	return (DDI_SUCCESS);
 
 fail_attach:
@@ -1018,8 +998,6 @@ mrsas_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,  void *arg, void **resultp)
 	int	mrsas_minor = getminor((dev_t)arg);
 
 	struct mrsas_instance	*instance;
-
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	switch (cmd) {
 		case DDI_INFO_DEVT2DEVINFO:
@@ -1068,9 +1046,6 @@ mrsas_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	struct mrsas_instance	*instance;
 
-	con_log(CL_ANN, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
-
 	/* CONSTCOND */
 	ASSERT(NO_COMPETING_THREADS);
 
@@ -1087,7 +1062,7 @@ mrsas_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 		case DDI_DETACH:
-			con_log(CL_ANN, (CE_NOTE,
+			cond_log(CL_ANN, (dip, CE_NOTE,
 			    "mrsas_detach: DDI_DETACH"));
 
 			mutex_enter(&instance->config_dev_mtx);
@@ -1107,8 +1082,8 @@ mrsas_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 					return (DDI_FAILURE);
 				}
 				instance->unroll.tranSetup = 0;
-				con_log(CL_ANN1,
-				    (CE_CONT, "scsi_hba_dettach()  done."));
+				cond_log(CL_ANN1, (dip, CE_CONT,
+				    "scsi_hba_dettach() done."));
 			}
 
 			flush_cache(instance);
@@ -1122,17 +1097,17 @@ mrsas_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			break;
 
 		case DDI_PM_SUSPEND:
-			con_log(CL_ANN, (CE_NOTE,
+			cond_log(CL_ANN, (dip, CE_NOTE,
 			    "mrsas_detach: DDI_PM_SUSPEND"));
 
 			break;
 		case DDI_SUSPEND:
-			con_log(CL_ANN, (CE_NOTE,
+			cond_log(CL_ANN, (dip, CE_NOTE,
 			    "mrsas_detach: DDI_SUSPEND"));
 
 			break;
 		default:
-			con_log(CL_ANN, (CE_WARN,
+			cond_log(CL_ANN, (dip, CE_WARN,
 			    "invalid detach command:0x%x", cmd));
 			return (DDI_FAILURE);
 	}
@@ -1140,12 +1115,9 @@ mrsas_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-
 static void
 mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 {
-	con_log(CL_ANN, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	if (instance->unroll.ioctl == 1) {
 		ddi_remove_minor_node(dip, instance->iocnode);
 		instance->unroll.ioctl = 0;
@@ -1167,13 +1139,13 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 			return;	 /* DDI_FAILURE */
 		}
 		instance->unroll.tranSetup = 0;
-		con_log(CL_ANN1, (CE_CONT, "scsi_hba_dettach()	done."));
+		cond_log(CL_ANN1, (dip, CE_CONT, "scsi_hba_dettach() done."));
 	}
 
 	if (instance->unroll.tran == 1)	 {
 		scsi_hba_tran_free(instance->tran);
 		instance->unroll.tran = 0;
-		con_log(CL_ANN1, (CE_CONT, "scsi_hba_tran_free()  done."));
+		cond_log(CL_ANN1, (dip, CE_CONT, "scsi_hba_tran_free() done."));
 	}
 
 	if (instance->unroll.syncCmd == 1) {
@@ -1185,7 +1157,8 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 			}
 
 			instance->unroll.syncCmd = 0;
-			con_log(CL_ANN1, (CE_CONT, "sync cmd aborted, done."));
+			cond_log(CL_ANN1, (dip, CE_CONT,
+			    "sync cmd aborted, done."));
 		}
 	}
 
@@ -1195,14 +1168,13 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 			    "failed to abort prevous AEN command");
 
 		instance->unroll.aenPend = 0;
-		con_log(CL_ANN1, (CE_CONT, "aen cmd aborted, done."));
+		cond_log(CL_ANN1, (dip, CE_CONT, "aen cmd aborted, done."));
 		/* This means the controller is fully initialized and running */
 		/* Shutdown should be a last command to controller. */
 		/* shutdown_controller(); */
 	}
 
-
-	if (instance->unroll.timer == 1)	 {
+	if (instance->unroll.timer == 1) {
 		if (instance->timeout_id != (timeout_id_t)-1) {
 			(void) untimeout(instance->timeout_id);
 			instance->timeout_id = (timeout_id_t)-1;
@@ -1212,7 +1184,6 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 	}
 
 	instance->func_ptr->disable_intr(instance);
-
 
 	if (instance->unroll.mutexs == 1) {
 		mutex_destroy(&instance->cmd_pool_mtx);
@@ -1232,9 +1203,8 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 		}
 
 		instance->unroll.mutexs = 0;
-		con_log(CL_ANN1, (CE_CONT, "Destroy mutex & cv,	 done."));
+		cond_log(CL_ANN1, (dip, CE_CONT, "Destroy mutex & cv, done."));
 	}
-
 
 	if (instance->unroll.soft_isr == 1) {
 		ddi_remove_softintr(instance->soft_intr_id);
@@ -1246,13 +1216,11 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 		instance->unroll.intr = 0;
 	}
 
-
-	if (instance->unroll.taskq == 1)	 {
+	if (instance->unroll.taskq == 1) {
 		if (instance->taskq) {
 			ddi_taskq_destroy(instance->taskq);
 			instance->unroll.taskq = 0;
 		}
-
 	}
 
 	/*
@@ -1264,7 +1232,7 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 		instance->unroll.verBuff = 0;
 	}
 
-	if (instance->unroll.pdlist_buff == 1)	{
+	if (instance->unroll.pdlist_buff == 1) {
 		if (instance->mr_tbolt_pd_list != NULL) {
 			kmem_free(instance->mr_tbolt_pd_list,
 			    MRSAS_TBOLT_GET_PD_MAX(instance) *
@@ -1275,7 +1243,7 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 		instance->unroll.pdlist_buff = 0;
 	}
 
-	if (instance->unroll.ldlist_buff == 1)	{
+	if (instance->unroll.ldlist_buff == 1) {
 		if (instance->mr_ld_list != NULL) {
 			kmem_free(instance->mr_ld_list, MRDRV_MAX_LD
 			    * sizeof (struct mrsas_ld));
@@ -1297,14 +1265,12 @@ mrsas_undo_resources(dev_info_t *dip, struct mrsas_instance *instance)
 		}
 	}
 
-	if (instance->unroll.regs == 1)	 {
+	if (instance->unroll.regs == 1) {
 		ddi_regs_map_free(&instance->regmap_handle);
 		instance->unroll.regs = 0;
-		con_log(CL_ANN1, (CE_CONT, "ddi_regs_map_free()	 done."));
+		cond_log(CL_ANN1, (dip, CE_CONT, "ddi_regs_map_free() done."));
 	}
 }
-
-
 
 /*
  * ************************************************************************** *
@@ -1328,8 +1294,6 @@ static	int
 mrsas_open(dev_t *dev, int openflags, int otyp, cred_t *credp)
 {
 	int	rval = 0;
-
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	/* Check root permissions */
 	if (drv_priv(credp) != 0) {
@@ -1372,8 +1336,6 @@ mrsas_close(dev_t dev, int openflags, int otyp, cred_t *credp)
 {
 	int	rval = 0;
 
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	/* no need for locks! */
 
 	if (scsi_hba_close) {
@@ -1409,7 +1371,6 @@ mrsas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	struct mrsas_instance	*instance;
 	struct mrsas_ioctl	*ioctl;
 	struct mrsas_aen	aen;
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	instance = ddi_get_soft_state(mrsas_state, MINOR2INST(getminor(dev)));
 
@@ -1505,18 +1466,15 @@ mrsas_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 	instance = (struct mrsas_instance *)ddi_get_soft_state
 	    (mrsas_state, instance_no);
 
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	if (!instance) {
-		con_log(CL_ANN, (CE_WARN, "mr_sas:%d could not get adapter "
-		    "in reset", instance_no));
+		cond_log(CL_ANN,
+		    (dip, CE_WARN, "could not get adapter in reset"));
 		return (DDI_FAILURE);
 	}
 
 	instance->func_ptr->disable_intr(instance);
 
-	con_log(CL_ANN1, (CE_CONT, "flushing cache for instance %d",
-	    instance_no));
+	cond_log(CL_ANN1, (dip, CE_CONT, "flushing cache"));
 
 	flush_cache(instance);
 
@@ -1535,29 +1493,26 @@ mrsas_quiesce(dev_info_t *dip)
 	instance = (struct mrsas_instance *)ddi_get_soft_state
 	    (mrsas_state, instance_no);
 
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	if (!instance) {
-		con_log(CL_ANN1, (CE_WARN, "mr_sas:%d could not get adapter "
-		    "in quiesce", instance_no));
+		cond_log(CL_ANN1,
+		    (dip, CE_WARN, "could not get adapter in quiesce"));
 		return (DDI_FAILURE);
 	}
 	if (instance->deadadapter || instance->adapterresetinprogress) {
-		con_log(CL_ANN1, (CE_WARN, "mr_sas:%d adapter is not in "
-		    "healthy state", instance_no));
+		cond_log(CL_ANN1,
+		    (dip, CE_WARN, "adapter is not in healthy state"));
 		return (DDI_FAILURE);
 	}
 
 	if (abort_aen_cmd(instance, instance->aen_cmd)) {
-		con_log(CL_ANN1, (CE_WARN, "mrsas_quiesce: "
+		cond_log(CL_ANN1, (dip, CE_WARN, "mrsas_quiesce: "
 		    "failed to abort prevous AEN command QUIESCE"));
 	}
 
 	if (instance->tbolt) {
 		if (abort_syncmap_cmd(instance,
 		    instance->map_update_cmd)) {
-			dev_err(dip, CE_WARN,
-			    "mrsas_detach: failed to abort "
+			dev_err(dip, CE_WARN, "mrsas_detach: failed to abort "
 			    "previous syncmap command");
 			return (DDI_FAILURE);
 		}
@@ -1565,14 +1520,13 @@ mrsas_quiesce(dev_info_t *dip)
 
 	instance->func_ptr->disable_intr(instance);
 
-	con_log(CL_ANN1, (CE_CONT, "flushing cache for instance %d",
-	    instance_no));
+	cond_log(CL_ANN1, (dip, CE_CONT, "flushing cache"));
 
 	flush_cache(instance);
 
 	if (wait_for_outstanding(instance)) {
-		con_log(CL_ANN1,
-		    (CE_CONT, "wait_for_outstanding: return FAIL.\n"));
+		cond_log(CL_ANN1,
+		    (dip, CE_CONT, "wait_for_outstanding: return FAIL.\n"));
 		return (DDI_FAILURE);
 	}
 	return (DDI_SUCCESS);
@@ -1609,8 +1563,7 @@ mrsas_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	uint8_t lun = sd->sd_address.a_lun;
 	dev_info_t *child = NULL;
 
-	con_log(CL_DLEVEL2, (CE_NOTE, "mrsas_tgt_init target %d lun %d",
-	    tgt, lun));
+	DTRACE_PROBE2(mrsas_tgt_init, uint16_t, tgt, uint8_t, lun);
 
 	instance = ADDR2MR(&sd->sd_address);
 
@@ -1672,7 +1625,7 @@ mrsas_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	instance = ADDR2MR(&sd->sd_address);
 
-	con_log(CL_DLEVEL2, (CE_NOTE, "tgt_free t = %d l = %d", tgt, lun));
+	DTRACE_PROBE2(tgt_free, int, tgt, int, lun);
 
 	if (tgt < MRDRV_MAX_LD && lun == 0) {
 		if (instance->mr_ld_list[tgt].dip == tgt_dip) {
@@ -1713,8 +1666,8 @@ mrsas_find_child(struct mrsas_instance *instance, uint16_t tgt, uint8_t lun)
 			break;
 		}
 	}
-	con_log(CL_DLEVEL2, (CE_NOTE, "mrsas_find_child: return child = %p",
-	    (void *)child));
+	cond_log(CL_DLEVEL2, (instance->dip, CE_NOTE,
+	    "mrsas_find_child: return child = %p", (void *)child));
 	return (child);
 }
 
@@ -1731,15 +1684,15 @@ mrsas_name_node(dev_info_t *dip, char *name, int len)
 
 	tgt = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "target", -1);
-	con_log(CL_DLEVEL2, (CE_NOTE,
+	cond_log(CL_DLEVEL2, (dip, CE_NOTE,
 	    "mrsas_name_node: dip %p tgt %d", (void *)dip, tgt));
 	if (tgt == -1) {
 		return (DDI_FAILURE);
 	}
 	lun = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "lun", -1);
-	con_log(CL_DLEVEL2,
-	    (CE_NOTE, "mrsas_name_node: tgt %d lun %d", tgt, lun));
+	cond_log(CL_DLEVEL2,
+	    (dip, CE_NOTE, "mrsas_name_node: tgt %d lun %d", tgt, lun));
 	if (lun == -1) {
 		return (DDI_FAILURE);
 	}
@@ -1775,8 +1728,6 @@ mrsas_tran_init_pkt(struct scsi_address *ap, register struct scsi_pkt *pkt,
 	struct scsa_cmd	*acmd;
 	struct mrsas_instance	*instance;
 	struct scsi_pkt	*new_pkt;
-
-	con_log(CL_DLEVEL1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	instance = ADDR2MR(ap);
 
@@ -1862,7 +1813,6 @@ mrsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 	struct mrsas_instance	*instance = ADDR2MR(ap);
 	struct mrsas_cmd	*cmd;
 
-	con_log(CL_DLEVEL1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 	if (instance->deadadapter == 1) {
 		con_log(CL_ANN1, (CE_WARN,
 		    "mrsas_tran_start: return TRAN_FATAL_ERROR "
@@ -1879,9 +1829,6 @@ mrsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 		    "returning mfi_pkt and setting TRAN_BUSY\n"));
 		return (TRAN_BUSY);
 	}
-
-	con_log(CL_ANN1, (CE_CONT, "chkpnt:%s:%d:SCSI CDB[0]=0x%x time:%x",
-	    __func__, __LINE__, pkt->pkt_cdbp[0], pkt->pkt_time));
 
 	pkt->pkt_reason	= CMD_CMPLT;
 	*pkt->pkt_scbp = STATUS_GOOD; /* clear arq scsi_status */
@@ -1911,7 +1858,7 @@ mrsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 
 	if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
 		if (instance->fw_outstanding > instance->max_fw_cmds) {
-			con_log(CL_ANN, (CE_CONT, "mr_sas:Firmware busy"));
+			con_log(CL_ANN, (CE_CONT, "mr_sas: Firmware busy"));
 			DTRACE_PROBE2(start_tran_err,
 			    uint16_t, instance->fw_outstanding,
 			    uint16_t, instance->max_fw_cmds);
@@ -1992,8 +1939,6 @@ mrsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 static int
 mrsas_tran_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	/* abort command not supported by H/W */
 
 	return (DDI_FAILURE);
@@ -2015,8 +1960,6 @@ static int
 mrsas_tran_reset(struct scsi_address *ap, int level)
 {
 	struct mrsas_instance *instance = ADDR2MR(ap);
-
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	if (wait_for_outstanding(instance)) {
 		con_log(CL_ANN1,
@@ -2046,8 +1989,6 @@ mrsas_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 	int	rval = 0;
 
 	struct mrsas_instance	*instance = ADDR2MR(ap);
-
-	con_log(CL_DLEVEL2, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	/* we do allow inquiring about capabilities for other targets */
 	if (cap == NULL) {
@@ -2133,8 +2074,6 @@ mrsas_tran_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 {
 	int		rval = 1;
 
-	con_log(CL_DLEVEL2, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	/* We don't allow setting capabilities for other targets */
 	if (cap == NULL || whom == 0) {
 		return (-1);
@@ -2193,8 +2132,6 @@ mrsas_tran_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
 	struct scsa_cmd *acmd = PKT2CMD(pkt);
 
-	con_log(CL_DLEVEL2, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	if (acmd->cmd_flags & CFLAG_DMAVALID) {
 		acmd->cmd_flags &= ~CFLAG_DMAVALID;
 
@@ -2227,8 +2164,6 @@ mrsas_tran_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
 	register struct scsa_cmd *acmd = PKT2CMD(pkt);
 
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	if (acmd->cmd_flags & CFLAG_DMAVALID) {
 		acmd->cmd_flags &= ~CFLAG_DMAVALID;
 
@@ -2259,8 +2194,6 @@ mrsas_tran_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
 	register struct scsa_cmd	*acmd = PKT2CMD(pkt);
 
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	if (acmd->cmd_flags & CFLAG_DMAVALID) {
 		(void) ddi_dma_sync(acmd->cmd_dmahandle, acmd->cmd_dma_offset,
 		    acmd->cmd_dma_len, (acmd->cmd_flags & CFLAG_DMASEND) ?
@@ -2272,8 +2205,6 @@ mrsas_tran_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 static int
 mrsas_tran_quiesce(dev_info_t *dip)
 {
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	return (1);
 }
 
@@ -2281,8 +2212,6 @@ mrsas_tran_quiesce(dev_info_t *dip)
 static int
 mrsas_tran_unquiesce(dev_info_t *dip)
 {
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	return (1);
 }
 
@@ -2308,7 +2237,6 @@ mrsas_isr(struct mrsas_instance *instance)
 	struct mrsas_header	*hdr;
 	struct scsi_pkt		*pkt;
 
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 	ASSERT(instance);
 	if (instance->tbolt) {
 		mutex_enter(&instance->chip_mtx);
@@ -2334,11 +2262,10 @@ mrsas_isr(struct mrsas_instance *instance)
 	    != DDI_SUCCESS) {
 		mrsas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
 		ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
-		con_log(CL_ANN1, (CE_WARN,
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
 		    "mr_sas_isr(): FMA check, returning DDI_INTR_UNCLAIMED"));
 		return (DDI_INTR_CLAIMED);
 	}
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 #ifdef OCRDEBUG
 	if (mrsas_debug_consecutive_timeout_after_ocr == 1) {
@@ -2356,10 +2283,9 @@ mrsas_isr(struct mrsas_instance *instance)
 	consumer = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
 	    instance->consumer);
 
-	con_log(CL_ANN, (CE_CONT, " producer %x consumer %x ",
-	    producer, consumer));
+	DTRACE_PROBE2(isr_pc, uint32_t, producer, uint32_t, consumer);
+
 	if (producer == consumer) {
-		con_log(CL_ANN, (CE_WARN, "producer ==	consumer case"));
 		DTRACE_PROBE2(isr_pc_err, uint32_t, producer,
 		    uint32_t, consumer);
 		mutex_exit(&instance->cmd_pend_mtx);
@@ -2419,7 +2345,6 @@ mrsas_isr(struct mrsas_instance *instance)
 
 	return (DDI_INTR_CLAIMED);
 }
-
 
 /*
  * ************************************************************************** *
@@ -2510,29 +2435,19 @@ push_pending_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 {
 	struct scsi_pkt *pkt;
 	struct mrsas_header	*hdr;
-	con_log(CL_DLEVEL2, (CE_NOTE, "push_pending_pkt(): Called\n"));
+
 	mutex_enter(&instance->cmd_pend_mtx);
 	mlist_del_init(&cmd->list);
 	mlist_add_tail(&cmd->list, &instance->cmd_pend_list);
 	if (cmd->sync_cmd == MRSAS_TRUE) {
 		hdr = (struct mrsas_header *)&cmd->frame->hdr;
 		if (hdr) {
-			con_log(CL_ANN1, (CE_CONT,
-			    "push_pending_mfi_pkt: "
-			    "cmd %p index %x "
-			    "time %llx",
-			    (void *)cmd, cmd->index,
-			    gethrtime()));
 			/* Wait for specified interval	*/
 			cmd->drv_pkt_time = ddi_get16(
 			    cmd->frame_dma_obj.acc_handle, &hdr->timeout);
 			if (cmd->drv_pkt_time < mrsas_debug_timeout)
 				cmd->drv_pkt_time =
 				    (uint16_t)mrsas_debug_timeout;
-				cond_log(CL_ANN1, (instance->dip, CE_CONT,
-				    "push_pending_pkt(): "
-				    "Called IO Timeout Value %x\n",
-				    cmd->drv_pkt_time));
 		}
 		if (hdr && instance->timeout_id == (timeout_id_t)-1) {
 			instance->timeout_id = timeout(io_timeout_checker,
@@ -2541,12 +2456,6 @@ push_pending_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 	} else {
 		pkt = cmd->pkt;
 		if (pkt) {
-			con_log(CL_ANN1, (CE_CONT,
-			    "push_pending_mfi_pkt: "
-			    "cmd %p index %x pkt %p, "
-			    "time %llx",
-			    (void *)cmd, cmd->index, (void *)pkt,
-			    gethrtime()));
 			cmd->drv_pkt_time = (uint16_t)mrsas_debug_timeout;
 		}
 		if (pkt && instance->timeout_id == (timeout_id_t)-1) {
@@ -2556,7 +2465,6 @@ push_pending_mfi_pkt(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 	}
 
 	mutex_exit(&instance->cmd_pend_mtx);
-
 }
 
 int
@@ -2583,7 +2491,8 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 		if (tmp == head) {
 			mutex_exit(&instance->cmd_pend_mtx);
 			flag = 0;
-			con_log(CL_ANN1, (CE_CONT, "mrsas_print_pending_cmds():"
+			cond_log(CL_ANN, (instance->dip, CE_CONT,
+			    "mrsas_print_pending_cmds():"
 			    " NO MORE CMDS PENDING....\n"));
 			break;
 		} else {
@@ -2594,7 +2503,8 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 					hdr = (struct mrsas_header *)
 					    &cmd->frame->hdr;
 					if (hdr) {
-						con_log(CL_ANN1, (CE_CONT,
+						cond_log(CL_ANN1,
+						    (instance->dip, CE_CONT,
 						    "print: cmd %p index 0x%x "
 						    "drv_pkt_time 0x%x (NO-PKT)"
 						    " hdr %p\n", (void *)cmd,
@@ -2605,7 +2515,8 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 				} else {
 					pkt = cmd->pkt;
 					if (pkt) {
-					con_log(CL_ANN1, (CE_CONT,
+					cond_log(CL_ANN1,
+					    (instance->dip, CE_CONT,
 					    "print: cmd %p index 0x%x "
 					    "drv_pkt_time 0x%x pkt %p \n",
 					    (void *)cmd, cmd->index,
@@ -2624,8 +2535,6 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 			}
 		}
 	}
-	con_log(CL_ANN1, (CE_CONT, "mrsas_print_pending_cmds(): Done\n"));
-
 
 	mrsas_debug_level = saved_level;
 
@@ -2636,15 +2545,11 @@ mrsas_print_pending_cmds(struct mrsas_instance *instance)
 int
 mrsas_complete_pending_cmds(struct mrsas_instance *instance)
 {
-
 	struct mrsas_cmd *cmd = NULL;
 	struct scsi_pkt *pkt;
 	struct mrsas_header *hdr;
 
 	struct mlist_head		*pos, *next;
-
-	con_log(CL_ANN1, (CE_NOTE,
-	    "mrsas_complete_pending_cmds(): Called"));
 
 	mutex_enter(&instance->cmd_pend_mtx);
 	mlist_for_each_safe(pos, next, &instance->cmd_pend_list) {
@@ -2658,7 +2563,8 @@ mrsas_complete_pending_cmds(struct mrsas_instance *instance)
 					    = CMD_DEV_GONE;
 					pkt->pkt_statistics
 					    = STAT_DISCON;
-					con_log(CL_ANN1, (CE_CONT,
+					cond_log(CL_ANN1,
+					    (instance->dip, CE_CONT,
 					    "fail and posting to scsa "
 					    "cmd %p index %x"
 					    " pkt %p "
@@ -2670,7 +2576,7 @@ mrsas_complete_pending_cmds(struct mrsas_instance *instance)
 			} else { /* for DCMDS */
 				if (cmd->sync_cmd == MRSAS_TRUE) {
 				hdr = (struct mrsas_header *)&cmd->frame->hdr;
-				con_log(CL_ANN1, (CE_CONT,
+				cond_log(CL_ANN1, (instance->dip, CE_CONT,
 				    "posting invalid status to application "
 				    "cmd %p index %x"
 				    " hdr %p "
@@ -2683,17 +2589,16 @@ mrsas_complete_pending_cmds(struct mrsas_instance *instance)
 			}
 			mlist_del_init(&cmd->list);
 		} else {
-			con_log(CL_ANN1, (CE_CONT,
+			cond_log(CL_ANN1, (instance->dip, CE_CONT,
 			    "mrsas_complete_pending_cmds:"
 			    "NULL command\n"));
 		}
-		con_log(CL_ANN1, (CE_CONT,
+		cond_log(CL_ANN1, (instance->dip, CE_CONT,
 		    "mrsas_complete_pending_cmds:"
 		    "looping for more commands\n"));
 	}
 	mutex_exit(&instance->cmd_pend_mtx);
 
-	con_log(CL_ANN1, (CE_CONT, "mrsas_complete_pending_cmds(): DONE\n"));
 	return (DDI_SUCCESS);
 }
 
@@ -2707,33 +2612,33 @@ mrsas_print_cmd_details(struct mrsas_instance *instance, struct mrsas_cmd *cmd,
 	int saved_level;
 	ddi_acc_handle_t acc_handle =
 	    instance->mpi2_frame_pool_dma_obj.acc_handle;
+	dev_info_t *dip = instance->dip;
 
 	if (detail == 0xDD) {
 		saved_level = mrsas_debug_level;
 		mrsas_debug_level = CL_ANN1;
 	}
 
-
 	if (instance->tbolt) {
-		con_log(CL_ANN1, (CE_CONT, "print_cmd_details: cmd %p "
+		cond_log(CL_ANN1, (dip, CE_CONT, "print_cmd_details: cmd %p "
 		    "cmd->index 0x%x SMID 0x%x timer 0x%x sec\n",
 		    (void *)cmd, cmd->index, cmd->SMID, cmd->drv_pkt_time));
 	} else {
-		con_log(CL_ANN1, (CE_CONT, "print_cmd_details: cmd %p "
+		cond_log(CL_ANN1, (dip, CE_CONT, "print_cmd_details: cmd %p "
 		    "cmd->index 0x%x timer 0x%x sec\n",
 		    (void *)cmd, cmd->index, cmd->drv_pkt_time));
 	}
 
 	if (pkt) {
-		con_log(CL_ANN1, (CE_CONT, "scsi_pkt CDB[0]=0x%x",
-		    pkt->pkt_cdbp[0]));
+		cond_log(CL_ANN1, (dip, CE_CONT,
+		    "scsi_pkt CDB[0]=0x%x", pkt->pkt_cdbp[0]));
 	} else {
-		con_log(CL_ANN1, (CE_CONT, "NO-PKT"));
+		cond_log(CL_ANN1, (dip, CE_CONT, "NO-PKT"));
 	}
 
 	if ((detail == 0xDD) && instance->tbolt) {
-		con_log(CL_ANN1, (CE_CONT, "RAID_SCSI_IO_REQUEST\n"));
-		con_log(CL_ANN1, (CE_CONT, "DevHandle=0x%X Function=0x%X "
+		cond_log(CL_ANN1, (dip, CE_CONT, "RAID_SCSI_IO_REQUEST\n"));
+		cond_log(CL_ANN1, (dip, CE_CONT, "DevHandle=0x%X Function=0x%X "
 		    "IoFlags=0x%X SGLFlags=0x%X DataLength=0x%X\n",
 		    ddi_get16(acc_handle, &scsi_io->DevHandle),
 		    ddi_get8(acc_handle, &scsi_io->Function),
@@ -2742,12 +2647,12 @@ mrsas_print_cmd_details(struct mrsas_instance *instance, struct mrsas_cmd *cmd,
 		    ddi_get32(acc_handle, &scsi_io->DataLength)));
 
 		for (i = 0; i < 32; i++) {
-			con_log(CL_ANN1, (CE_CONT, "CDB[%d]=0x%x ", i,
+			cond_log(CL_ANN1, (dip, CE_CONT, "CDB[%d]=0x%x ", i,
 			    ddi_get8(acc_handle, &scsi_io->CDB.CDB32[i])));
 		}
 
-		con_log(CL_ANN1, (CE_CONT, "RAID-CONTEXT\n"));
-		con_log(CL_ANN1, (CE_CONT, "status=0x%X extStatus=0x%X "
+		cond_log(CL_ANN1, (dip, CE_CONT, "RAID-CONTEXT\n"));
+		cond_log(CL_ANN1, (dip, CE_CONT, "status=0x%X extStatus=0x%X "
 		    "ldTargetId=0x%X timeoutValue=0x%X regLockFlags=0x%X "
 		    "RAIDFlags=0x%X regLockRowLBA=0x%" PRIu64
 		    " regLockLength=0x%X spanArm=0x%X\n",
@@ -2776,14 +2681,13 @@ mrsas_issue_pending_cmds(struct mrsas_instance *instance)
 	struct mrsas_cmd *cmd = NULL;
 	struct scsi_pkt *pkt;
 
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_issue_pending_cmds(): Called"));
 	while (tmp != head) {
 		mutex_enter(&instance->cmd_pend_mtx);
 		cmd = mlist_entry(tmp, struct mrsas_cmd, list);
 		tmp = tmp->next;
 		mutex_exit(&instance->cmd_pend_mtx);
 		if (cmd) {
-			con_log(CL_ANN1, (CE_CONT,
+			cond_log(CL_ANN1, (instance->dip, CE_CONT,
 			    "mrsas_issue_pending_cmds(): "
 			    "Got a cmd: cmd %p index 0x%x drv_pkt_time 0x%x ",
 			    (void *)cmd, cmd->index, cmd->drv_pkt_time));
@@ -2818,7 +2722,7 @@ mrsas_issue_pending_cmds(struct mrsas_instance *instance)
 
 			pkt = cmd->pkt;
 			if (pkt) {
-				con_log(CL_ANN1, (CE_CONT,
+				cond_log(CL_ANN1, (instance->dip, CE_CONT,
 				    "PENDING PKT-CMD ISSUE: cmd %p index %x "
 				    "pkt %p time %llx",
 				    (void *)cmd, cmd->index,
@@ -2843,18 +2747,15 @@ mrsas_issue_pending_cmds(struct mrsas_instance *instance)
 				instance->func_ptr->issue_cmd(cmd, instance);
 			}
 		} else {
-			con_log(CL_ANN1, (CE_CONT,
+			cond_log(CL_ANN1, (instance->dip, CE_CONT,
 			    "mrsas_issue_pending_cmds: NULL command\n"));
 		}
-		con_log(CL_ANN1, (CE_CONT,
+		cond_log(CL_ANN1, (instance->dip, CE_CONT,
 		    "mrsas_issue_pending_cmds:"
 		    "looping for more commands"));
 	}
-	con_log(CL_ANN1, (CE_CONT, "mrsas_issue_pending_cmds(): DONE\n"));
 	return (DDI_SUCCESS);
 }
-
-
 
 /*
  * destroy_mfi_frame_pool
@@ -2878,7 +2779,6 @@ destroy_mfi_frame_pool(struct mrsas_instance *instance)
 
 		cmd->frame_dma_obj_status  = DMA_OBJ_FREED;
 	}
-
 }
 
 /*
@@ -2902,7 +2802,7 @@ create_mfi_frame_pool(struct mrsas_instance *instance)
 	sgl_sz		= sge_sz * instance->max_num_sge;
 	tot_frame_size	= sgl_sz + MRMFI_FRAME_SIZE + SENSE_LENGTH;
 
-	con_log(CL_DLEVEL3, (CE_NOTE, "create_mfi_frame_pool: "
+	cond_log(CL_DLEVEL3, (instance->dip, CE_NOTE, "create_mfi_frame_pool: "
 	    "sgl_sz %x tot_frame_size %x", sgl_sz, tot_frame_size));
 
 	while (i < max_cmd) {
@@ -2950,7 +2850,7 @@ create_mfi_frame_pool(struct mrsas_instance *instance)
 		    &cmd->frame->io.context, cmd->index);
 		i++;
 
-		con_log(CL_DLEVEL3, (CE_NOTE, "[%x]-%x",
+		cond_log(CL_DLEVEL3, (instance->dip, CE_NOTE, "[%x]-%x",
 		    cmd->index, cmd->frame_phys_addr));
 	}
 
@@ -3118,9 +3018,8 @@ mrsas_alloc_cmd_pool(struct mrsas_instance *instance)
 	struct mrsas_cmd	*cmd;
 
 	max_cmd = instance->max_fw_cmds;
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_alloc_cmd_pool: "
+	cond_log(CL_ANN, (instance->dip, CE_NOTE, "mrsas_alloc_cmd_pool: "
 	    "max_cmd %x", max_cmd));
-
 
 	sz = sizeof (struct mrsas_cmd *) * max_cmd;
 
@@ -3249,8 +3148,6 @@ mfi_undo_cmd_pool:
 	return (DDI_FAILURE);
 }
 
-
-
 /*
  * get_ctrl_info
  */
@@ -3271,7 +3168,7 @@ get_ctrl_info(struct mrsas_instance *instance,
 	}
 
 	if (!cmd) {
-		con_log(CL_ANN, (CE_WARN,
+		cond_log(CL_ANN, (instance->dip, CE_WARN,
 		    "Failed to get a cmd for ctrl info"));
 		DTRACE_PROBE2(info_mfi_err, uint16_t, instance->fw_outstanding,
 		    uint16_t, instance->max_fw_cmds);
@@ -3368,8 +3265,6 @@ abort_aen_cmd(struct mrsas_instance *instance,
 	struct mrsas_cmd		*cmd;
 	struct mrsas_abort_frame	*abort_fr;
 
-	con_log(CL_ANN1, (CE_NOTE, "chkpnt: abort_aen:%d", __LINE__));
-
 	if (instance->tbolt) {
 		cmd = get_raid_msg_mfi_pkt(instance);
 	} else {
@@ -3377,7 +3272,7 @@ abort_aen_cmd(struct mrsas_instance *instance,
 	}
 
 	if (!cmd) {
-		con_log(CL_ANN1, (CE_WARN,
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
 		    "abort_aen_cmd():Failed to get a cmd for abort_aen_cmd"));
 		DTRACE_PROBE2(abort_mfi_err, uint16_t, instance->fw_outstanding,
 		    uint16_t, instance->max_fw_cmds);
@@ -3413,7 +3308,7 @@ abort_aen_cmd(struct mrsas_instance *instance,
 	}
 
 	if (instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
-		con_log(CL_ANN1, (CE_WARN,
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
 		    "abort_aen_cmd: issue_cmd_in_poll_mode failed"));
 		ret = -1;
 	} else {
@@ -3433,7 +3328,6 @@ abort_aen_cmd(struct mrsas_instance *instance,
 
 	return (ret);
 }
-
 
 static int
 mrsas_build_init_cmd(struct mrsas_instance *instance,
@@ -3514,7 +3408,7 @@ mrsas_build_init_cmd(struct mrsas_instance *instance,
 
 	if (mrsas_alloc_dma_obj(instance, &instance->drv_ver_dma_obj,
 	    (uchar_t)DDI_STRUCTURE_LE_ACC) != 1) {
-		con_log(CL_ANN, (CE_WARN,
+		cond_log(CL_ANN, (instance->dip, CE_WARN,
 		    "init_mfi : Could not allocate driver version buffer."));
 		return (DDI_FAILURE);
 	}
@@ -3555,7 +3449,7 @@ mrsas_init_adapter_ppc(struct mrsas_instance *instance)
 	 * frames etc
 	 */
 	if (alloc_space_for_mfi(instance) != DDI_SUCCESS) {
-		con_log(CL_ANN, (CE_NOTE,
+		cond_log(CL_ANN, (instance->dip, CE_NOTE,
 		    "Error, failed to allocate memory for MFI adapter"));
 		return (DDI_FAILURE);
 	}
@@ -3569,8 +3463,8 @@ mrsas_init_adapter_ppc(struct mrsas_instance *instance)
 	}
 
 	if (mrsas_build_init_cmd(instance, &cmd) != DDI_SUCCESS) {
-		con_log(CL_ANN,
-		    (CE_NOTE, "Error, failed to build INIT command"));
+		cond_log(CL_ANN, (instance->dip, CE_NOTE,
+		    "Error, failed to build INIT command"));
 
 		goto fail_undo_alloc_mfi_space;
 	}
@@ -3580,7 +3474,8 @@ mrsas_init_adapter_ppc(struct mrsas_instance *instance)
 	 * send INIT MFI frame in polled mode
 	 */
 	if (instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
-		con_log(CL_ANN, (CE_WARN, "failed to init firmware"));
+		cond_log(CL_ANN, (instance->dip, CE_WARN,
+		    "failed to init firmware"));
 		goto fail_fw_init;
 	}
 
@@ -3590,7 +3485,8 @@ mrsas_init_adapter_ppc(struct mrsas_instance *instance)
 
 	if (mrsas_ctio &&
 	    (instance->func_ptr->read_fw_status_reg(instance) & 0x04000000)) {
-		con_log(CL_ANN, (CE_NOTE, "mr_sas: IEEE SGL's supported"));
+		cond_log(CL_ANN, (instance->dip, CE_NOTE,
+		    "IEEE SGLs supported"));
 		instance->flag_ieee = 1;
 	} else {
 		instance->flag_ieee = 0;
@@ -3622,11 +3518,11 @@ int
 mrsas_init_adapter(struct mrsas_instance *instance)
 {
 	struct mrsas_ctrl_info		ctrl_info;
-
+	dev_info_t *dip = instance->dip;
 
 	/* we expect the FW state to be READY */
 	if (mfi_state_transition_to_ready(instance)) {
-		con_log(CL_ANN, (CE_WARN, "mr_sas: F/W is not ready"));
+		cond_log(CL_ANN, (dip, CE_WARN, "F/W is not ready"));
 		return (DDI_FAILURE);
 	}
 
@@ -3647,12 +3543,9 @@ mrsas_init_adapter(struct mrsas_instance *instance)
 	    instance->func_ptr->read_fw_status_reg(instance) & 0xFFFF;
 	instance->max_fw_cmds = instance->max_fw_cmds - 1;
 
-
-
 	/* Initialize adapter */
 	if (instance->func_ptr->init_adapter(instance) != DDI_SUCCESS) {
-		con_log(CL_ANN,
-		    (CE_WARN, "mr_sas: could not initialize adapter"));
+		dev_err(dip, CE_WARN, "could not initialize adapter");
 		return (DDI_FAILURE);
 	}
 
@@ -3691,12 +3584,10 @@ mrsas_issue_init_mfi(struct mrsas_instance *instance)
  * this frame - since we don't need any SGL - we use SGL's space as
  * queue info structure
  */
-	con_log(CL_ANN1, (CE_NOTE,
-	    "mrsas_issue_init_mfi: entry\n"));
 	cmd = get_mfi_app_pkt(instance);
 
 	if (!cmd) {
-		con_log(CL_ANN1, (CE_WARN,
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
 		    "mrsas_issue_init_mfi: get_pkt failed\n"));
 		return (DDI_FAILURE);
 	}
@@ -3752,7 +3643,7 @@ mrsas_issue_init_mfi(struct mrsas_instance *instance)
 
 	/* issue the init frame in polled mode */
 	if (instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
-		con_log(CL_ANN1, (CE_WARN,
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
 		    "mrsas_issue_init_mfi():failed to "
 		    "init firmware"));
 		return_mfi_app_pkt(instance, cmd);
@@ -3765,7 +3656,6 @@ mrsas_issue_init_mfi(struct mrsas_instance *instance)
 	}
 
 	return_mfi_app_pkt(instance, cmd);
-	con_log(CL_ANN1, (CE_CONT, "mrsas_issue_init_mfi: Done"));
 
 	return (DDI_SUCCESS);
 }
@@ -3785,28 +3675,28 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 	uint32_t	cur_abs_reg_val;
 	uint32_t	prev_abs_reg_val;
 	uint32_t	status;
+	dev_info_t *	dip = instance->dip;
 
 	cur_abs_reg_val =
 	    instance->func_ptr->read_fw_status_reg(instance);
 	fw_state =
 	    cur_abs_reg_val & MFI_STATE_MASK;
-	con_log(CL_ANN1, (CE_CONT,
+	cond_log(CL_ANN, (dip, CE_CONT,
 	    "mfi_state_transition_to_ready:FW state = 0x%x", fw_state));
 
 	while (fw_state != MFI_STATE_READY) {
-		con_log(CL_ANN, (CE_CONT,
+		cond_log(CL_ANN, (dip, CE_CONT,
 		    "mfi_state_transition_to_ready:FW state%x", fw_state));
 
 		switch (fw_state) {
 		case MFI_STATE_FAULT:
-			con_log(CL_ANN, (CE_NOTE,
-			    "mr_sas: FW in FAULT state!!"));
-
+			cond_log(CL_ANN,
+			    (dip, CE_NOTE, "FW in FAULT state!!"));
 			return (ENODEV);
 		case MFI_STATE_WAIT_HANDSHAKE:
 			/* set the CLR bit in IMR0 */
-			con_log(CL_ANN1, (CE_NOTE,
-			    "mr_sas: FW waiting for HANDSHAKE"));
+			cond_log(CL_ANN,
+			    (dip, CE_NOTE, "FW waiting for HANDSHAKE"));
 			/*
 			 * PCI_Hot Plug: MFI F/W requires
 			 * (MFI_INIT_CLEAR_HANDSHAKE|MFI_INIT_HOTPLUG)
@@ -3825,8 +3715,8 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 			break;
 		case MFI_STATE_BOOT_MESSAGE_PENDING:
 			/* set the CLR bit in IMR0 */
-			con_log(CL_ANN1, (CE_NOTE,
-			    "mr_sas: FW state boot message pending"));
+			cond_log(CL_ANN,
+			    (dip, CE_NOTE, "FW state boot message pending"));
 			/*
 			 * PCI_Hot Plug: MFI F/W requires
 			 * (MFI_INIT_CLEAR_HANDSHAKE|MFI_INIT_HOTPLUG)
@@ -3844,8 +3734,8 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 		case MFI_STATE_OPERATIONAL:
 			/* bring it to READY state; assuming max wait 2 secs */
 			instance->func_ptr->disable_intr(instance);
-			con_log(CL_ANN1, (CE_NOTE,
-			    "mr_sas: FW in OPERATIONAL state"));
+			cond_log(CL_ANN,
+			    (dip, CE_NOTE, "FW in OPERATIONAL state"));
 			/*
 			 * PCI_Hot Plug: MFI F/W requires
 			 * (MFI_INIT_READY | MFI_INIT_MFIMODE | MFI_INIT_ABORT)
@@ -3875,7 +3765,7 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 			break;
 		case MFI_STATE_UNDEFINED:
 			/* this state should not last for more than 2 seconds */
-			con_log(CL_ANN1, (CE_NOTE, "FW state undefined"));
+			cond_log(CL_ANN, (dip, CE_NOTE, "FW state undefined"));
 
 			max_wait	= (instance->tbolt == 1) ? 180 : 2;
 			cur_state	= MFI_STATE_UNDEFINED;
@@ -3896,7 +3786,7 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 			max_wait	= 180;
 			cur_state	= MFI_STATE_DEVICE_SCAN;
 			prev_abs_reg_val = cur_abs_reg_val;
-			con_log(CL_NONE, (CE_NOTE,
+			cond_log(CL_NONE, (dip, CE_NOTE,
 			    "Device scan in progress ...\n"));
 			break;
 		case MFI_STATE_FLUSH_CACHE:
@@ -3904,8 +3794,8 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 			cur_state	= MFI_STATE_FLUSH_CACHE;
 			break;
 		default:
-			con_log(CL_ANN1, (CE_NOTE,
-			    "mr_sas: Unknown state 0x%x", fw_state));
+			cond_log(CL_ANN, (dip, CE_NOTE,
+			    "Unknown state 0x%x", fw_state));
 			return (ENODEV);
 		}
 
@@ -3930,7 +3820,7 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 
 		/* return error if fw_state hasn't changed after max_wait */
 		if (fw_state == cur_state) {
-			con_log(CL_ANN1, (CE_WARN,
+			cond_log(CL_ANN, (dip, CE_WARN,
 			    "FW state hasn't changed in %d secs", max_wait));
 			return (ENODEV);
 		}
@@ -3939,7 +3829,7 @@ mfi_state_transition_to_ready(struct mrsas_instance *instance)
 	/* This may also need to apply to Skinny, but for now, don't worry. */
 	if (!instance->tbolt && !instance->skinny) {
 		fw_ctrl = RD_IB_DOORBELL(instance);
-		con_log(CL_ANN1, (CE_CONT,
+		cond_log(CL_ANN1, (dip, CE_CONT,
 		    "mfi_state_transition_to_ready:FW ctrl = 0x%x", fw_ctrl));
 
 		/*
@@ -4111,7 +4001,7 @@ flush_cache(struct mrsas_instance *instance)
 	}
 
 	if (!cmd) {
-		con_log(CL_ANN1, (CE_WARN,
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
 		    "flush_cache():Failed to get a cmd for flush_cache"));
 		DTRACE_PROBE2(flush_cache_err, uint16_t,
 		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
@@ -4146,10 +4036,10 @@ flush_cache(struct mrsas_instance *instance)
 	}
 
 	if (instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
-		con_log(CL_ANN1, (CE_WARN,
-	    "flush_cache: failed to issue MFI_DCMD_CTRL_CACHE_FLUSH"));
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
+		    "flush_cache: failed to issue MFI_DCMD_CTRL_CACHE_FLUSH"));
 	}
-	con_log(CL_ANN1, (CE_CONT, "flush_cache done"));
+	cond_log(CL_ANN1, (instance->dip, CE_CONT, "flush_cache done"));
 	if (instance->tbolt) {
 		return_raid_msg_mfi_pkt(instance, cmd);
 	} else {
@@ -4176,8 +4066,6 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 	mrsas_pd_address_t	*pd_addr;
 	ddi_acc_handle_t		acc_handle;
 
-	con_log(CL_ANN, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	acc_handle = cmd->frame_dma_obj.acc_handle;
 	cmd->cmd_status = ddi_get8(acc_handle, &cmd->frame->io.cmd_status);
 	if (cmd->cmd_status == ENODATA) {
@@ -4190,15 +4078,14 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 	 */
 	if (ddi_log_sysevent(instance->dip, DDI_VENDOR_LSI, "LSIMEGA", "SAS",
 	    NULL, NULL, DDI_NOSLEEP) != DDI_SUCCESS) {
-		int	instance_no = ddi_get_instance(instance->dip);
-		con_log(CL_ANN, (CE_WARN,
-		    "mr_sas%d: Failed to log AEN event", instance_no));
+		cond_log(CL_ANN, (instance->dip, CE_WARN,
+		    "Failed to log AEN event"));
 	}
 	/*
 	 * Check for any ld devices that has changed state. i.e. online
 	 * or offline.
 	 */
-	con_log(CL_ANN1, (CE_CONT,
+	cond_log(CL_ANN, (instance->dip, CE_CONT,
 	    "AEN: code = %x class = %x locale = %x args = %x",
 	    ddi_get32(acc_handle, &evt_detail->code),
 	    evt_detail->cl.members.class,
@@ -4215,8 +4102,8 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 				mutex_exit(&instance->config_dev_mtx);
 				rval = mrsas_service_evt(instance, tgt, 0,
 				    MRSAS_EVT_UNCONFIG_TGT, NULL);
-				con_log(CL_ANN1, (CE_WARN,
-				    "mr_sas: CFG CLEARED AEN rval = %d "
+				cond_log(CL_ANN1, (instance->dip, CE_WARN,
+				    "CFG CLEARED AEN rval = %d "
 				    "tgt id = %d", rval, tgt));
 			}
 		}
@@ -4231,7 +4118,8 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 		rval = mrsas_service_evt(instance,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id), 0,
 		    MRSAS_EVT_UNCONFIG_TGT, NULL);
-		con_log(CL_ANN1, (CE_WARN, "mr_sas: LD DELETED AEN rval = %d "
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
+		    "LD DELETED AEN rval = %d "
 		    "tgt id = %d index = %d", rval,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id),
 		    ddi_get8(acc_handle, &evt_detail->args.ld.ld_index)));
@@ -4242,7 +4130,8 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 		rval = mrsas_service_evt(instance,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id), 0,
 		    MRSAS_EVT_CONFIG_TGT, NULL);
-		con_log(CL_ANN1, (CE_WARN, "mr_sas: LD CREATED AEN rval = %d "
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
+		    "LD CREATED AEN rval = %d "
 		    "tgt id = %d index = %d", rval,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id),
 		    ddi_get8(acc_handle, &evt_detail->args.ld.ld_index)));
@@ -4253,9 +4142,9 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 		if (instance->tbolt || instance->skinny) {
 			pd_addr = &evt_detail->args.pd_addr;
 			dtype = pd_addr->scsi_dev_type;
-			con_log(CL_DLEVEL1, (CE_NOTE,
-			    " MR_EVT_PD_REMOVED_EXT: dtype = %x,"
-			    " arg_type = %d ", dtype, evt_detail->arg_type));
+			cond_log(CL_DLEVEL1, (instance->dip, CE_NOTE,
+			    "MR_EVT_PD_REMOVED_EXT: dtype = %x, "
+			    "arg_type = %d ", dtype, evt_detail->arg_type));
 			tgt = ddi_get16(acc_handle,
 			    &evt_detail->args.pd.device_id);
 			mutex_enter(&instance->config_dev_mtx);
@@ -4265,8 +4154,8 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 			rval = mrsas_service_evt(instance, ddi_get16(
 			    acc_handle, &evt_detail->args.pd.device_id),
 			    1, MRSAS_EVT_UNCONFIG_TGT, NULL);
-			con_log(CL_ANN1, (CE_WARN, "mr_sas: PD_REMOVED:"
-			    "rval = %d tgt id = %d ", rval,
+			cond_log(CL_ANN1, (instance->dip, CE_WARN,
+			    "PD_REMOVED: rval = %d tgt id = %d ", rval,
 			    ddi_get16(acc_handle,
 			    &evt_detail->args.pd.device_id)));
 		}
@@ -4279,9 +4168,9 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 			    ddi_get16(acc_handle,
 			    &evt_detail->args.pd.device_id),
 			    1, MRSAS_EVT_CONFIG_TGT, NULL);
-			con_log(CL_ANN1, (CE_WARN, "mr_sas: PD_INSERTEDi_EXT:"
-			    "rval = %d tgt id = %d ", rval,
-			    ddi_get16(acc_handle,
+			cond_log(CL_ANN1, (instance->dip, CE_WARN,
+			    "PD_INSERTEDi_EXT:rval = %d tgt id = %d",
+			    rval, ddi_get16(acc_handle,
 			    &evt_detail->args.pd.device_id)));
 		}
 		break;
@@ -4302,9 +4191,9 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 				    ddi_get16(acc_handle,
 				    &evt_detail->args.pd.device_id),
 				    1, MRSAS_EVT_UNCONFIG_TGT, NULL);
-				con_log(CL_ANN1, (CE_WARN, "mr_sas: PD_REMOVED:"
-				    "rval = %d tgt id = %d ", rval,
-				    ddi_get16(acc_handle,
+				cond_log(CL_ANN1, (instance->dip, CE_WARN,
+				    "PD_REMOVED:rval = %d tgt id = %d ",
+				    rval, ddi_get16(acc_handle,
 				    &evt_detail->args.pd.device_id)));
 				break;
 			}
@@ -4315,10 +4204,9 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 				    ddi_get16(acc_handle,
 				    &evt_detail->args.pd.device_id),
 				    1, MRSAS_EVT_CONFIG_TGT, NULL);
-				con_log(CL_ANN1, (CE_WARN,
-				    "mr_sas: PD_INSERTED: rval = %d "
-				    " tgt id = %d ", rval,
-				    ddi_get16(acc_handle,
+				cond_log(CL_ANN1, (instance->dip, CE_WARN,
+				    "PD_INSERTED: rval = %d tgt id = %d ",
+				    rval, ddi_get16(acc_handle,
 				    &evt_detail->args.pd.device_id)));
 				break;
 			}
@@ -4366,9 +4254,6 @@ complete_cmd_in_sync_mode(struct mrsas_instance *instance,
 
 	cmd->sync_cmd = MRSAS_FALSE;
 
-	con_log(CL_ANN1, (CE_NOTE, "complete_cmd_in_sync_mode called %p \n",
-	    (void *)cmd));
-
 	mutex_enter(&instance->int_cmd_mtx);
 	if (cmd->cmd_status == ENODATA) {
 		cmd->cmd_status = 0;
@@ -4392,18 +4277,19 @@ mrsas_initiate_ocr_if_fw_is_faulty(struct mrsas_instance *instance)
 
 	cur_abs_reg_val =  instance->func_ptr->read_fw_status_reg(instance);
 	fw_state = cur_abs_reg_val & MFI_STATE_MASK;
+	DTRACE_PROBE1(fw_status_reg, uint32_t, fw_state);
 	if (fw_state == MFI_STATE_FAULT) {
 		if (instance->disable_online_ctrl_reset == 1) {
 			dev_err(instance->dip, CE_WARN,
 			    "mrsas_initiate_ocr_if_fw_is_faulty: "
 			    "FW in Fault state, detected in ISR: "
-			    "FW doesn't support ocr ");
+			    "FW doesn't support ocr");
 
 			return (ADAPTER_RESET_NOT_REQUIRED);
 		} else {
-			con_log(CL_ANN, (CE_NOTE,
+			dev_err(instance->dip, CE_NOTE,
 			    "mrsas_initiate_ocr_if_fw_is_faulty: FW in Fault "
-			    "state, detected in ISR: FW supports ocr "));
+			    "state, detected in ISR: FW supports ocr");
 
 			return (ADAPTER_RESET_REQUIRED);
 		}
@@ -4429,8 +4315,7 @@ mrsas_softintr(struct mrsas_instance *instance)
 	mlist_t			process_list;
 	struct mrsas_header	*hdr;
 	struct scsi_arq_status	*arqstat;
-
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_softintr() called."));
+	dev_info_t *dip = instance->dip;
 
 	ASSERT(instance);
 
@@ -4460,8 +4345,8 @@ mrsas_softintr(struct mrsas_instance *instance)
 		if (mrsas_check_dma_handle(cmd->frame_dma_obj.dma_handle) !=
 		    DDI_SUCCESS) {
 			mrsas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
-			ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
-			con_log(CL_ANN1, (CE_WARN,
+			ddi_fm_service_impact(dip, DDI_SERVICE_LOST);
+			cond_log(CL_ANN1, (dip, CE_WARN,
 			    "mrsas_softintr: "
 			    "FMA check reports DMA handle failure"));
 			return (DDI_INTR_CLAIMED);
@@ -4507,7 +4392,7 @@ mrsas_softintr(struct mrsas_instance *instance)
 			    | STATE_GOT_TARGET | STATE_SENT_CMD
 			    | STATE_XFERRED_DATA | STATE_GOT_STATUS;
 
-			con_log(CL_ANN, (CE_CONT,
+			cond_log(CL_ANN, (dip, CE_CONT,
 			    "CDB[0] = %x completed for %s: size %lx context %x",
 			    pkt->pkt_cdbp[0], ((acmd->islogical) ? "LD" : "PD"),
 			    acmd->cmd_dmacount, hdr->context));
@@ -4542,21 +4427,22 @@ mrsas_softintr(struct mrsas_instance *instance)
 				pkt->pkt_scbp[0] = STATUS_GOOD;
 				break;
 			case MFI_STAT_LD_INIT_IN_PROGRESS:
-				con_log(CL_ANN,
-				    (CE_WARN, "Initialization in Progress"));
+				cond_log(CL_ANN, (dip, CE_WARN,
+				    "Initialization in Progress"));
 				pkt->pkt_reason	= CMD_TRAN_ERR;
 
 				break;
 			case MFI_STAT_SCSI_DONE_WITH_ERROR:
-				con_log(CL_ANN, (CE_CONT, "scsi_done error"));
+				cond_log(CL_ANN, (dip, CE_CONT,
+				    "scsi_done error"));
 
 				pkt->pkt_reason	= CMD_CMPLT;
 				((struct scsi_status *)
 				    pkt->pkt_scbp)->sts_chk = 1;
 
 				if (pkt->pkt_cdbp[0] == SCMD_TEST_UNIT_READY) {
-					con_log(CL_ANN,
-					    (CE_WARN, "TEST_UNIT_READY fail"));
+					cond_log(CL_ANN, (dip,
+					    CE_WARN, "TEST_UNIT_READY fail"));
 				} else {
 					pkt->pkt_state |= STATE_ARQ_DONE;
 					arqstat = (void *)(pkt->pkt_scbp);
@@ -4579,8 +4465,8 @@ mrsas_softintr(struct mrsas_instance *instance)
 				break;
 			case MFI_STAT_LD_OFFLINE:
 			case MFI_STAT_DEVICE_NOT_FOUND:
-				con_log(CL_ANN, (CE_CONT,
-				"mrsas_softintr:device not found error"));
+				cond_log(CL_ANN, (dip, CE_CONT,
+				    "mrsas_softintr:device not found error"));
 				pkt->pkt_reason	= CMD_DEV_GONE;
 				pkt->pkt_statistics  = STAT_DISCON;
 				break;
@@ -4615,7 +4501,8 @@ mrsas_softintr(struct mrsas_instance *instance)
 				break;
 
 			default:
-				con_log(CL_ANN, (CE_CONT, "Unknown status!"));
+				cond_log(CL_ANN, (dip, CE_CONT,
+				    "Unknown status!"));
 				pkt->pkt_reason	= CMD_TRAN_ERR;
 
 				break;
@@ -4628,7 +4515,7 @@ mrsas_softintr(struct mrsas_instance *instance)
 			if (acmd->cmd_dmahandle) {
 				if (mrsas_check_dma_handle(
 				    acmd->cmd_dmahandle) != DDI_SUCCESS) {
-					ddi_fm_service_impact(instance->dip,
+					ddi_fm_service_impact(dip,
 					    DDI_SERVICE_UNAFFECTED);
 					pkt->pkt_reason = CMD_TRAN_ERR;
 					pkt->pkt_statistics = 0;
@@ -4657,7 +4544,7 @@ mrsas_softintr(struct mrsas_instance *instance)
 			    MR_DCMD_CTRL_EVENT_WAIT) {
 				if ((instance->aen_cmd == cmd) &&
 				    (instance->aen_cmd->abort_aen)) {
-					con_log(CL_ANN, (CE_WARN,
+					cond_log(CL_ANN, (dip, CE_WARN,
 					    "mrsas_softintr: "
 					    "aborted_aen returned"));
 				} else {
@@ -4672,7 +4559,8 @@ mrsas_softintr(struct mrsas_instance *instance)
 			break;
 
 		case MFI_CMD_OP_ABORT:
-			con_log(CL_ANN, (CE_NOTE, "MFI_CMD_OP_ABORT complete"));
+			cond_log(CL_ANN, (dip, CE_NOTE,
+			    "MFI_CMD_OP_ABORT complete"));
 			/*
 			 * MFI_CMD_OP_ABORT successfully completed
 			 * in the synchronous mode
@@ -4682,14 +4570,15 @@ mrsas_softintr(struct mrsas_instance *instance)
 
 		default:
 			mrsas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
-			ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
+			ddi_fm_service_impact(dip, DDI_SERVICE_LOST);
 
 			if (cmd->pkt != NULL) {
 				pkt = cmd->pkt;
 				if (((pkt->pkt_flags & FLAG_NOINTR) == 0) &&
 				    pkt->pkt_comp) {
 
-					con_log(CL_ANN1, (CE_CONT, "posting to "
+					cond_log(CL_ANN1, (dip, CE_CONT,
+					    "posting to "
 					    "scsa cmd %p index %x pkt %p"
 					    "time %llx, default ", (void *)cmd,
 					    cmd->index, (void *)pkt,
@@ -4699,7 +4588,7 @@ mrsas_softintr(struct mrsas_instance *instance)
 
 				}
 			}
-			con_log(CL_ANN, (CE_WARN, "Cmd type unknown !"));
+			cond_log(CL_ANN, (dip, CE_WARN, "Cmd type unknown !"));
 			break;
 		}
 	}
@@ -4722,28 +4611,31 @@ mrsas_alloc_dma_obj(struct mrsas_instance *instance, dma_obj_t *obj,
 	size_t	alen = 0;
 	uint_t	cookie_cnt;
 	struct ddi_device_acc_attr tmp_endian_attr;
+	dev_info_t *dip = instance->dip;
 
 	tmp_endian_attr = endian_attr;
 	tmp_endian_attr.devacc_attr_endian_flags = endian_flags;
 	tmp_endian_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 
-	i = ddi_dma_alloc_handle(instance->dip, &obj->dma_attr,
+	i = ddi_dma_alloc_handle(dip, &obj->dma_attr,
 	    DDI_DMA_SLEEP, NULL, &obj->dma_handle);
 	if (i != DDI_SUCCESS) {
 
 		switch (i) {
 			case DDI_DMA_BADATTR :
-				con_log(CL_ANN, (CE_WARN,
-				"Failed ddi_dma_alloc_handle- Bad attribute"));
+				cond_log(CL_ANN, (dip, CE_WARN,
+				    "Failed ddi_dma_alloc_handle: "
+				    "Bad attribute"));
 				break;
 			case DDI_DMA_NORESOURCES :
-				con_log(CL_ANN, (CE_WARN,
-				"Failed ddi_dma_alloc_handle- No Resources"));
+				cond_log(CL_ANN, (dip, CE_WARN,
+				    "Failed ddi_dma_alloc_handle: "
+				    "No Resources"));
 				break;
 			default :
-				con_log(CL_ANN, (CE_WARN,
-				"Failed ddi_dma_alloc_handle: "
-				"unknown status %d", i));
+				cond_log(CL_ANN, (dip, CE_WARN,
+				    "Failed ddi_dma_alloc_handle: "
+				    "Unknown status: %d", i));
 				break;
 		}
 
@@ -4757,7 +4649,7 @@ mrsas_alloc_dma_obj(struct mrsas_instance *instance, dma_obj_t *obj,
 
 		ddi_dma_free_handle(&obj->dma_handle);
 
-		con_log(CL_ANN, (CE_WARN, "Failed : ddi_dma_mem_alloc"));
+		cond_log(CL_ANN, (dip, CE_WARN, "Failed : ddi_dma_mem_alloc"));
 
 		return (-1);
 	}
@@ -4769,18 +4661,19 @@ mrsas_alloc_dma_obj(struct mrsas_instance *instance, dma_obj_t *obj,
 		ddi_dma_mem_free(&obj->acc_handle);
 		ddi_dma_free_handle(&obj->dma_handle);
 
-		con_log(CL_ANN, (CE_WARN, "Failed : ddi_dma_addr_bind_handle"));
+		cond_log(CL_ANN, (dip, CE_WARN,
+		    "Failed: ddi_dma_addr_bind_handle"));
 
 		return (-1);
 	}
 
 	if (mrsas_check_dma_handle(obj->dma_handle) != DDI_SUCCESS) {
-		ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
+		ddi_fm_service_impact(dip, DDI_SERVICE_LOST);
 		return (-1);
 	}
 
 	if (mrsas_check_acc_handle(obj->acc_handle) != DDI_SUCCESS) {
-		ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
+		ddi_fm_service_impact(dip, DDI_SERVICE_LOST);
 		return (-1);
 	}
 
@@ -4835,6 +4728,7 @@ mrsas_dma_alloc(struct mrsas_instance *instance, struct scsi_pkt *pkt,
 	int	dma_flags;
 	int	(*cb)(caddr_t);
 	int	i;
+	dev_info_t *dip = instance->dip;
 
 	ddi_dma_attr_t	tmp_dma_attr = mrsas_generic_dma_attr;
 	struct scsa_cmd	*acmd = PKT2CMD(pkt);
@@ -4872,7 +4766,7 @@ mrsas_dma_alloc(struct mrsas_instance *instance, struct scsi_pkt *pkt,
 		    (U64)mrsas_tbolt_max_cap_maxxfer;  /* limit to 256K */
 	}
 
-	if ((i = ddi_dma_alloc_handle(instance->dip, &tmp_dma_attr,
+	if ((i = ddi_dma_alloc_handle(dip, &tmp_dma_attr,
 	    cb, 0, &acmd->cmd_dmahandle)) != DDI_SUCCESS) {
 		switch (i) {
 		case DDI_DMA_BADATTR:
@@ -4884,7 +4778,8 @@ mrsas_dma_alloc(struct mrsas_instance *instance, struct scsi_pkt *pkt,
 			return (DDI_FAILURE);
 
 		default:
-			con_log(CL_ANN, (CE_PANIC, "ddi_dma_alloc_handle: "
+			cond_log(CL_ANN, (dip, CE_PANIC,
+			    "ddi_dma_alloc_handle: "
 			    "impossible result (0x%x)", i));
 			bioerror(bp, EFAULT);
 			return (DDI_FAILURE);
@@ -4897,14 +4792,16 @@ mrsas_dma_alloc(struct mrsas_instance *instance, struct scsi_pkt *pkt,
 	switch (i) {
 	case DDI_DMA_PARTIAL_MAP:
 		if ((dma_flags & DDI_DMA_PARTIAL) == 0) {
-			con_log(CL_ANN, (CE_PANIC, "ddi_dma_buf_bind_handle: "
+			cond_log(CL_ANN, (dip, CE_PANIC,
+			    "ddi_dma_buf_bind_handle: "
 			    "DDI_DMA_PARTIAL_MAP impossible"));
 			goto no_dma_cookies;
 		}
 
 		if (ddi_dma_numwin(acmd->cmd_dmahandle, &acmd->cmd_nwin) ==
 		    DDI_FAILURE) {
-			con_log(CL_ANN, (CE_PANIC, "ddi_dma_numwin failed"));
+			cond_log(CL_ANN, (dip, CE_PANIC,
+			    "ddi_dma_numwin failed"));
 			goto no_dma_cookies;
 		}
 
@@ -4913,7 +4810,8 @@ mrsas_dma_alloc(struct mrsas_instance *instance, struct scsi_pkt *pkt,
 		    &acmd->cmd_dmacookies[0], &acmd->cmd_ncookies) ==
 		    DDI_FAILURE) {
 
-			con_log(CL_ANN, (CE_PANIC, "ddi_dma_getwin failed"));
+			cond_log(CL_ANN, (dip, CE_PANIC,
+			    "ddi_dma_getwin failed"));
 			goto no_dma_cookies;
 		}
 
@@ -4960,11 +4858,11 @@ get_dma_cookies:
 		bioerror(bp, EINVAL);
 		break;
 	case DDI_DMA_INUSE:
-		con_log(CL_ANN, (CE_PANIC, "ddi_dma_buf_bind_handle:"
+		cond_log(CL_ANN, (dip, CE_PANIC, "ddi_dma_buf_bind_handle:"
 		    " DDI_DMA_INUSE impossible"));
 		break;
 	default:
-		con_log(CL_ANN, (CE_PANIC, "ddi_dma_buf_bind_handle: "
+		cond_log(CL_ANN, (dip, CE_PANIC, "ddi_dma_buf_bind_handle: "
 		    "impossible result (0x%x)", i));
 		break;
 	}
@@ -5367,8 +5265,9 @@ issue_mfi_pthru(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	kpthru = (struct mrsas_pthru_frame *)&ioctl->frame[0];
 
 	if (instance->adapterresetinprogress) {
-		con_log(CL_ANN1, (CE_WARN, "issue_mfi_pthru: Reset flag set, "
-		"returning mfi_pkt and setting TRAN_BUSY\n"));
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
+		    "issue_mfi_pthru: Reset flag set, "
+		    "returning mfi_pkt and setting TRAN_BUSY\n"));
 		return (DDI_FAILURE);
 	}
 	model = ddi_model_convert_from(mode & FMODELS);
@@ -6156,6 +6055,7 @@ handle_drv_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	int	rval = DDI_SUCCESS;
 	int	*props = NULL;
 	void	*ubuf;
+	dev_info_t *dip = instance->dip;
 
 	uint8_t		*pci_conf_buf;
 	uint32_t	xferlen;
@@ -6169,7 +6069,7 @@ handle_drv_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 
 	model = ddi_model_convert_from(mode & FMODELS);
 	if (model == DDI_MODEL_ILP32) {
-		con_log(CL_ANN1, (CE_CONT,
+		cond_log(CL_ANN1, (dip, CE_CONT,
 		    "handle_drv_ioctl: DDI_MODEL_ILP32"));
 
 		xferlen	= kdcmd->sgl.sge32[0].length;
@@ -6177,29 +6077,29 @@ handle_drv_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 		ubuf = (void *)(ulong_t)kdcmd->sgl.sge32[0].phys_addr;
 	} else {
 #ifdef _ILP32
-		con_log(CL_ANN1, (CE_CONT,
+		cond_log(CL_ANN1, (dip, CE_CONT,
 		    "handle_drv_ioctl: DDI_MODEL_ILP32"));
 		xferlen	= kdcmd->sgl.sge32[0].length;
 		ubuf = (void *)(ulong_t)kdcmd->sgl.sge32[0].phys_addr;
 #else
-		con_log(CL_ANN1, (CE_CONT,
+		cond_log(CL_ANN1, (dip, CE_CONT,
 		    "handle_drv_ioctl: DDI_MODEL_LP64"));
 		xferlen	= kdcmd->sgl.sge64[0].length;
 		ubuf = (void *)(ulong_t)kdcmd->sgl.sge64[0].phys_addr;
 #endif
 	}
-	con_log(CL_ANN1, (CE_CONT, "handle_drv_ioctl: "
+	cond_log(CL_ANN1, (dip, CE_CONT, "handle_drv_ioctl: "
 	    "dataBuf=%p size=%d bytes", ubuf, xferlen));
 
 	switch (kdcmd->opcode) {
 	case MRSAS_DRIVER_IOCTL_DRIVER_VERSION:
-		con_log(CL_ANN1, (CE_CONT, "handle_drv_ioctl: "
+		cond_log(CL_ANN1, (dip, CE_CONT, "handle_drv_ioctl: "
 		    "MRSAS_DRIVER_IOCTL_DRIVER_VERSION"));
 
 		fill_up_drv_ver(&dv);
 
 		if (ddi_copyout(&dv, ubuf, xferlen, mode)) {
-			con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
+			cond_log(CL_ANN, (dip, CE_WARN, "handle_drv_ioctl: "
 			    "MRSAS_DRIVER_IOCTL_DRIVER_VERSION : "
 			    "copy to user space failed"));
 			kdcmd->cmd_status = 1;
@@ -6209,12 +6109,12 @@ handle_drv_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 		}
 		break;
 	case MRSAS_DRIVER_IOCTL_PCI_INFORMATION:
-		con_log(CL_ANN1, (CE_NOTE, "handle_drv_ioctl: "
+		cond_log(CL_ANN1, (dip, CE_NOTE, "handle_drv_ioctl: "
 		    "MRSAS_DRIVER_IOCTL_PCI_INFORMAITON"));
 
-		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, instance->dip,
+		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
 		    0, "reg", &props, &num_props)) {
-			con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
+			cond_log(CL_ANN, (dip, CE_WARN, "handle_drv_ioctl: "
 			    "MRSAS_DRIVER_IOCTL_PCI_INFORMATION : "
 			    "ddi_prop_look_int_array failed"));
 			rval = DDI_FAILURE;
@@ -6236,7 +6136,7 @@ handle_drv_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 		}
 
 		if (ddi_copyout(&pi, ubuf, xferlen, mode)) {
-			con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
+			cond_log(CL_ANN, (dip, CE_WARN, "handle_drv_ioctl: "
 			    "MRSAS_DRIVER_IOCTL_PCI_INFORMATION : "
 			    "copy to user space failed"));
 			kdcmd->cmd_status = 1;
@@ -6246,7 +6146,7 @@ handle_drv_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 		}
 		break;
 	default:
-		con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
+		cond_log(CL_ANN, (dip, CE_WARN, "handle_drv_ioctl: "
 		    "invalid driver specific IOCTL opcode = 0x%x",
 		    kdcmd->opcode));
 		kdcmd->cmd_status = 1;
@@ -6275,7 +6175,7 @@ handle_mfi_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 		cmd = mrsas_get_mfi_pkt(instance);
 	}
 	if (!cmd) {
-		con_log(CL_ANN, (CE_WARN, "mr_sas: "
+		cond_log(CL_ANN, (instance->dip, CE_WARN,
 		    "failed to get a cmd packet"));
 		DTRACE_PROBE2(mfi_ioctl_err, uint16_t,
 		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
@@ -6304,7 +6204,7 @@ handle_mfi_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 		rval = issue_mfi_pthru(instance, ioctl, cmd, mode);
 		break;
 	default:
-		con_log(CL_ANN, (CE_WARN, "handle_mfi_ioctl: "
+		cond_log(CL_ANN, (instance->dip, CE_WARN, "handle_mfi_ioctl: "
 		    "invalid mfi ioctl hdr->cmd = %d", hdr->cmd));
 		rval = DDI_FAILURE;
 		break;
@@ -6349,7 +6249,6 @@ register_mfi_aen(struct mrsas_instance *instance, uint32_t seq_num,
 	union mrsas_evt_class_locale	curr_aen;
 	union mrsas_evt_class_locale	prev_aen;
 
-	con_log(CL_ANN, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 	/*
 	 * If there an AEN pending already (aen_cmd), check if the
 	 * class_locale of that pending AEN is inclusive of the new
@@ -6399,7 +6298,8 @@ register_mfi_aen(struct mrsas_instance *instance, uint32_t seq_num,
 			ret_val = abort_aen_cmd(instance, aen_cmd);
 
 			if (ret_val) {
-				con_log(CL_ANN, (CE_WARN, "register_mfi_aen: "
+				cond_log(CL_ANN, (instance->dip, CE_WARN,
+				    "register_mfi_aen: "
 				    "failed to abort prevous AEN command"));
 
 				return (ret_val);
@@ -6560,8 +6460,8 @@ io_timeout_checker(void *arg)
 	mlist_t			process_list;
 
 	if (instance->adapterresetinprogress == 1) {
-		con_log(CL_ANN, (CE_NOTE, "io_timeout_checker:"
-		    " reset in progress"));
+		cond_log(CL_ANN, (instance->dip, CE_NOTE,
+		    "io_timeout_checker: reset in progress"));
 
 		instance->timeout_id = timeout(io_timeout_checker,
 		    (void *) instance, drv_usectohz(MRSAS_1_SECOND));
@@ -6637,7 +6537,7 @@ io_timeout_checker(void *arg)
 
 			return;
 		} else {
-			if (cmd->retry_count_for_ocr <=	 IO_RETRY_COUNT) {
+			if (cmd->retry_count_for_ocr <= IO_RETRY_COUNT) {
 				if (instance->adapterresetinprogress == 0) {
 					if (instance->tbolt) {
 						(void) mrsas_tbolt_reset_ppc(
@@ -6664,9 +6564,8 @@ io_timeout_checker(void *arg)
 			}
 		}
 	}
-	con_log(CL_ANN, (CE_NOTE, "mrsas: "
-	    "schedule next timeout check: "
-	    "do timeout \n"));
+	cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+	    "schedule next timeout check: do timeout \n"));
 	instance->timeout_id =
 	    timeout(io_timeout_checker, (void *)instance,
 	    drv_usectohz(MRSAS_1_SECOND));
@@ -6686,20 +6585,23 @@ issue_cmd_ppc(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
 
 	pkt = cmd->pkt;
 	if (pkt) {
-		con_log(CL_DLEVEL1, (CE_NOTE, "%llx : issue_cmd_ppc:"
+		cond_log(CL_DLEVEL1, (instance->dip, CE_NOTE,
+		    "%llx : issue_cmd_ppc:"
 		    "ISSUED CMD TO FW : called : cmd:"
 		    ": %p instance : %p pkt : %p pkt_time : %x\n",
 		    gethrtime(), (void *)cmd, (void *)instance,
 		    (void *)pkt, cmd->drv_pkt_time));
 		if (instance->adapterresetinprogress) {
 			cmd->drv_pkt_time = (uint16_t)mrsas_debug_timeout;
-			con_log(CL_ANN1, (CE_NOTE, "Reset the scsi_pkt timer"));
+			cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+			    "Reset the scsi_pkt timer"));
 		} else {
 			push_pending_mfi_pkt(instance, cmd);
 		}
 
 	} else {
-		con_log(CL_DLEVEL1, (CE_NOTE, "%llx : issue_cmd_ppc:"
+		cond_log(CL_DLEVEL1, (instance->dip, CE_NOTE,
+		    "%llx : issue_cmd_ppc:"
 		    "ISSUED CMD TO FW : called : cmd : %p, instance: %p"
 		    "(NO PKT)\n", gethrtime(), (void *)cmd, (void *)instance));
 	}
@@ -6709,7 +6611,6 @@ issue_cmd_ppc(struct mrsas_cmd *cmd, struct mrsas_instance *instance)
 	WR_IB_PICK_QPORT((cmd->frame_phys_addr) |
 	    (((cmd->frame_count - 1) << 1) | 1), instance);
 	mutex_exit(&instance->reg_write_mtx);
-
 }
 
 /*
@@ -6723,22 +6624,21 @@ issue_cmd_in_sync_mode_ppc(struct mrsas_instance *instance,
 	uint32_t	msecs = MFI_POLL_TIMEOUT_SECS * MILLISEC;
 	struct mrsas_header *hdr = &cmd->frame->hdr;
 
-	con_log(CL_ANN1, (CE_NOTE, "issue_cmd_in_sync_mode_ppc: called"));
-
 	if (instance->adapterresetinprogress) {
 		cmd->drv_pkt_time = ddi_get16(
 		    cmd->frame_dma_obj.acc_handle, &hdr->timeout);
 		if (cmd->drv_pkt_time < mrsas_debug_timeout)
 			cmd->drv_pkt_time = (uint16_t)mrsas_debug_timeout;
 
-		con_log(CL_ANN1, (CE_NOTE, "sync_mode_ppc: "
+		cond_log(CL_ANN1, (instance->dip, CE_NOTE, "sync_mode_ppc: "
 		    "issue and return in reset case\n"));
 		WR_IB_PICK_QPORT((cmd->frame_phys_addr) |
 		    (((cmd->frame_count - 1) << 1) | 1), instance);
 
 		return (DDI_SUCCESS);
 	} else {
-		con_log(CL_ANN1, (CE_NOTE, "sync_mode_ppc: pushing the pkt\n"));
+		cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+		    "sync_mode_ppc: pushing the pkt\n"));
 		push_pending_mfi_pkt(instance, cmd);
 	}
 
@@ -6755,8 +6655,6 @@ issue_cmd_in_sync_mode_ppc(struct mrsas_instance *instance,
 		cv_wait(&instance->int_cmd_cv, &instance->int_cmd_mtx);
 	}
 	mutex_exit(&instance->int_cmd_mtx);
-
-	con_log(CL_ANN1, (CE_NOTE, "issue_cmd_in_sync_mode_ppc: done"));
 
 	if (i < (msecs -1)) {
 		return (DDI_SUCCESS);
@@ -6776,8 +6674,6 @@ issue_cmd_in_poll_mode_ppc(struct mrsas_instance *instance,
 	uint16_t	flags;
 	uint32_t	msecs = MFI_POLL_TIMEOUT_SECS * MILLISEC;
 	struct mrsas_header *frame_hdr;
-
-	con_log(CL_ANN1, (CE_NOTE, "issue_cmd_in_poll_mode_ppc: called"));
 
 	frame_hdr = (struct mrsas_header *)cmd->frame;
 	ddi_put8(cmd->frame_dma_obj.acc_handle, &frame_hdr->cmd_status,
@@ -6800,8 +6696,8 @@ issue_cmd_in_poll_mode_ppc(struct mrsas_instance *instance,
 
 	if (ddi_get8(cmd->frame_dma_obj.acc_handle, &frame_hdr->cmd_status)
 	    == MFI_CMD_STATUS_POLL_MODE) {
-		con_log(CL_ANN, (CE_NOTE, "issue_cmd_in_poll_mode: "
-		    "cmd polling timed out"));
+		cond_log(CL_ANN, (instance->dip, CE_NOTE,
+		    "issue_cmd_in_poll_mode: cmd polling timed out"));
 		return (DDI_FAILURE);
 	}
 
@@ -6812,8 +6708,6 @@ static void
 enable_intr_ppc(struct mrsas_instance *instance)
 {
 	uint32_t	mask;
-
-	con_log(CL_ANN1, (CE_NOTE, "enable_intr_ppc: called"));
 
 	if (instance->skinny) {
 		/* For SKINNY, write ~0x1, from BSD's mfi driver. */
@@ -6829,24 +6723,24 @@ enable_intr_ppc(struct mrsas_instance *instance)
 	/* dummy read to force PCI flush */
 	mask = RD_OB_INTR_MASK(instance);
 
-	con_log(CL_ANN1, (CE_NOTE, "enable_intr_ppc: "
-	    "outbound_intr_mask = 0x%x", mask));
+	cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+	    "enable_intr_ppc: outbound_intr_mask = 0x%x", mask));
 }
 
 static void
 disable_intr_ppc(struct mrsas_instance *instance)
 {
-	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: called"));
-
-	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: before : "
-	    "outbound_intr_mask = 0x%x", RD_OB_INTR_MASK(instance)));
+	cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+	    "disable_intr_ppc: before : outbound_intr_mask = 0x%x",
+	    RD_OB_INTR_MASK(instance)));
 
 	/* For now, assume there are no extras needed for Skinny support. */
 
 	WR_OB_INTR_MASK(OB_INTR_MASK, instance);
 
-	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: after : "
-	    "outbound_intr_mask = 0x%x", RD_OB_INTR_MASK(instance)));
+	cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+	    "disable_intr_ppc: after : outbound_intr_mask = 0x%x",
+	    RD_OB_INTR_MASK(instance)));
 
 	/* dummy read to force PCI flush */
 	(void) RD_OB_INTR_MASK(instance);
@@ -6858,12 +6752,10 @@ intr_ack_ppc(struct mrsas_instance *instance)
 	uint32_t	status;
 	int ret = DDI_INTR_CLAIMED;
 
-	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: called"));
-
 	/* check if it is our interrupt */
 	status = RD_OB_INTR_STATUS(instance);
 
-	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: status = 0x%x", status));
+	DTRACE_PROBE1(intr_ack_ppc_status, uint32_t, status);
 
 	/*
 	 * NOTE:  Some drivers call out SKINNY here, but the return is the same
@@ -6895,8 +6787,6 @@ intr_ack_ppc(struct mrsas_instance *instance)
 	/* dummy READ */
 	status = RD_OB_INTR_STATUS(instance);
 
-	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: interrupt cleared"));
-
 	return (ret);
 }
 
@@ -6912,7 +6802,7 @@ mrsas_kill_adapter(struct mrsas_instance *instance)
 	if (instance->deadadapter == 1)
 		return (DDI_FAILURE);
 
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_kill_adapter: "
+	cond_log(CL_ANN, (instance->dip, CE_NOTE, "mrsas_kill_adapter: "
 	    "Writing to doorbell with MFI_STOP_ADP "));
 	mutex_enter(&instance->ocr_flags_mtx);
 	instance->deadadapter = 1;
@@ -6932,8 +6822,6 @@ mrsas_reset_ppc(struct mrsas_instance *instance)
 	uint32_t cur_abs_reg_val;
 	uint32_t fw_state;
 
-	con_log(CL_ANN, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
-
 	if (instance->deadadapter == 1) {
 		dev_err(instance->dip, CE_WARN, "mrsas_reset_ppc: "
 		    "no more resets as HBA has been marked dead ");
@@ -6942,22 +6830,25 @@ mrsas_reset_ppc(struct mrsas_instance *instance)
 	mutex_enter(&instance->ocr_flags_mtx);
 	instance->adapterresetinprogress = 1;
 	mutex_exit(&instance->ocr_flags_mtx);
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: adpterresetinprogress "
-	    "flag set, time %llx", gethrtime()));
 
 	instance->func_ptr->disable_intr(instance);
 retry_reset:
-	WR_IB_WRITE_SEQ(0, instance);
-	WR_IB_WRITE_SEQ(4, instance);
+	/* Flush */
+	WR_IB_WRITE_SEQ(0x0, instance);
+	/* Write magic number */
+	WR_IB_WRITE_SEQ(0x4, instance);
 	WR_IB_WRITE_SEQ(0xb, instance);
-	WR_IB_WRITE_SEQ(2, instance);
-	WR_IB_WRITE_SEQ(7, instance);
+	WR_IB_WRITE_SEQ(0x2, instance);
+	WR_IB_WRITE_SEQ(0x7, instance);
 	WR_IB_WRITE_SEQ(0xd, instance);
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: magic number written "
-	    "to write sequence register\n"));
-	delay(100 * drv_usectohz(MILLISEC));
-	status = RD_OB_DRWE(instance);
 
+	cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+	    "mrsas_reset_ppc: magic number written "
+	    "to write sequence register\n"));
+
+	delay(100 * drv_usectohz(MILLISEC));
+
+	status = RD_OB_DRWE(instance);
 	while (!(status & DIAG_WRITE_ENABLE)) {
 		delay(100 * drv_usectohz(MILLISEC));
 		status = RD_OB_DRWE(instance);
@@ -6968,7 +6859,10 @@ retry_reset:
 			return (DDI_FAILURE);
 		}
 	}
+
+	/* Send the reset command */
 	WR_IB_DRWE(status | DIAG_RESET_ADAPTER, instance);
+
 	delay(100 * drv_usectohz(MILLISEC));
 	status = RD_OB_DRWE(instance);
 	while (status & DIAG_RESET_ADAPTER) {
@@ -7031,56 +6925,31 @@ retry_reset:
 	/* reset the counter as FW is up after OCR */
 	instance->fw_fault_count_after_ocr = 0;
 
-
 	ddi_put32(instance->mfi_internal_dma_obj.acc_handle,
 	    instance->producer, 0);
 
 	ddi_put32(instance->mfi_internal_dma_obj.acc_handle,
 	    instance->consumer, 0);
 
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	    " after resetting produconsumer chck indexs:"
-	    "producer %x consumer %x", *instance->producer,
-	    *instance->consumer));
-
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	    "Calling mrsas_issue_init_mfi"));
 	(void) mrsas_issue_init_mfi(instance);
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	    "mrsas_issue_init_mfi Done"));
-
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	    "Calling mrsas_print_pending_cmd\n"));
 	(void) mrsas_print_pending_cmds(instance);
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	    "mrsas_print_pending_cmd done\n"));
 
 	instance->func_ptr->enable_intr(instance);
 	instance->fw_outstanding = 0;
 
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	    "Calling mrsas_issue_pending_cmds"));
 	(void) mrsas_issue_pending_cmds(instance);
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	    "issue_pending_cmds done.\n"));
-
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	    "Calling aen registration"));
-
 
 	instance->aen_cmd->retry_count_for_ocr = 0;
 	instance->aen_cmd->drv_pkt_time = 0;
 
 	instance->func_ptr->issue_cmd(instance->aen_cmd, instance);
-	con_log(CL_ANN1, (CE_NOTE, "Unsetting adpresetinprogress flag.\n"));
 
 	mutex_enter(&instance->ocr_flags_mtx);
 	instance->adapterresetinprogress = 0;
 	mutex_exit(&instance->ocr_flags_mtx);
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc: "
-	    "adpterresetinprogress flag unset"));
 
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_reset_ppc done\n"));
+	cond_log(CL_ANN1,
+	    (instance->dip, CE_NOTE, "mrsas_reset_ppc complete\n"));
 	return (DDI_SUCCESS);
 }
 
@@ -7264,39 +7133,36 @@ mrsas_fm_ereport(struct mrsas_instance *instance, char *detail)
 static int
 mrsas_add_intrs(struct mrsas_instance *instance, int intr_type)
 {
-
 	dev_info_t *dip = instance->dip;
 	int	avail, actual, count;
 	int	i, flag, ret;
 
-	con_log(CL_DLEVEL1, (CE_NOTE, "mrsas_add_intrs: intr_type = %x",
-	    intr_type));
-
 	/* Get number of interrupts */
 	ret = ddi_intr_get_nintrs(dip, intr_type, &count);
 	if ((ret != DDI_SUCCESS) || (count == 0)) {
-		con_log(CL_ANN, (CE_WARN, "ddi_intr_get_nintrs() failed:"
-		    "ret %d count %d", ret, count));
+		dev_err(dip, CE_WARN, "ddi_intr_get_nintrs() failed: "
+		    "ret %d count %d", ret, count);
 
 		return (DDI_FAILURE);
 	}
 
-	con_log(CL_DLEVEL1, (CE_NOTE, "mrsas_add_intrs: count = %d ", count));
+	cond_log(CL_DLEVEL1,
+	    (dip, CE_NOTE, "mrsas_add_intrs: count = %d", count));
 
 	/* Get number of available interrupts */
 	ret = ddi_intr_get_navail(dip, intr_type, &avail);
 	if ((ret != DDI_SUCCESS) || (avail == 0)) {
-		con_log(CL_ANN, (CE_WARN, "ddi_intr_get_navail() failed:"
-		    "ret %d avail %d", ret, avail));
+		dev_err(dip, CE_WARN, "ddi_intr_get_navail() failed: "
+		    "ret %d avail %d", ret, avail);
 
 		return (DDI_FAILURE);
 	}
-	con_log(CL_DLEVEL1, (CE_NOTE, "mrsas_add_intrs: avail = %d ", avail));
+	cond_log(CL_DLEVEL1,
+	    (dip, CE_NOTE, "mrsas_add_intrs: avail = %d", avail));
 
 	/* Only one interrupt routine. So limit the count to 1 */
-	if (count > 1) {
+	if (count > 1)
 		count = 1;
-	}
 
 	/*
 	 * Allocate an array of interrupt handlers. Currently we support
@@ -7316,14 +7182,14 @@ mrsas_add_intrs(struct mrsas_instance *instance, int intr_type)
 	    count, &actual, flag);
 
 	if ((ret != DDI_SUCCESS) || (actual == 0)) {
-		con_log(CL_ANN, (CE_WARN, "mrsas_add_intrs: "
-		    "avail = %d", avail));
+		dev_err(dip, CE_WARN, "mrsas_add_intrs: "
+		    "allocation failed, avail = %d", avail);
 		goto mrsas_free_htable;
 	}
 
 	if (actual < count) {
-		con_log(CL_ANN, (CE_WARN, "mrsas_add_intrs: "
-		    "Requested = %d  Received = %d", count, actual));
+		dev_err(dip, CE_WARN, "mrsas_add_intrs: "
+		    "Requested = %d  Received = %d", count, actual);
 	}
 	instance->intr_cnt = actual;
 
@@ -7332,8 +7198,8 @@ mrsas_add_intrs(struct mrsas_instance *instance, int intr_type)
 	 */
 	if ((ret = ddi_intr_get_pri(instance->intr_htable[0],
 	    &instance->intr_pri)) != DDI_SUCCESS) {
-		con_log(CL_ANN, (CE_WARN, "mrsas_add_intrs: "
-		    "get priority call failed"));
+		dev_err(dip, CE_WARN, "mrsas_add_intrs: "
+		    "get priority call failed");
 		goto mrsas_free_handles;
 	}
 
@@ -7341,12 +7207,12 @@ mrsas_add_intrs(struct mrsas_instance *instance, int intr_type)
 	 * Test for high level mutex. we don't support them.
 	 */
 	if (instance->intr_pri >= ddi_intr_get_hilevel_pri()) {
-		con_log(CL_ANN, (CE_WARN, "mrsas_add_intrs: "
-		    "High level interrupts not supported."));
+		dev_err(dip, CE_WARN, "mrsas_add_intrs: "
+		    "High level interrupts not supported.");
 		goto mrsas_free_handles;
 	}
 
-	con_log(CL_DLEVEL1, (CE_NOTE, "mrsas_add_intrs: intr_pri = 0x%x ",
+	cond_log(CL_DLEVEL1, (dip, CE_NOTE, "mrsas_add_intrs: intr_pri = 0x%x",
 	    instance->intr_pri));
 
 	/* Call ddi_intr_add_handler() */
@@ -7356,34 +7222,33 @@ mrsas_add_intrs(struct mrsas_instance *instance, int intr_type)
 		    (caddr_t)(uintptr_t)i);
 
 		if (ret != DDI_SUCCESS) {
-			con_log(CL_ANN, (CE_WARN, "mrsas_add_intrs:"
-			    "failed %d", ret));
+			dev_err(dip, CE_WARN,
+			    "mrsas_add_intrs:failed %d", ret);
 			goto mrsas_free_handles;
 		}
-
 	}
 
-	con_log(CL_DLEVEL1, (CE_NOTE, " ddi_intr_add_handler done"));
+	cond_log(CL_DLEVEL1, (dip, CE_NOTE, " ddi_intr_add_handler done"));
 
 	if ((ret = ddi_intr_get_cap(instance->intr_htable[0],
 	    &instance->intr_cap)) != DDI_SUCCESS) {
-		con_log(CL_ANN, (CE_WARN, "ddi_intr_get_cap() failed %d",
-		    ret));
+		dev_err(dip, CE_WARN, "ddi_intr_get_cap() failed %d", ret);
 		goto mrsas_free_handlers;
 	}
 
-	if (instance->intr_cap &  DDI_INTR_FLAG_BLOCK) {
-		con_log(CL_ANN, (CE_WARN, "Calling ddi_intr_block _enable"));
+	if (instance->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		cond_log(CL_ANN,
+		    (dip, CE_WARN, "Calling ddi_intr_block_enable"));
 
 		(void) ddi_intr_block_enable(instance->intr_htable,
 		    instance->intr_cnt);
 	} else {
-		con_log(CL_ANN, (CE_NOTE, " calling ddi_intr_enable"));
+		cond_log(CL_ANN, (dip, CE_NOTE, " calling ddi_intr_enable"));
 
 		for (i = 0; i < instance->intr_cnt; i++) {
 			(void) ddi_intr_enable(instance->intr_htable[i]);
-			con_log(CL_ANN, (CE_NOTE, "ddi intr enable returns "
-			    "%d", i));
+			cond_log(CL_ANN,
+			    (dip, CE_NOTE, "ddi intr enable returns %d", i));
 		}
 	}
 
@@ -7405,7 +7270,6 @@ mrsas_free_htable:
 	instance->intr_htable_size = 0;
 
 	return (DDI_FAILURE);
-
 }
 
 
@@ -7413,8 +7277,6 @@ static void
 mrsas_rem_intrs(struct mrsas_instance *instance)
 {
 	int i;
-
-	con_log(CL_ANN, (CE_NOTE, "mrsas_rem_intrs called"));
 
 	/* Disable all interrupts first */
 	if (instance->intr_cap & DDI_INTR_FLAG_BLOCK) {
@@ -7451,8 +7313,6 @@ mrsas_tran_bus_config(dev_info_t *parent, uint_t flags,
 
 	char *ptr = NULL;
 	int tgt, lun;
-
-	con_log(CL_ANN1, (CE_NOTE, "Bus config called for op = %x", op));
 
 	if ((instance = ddi_get_soft_state(mrsas_state,
 	    ddi_get_instance(parent))) == NULL) {
@@ -7503,8 +7363,6 @@ mrsas_tran_bus_config(dev_info_t *parent, uint_t flags,
 	}
 	ndi_devi_exit(parent, config);
 
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_tran_bus_config: rval = %x",
-	    rval));
 	return (rval);
 }
 
@@ -7581,9 +7439,6 @@ mrsas_config_ld(struct mrsas_instance *instance, uint16_t tgt,
 	dev_info_t *child;
 	int rval;
 
-	con_log(CL_DLEVEL1, (CE_NOTE, "mrsas_config_ld: t = %d l = %d",
-	    tgt, lun));
-
 	if ((child = mrsas_find_child(instance, tgt, lun)) != NULL) {
 		if (ldip) {
 			*ldip = child;
@@ -7591,8 +7446,8 @@ mrsas_config_ld(struct mrsas_instance *instance, uint16_t tgt,
 		if (instance->mr_ld_list[tgt].flag != MRDRV_TGT_VALID) {
 			rval = mrsas_service_evt(instance, tgt, 0,
 			    MRSAS_EVT_UNCONFIG_TGT, NULL);
-			con_log(CL_ANN1, (CE_WARN,
-			    "mr_sas: DELETING STALE ENTRY rval = %d "
+			cond_log(CL_ANN1, (instance->dip, CE_WARN,
+			    "DELETING STALE ENTRY rval = %d "
 			    "tgt id = %d ", rval, tgt));
 			return (NDI_FAILURE);
 		}
@@ -7616,8 +7471,6 @@ mrsas_config_ld(struct mrsas_instance *instance, uint16_t tgt,
 	}
 
 	kmem_free(sd, sizeof (struct scsi_device));
-	con_log(CL_DLEVEL1, (CE_NOTE, "mrsas_config_ld: return rval = %d",
-	    rval));
 	return (rval);
 }
 
@@ -7635,37 +7488,40 @@ mrsas_config_scsi_device(struct mrsas_instance *instance,
 	int dtype = sd->sd_inq->inq_dtype & DTYPE_MASK;
 	int rval;
 
-	con_log(CL_DLEVEL1, (CE_NOTE, "mr_sas: scsi_device t%dL%d", tgt, lun));
+	DTRACE_PROBE2(config_scsi_device, uint32_t, tgt, uint32_t, lun);
+
 	scsi_hba_nodename_compatible_get(sd->sd_inq, NULL, dtype,
 	    NULL, &nodename, &compatible, &ncompatible);
 
 	if (nodename == NULL) {
-		con_log(CL_ANN1, (CE_WARN, "mr_sas: Found no compatible driver "
-		    "for t%dL%d", tgt, lun));
+		cond_log(CL_ANN1, (instance->dip, CE_WARN,
+		    "Found no compatible driver for t%dL%d", tgt, lun));
 		rval = NDI_FAILURE;
 		goto finish;
 	}
 
 	childname = (dtype == DTYPE_DIRECT) ? "sd" : nodename;
-	con_log(CL_DLEVEL1, (CE_NOTE,
-	    "mr_sas: Childname = %2s nodename = %s", childname, nodename));
+	cond_log(CL_DLEVEL1, (instance->dip, CE_NOTE,
+	    "Childname = %2s nodename = %s", childname, nodename));
 
 	/* Create a dev node */
 	rval = ndi_devi_alloc(instance->dip, childname, DEVI_SID_NODEID, &ldip);
-	con_log(CL_DLEVEL1, (CE_NOTE,
+	cond_log(CL_DLEVEL1, (instance->dip, CE_NOTE,
 	    "mr_sas_config_scsi_device: ndi_devi_alloc rval = %x", rval));
 	if (rval == NDI_SUCCESS) {
 		if (ndi_prop_update_int(DDI_DEV_T_NONE, ldip, "target", tgt) !=
 		    DDI_PROP_SUCCESS) {
-			con_log(CL_ANN1, (CE_WARN, "mr_sas: unable to create "
-			    "property for t%dl%d target", tgt, lun));
+			cond_log(CL_ANN1, (instance->dip, CE_WARN,
+			    "unable to create property for t%dl%d target",
+			    tgt, lun));
 			rval = NDI_FAILURE;
 			goto finish;
 		}
 		if (ndi_prop_update_int(DDI_DEV_T_NONE, ldip, "lun", lun) !=
 		    DDI_PROP_SUCCESS) {
-			con_log(CL_ANN1, (CE_WARN, "mr_sas: unable to create "
-			    "property for t%dl%d lun", tgt, lun));
+			cond_log(CL_ANN1, (instance->dip, CE_WARN,
+			    "unable to create property for t%dl%d lun",
+			    tgt, lun));
 			rval = NDI_FAILURE;
 			goto finish;
 		}
@@ -7673,21 +7529,22 @@ mrsas_config_scsi_device(struct mrsas_instance *instance,
 		if (ndi_prop_update_string_array(DDI_DEV_T_NONE, ldip,
 		    "compatible", compatible, ncompatible) !=
 		    DDI_PROP_SUCCESS) {
-			con_log(CL_ANN1, (CE_WARN, "mr_sas: unable to create "
-			    "property for t%dl%d compatible", tgt, lun));
+			cond_log(CL_ANN1, (instance->dip, CE_WARN,
+			    "unable to create property for t%dl%d compatible",
+			    tgt, lun));
 			rval = NDI_FAILURE;
 			goto finish;
 		}
 
 		rval = ndi_devi_online(ldip, NDI_ONLINE_ATTACH);
 		if (rval != NDI_SUCCESS) {
-			con_log(CL_ANN1, (CE_WARN, "mr_sas: unable to online "
-			    "t%dl%d", tgt, lun));
+			cond_log(CL_ANN1, (instance->dip, CE_WARN,
+			    "unable to online t%dl%d", tgt, lun));
 			ndi_prop_remove_all(ldip);
 			(void) ndi_devi_free(ldip);
 		} else {
-			con_log(CL_ANN1, (CE_CONT, "mr_sas: online Done :"
-			    "0 t%dl%d", tgt, lun));
+			cond_log(CL_ANN1, (instance->dip, CE_CONT,
+			    "online Done :0 t%dl%d", tgt, lun));
 		}
 
 	}
@@ -7696,8 +7553,8 @@ finish:
 		*dipp = ldip;
 	}
 
-	con_log(CL_DLEVEL1, (CE_NOTE,
-	    "mr_sas: config_scsi_device rval = %d t%dL%d",
+	cond_log(CL_DLEVEL1, (instance->dip, CE_NOTE,
+	    "config_scsi_device rval = %d t%dL%d",
 	    rval, tgt, lun));
 	scsi_hba_nodename_compatible_free(nodename, compatible);
 	return (rval);
@@ -7709,10 +7566,6 @@ mrsas_service_evt(struct mrsas_instance *instance, int tgt, int lun, int event,
     uint64_t wwn)
 {
 	struct mrsas_eventinfo *mrevt = NULL;
-
-	con_log(CL_ANN1, (CE_NOTE,
-	    "mrsas_service_evt called for t%dl%d event = %d",
-	    tgt, lun, event));
 
 	if ((instance->taskq == NULL) || (mrevt =
 	    kmem_zalloc(sizeof (struct mrsas_eventinfo), KM_NOSLEEP)) == NULL) {
@@ -7728,8 +7581,8 @@ mrsas_service_evt(struct mrsas_instance *instance, int tgt, int lun, int event,
 	if ((ddi_taskq_dispatch(instance->taskq,
 	    (void (*)(void *))mrsas_issue_evt_taskq, mrevt, DDI_NOSLEEP)) !=
 	    DDI_SUCCESS) {
-		con_log(CL_ANN1, (CE_NOTE,
-		    "mr_sas: Event task failed for t%dl%d event = %d",
+		cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+		    "Event task failed for t%dl%d event = %d",
 		    tgt, lun, event));
 		kmem_free(mrevt, sizeof (struct mrsas_eventinfo));
 		return (DDI_FAILURE);
@@ -7746,7 +7599,8 @@ mrsas_issue_evt_taskq(struct mrsas_eventinfo *mrevt)
 	int circ1 = 0;
 	char *devname;
 
-	con_log(CL_ANN1, (CE_NOTE, "mrsas_issue_evt_taskq: called for"
+	cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+	    "mrsas_issue_evt_taskq: called for"
 	    " tgt %d lun %d event %d",
 	    mrevt->tgt, mrevt->lun, mrevt->event));
 
@@ -7759,7 +7613,6 @@ mrsas_issue_evt_taskq(struct mrsas_eventinfo *mrevt)
 		dip = instance->mr_tbolt_pd_list[mrevt->tgt].dip;
 		mutex_exit(&instance->config_dev_mtx);
 	}
-
 
 	ndi_devi_enter(instance->dip, &circ1);
 	switch (mrevt->event) {
@@ -7774,14 +7627,14 @@ mrsas_issue_evt_taskq(struct mrsas_eventinfo *mrevt)
 				    mrevt->tgt,
 				    1, NULL);
 			}
-			con_log(CL_ANN1, (CE_NOTE,
-			    "mr_sas: EVT_CONFIG_TGT called:"
+			cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+			    "EVT_CONFIG_TGT called:"
 			    " for tgt %d lun %d event %d",
 			    mrevt->tgt, mrevt->lun, mrevt->event));
 
 		} else {
-			con_log(CL_ANN1, (CE_NOTE,
-			    "mr_sas: EVT_CONFIG_TGT dip != NULL:"
+			cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+			    "EVT_CONFIG_TGT dip != NULL:"
 			    " for tgt %d lun %d event %d",
 			    mrevt->tgt, mrevt->lun, mrevt->event));
 		}
@@ -7800,13 +7653,13 @@ mrsas_issue_evt_taskq(struct mrsas_eventinfo *mrevt)
 				kmem_free(devname, MAXNAMELEN + 1);
 			}
 			(void) ndi_devi_offline(dip, NDI_DEVI_REMOVE);
-			con_log(CL_ANN1, (CE_NOTE,
-			    "mr_sas: EVT_UNCONFIG_TGT called:"
+			cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+			    "EVT_UNCONFIG_TGT called:"
 			    " for tgt %d lun %d event %d",
 			    mrevt->tgt, mrevt->lun, mrevt->event));
 		} else {
-			con_log(CL_ANN1, (CE_NOTE,
-			    "mr_sas: EVT_UNCONFIG_TGT dip == NULL:"
+			cond_log(CL_ANN1, (instance->dip, CE_NOTE,
+			    "EVT_UNCONFIG_TGT dip == NULL:"
 			    " for tgt %d lun %d event %d",
 			    mrevt->tgt, mrevt->lun, mrevt->event));
 		}
@@ -7815,7 +7668,6 @@ mrsas_issue_evt_taskq(struct mrsas_eventinfo *mrevt)
 	kmem_free(mrevt, sizeof (struct mrsas_eventinfo));
 	ndi_devi_exit(instance->dip, circ1);
 }
-
 
 int
 mrsas_mode_sense_build(struct scsi_pkt *pkt)
@@ -7831,7 +7683,7 @@ mrsas_mode_sense_build(struct scsi_pkt *pkt)
 	acmd = PKT2CMD(pkt);
 	bp = acmd->cmd_buf;
 	if ((!bp) && bp->b_un.b_addr && bp->b_bcount && acmd->cmd_dmacount) {
-		con_log(CL_ANN1, (CE_WARN, "Failing MODESENSE Command"));
+		con_log(CL_ANN, (CE_WARN, "Failing MODESENSE Command"));
 		/* ADD pkt statistics as Command failed. */
 		return (NULL);
 	}

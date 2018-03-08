@@ -426,7 +426,6 @@ struct mrsas_ld {
 	uint8_t 		reserved[2];
 };
 
-
 struct mrsas_tbolt_pd {
 	dev_info_t		*dip;
 	uint8_t 		lun_type;
@@ -672,7 +671,7 @@ struct mrsas_function_template {
  */
 #define	CL_NONE		0	/* No debug information */
 #define	CL_ANN		1	/* print unconditionally, announcements */
-#define	CL_ANN1		2	/* No-op  */
+#define	CL_ANN1		2	/* More informational information */
 #define	CL_DLEVEL1	3	/* debug level 1, informative */
 #define	CL_DLEVEL2	4	/* debug level 2, verbose */
 #define	CL_DLEVEL3	5	/* debug level 3, very verbose */

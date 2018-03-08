@@ -484,7 +484,7 @@ mr_update_load_balance_params(MR_FW_RAID_MAP_ALL *map,
 			/* Get dev handle from Pd. */
 			lbInfo[ldCount].raid1DevHandle[1] =
 			    MR_PdDevHandleGet(pd, map);
-			con_log(CL_ANN1, (CE_NOTE,
+			con_log(CL_ANN, (CE_NOTE,
 			    "mrsas: ld=%d load balancing enabled \n", ldCount));
 		} else {
 			lbInfo[ldCount].loadBalanceFlag = 0;
