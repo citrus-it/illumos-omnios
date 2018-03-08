@@ -3629,8 +3629,11 @@ mrsas_init_adapter(struct mrsas_instance *instance)
 	    .disable_online_ctrl_reset)
 		instance->disable_online_ctrl_reset = 1;
 
-	return (DDI_SUCCESS);
+	/* TODO */
+	if (ctrl_info.adapter_operations3.bits.use_seq_num_jbod_fp)
+		dev_err(dip, CE_WARN, "JBOD fastpath supported");
 
+	return (DDI_SUCCESS);
 }
 
 static int
