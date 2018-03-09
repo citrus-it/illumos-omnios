@@ -1144,7 +1144,6 @@ mrsas_tbolt_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		return (TRAN_BUSY);
 	}
 
-
 	if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
 		if (instance->fw_outstanding > instance->max_fw_cmds) {
 			dev_err(instance->dip, CE_WARN,
@@ -1200,7 +1199,6 @@ mrsas_tbolt_prepare_pkt(struct scsa_cmd *acmd)
 
 	return (0);
 }
-
 
 int
 mr_sas_tbolt_build_sgl(struct mrsas_instance *instance,
@@ -1857,13 +1855,6 @@ tbolt_issue_cmd_in_sync_mode(struct mrsas_instance *instance,
 		push_pending_mfi_pkt(instance, cmd);
 	}
 
-	cond_log(CL_DLEVEL2, (instance->dip, CE_NOTE,
-	    "HighQport offset :%p",
-	    (void *)((uintptr_t)(instance)->regmap + IB_HIGH_QPORT)));
-	cond_log(CL_DLEVEL2, (instance->dip, CE_NOTE,
-	    "LowQport offset :%p",
-	    (void *)((uintptr_t)(instance)->regmap + IB_LOW_QPORT)));
-
 	cmd->sync_cmd = MRSAS_TRUE;
 	cmd->cmd_status =  ENODATA;
 
@@ -1871,11 +1862,6 @@ tbolt_issue_cmd_in_sync_mode(struct mrsas_instance *instance,
 	WR_IB_LOW_QPORT((uint32_t)(req_desc->Words), instance);
 	WR_IB_HIGH_QPORT((uint32_t)(req_desc->Words >> 32), instance);
 	mutex_exit(&instance->reg_write_mtx);
-
-	cond_log(CL_ANN1, (instance->dip, CE_NOTE,
-	    " req desc high part %x", (uint_t)(req_desc->Words >> 32)));
-	cond_log(CL_ANN1, (instance->dip, CE_NOTE, " req desc low part %x",
-	    (uint_t)(req_desc->Words & 0xffffffff)));
 
 	mutex_enter(&instance->int_cmd_mtx);
 	for (i = 0; i < msecs && (cmd->cmd_status == ENODATA); i++) {
@@ -2148,7 +2134,6 @@ mr_sas_tbolt_build_mfi_cmd(struct mrsas_instance *instance,
 
 	ddi_put32(acc_handle, &scsi_raid_io->SenseBufferLowAddress,
 	    cmd->sense_phys_addr1);
-
 
 	scsi_raid_io_sgl_ieee =
 	    (Mpi25IeeeSgeChain64_t *)&scsi_raid_io->SGL.IeeeChain;
@@ -2680,7 +2665,6 @@ mrsas_tbolt_get_ld_map_info(struct mrsas_instance *instance)
 	dcmd->opcode = MR_DCMD_LD_MAP_GET_INFO;
 	dcmd->sgl.sge32[0].phys_addr = ci_h;
 	dcmd->sgl.sge32[0].length = size_map_info;
-
 
 	mr_sas_tbolt_build_mfi_cmd(instance, cmd);
 
