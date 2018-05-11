@@ -5915,7 +5915,10 @@ pr_prefix6(const struct in6_addr *addr, uint_t prefixlen, char *dst,
 	char *cp;
 
 	if (IN6_IS_ADDR_UNSPECIFIED(addr) && prefixlen == 0) {
-		(void) strncpy(dst, "default", dstlen);
+		if (Nflag)
+			(void) strlcpy(dst, "::/0", dstlen);
+		else
+			(void) strlcpy(dst, "default", dstlen);
 		dst[dstlen - 1] = 0;
 		return (dst);
 	}
@@ -6048,7 +6051,14 @@ pr_net(uint_t addr, uint_t mask, char *dst, uint_t dstlen)
 					/* -2 == Noncontiguous mask... */
 
 	if (addr == INADDR_ANY && mask == INADDR_ANY) {
-		(void) strlcpy(dst, "default", dstlen);
+		if (Nflag) {
+			(void) strlcpy(dst, "0.0.0.0", dstlen);
+			if (CIDRflag)
+				(void) strlcat(dst, "/0", dstlen);
+		}
+		else {
+			(void) strlcpy(dst, "default", dstlen);
+		}
 		return (dst);
 	}
 
@@ -6133,8 +6143,16 @@ pr_netaddr(uint_t addr, uint_t mask, char *dst, uint_t dstlen)
 
 	addr = ntohl(addr);
 	mask = ntohl(mask);
+
 	if (addr == INADDR_ANY && mask == INADDR_ANY) {
-		(void) strlcpy(dst, "default", dstlen);
+		if (Nflag) {
+			(void) strlcpy(dst, "0.0.0.0", dstlen);
+			if (CIDRflag)
+				(void) strlcat(dst, "/0", dstlen);
+		}
+		else {
+			(void) strlcpy(dst, "default", dstlen);
+		}
 		return (dst);
 	}
 
