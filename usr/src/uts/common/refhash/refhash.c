@@ -10,10 +10,10 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
-#include <sys/scsi/adapters/mpt_sas/mptsas_hash.h>
+#include <sys/refhash.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
