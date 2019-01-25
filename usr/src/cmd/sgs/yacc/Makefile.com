@@ -50,10 +50,6 @@ SRCS=		$(COMSRCS) $(LIBSRCS)
 
 LIBS =          $(DYNLIB)
 
-# Append to LINTFLAGS and LINTFLAGS64 from lib/Makefile.lib
-LINTFLAGS +=	-erroff=E_NAME_MULTIPLY_DEF2
-LINTFLAGS64 +=	-erroff=E_NAME_MULTIPLY_DEF2
-
 # Tune ZDEFS to ignore undefined symbols for building the yacc shared library
 # since these symbols (mainly yyparse) are to be resolved elsewhere.
 #
@@ -64,8 +60,6 @@ INCLIST=	-I../../include -I../../include/$(MACH)
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 $(PROG):=	LDLIBS = $(LDLIBS.cmd)
 BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
-
-LINTPOUT=	lint.out
 
 CSTD= $(CSTD_GNU99)
 CFLAGS += $(CCVERBOSE)
@@ -85,7 +79,4 @@ DYNLINKLIB=	$(LIBLINKS:%=$(DYNLINKLIBDIR)/%)
 
 LDLIBS += -lc
 
-CLEANFILES +=	$(LINTPOUT)
 CLOBBERFILES +=	$(LIBS) $(LIBRARY)
-
-lint: lintcheck

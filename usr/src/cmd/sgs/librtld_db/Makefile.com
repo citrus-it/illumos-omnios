@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBRARY=	librtld_db.a
@@ -39,9 +40,6 @@ CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc
 DYNFLAGS +=	$(VERSREF)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
-LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
-LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
-
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
 BLTDEFS=	msg.h
@@ -57,9 +55,10 @@ SGSMSGALL=	$(SGSMSGCOM)
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA)
 
 SRCS=		../common/llib-lrtld_db
-LINTSRCS=	$(COMOBJS:%.o=../common/%.c) $(PLTSRCS) $(BLTDATA)
+MSGSRCS=	$(COMOBJS:%.o=../common/%.c) $(PLTSRCS) $(BLTDATA)
 
-CLEANFILES +=	$(BLTFILES) $(LINTOUTS)
+
+CLEANFILES +=	$(BLTFILES)
 CLOBBERFILES +=	$(DYNLIB)
 
 ROOTFS_DYNLIB=	$(DYNLIB:%=$(ROOTFS_LIBDIR)/%)

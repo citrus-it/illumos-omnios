@@ -84,7 +84,3 @@ $(DYNLINKLIBDIR)/%: %$(VERS)
 
 clean:
 	$(RM) $(POBJS) $(OBJS) $(PICS) $(CLEANFILES)
-
-lintcheck: $$(SRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS)
-

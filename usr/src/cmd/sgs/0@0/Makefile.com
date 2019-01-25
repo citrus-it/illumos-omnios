@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBRARY=	0@0.a
@@ -43,7 +44,7 @@ BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 
 SRCS=		$(OBJECTS:%.o=../common/%.c)
 
-CLEANFILES +=	$(LINTOUT) $(CRTS)
+CLEANFILES +=	$(CRTS)
 CLOBBERFILES +=	$(DYNLIB)
 
 ROOTDYNLIB=	$(DYNLIB:%=$(ROOTLIBDIR)/%)

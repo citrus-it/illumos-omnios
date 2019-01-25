@@ -23,6 +23,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		elfedit
 
@@ -50,9 +52,6 @@ LDFLAGS +=	$(VERSREF) $(CC_USE_PROTO) -M$(MAPFILE) $(LLDFLAGS)
 LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(CONVLIBDIR) $(CONV_LIB) -ltecla
 
-LINTFLAGS +=	-x
-LINTFLAGS64 +=	-x
-
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
@@ -71,4 +70,4 @@ SRCS =		$(COMOBJ:%.o=../common/%.c) \
 		$(COMOBJ32:%32.o=../common/%.c) \
 		$(BLTDATA)
 
-CLEANFILES +=	$(LINTOUTS) $(BLTFILES)
+CLEANFILES +=	$(BLTFILES)

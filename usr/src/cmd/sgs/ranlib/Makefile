@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG=		ranlib
 
@@ -37,7 +36,5 @@ all:		$(PROG)
 install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
-
-lint:
 
 include		../../Makefile.targ

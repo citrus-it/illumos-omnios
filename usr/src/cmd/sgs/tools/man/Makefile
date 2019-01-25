@@ -19,13 +19,11 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Note, these man pages are not part of the product.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 MAN1l=		chkmsg.1l \
 		sgsmsg.1l
@@ -49,4 +47,4 @@ install:	all $(ROOTMANS)
 $(ROOTDIR)/man1l/%:	%
 		$(INS.file)
 
-clobber clean lint:
+clobber clean:

@@ -135,11 +135,6 @@ native :=	DYNFLAGS = -R$(SGSLIBDIR) -L$(SGSLIBDIR) $(ZNOVERSION) \
 CC_USE_PROTO =	-Yl,$(SGSBINDIR)
 LD_USE_PROTO =	$(SGSBINDIR)/
 
-#
-# These libraries have two resulting lint libraries.  If a dependency is
-# declared using these variables, the substitution for the 32/64 versions at
-# lint time happens automatically (see Makefile.targ).
-#
 LD_LIB =	-lld
 LD_LIB32 =	-lld32
 LD_LIB64 =	-lld64

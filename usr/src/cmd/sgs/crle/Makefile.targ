@@ -44,13 +44,11 @@ clean:
 delete:
 		$(RM) $(PROG)
 
-lint:		$(SGSLINTOUT)
-
 include		$(SRC)/cmd/Makefile.targ
 include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
- 
+
 catalog:        $(BLTMESG)
 
 chkmsg:		$(SRCS)

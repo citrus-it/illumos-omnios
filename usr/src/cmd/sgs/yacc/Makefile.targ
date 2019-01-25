@@ -23,6 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 $(PROG): objs .WAIT $(POBJS)
@@ -80,7 +81,3 @@ $(DYNLINKLIBDIR)/%: %$(VERS)
 
 clean:
 		$(RM) $(POBJS) $(OBJS) $(PICS) $(CLEANFILES)
-
-lintcheck: $$(SRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS)
-

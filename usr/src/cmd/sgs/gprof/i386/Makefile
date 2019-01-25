@@ -18,13 +18,10 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/gprof/i386/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include 	../Makefile.com
@@ -34,7 +31,5 @@ include 	../Makefile.com
 all:		$(PROG)
 
 install:	all .WAIT $(ROOTPROG) $(ROOTLIBBLURB) $(ROOTCCSBINLINK)
-
-lint:           $(LINTOUT32) $(SGSLINTOUT)
 
 include		../Makefile.targ

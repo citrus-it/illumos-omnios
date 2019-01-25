@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2018 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBRARY =	libconv.a
@@ -110,14 +111,10 @@ AS_CPPFLAGS=	-P -D_ASM $(CPPFLAGS)
 
 BLTDATA=	$(BLTOBJS:%.o=%.c) $(BLTOBJS:%.o=%.h) report_bufsize.h
 
-LINTSRCS=      $(COMOBJS:%.o=../common/%.c) \
+MSGSRCS=	$(COMOBJS:%.o=../common/%.c) \
 		$(COMOBJS_NOMSG:%.o=../common/%.c) \
 		$(ELFCOM_OBJS:%.o=$(ELFCAP)/%.c)
 
 SGSMSGTARG=	$(BLTOBJS:%_msg.o=../common/%.msg)
 
-LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
-LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
-
-CLEANFILES +=	$(BLTDATA) $(LINTOUTS) bld_vernote vernote.s
-CLOBBERFILES +=	$(LINTLIBS)
+CLEANFILES +=	$(BLTDATA) bld_vernote vernote.s

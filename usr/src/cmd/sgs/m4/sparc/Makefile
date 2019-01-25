@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/m4/sparc/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG=		m4
@@ -57,8 +57,7 @@ CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CSTD=	$(CSTD_GNU99)
 
-LINTFLAGS +=	$(LDLIBS)
-CLEANFILES +=	$(LINTOUT) $(BLTSRCS)
+CLEANFILES +=	$(BLTSRCS)
 
 m4objs.xpg4/%.o := CPPFLAGS += -DXPG4
 
@@ -87,17 +86,5 @@ m4objs m4objs.xpg4:
 install:	all $(VAR_SGSBINPROG) $(ROOTXPG4PROG) $(VAR_SGSCCSLINK)
 clean:
 		$(RM) $(ALLOBJS) $(CLEANFILES)
-
-lint:		$(LINTOUT)
-
-LINT_HDR=	perl ../../tools/lint_hdr.pl
-
-$(LINTOUT):	$(SRCS)
-	$(LINT_HDR) $(PROG)		 > $(LINTOUT)
-	$(LINT_HDR) -s m4		>> $(LINTOUT)
-	$(LINT.c) $(YSRCS)		2>&1 | tee -a $(LINTOUT)
-
-	$(LINT_HDR) -s "XPG m4"		>> $(LINTOUT)
-	$(LINT.c) $(XPG4SRCS)		2>&1 | tee -a $(LINTOUT)
 
 include		../../../Makefile.targ

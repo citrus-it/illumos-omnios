@@ -38,7 +38,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 
 # for messaging catalog
 #
@@ -46,11 +45,11 @@ POFILE= tsort.po
 
 .KEEP_STATE:
 
-all clean clobber install lint:	$(SUBDIRS)
+all clean clobber install:	$(SUBDIRS)
 
 catalog:	$(POFILE)
 
-$(POFILE):	
+$(POFILE):
 	$(RM) $@
 	$(XGETTEXT) $(XGETFLAGS) $(CSRC)
 	sed "/^domain/d" < messages.po > $@

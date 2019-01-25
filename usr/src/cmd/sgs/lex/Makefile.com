@@ -59,10 +59,6 @@ SRCS=		$(MACHSRCS)
 
 LIBS =          $(DYNLIB)
 
-# Append to LINTFLAGS and LINTFLAGS64 from lib/Makefile.lib
-LINTFLAGS +=	-erroff=E_NAME_MULTIPLY_DEF2 -erroff=E_FUNC_RET_MAYBE_IGNORED2
-LINTFLAGS64 +=	-erroff=E_NAME_MULTIPLY_DEF2 -erroff=E_FUNC_RET_MAYBE_IGNORED2
-
 INCLIST=	$(INCLIST_$(MACH)) -I../../include -I../../include/$(MACH)
 DEFLIST=	-DELF
 
@@ -80,8 +76,6 @@ pics/%_e.o:=	DEFLIST = -DEUC -DJLSLEX  -DEOPTION -D$*=$*_e
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
 
-LINTPOUT=	lint.out
-
 $(ROOTPROG):=	FILEMODE = 0555
 
 ROOTFORMS=	$(FORMS:%=$(ROOTSHLIBCCS)/%)
@@ -95,7 +89,5 @@ $(DYNLIB) :=	CFLAGS64 += $(CCVERBOSE)
 
 LDLIBS += -lc
 
-CLEANFILES +=	../common/parser.c $(LINTPOUT)
+CLEANFILES +=	../common/parser.c
 CLOBBERFILES +=	$(LIBS) $(LIBRARY)
-
-lint: lintcheck

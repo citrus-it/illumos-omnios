@@ -24,7 +24,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/error/sparc/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		error
 
@@ -43,8 +44,6 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
 CSTD=	$(CSTD_GNU99)
 
-CLEANFILES +=	$(LINTOUT)
-
 %.o:		../common/%.c
 		$(COMPILE.c) $<
 
@@ -60,11 +59,5 @@ install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
-
-lint:		$(LINTOUT)
-
-$(LINTOUT):	$(SRCS)
-		perl ../../tools/lint_hdr.pl $(PROG)	> $(LINTOUT)
-		$(LINT.c) $(SRCS) $(LDLIBS)		2>&1 | tee -a $(LINTOUT)
 
 include		../../../Makefile.targ

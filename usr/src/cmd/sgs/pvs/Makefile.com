@@ -46,8 +46,6 @@ LLDFLAGS64 =	'-R$$ORIGIN/../../lib/$(MACH64)'
 LDFLAGS +=	$(VERSREF) $(CC_USE_PROTO) $(MAPOPTS) $(LLDFLAGS)
 LDLIBS +=	$(LDDBGLIBDIR) $(LDDBG_LIB) $(ELFLIBDIR) -lelf \
 		    $(CONVLIBDIR) $(CONV_LIB)
-LINTFLAGS +=	-x
-LINTFLAGS64 +=	-x
 
 # not linted
 SMATCH=off
@@ -67,4 +65,4 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n pvs_msg
 SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA) \
 		$(TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c)
 
-CLEANFILES +=	$(LINTOUTS) $(BLTFILES)
+CLEANFILES +=	$(BLTFILES)

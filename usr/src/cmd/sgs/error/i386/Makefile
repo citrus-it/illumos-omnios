@@ -25,6 +25,8 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		error
 
@@ -46,8 +48,6 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 
 SMOFF += no_if_block,indenting
 
-CLEANFILES +=	$(LINTOUT)
-
 %.o:		../common/%.c
 		$(COMPILE.c) $<
 
@@ -63,11 +63,5 @@ install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
-
-lint:		$(LINTOUT)
-
-$(LINTOUT):	$(SRCS)
-		perl ../../tools/lint_hdr.pl $(PROG)	> $(LINTOUT)
-		$(LINT.c) $(SRCS) $(LDLIBS)		2>&1 | tee -a $(LINTOUT)
 
 include		../../../Makefile.targ

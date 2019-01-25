@@ -45,11 +45,6 @@ LDLIBS +=	$(LDLIBDIR) $(LD_LIB) $(ELFLIBDIR) -lelf \
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-parentheses
 
-LINTFLAGS +=	-x
-LINTFLAGS64 +=	-x $(VAR_LINTFLAGS64)
-
-CLEANFILES +=	$(LINTOUTS)
-
 native :=	LDFLAGS = -R$(SGSLIBDIR) $(ZNOVERSION)
 native :=	LDLIBS = -L$(SGSLIBDIR) $(LD_LIB) -lelf $(CONVLIBDIR) \
 		    $(CONV_LIB)

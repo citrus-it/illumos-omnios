@@ -66,9 +66,6 @@ MAPFILES =	../common/mapfile-vers
 DYNFLAGS +=	$(VERSREF)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
-LINTFLAGS +=	-u -erroff=E_BAD_PTR_CAST_ALIGN
-LINTFLAGS64 +=	-u -erroff=E_CAST_INT_TO_SMALL_INT
-
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
@@ -107,6 +104,6 @@ $(ROOTFS_DYNLIB64) :=	FILEMODE= 755
 
 LIBS =		$(DYNLIB)
 
-CLEANFILES +=	$(LINTOUTS) $(BLTSRCS) $(BLTFILES)
+CLEANFILES +=	$(BLTSRCS) $(BLTFILES)
 
 .PARALLEL:	$(LIBS)

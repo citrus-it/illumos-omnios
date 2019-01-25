@@ -19,14 +19,8 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1998-1999 by Sun Microsystems, Inc.
 # All rights reserved.
-#
-# cmd/sgs/size/Makefile
-#
 
 include		../../../Makefile.master
 
@@ -36,12 +30,11 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 package:=	TARGET= package
 
 .KEEP_STATE:
 
-all clean clobber install lint package:	$(SUBDIRS)
+all clean clobber install package:	$(SUBDIRS)
 
 $(MACH) $(MACH64): FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

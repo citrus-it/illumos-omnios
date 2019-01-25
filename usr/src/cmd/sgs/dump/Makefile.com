@@ -47,7 +47,3 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 SMOFF += indenting
 
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
-LINTFLAGS +=	-x
-LINTSRCS =	$(SRCS)
-
-CLEANFILES +=	$(LINTOUTS)

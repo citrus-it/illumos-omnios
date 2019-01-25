@@ -18,13 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms. 
-#
-# cmd/sgs/symorder/Makefile
 
 PROG=		symorder
 
@@ -38,8 +33,6 @@ all:		$(PROG)
 
 install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
-clean \
-clobber \
-lint:
+clean clobber:
 
 include		../../Makefile.targ
