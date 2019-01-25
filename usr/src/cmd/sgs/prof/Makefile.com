@@ -28,8 +28,8 @@
 
 PROG=		prof
 
-include 	$(SRC)/cmd/Makefile.cmd
-include 	$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJS=	prof.o profv.o lookup.o rdelf.o \
 		symintOpen.o symintClose.o symintUtil.o symintErr.o symintLoad.o

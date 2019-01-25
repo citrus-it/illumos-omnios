@@ -28,7 +28,7 @@
 PROG=		m4
 XPG4PROG=	m4
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 include		../../../sgs/Makefile.var
 
 COBJS=		m4.o  m4ext.o  m4macs.o

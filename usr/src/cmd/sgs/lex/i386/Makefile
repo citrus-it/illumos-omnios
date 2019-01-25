@@ -27,7 +27,7 @@
 
 INCLIST_i386=	-I.
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 include		../Makefile.com
 
 .KEEP_STATE:

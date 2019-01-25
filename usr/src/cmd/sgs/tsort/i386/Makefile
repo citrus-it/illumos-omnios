@@ -27,7 +27,7 @@
 
 PROG=		tsort
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 
 OBJS=		Err.o erraction.o errafter.o errbefore.o errexit.o \
 		errprefix.o errsource.o errstrtok.o errtag.o errtext.o \

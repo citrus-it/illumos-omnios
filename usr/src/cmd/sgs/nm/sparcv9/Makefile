@@ -29,8 +29,8 @@ PROG=		nm
 
 ARFORMAT=	PORTAR
 
-include 	../../../Makefile.cmd
-include 	../../Makefile.com
+include		../../../Makefile.cmd
+include		../../Makefile.com
 
 COMOBJS=	nm.o
 

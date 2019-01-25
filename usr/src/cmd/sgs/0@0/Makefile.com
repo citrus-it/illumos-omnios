@@ -33,7 +33,7 @@ CRTI=		pics/crti.o
 CRTN=		pics/crtn.o
 CRTS=		$(CRTI)		$(CRTN)
 
-include 	$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.lib
 
 MAPFILES=
 ASFLAGS=	-P -D_ASM	$(CPPFLAGS)

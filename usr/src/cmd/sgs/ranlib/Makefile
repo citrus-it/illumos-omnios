@@ -29,7 +29,7 @@ PROG=		ranlib
 
 SRCS=		$(PROG:%=%.sh)
 
-include 	../../Makefile.cmd
+include		../../Makefile.cmd
 
 .KEEP_STATE:
 

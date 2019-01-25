@@ -25,7 +25,7 @@
 PROG=		rdb
 
 # DEMO DELETE START
-include 	../../../../Makefile.cmd
+include		../../../../Makefile.cmd
 # DEMO DELETE END
 
 MACH:sh=	uname -p

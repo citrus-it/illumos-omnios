@@ -29,10 +29,10 @@ VERS=		.1
 COMOBJS=	rtld.o
 BLTOBJ=		msg.o
 
-OBJECTS= 	$(BLTOBJ)  $(COMOBJS)
+OBJECTS=	$(BLTOBJ)  $(COMOBJS)
 
 # include library definitions
-include 	$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
 SGSMSGALL=	rtld.msg

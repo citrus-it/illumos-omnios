@@ -28,8 +28,8 @@
 
 PROG=		gprof
 
-include 	$(SRC)/cmd/Makefile.cmd
-include 	$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJS=	gprof.o arcs.o dfn.o lookup.o calls.o \
 		printgprof.o printlist.o readelf.o

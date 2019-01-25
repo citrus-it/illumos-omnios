@@ -30,7 +30,7 @@ DATAFILES=	copyright prototype_com prototype_$(MACH) postinstall \
 		preremove depend checkinstall
 README=		SUNWonld-README
 FILES=		$(DATAFILES) pkginfo
-PACKAGE= 	SUNWonld
+PACKAGE=	SUNWonld
 ROOTONLD=	$(ROOT)/opt/SUNWonld
 ROOTREADME=	$(README:%=$(ROOTONLD)/%)
 

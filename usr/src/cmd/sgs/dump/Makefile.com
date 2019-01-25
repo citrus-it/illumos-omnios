@@ -29,8 +29,8 @@
 
 PROG=		dump
 
-include 	$(SRC)/cmd/Makefile.cmd
-include 	$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJS=	dump.o		fcns.o
 

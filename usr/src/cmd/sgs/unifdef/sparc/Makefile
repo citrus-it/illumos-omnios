@@ -27,7 +27,7 @@
 
 PROG=		unifdef
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 
 OBJS=		unifdef.o
 

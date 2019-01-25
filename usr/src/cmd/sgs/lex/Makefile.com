@@ -42,7 +42,7 @@ OBJECTS=	$(LIBOBJS) $(LIBOBJS_W) $(LIBOBJS_E)
 
 FORMS=		nceucform ncform nrform
 
-include 	../../../../lib/Makefile.lib
+include		../../../../lib/Makefile.lib
 
 SRCDIR =	../common
 

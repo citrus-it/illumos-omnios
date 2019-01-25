@@ -93,7 +93,7 @@ POFILES=	$(POSUBDIRS:%=%/%.po)
 MSGSUBDIRS=	ld		ldd		libld		liblddbg \
 		libldstab	librtld		rtld		libelf \
 		ldprof		libcrle		pvs		elfdump	\
-		elfedit		crle		moe 		lari \
+		elfedit		crle		moe		lari \
 		librtld_db	elfwrap		ar
 
 MSGDIR=		messages

@@ -29,7 +29,7 @@ PROG=		lorder
 
 SRCS=		$(PROG:%=%.sh)
 
-include 	$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/sgs/Makefile.com
 
 .KEEP_STATE:

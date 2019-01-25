@@ -30,7 +30,7 @@
 
 PROG=		error
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 
 OBJS=		errormain.o errorinput.o errorpi.o errorsubr.o \
 		errorfilter.o errortouch.o

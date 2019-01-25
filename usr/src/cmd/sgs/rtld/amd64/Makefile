@@ -31,7 +31,7 @@ BASEPLAT =	amd64
 
 P_COMOBJS=	debugdata.o \
 		analyze.o	elf.o		external.o	globals.o \
-		malloc.o 	paths.o		setup.o		util.o \
+		malloc.o	paths.o		setup.o		util.o \
 		dlfcns.o	config_elf.o	locale.o	tsort.o \
 		remove.o	move.o		tls.o		cap.o
 

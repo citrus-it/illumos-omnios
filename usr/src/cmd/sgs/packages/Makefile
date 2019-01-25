@@ -41,7 +41,7 @@ LDMAKEDIRS=	$(MACHS:%=../libldmake/%)
 
 SUBDIRS1=	../libconv \
 		.WAIT \
-	 	../libdl \
+		../libdl \
 		.WAIT \
 		../libelf \
 		.WAIT \
@@ -99,11 +99,11 @@ $(PKGDIRS) :=	TARGET = package
 all clean clobber install: FRC
 		@ cd $(MACH); pwd; $(MAKE) $@
 
-# 
-# invoke `package' to build this package from scratch.  It will 
-# perform make install in the directories that contains components 
-# that this package is dependent upon 
-# 
+#
+# invoke `package' to build this package from scratch.  It will
+# perform make install in the directories that contains components
+# that this package is dependent upon
+#
 package:	FRC
 	@/bin/time $(MAKE) package_build 2>&1 | tee $(BUILDLOG)
 	@ echo "===BUILD COMPLETED  checking for warnings...==="

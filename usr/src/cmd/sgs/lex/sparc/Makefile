@@ -27,7 +27,7 @@
 
 INCLIST_sparc=	-I../common
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 include		../Makefile.com
 
 .KEEP_STATE:

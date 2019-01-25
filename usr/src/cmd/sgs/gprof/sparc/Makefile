@@ -24,7 +24,7 @@
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
-include 	../Makefile.com
+include		../Makefile.com
 
 DEFLIST +=	-DSPARC
 

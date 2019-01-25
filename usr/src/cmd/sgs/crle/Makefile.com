@@ -32,7 +32,7 @@ PROG=		crle
 include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/sgs/Makefile.com
 
-COMOBJ=		config.o	crle.o 		depend.o	dump.o \
+COMOBJ=		config.o	crle.o		depend.o	dump.o \
 		inspect.o	hash.o		print.o		util.o
 BLTOBJ=		msg.o
 TOOLSOBJ=	alist.o

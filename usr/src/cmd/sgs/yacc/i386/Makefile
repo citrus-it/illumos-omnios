@@ -27,7 +27,7 @@
 
 DEFLIST=	-DELF
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 include		../Makefile.com
 
 .KEEP_STATE:

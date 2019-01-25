@@ -81,8 +81,8 @@ OBJECTS =	$(BLTOBJ) $(G_MACHOBJS32) $(G_MACHOBJS64) \
 		$(COMOBJS) $(COMOBJS32) $(COMOBJS64) \
 		$(TOOLOBJS) $(E_TOOLOBJS) $(AVLOBJ) $(ELFCAPOBJ)
 
-include 	$(SRC)/lib/Makefile.lib
-include 	$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/lib/Makefile.lib
+include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
 

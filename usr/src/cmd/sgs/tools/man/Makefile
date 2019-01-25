@@ -30,7 +30,7 @@ MAN1l=		chkmsg.1l \
 
 MANS=		$(MAN1l)
 
-include 	../../../../Makefile.master
+include		../../../../Makefile.master
 
 ROOTDIR=	$(ROOT)/opt/SUNWonld/man
 ROOT1lMAN=	$(MAN1l:%=$(ROOTDIR)/man1l/%)
