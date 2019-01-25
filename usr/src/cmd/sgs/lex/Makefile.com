@@ -57,7 +57,7 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 #
 MACHSRCS=	$(MACHOBJS:%.o=../common/%.c)
 LIBSRCS =	$(LIBOBJS:%.o=../common/%.c)
-SRCS=		$(MACHSRCS)
+SRCS=		$(MACHSRCS) $(LIBSRCS)
 
 LIBS =          $(DYNLIB)
 

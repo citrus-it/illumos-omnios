@@ -104,6 +104,7 @@ install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
+lint :=		TARGET= lint
 _msg :=		TARGET= catalog
 _msg_gettext :=	TARGET= catalog
 _msg_sgsmsg :=	TARGET= catalog
@@ -145,6 +146,8 @@ check:		chkmsg
 install_lib:	FRC
 		@ cd lex; pwd; $(MAKE) $@
 		@ cd yacc; pwd; $(MAKE) $@
+
+lint:
 
 delete \
 clean clobber:	native-clobber .WAIT $(SUBDIRS) $(MSGDIR)

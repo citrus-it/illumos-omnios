@@ -57,7 +57,6 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA)
 SRCS=		../common/llib-lrtld_db
 MSGSRCS=	$(COMOBJS:%.o=../common/%.c) $(PLTSRCS) $(BLTDATA)
 
-
 CLEANFILES +=	$(BLTFILES)
 CLOBBERFILES +=	$(DYNLIB)
 

@@ -72,3 +72,5 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n elfwrap_msg
 SRCS =		$(COMOBJ:%.o=../common/%.c) ../common/machine.c \
 		$(COMOBJ32:%32.o=../common/%.c) \
 		$(TOOLOBJ:%.o=../../tools/common/%.c) $(BLTDATA)
+
+CLEANFILES +=	$(BLTFILES)
