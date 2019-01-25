@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 RackTop Systems.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 .KEEP_STATE:

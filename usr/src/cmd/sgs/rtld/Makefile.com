@@ -21,8 +21,9 @@
 
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
-#
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 RTLD=		ld.so.1
 

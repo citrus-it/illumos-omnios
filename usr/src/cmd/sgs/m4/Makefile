@@ -19,13 +19,10 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1995 by Sun Microsystems, Inc.
 # All Rights Reserved.
 #
-# cmd/sgs/m4/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../../../Makefile.master

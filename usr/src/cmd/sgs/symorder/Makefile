@@ -19,7 +19,10 @@
 # CDDL HEADER END
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms. 
+# Use is subject to license terms.
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		symorder
 

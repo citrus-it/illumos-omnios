@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.

@@ -21,6 +21,9 @@
 #
 # Copyright (c) 1998-1999 by Sun Microsystems, Inc.
 # All rights reserved.
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 include		../../../Makefile.master
 

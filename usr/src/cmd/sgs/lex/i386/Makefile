@@ -22,9 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/sgs/lex/i386/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 INCLIST_i386=	-I.

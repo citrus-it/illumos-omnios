@@ -25,6 +25,8 @@
 # Copyright (c) 1994-2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 .KEEP_STATE:
 
