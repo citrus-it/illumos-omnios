@@ -87,7 +87,6 @@ SRCS =		../common/llib-llddbg
 LIBSRCS =	$(COMOBJS:%.o=../common/%.c) \
 		$(TOOLOBJ:%.o=$(SGSTOOLS)/common/%.c) $(BLTDATA)
 
-LINTSRCS =	$(LIBSRCS) ../common/lintsup.c
 LINTSRCS32 =	$(COMOBJS32:%32.o=../common/%.c)
 LINTSRCS64 =	$(COMOBJS64:%64.o=../common/%.c)
 

@@ -78,6 +78,5 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n elfdump_msg
 SRCS =		$(COMOBJ:%.o=../common/%.c) \
 		$(COMOBJ32:%32.o=../common/%.c) \
 		$(TOOLOBJ:%.o=../../tools/common/%.c) $(BLTDATA)
-LINTSRCS =	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(LINTOUTS) $(BLTFILES) gen_struct_layout

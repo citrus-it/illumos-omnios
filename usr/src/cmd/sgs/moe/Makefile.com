@@ -55,6 +55,5 @@ SGSMSGALL=	$(SGSMSGCOM)
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n moe_msg
 
 SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA)
-LINTSRCS=	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(LINTOUTS) $(BLTFILES)

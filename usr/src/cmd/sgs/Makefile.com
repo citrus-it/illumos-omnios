@@ -136,41 +136,6 @@ CC_USE_PROTO =	-Yl,$(SGSBINDIR)
 LD_USE_PROTO =	$(SGSBINDIR)/
 
 #
-# lint-related stuff
-#
-LIBNAME32 =	$(LIBNAME:%=%32)
-LIBNAME64 =	$(LIBNAME:%=%64)
-LIBNAMES =	$(LIBNAME32) $(LIBNAME64)
-
-SGSLINTOUT =	lint.out
-LINTOUT1 =	lint.out.1
-LINTOUT32 =	lint.out.32
-LINTOUT64 =	lint.out.64
-LINTOUTS =	$(SGSLINTOUT) $(LINTOUT1) $(LINTOUT32) $(LINTOUT64)
-
-LINTLIBSRC =	$(LINTLIB:%.ln=%)
-LINTLIB32 =	$(LINTLIB:%.ln=%32.ln)
-LINTLIB64 =	$(LINTLIB:%.ln=%64.ln)
-LINTLIBS =	$(LINTLIB32) $(LINTLIB64)
-
-LINTFLAGS =	-m -errtags=yes -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTFLAGS64 =	-m -errtags=yes -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED \
-		    $(VAR_LINTFLAGS64)
-
-#
-# When building a lint library, no other lint libraries are verified as
-# dependencies, nor is the stardard C lint library processed.  All dependency
-# verification is carried out through linting the sources themselves.
-#
-$(LINTLIB) :=	LINTFLAGS += -n
-$(LINTLIB) :=	LINTFLAGS64 += -n
-
-$(LINTLIB32) :=	LINTFLAGS += -n
-$(LINTLIB32) :=	LINTFLAGS64 += -n
-$(LINTLIB64) :=	LINTFLAGS += -n
-$(LINTLIB64) :=	LINTFLAGS64 += -n
-
-#
 # These libraries have two resulting lint libraries.  If a dependency is
 # declared using these variables, the substitution for the 32/64 versions at
 # lint time happens automatically (see Makefile.targ).

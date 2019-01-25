@@ -68,7 +68,6 @@ SGSMSGALL=	$(SGSMSGCOM)
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n ldprof_msg
 
 SRCS=		$(COMOBJS:%.o=../common/%.c) $(BLTDATA)
-LINTSRCS=	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(LINTOUTS) $(BLTFILES)
 CLOBBERFILES +=	$(DYNLIB) $(LINTLIB)

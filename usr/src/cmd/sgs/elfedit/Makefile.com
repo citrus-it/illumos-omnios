@@ -70,6 +70,5 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n elfedit_msg
 SRCS =		$(COMOBJ:%.o=../common/%.c) \
 		$(COMOBJ32:%32.o=../common/%.c) \
 		$(BLTDATA)
-LINTSRCS =	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(LINTOUTS) $(BLTFILES)

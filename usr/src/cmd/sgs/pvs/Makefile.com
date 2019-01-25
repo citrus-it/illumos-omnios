@@ -66,6 +66,5 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n pvs_msg
 
 SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA) \
 		$(TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c)
-LINTSRCS=	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(LINTOUTS) $(BLTFILES)

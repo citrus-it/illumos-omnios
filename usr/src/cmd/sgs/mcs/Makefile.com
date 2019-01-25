@@ -53,6 +53,5 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 
 SRCS =		$(COMOBJS:%.o=../common/%.c) \
 		$(TOOLSOBJS:%.o=$(SGSTOOLS)/common/%.c)
-LINTSRCS =	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(OBJS) $(LINTOUTS)

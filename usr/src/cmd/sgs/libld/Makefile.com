@@ -151,7 +151,6 @@ LIBSRCS =	$(TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c) \
 		$(AVLOBJS:%.o=$(VAR_AVLDIR)/%.c) \
 		$(BLTDATA)
 
-LINTSRCS =	$(LIBSRCS) ../common/lintsup.c
 LINTSRCS32 =	$(COMOBJS32:%32.o=../common/%.c) \
 		$(L_MACHOBJS32:%32.o=../common/%.c)
 LINTSRCS64 =	$(COMOBJS64:%64.o=../common/%.c) \

@@ -67,6 +67,5 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n crle_msg
 
 SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA) \
 		$(TOOLSOBJ:%.o=$(SGSTOOLS)/common/%.c)
-LINTSRCS=	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(SGSLINTOUT) $(BLTFILES)
