@@ -81,7 +81,6 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n liblddbg_msg
 
 CHKSRCS =	$(COMOBJS32:%32.o=../common/%.c)
 
-SRCS =		../common/llib-llddbg
 LIBSRCS =	$(COMOBJS:%.o=../common/%.c) \
 		$(TOOLOBJ:%.o=$(SGSTOOLS)/common/%.c) $(BLTDATA)
 

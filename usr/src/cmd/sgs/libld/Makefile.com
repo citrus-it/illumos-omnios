@@ -139,7 +139,6 @@ CHKSRCS =	$(SRCBASE)/uts/common/krtld/reloc.h \
 		$(KRTLD_AMD64)/doreloc.c \
 		$(KRTLD_SPARC)/doreloc.c
 
-SRCS =		../common/llib-lld
 LIBSRCS =	$(TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c) \
 		$(E_TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c) \
 		$(COMOBJS:%.o=../common/%.c) \

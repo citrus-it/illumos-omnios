@@ -182,7 +182,7 @@ FRC:
 # and tweak the file globs slightly.
 #
 XRPRUNE=	rtld.4.x packages abi
-XRADD=		*.msg mapfile* llib-[a-z]*
+XRADD=		*.msg mapfile*
 XRDEL=		Makefile* kobj_*
 
 #

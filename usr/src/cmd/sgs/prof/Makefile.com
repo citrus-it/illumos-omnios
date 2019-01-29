@@ -49,7 +49,6 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 SMATCH=off
 
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
-LINTFLAGS +=	-x
 
 %.o:		../common/%.c
 		$(COMPILE.c) $<

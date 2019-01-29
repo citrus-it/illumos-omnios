@@ -94,7 +94,6 @@ SGSMSGFLAGS2=	$(SGSMSGFLAGS) -h $(BLTDEFS) -d $(BLTDATA) -n libelf_msg
 BLTSRCS=	$(BLTOBJS:%.o=%.c)
 LIBSRCS=	$(COMOBJS:%.o=../common/%.c)  $(MISCOBJS:%.o=../misc/%.c) \
 		$(MACHOBJS:%.o=%.c)  $(BLTSRCS)
-SRCS=		../common/llib-lelf
 
 ROOTFS_DYNLIB=		$(DYNLIB:%=$(ROOTFS_LIBDIR)/%)
 

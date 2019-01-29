@@ -63,7 +63,6 @@ SGSMSGALL=	$(SGSMSGCOM)
 SGSMSGTARG=	$(SGSMSGCOM)
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n librtld_msg
 
-SRCS=		../common/llib-lrtld
 MSGSRCS=	$(MACHOBJS:%.o=%.c)  $(COMOBJS:%.o=../common/%.c) \
 		$(BLTDATA)
 
