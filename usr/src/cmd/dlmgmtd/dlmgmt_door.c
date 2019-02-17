@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -916,7 +917,7 @@ static void
 dlmgmt_removeconf(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
     ucred_t *cred)
 {
-	dlmgmt_door_removeconf_t 	*removeconf = argp;
+	dlmgmt_door_removeconf_t	*removeconf = argp;
 	dlmgmt_removeconf_retval_t	*retvalp = retp;
 	dlmgmt_link_t			*linkp;
 	int				err;
@@ -993,7 +994,7 @@ dlmgmt_openconf(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 {
 	dlmgmt_door_openconf_t	*openconf = argp;
 	dlmgmt_openconf_retval_t *retvalp = retp;
-	dlmgmt_link_t 		*linkp;
+	dlmgmt_link_t		*linkp;
 	datalink_id_t		linkid = openconf->ld_linkid;
 	dlmgmt_dlconf_t		*dlconfp;
 	dlmgmt_linkattr_t	*attrp;
@@ -1062,7 +1063,7 @@ dlmgmt_getconfsnapshot(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 {
 	dlmgmt_door_getconfsnapshot_t	*snapshot = argp;
 	dlmgmt_getconfsnapshot_retval_t	*retvalp = retp;
-	dlmgmt_link_t 			*linkp;
+	dlmgmt_link_t			*linkp;
 	datalink_id_t			linkid = snapshot->ld_linkid;
 	dlmgmt_linkattr_t		*attrp;
 	char				*buf;
@@ -1231,9 +1232,19 @@ dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	/*
 	 * Before we remove the link from its current zone, make sure that
 	 * there isn't a link with the same name in the destination zone.
+	 * If the link is moving to the global zone, then check whether the
+	 * detected duplicate link is on loan since this means it is
+	 * not a real duplicate in the destination zone.
+	 *
+	 * This situation can occur when a link is created then given to a
+	 * zone and then a link with a duplicate name is created. When the
+	 * first zone is halted the link cannot be moved back to the global
+	 * zone as it would then be a duplicate. Returning EEXIST here
+	 * results in the zone remaining in the 'down' state.
 	 */
-	if (zoneid != GLOBAL_ZONEID &&
-	    link_by_name(linkp->ll_link, newzoneid) != NULL) {
+	dlmgmt_link_t *dup = link_by_name(linkp->ll_link, newzoneid);
+	if (dup != NULL && dup != linkp &&
+	    (newzoneid != GLOBAL_ZONEID || !dup->ll_onloan)) {
 		err = EEXIST;
 		goto done;
 	}

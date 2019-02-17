@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		dlmgmtd
 OBJS=		dlmgmt_main.o dlmgmt_door.o dlmgmt_util.o dlmgmt_db.o
@@ -31,6 +33,8 @@ MANIFEST=	dlmgmt.xml
 CFGFILES=	datalink.conf
 
 include ../Makefile.cmd
+
+CSTD = $(CSTD_GNU99)
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 ROOTCFGDIR=		$(ROOTETC)/dladm
