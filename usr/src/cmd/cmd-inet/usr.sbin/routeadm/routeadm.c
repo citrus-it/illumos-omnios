@@ -21,9 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -46,6 +45,7 @@
 #include <libscf.h>
 #include <libscf_priv.h>
 #include <libuutil.h>
+#include <ifaddrs.h>
 
 /*
  * This program moves routing management under SMF.  We do this by giving
@@ -71,7 +71,7 @@
  *	# routeadm -s routing-svcs="route:default ripng:default"
  * sets this variable in each instance specified. If the user specifies a
  * non-SMF routing daemon via
- * 	# routeadm -s ipv4-routing-daemon=/usr/sbin/mydaemon
+ *	# routeadm -s ipv4-routing-daemon=/usr/sbin/mydaemon
  * the variable will be set for the legacy-routing:ipv4 instance.
  *
  * In order to ensure that the SMF versions of routing daemons are used
@@ -97,8 +97,8 @@
  *
  * routeadm -e[d] ipv4[6]-routing[forwarding]
  *
- * 	In this case,  the goal is to prepare the configured routing daemons
- * 	(specified through routeadm -s routing-svcs="...") or forwarding
+ *	In this case,  the goal is to prepare the configured routing daemons
+ *	(specified through routeadm -s routing-svcs="...") or forwarding
  *	services to switch on (-e) or of (-d) at next boot.
  *
  *	Since this operation must be applied to multiple services in the
@@ -2335,8 +2335,8 @@ out:
 
 /*
  *
- * Return the number of IPv6 addresses configured.  This answers the
- * generic question, "is IPv6 configured?".  We only start in.ndpd if IPv6
+ * Return the number of non-loopback IPv6 addresses configured.  This answers
+ * the generic question, "is IPv6 configured?".  We only start in.ndpd if IPv6
  * is configured, and we also only enable IPv6 routing daemons if IPv6 is
  * enabled.
  */
@@ -2344,28 +2344,24 @@ static int
 ra_numv6intfs(void)
 {
 	static int	num = -1;
-	int		ipsock;
-	struct lifnum	lifn;
+	int		cnt;
+	struct ifaddrs *ifp_head, *ifp;
 
 	if (num != -1)
 		return (num);
 
-	if ((ipsock = socket(PF_INET6, SOCK_DGRAM, 0)) == -1) {
-		(void) fprintf(stderr,
-		    gettext("%1$s: unable to open %2$s: %3$s\n"),
-		    myname, IP_DEV_NAME, strerror(errno));
+	if (getifaddrs(&ifp_head) < 0)
 		return (0);
-	}
-	lifn.lifn_family = AF_INET6;
-	lifn.lifn_flags = 0;
 
-	if (ioctl(ipsock, SIOCGLIFNUM, &lifn) == -1) {
-		(void) close(ipsock);
-		return (0);
+	cnt = 0;
+	for (ifp = ifp_head; ifp; ifp = ifp->ifa_next) {
+		if (!(ifp->ifa_flags & IFF_LOOPBACK) &&
+		    (ifp->ifa_flags & IFF_IPV6))
+			cnt++;
 	}
-	(void) close(ipsock);
 
-	return (num = lifn.lifn_count);
+	freeifaddrs(ifp_head);
+	return (num = cnt);
 }
 
 /*
@@ -2430,7 +2426,7 @@ ra_parseconf(void)
 		} else {
 			(void) fprintf(stderr,
 			    gettext("%1$s: %2$s: invalid option name on "
-				"line %3$d\n"),
+			    "line %3$d\n"),
 			    myname, RA_CONF_FILE, lineno);
 			continue;
 		}
@@ -2455,7 +2451,7 @@ ra_parseopt(char *confstr, int lineno, raopt_t *raopt)
 	if ((oval = ra_str2oval(confstr)) == OPT_INVALID) {
 		(void) fprintf(stderr,
 		    gettext("%1$s: %2$s: invalid option "
-			"value on line %3$d\n"),
+		    "value on line %3$d\n"),
 		    myname, RA_CONF_FILE, lineno);
 		return (0);
 	}
@@ -2465,14 +2461,14 @@ ra_parseopt(char *confstr, int lineno, raopt_t *raopt)
 	if ((confstr = strtok(NULL, " ")) == NULL) {
 		(void) fprintf(stderr,
 		    gettext("%1$s: %2$s: missing revert "
-			"value on line %3$d\n"),
+		    "value on line %3$d\n"),
 		    myname, RA_CONF_FILE, lineno);
 		return (0);
 	}
 	if ((d_oval = ra_str2oval(confstr)) == OPT_INVALID) {
 		(void) fprintf(stderr,
 		    gettext("%1$s: %2$s: invalid revert "
-			"value on line %3$d\n"),
+		    "value on line %3$d\n"),
 		    myname, RA_CONF_FILE, lineno, confstr);
 		return (0);
 	}
