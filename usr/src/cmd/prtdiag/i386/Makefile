@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2015 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 SRCDIR		= ..
@@ -30,7 +31,7 @@ SRCDIR		= ..
 include $(SRCDIR)/Makefile.com
 
 OBJS += smbios.o
-LDLIBS += -lsmbios -lnvpair -lpcidb -L$(ROOT)/usr/lib/fm -ltopo
+LDLIBS += -lsmbios -lnvpair -lpcidb -L$(ROOT)/usr/lib/fm -ltopo -lumem
 LDFLAGS += -R/usr/lib/fm
 
 .KEEP_STATE:

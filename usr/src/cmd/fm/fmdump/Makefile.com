@@ -22,12 +22,15 @@
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
 .KEEP_STATE:
 .SUFFIXES:
 
 SRCS += fmdump.c nvlrender.c asru.c error.c fault.c scheme.c info.c
 OBJS = $(SRCS:%.c=%.o)
-LINTFILES = $(SRCS:%.c=%.ln)
 
 PROG = fmdump
 ROOTPROG = $(ROOTUSRSBIN)/$(PROG)
@@ -35,14 +38,13 @@ ROOTPROG = $(ROOTUSRSBIN)/$(PROG)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I. -I../common -I../../include
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
-LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_log -lnvpair -ltopo -lfmd_msg
+LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_log -lnvpair -ltopo -lumem -lfmd_msg
 LDFLAGS += -R/usr/lib/fm
-LINTFLAGS += -mnu
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS)
 
 all: $(PROG)
 
@@ -60,19 +62,10 @@ $(PROG): $(OBJS)
 	$(CTFCONVERT_O)
 
 clean:
-	$(RM) $(OBJS) $(LINTFILES)
+	$(RM) $(OBJS)
 
 clobber: clean
 	$(RM) $(PROG)
-
-%.ln: ../common/%.c
-	$(LINT.c) -c $<
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES)
 
 install_h:
 

@@ -25,13 +25,14 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 .KEEP_STATE:
 .SUFFIXES:
 
 SRCS += fmtopo.c
 OBJS = $(SRCS:%.c=%.o)
-LINTFILES = $(SRCS:%.c=%.ln)
 
 PROG = fmtopo
 ROOTLIBFM = $(ROOT)/usr/lib/fm
@@ -41,15 +42,14 @@ ROOTPROG = $(ROOTLIBFMD)/$(PROG)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I. -I../common
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
-LDLIBS += -L$(ROOT)/usr/lib/fm -ltopo -lnvpair
+LDLIBS += -L$(ROOT)/usr/lib/fm -ltopo -lumem -lnvpair
 LDFLAGS += -R/usr/lib/fm
-LINTFLAGS += -mnu
 
 # not linted
 SMATCH=off
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS)
 
 all: $(PROG)
 
@@ -67,19 +67,10 @@ $(PROG): $(OBJS)
 	$(CTFCONVERT_O)
 
 clean:
-	$(RM) $(OBJS) $(LINTFILES)
+	$(RM) $(OBJS)
 
 clobber: clean
 	$(RM) $(PROG)
-
-%.ln: ../common/%.c
-	$(LINT.c) -c $<
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES)
 
 $(ROOTLIBFMD)/%: %
 	$(INS.file)

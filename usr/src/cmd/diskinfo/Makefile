@@ -11,6 +11,7 @@
 
 #
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG=		diskinfo
@@ -24,7 +25,8 @@ CSTD=	$(CSTD_GNU99)
 
 CPPFLAGS +=	-I$(SRC)/lib/fm/topo
 
-LDLIBS +=	-L$(ROOT)/usr/lib/fm -R/usr/lib/fm -ldiskmgt -lnvpair -ltopo
+LDLIBS +=	-L$(ROOT)/usr/lib/fm -R/usr/lib/fm -ldiskmgt -lnvpair \
+		-ltopo -lumem
 
 .KEEP_STATE:
 
