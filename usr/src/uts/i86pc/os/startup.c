@@ -2855,7 +2855,11 @@ pat_sync(void)
  * (for license circumvention, etc), we store it in /etc/hostid
  * in rot47 format.
  */
+#ifndef __xpv
 extern volatile unsigned long tenmicrodata;
+#else
+volatile unsigned long tenmicrodata;
+#endif
 static int atoi(char *);
 
 /*

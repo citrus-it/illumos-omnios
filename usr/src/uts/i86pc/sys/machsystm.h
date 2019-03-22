@@ -140,10 +140,6 @@ void    (*non_deep_idle_cpu)();
 void    (*disp_enq_thread)(cpu_t *, int);
 void    (*non_deep_idle_disp_enq_thread)(cpu_t *, int);
 
-#ifndef __xpv
-extern unsigned int microdata;
-#endif
-
 extern int use_mp;
 
 extern struct cpu	cpus[];		/* pointer to other cpus */

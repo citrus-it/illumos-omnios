@@ -75,6 +75,7 @@
 #include <sys/hpet.h>
 #include <sys/apic_common.h>
 #include <sys/apic_timer.h>
+#include <sys/ebt.h>
 
 static void	apic_record_ioapic_rdt(void *intrmap_private,
 		    ioapic_rdt_t *irdt);
@@ -1076,7 +1077,7 @@ apic_cpu_remove(psm_cpu_request_t *reqp)
  * The fixed-frequency PIT (aka 8254) is used for the measurement.
  */
 static uint64_t
-apic_calibrate_impl()
+i8254_apic_calibrate_impl()
 {
 	uint8_t		pit_tick_lo;
 	uint16_t	pit_tick, target_pit_tick, pit_ticks_adj;
@@ -1141,6 +1142,49 @@ apic_calibrate_impl()
 	return ((SF * apic_ticks * PIT_HZ) / ((uint64_t)pit_ticks * NANOSEC));
 }
 
+static uint64_t
+hyperv_apic_calibrate_impl()
+{
+	uint32_t	start_apic_tick, end_apic_tick, apic_ticks;
+	uint64_t	now, end, usecs;
+	ulong_t		iflag;
+
+	/*
+	 * Determine how many microseconds to allow the APIC to run.
+	 * This is based on the time that is spent in the PIC variant of this
+	 * code.
+	 */
+	usecs = (uint64_t)APIC_TIME_COUNT * MICROSEC / PIT_HZ;
+
+	apic_reg_ops->apic_write(APIC_DIVIDE_REG, apic_divide_reg_init);
+	apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
+
+	iflag = intr_clear();
+
+	start_apic_tick = apic_reg_ops->apic_read(APIC_CURR_COUNT);
+
+        /* The time counter has a fixed frequency of 10MHz */
+        now = rdmsr(HV_X64_MSR_TIME_REF_COUNT);
+        end = now + 10 * usecs;
+
+        while (now < end)
+                now = rdmsr(HV_X64_MSR_TIME_REF_COUNT);
+
+	end_apic_tick = apic_reg_ops->apic_read(APIC_CURR_COUNT);
+
+	intr_restore(iflag);
+
+	apic_ticks = start_apic_tick - end_apic_tick;
+
+	/*
+	 * Determine the number of nanoseconds per APIC clock tick
+	 * and then determine how many APIC ticks to interrupt at the
+	 * desired frequency
+	 * apic_ticks_per_ns = apic_ticks / USEC2NSEC(usecs)
+	 */
+	return (SF * apic_ticks / USEC2NSEC(usecs));
+}
+
 /*
  * It was found empirically that 5 measurements seem sufficient to give a good
  * accuracy. Most spurious measurements are higher than the target value thus
@@ -1161,6 +1205,9 @@ apic_calibrate()
 	int		median_idx;
 	uint64_t	median;
 
+	if (boothowto & RB_VERBOSE)
+		cmn_err(CE_CONT, "?Calibrating APIC");
+
 	/*
 	 * When running under a virtual machine, the emulated PIT and APIC
 	 * counters do not always return the right values and can roll over.
@@ -1170,8 +1217,12 @@ apic_calibrate()
 	 * The median is preferred to the average here as we only want to
 	 * discard outliers.
 	 */
-	for (int i = 0; i < APIC_CALIBRATE_MEASUREMENTS; i++)
-		measurements[i] = apic_calibrate_impl();
+	for (int i = 0; i < APIC_CALIBRATE_MEASUREMENTS; i++) {
+		if (ebt_active == EBT_IMPL_HYPERV)
+			measurements[i] = hyperv_apic_calibrate_impl();
+		else
+			measurements[i] = i8254_apic_calibrate_impl();
+	}
 
 	/*
 	 * sort results and retrieve median.

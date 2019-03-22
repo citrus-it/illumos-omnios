@@ -11,16 +11,42 @@
 
 /*
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
- * The microfind() routine is used to calibrate the delay provided by
- * tenmicrosec().  Early in boot gethrtime() is not yet configured and
- * available for accurate delays, but some drivers still need to be able to
- * pause execution for rough increments of ten microseconds.  To that end,
- * microfind() will measure the wall time elapsed during a simple delay loop
- * using the Intel 8254 Programmable Interval Timer (PIT), and attempt to find
- * a loop count that approximates a ten microsecond delay.
+ * Early in boot, gethrtime() is not yet configured and available for accurate
+ * delays, but some drivers still need to be able to pause execution for rough
+ * increments of ten microseconds. To that end, these early boot timer (EBT)
+ * routines provide various methods to achieve that.
+ */
+
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/pit.h>
+#include <sys/archsystm.h>
+#include <sys/cmn_err.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/x86_archext.h>
+#include <sys/reboot.h>
+#include <sys/ebt.h>
+
+typedef enum ebt_plugin_status {
+        EBT_PLUGIN_SUCCESS = 0,
+        EBT_PLUGIN_ERROR
+} ebt_plugin_status_t;
+
+typedef ebt_plugin_status_t (*ebt_register_f)(void);
+typedef void (*ebt_delay_f)(void);
+
+static int ebt_slot = -1;
+ebt_impl_t ebt_active = EBT_IMPL_PIT;
+
+/*
+ * i8254_microfind() will measure the wall time elapsed during a simple delay
+ * loop using the Intel 8254 Programmable Interval Timer (PIT), and attempt to
+ * find a loop count that approximates a ten microsecond delay.
  *
  * This mechanism is accurate enough when running unvirtualised on real CPUs,
  * but is somewhat less efficacious in a virtual machine.  In a virtualised
@@ -29,23 +55,10 @@
  * guess.
  */
 
-#include <sys/types.h>
-#include <sys/dl.h>
-#include <sys/param.h>
-#include <sys/pit.h>
-#include <sys/inline.h>
-#include <sys/machlock.h>
-#include <sys/avintr.h>
-#include <sys/smp_impldefs.h>
-#include <sys/archsystm.h>
-#include <sys/systm.h>
-#include <sys/machsystm.h>
-
 /*
- * Loop count for 10 microsecond wait.  MUST be initialized for those who
- * insist on calling "tenmicrosec" before the clock has been initialized.
+ * Loop count for 10 microsecond wait.
  */
-unsigned int microdata = 50;
+unsigned int microdata;
 
 /*
  * These values, used later in microfind(), are stored in globals to allow them
@@ -54,6 +67,20 @@ unsigned int microdata = 50;
 unsigned int microdata_trial_count = 7;
 unsigned int microdata_allowed_failures = 3;
 
+/* Global variable used in the delay loops */
+volatile unsigned long tenmicrodata;
+
+void
+i8254_tenmicrosec(void)
+{
+	int i;
+
+	/*
+	 * Artificial loop to induce delay.
+	 */
+	for (i = 0; i < microdata; i++)
+		tenmicrodata = microdata;
+}
 
 static void
 microfind_pit_reprogram_for_bios(void)
@@ -189,8 +216,8 @@ microfind_pit_delta_avg(int trials, int allowed_failures)
 	return (total / tc);
 }
 
-void
-microfind(void)
+ebt_plugin_status_t
+i8254_microfind(void)
 {
 	int ticks = -1;
 	ulong_t s;
@@ -225,7 +252,9 @@ microfind(void)
 				 * If the counter wrapped on the first try,
 				 * then we have some serious problems.
 				 */
-				panic("microfind: pit counter always wrapped");
+				cmn_err(CE_NOTE,
+				    "microfind: pit counter always wrapped");
+				return (EBT_PLUGIN_ERROR);
 			}
 			microdata = microdata >> 1;
 			ticks = ticksprev;
@@ -258,7 +287,7 @@ microfind(void)
 		 * we will be unable to scale the value of "microdata"
 		 * correctly.
 		 */
-		panic("microfind: could not calibrate delay loop");
+		return (EBT_PLUGIN_ERROR);
 	}
 
 	/*
@@ -278,4 +307,122 @@ microfind(void)
 	 * Restore previous interrupt state.
 	 */
 	restore_int_flag(s);
+
+	if (boothowto & RB_VERBOSE)
+		cmn_err(CE_CONT, "microfind calculated %u loops\n", microdata);
+
+	return (EBT_PLUGIN_SUCCESS);
+}
+
+/*
+ * When running under Hyper-V, the hypervisor provides a 10MHz timer that
+ * can be accessed by reading an MSR. This is preferable to using the emulated
+ * PIT which can be unreliable, and is entirely absent in a second generation
+ * VM.
+ */
+
+static ebt_plugin_status_t
+ebt_hyperv_init(void)
+{
+	struct cpuid_regs cp;
+
+	if ((get_hwenv() & HW_MICROSOFT) == 0)
+		return (EBT_PLUGIN_ERROR);
+
+	cp.cp_eax = CPUID_LEAF_HV_FEATURES;
+	(void) __cpuid_insn(&cp);
+
+	if ((cp.cp_eax & HV_X64_MSR_TIME_REF_COUNT_AVAILABLE) == 0) {
+		cmn_err(CE_NOTE, "Hyper-V detected but TIME_REF unavailable.");
+		return (EBT_PLUGIN_ERROR);
+	}
+
+	return (EBT_PLUGIN_SUCCESS);
+}
+
+static void
+ebt_hyperv_tenmicrosec()
+{
+        uint64_t now, end;
+
+        /* The time counter has a fixed frequency of 10MHz */
+        now = rdmsr(HV_X64_MSR_TIME_REF_COUNT);
+        end = now + 10 * 10;
+
+        while (now < end)
+                now = rdmsr(HV_X64_MSR_TIME_REF_COUNT);
+}
+
+/*
+ * Plugins
+ */
+
+typedef struct ebt_plugin_ops {
+	ebt_register_f init;
+	ebt_delay_f tenmicrosec;
+} ebt_plugin_ops_t;
+
+typedef struct ebt_plugin {
+	char *ident;
+	ebt_impl_t impl;
+	ebt_plugin_ops_t ops;
+} ebt_plugin_t;
+
+static ebt_plugin_t  plugins[] = {
+	{ "hyperv", EBT_IMPL_HYPERV,
+	    { ebt_hyperv_init,	ebt_hyperv_tenmicrosec }},
+	{ "i8254",  EBT_IMPL_PIT,
+	    { i8254_microfind,	i8254_tenmicrosec }},
+	{ .ident = NULL }
+};
+
+void
+microfind(void)
+{
+	int i;
+
+	for (i = 0; plugins[i].ident != NULL; i++) {
+		if (plugins[i].ops.init == NULL)
+			break;
+		/*
+		 * Set this to the active handler before initialising
+		 * in case the module wants to time the entire call to
+		 * tenmicrosec()
+		 */
+		ebt_slot = i;
+		ebt_active = plugins[i].impl;
+		if (plugins[i].ops.init() == EBT_PLUGIN_SUCCESS)
+			break;
+		if (boothowto & RB_VERBOSE)
+			cmn_err(CE_CONT, "ebt_init %s failed\n",
+			    plugins[i].ident);
+	}
+	if (plugins[i].ident != NULL) {
+		cmn_err(CE_CONT, "?EBT: selected %s\n", plugins[i].ident);
+	} else {
+		panic("Could not find usable early boot timer");
+	}
+}
+
+/*
+ * If anything calls tenmicrosec() before the clock has been initialized,
+ * use a small loop to introduce a delay. This will most likely be shorter
+ * than the desired ten microseconds.
+ */
+static void
+ebt_fixedloop_delay(void)
+{
+	int i;
+
+	for (i = 0; i < 50; i++)
+		tenmicrodata = i;
+}
+
+void
+ebt_tenmicrosec(void)
+{
+	if (ebt_slot < 0)
+		ebt_fixedloop_delay();
+	else
+		plugins[ebt_slot].ops.tenmicrosec();
 }

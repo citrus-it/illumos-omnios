@@ -99,6 +99,7 @@ extern uint_t xc_serv(caddr_t, caddr_t); /* cross call service routine	*/
 extern void av_set_softint_pending();	/* set software interrupt pending */
 extern void kdi_av_set_softint_pending(); /* kmdb private entry point */
 extern void microfind(void);	/* initialize tenmicrosec		*/
+extern void ebt_tenmicrosec(void);	/* execute tenmicrosec */
 
 /* map physical address							*/
 
