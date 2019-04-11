@@ -130,7 +130,7 @@ free_slot(int	s)
 }
 
 void
-_nscd_free_cslots()
+_nscd_free_cslots(void)
 {
 
 	int i;
@@ -195,7 +195,7 @@ init_slot(int	s)
 }
 
 static int
-_nscd_init_cslots()
+_nscd_init_cslots(void)
 {
 	(void) mutex_lock(&child_lock);
 
@@ -359,7 +359,7 @@ selfcred_kill(
 
 
 void
-_nscd_kill_forker()
+_nscd_kill_forker(void)
 {
 	(void) mutex_lock(&forking_lock);
 	if (forking_door != -1)
@@ -369,7 +369,7 @@ _nscd_kill_forker()
 }
 
 void
-_nscd_kill_all_children()
+_nscd_kill_all_children(void)
 {
 	int	i;
 	int	ret;
@@ -861,7 +861,7 @@ _nscd_proc_fork(
 
 		NSCD_SET_STATUS_SUCCESS(phdr);
 		return;
-	} if (cid  == (pid_t)-1) {
+	} else if (cid  == (pid_t)-1) {
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "forker unable to fork ...\n");
 
@@ -949,7 +949,7 @@ _nscd_proc_alt_get(
 	nss_pheader_t	*phdr = (nss_pheader_t *)buf;
 	char		*me = "_nscd_proc_alt_get";
 	ucred_t		*uc = NULL;
-	child_t		*ch;
+	child_t		*ch = NULL;
 
 	_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 	(me, "getting an alternate door ...\n");
@@ -989,7 +989,7 @@ _nscd_proc_alt_get(
 
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "no child slot available (child array = %p, slot = %d)\n",
-		    child, ch->child_slot);
+		    child, ch != NULL ? ch->child_slot : -1);
 
 		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
 		    NSCD_SELF_CRED_NO_CHILD_SLOT);
@@ -1235,7 +1235,7 @@ _nscd_is_self_cred_on(int recheck, char **dblist)
 }
 
 static nscd_rc_t
-setup_ldap_backend()
+setup_ldap_backend(void)
 {
 	nscd_rc_t	rc;
 	static void	(*ldap_func)();
@@ -1509,7 +1509,8 @@ check_user_process(void *arg)
 }
 
 static nscd_rc_t
-init_user_proc_monitor() {
+init_user_proc_monitor(void)
+{
 
 	int	errnum;
 	char	*me = "init_user_proc_monitor";
@@ -1535,12 +1536,12 @@ init_user_proc_monitor() {
 static void *
 get_smf_prop(const char *var, char type, void *def_val)
 {
-	scf_simple_prop_t	*prop;
-	void			*val;
+	scf_simple_prop_t	*prop = NULL;
+	void			*val = NULL;
 	char			*me = "get_smf_prop";
 
 	prop = scf_simple_prop_get(NULL, NULL, "config", var);
-	if (prop) {
+	if (prop != NULL) {
 		switch (type) {
 		case 'b':
 			val = scf_simple_prop_next_boolean(prop);

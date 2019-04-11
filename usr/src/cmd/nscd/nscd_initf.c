@@ -71,8 +71,7 @@ _nss_initf_proto(nss_db_params_t *p)
 }
 
 void
-_nss_initf_rpc(p)
-	nss_db_params_t	*p;
+_nss_initf_rpc(nss_db_params_t *p)
 {
 	p->name	= NSS_DBNAM_RPC;
 	p->default_config = NSS_DEFCONF_RPC;

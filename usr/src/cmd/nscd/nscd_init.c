@@ -47,7 +47,7 @@ _nscd_set_start_time(int reset)
 }
 
 time_t
-_nscd_get_start_time()
+_nscd_get_start_time(void)
 {
 	return (start_time);
 }
@@ -193,12 +193,12 @@ _nscd_init(
 }
 
 nscd_rc_t
-_nscd_refresh()
+_nscd_refresh(void)
 {
 	char			*me = "nscd_refresh";
 	char			*cfgfile;
-	nscd_rc_t		rc;
-	nscd_cfg_error_t	*err;
+	nscd_rc_t		rc = NSCD_SUCCESS;
+	nscd_cfg_error_t	*err = NULL;
 	char			errmsg[1024];
 
 	/*
@@ -210,10 +210,10 @@ _nscd_refresh()
 		cfgfile = cfgfile_save;
 
 	if (access(cfgfile, R_OK) != 0) {
+		rc = NSCD_CFG_FILE_ACCESS_ERROR;
 		(void) snprintf(errmsg, sizeof (errmsg),
-		"unable to read the config file %s (rc = %d), %s\n",
-		    cfgfile, NSCD_CFG_FILE_ACCESS_ERROR,
-		    strerror(errno));
+		    "unable to read the config file %s (rc = %d), %s\n",
+		    cfgfile, rc, strerror(errno));
 
 		goto error_exit;
 	}
@@ -228,17 +228,17 @@ _nscd_refresh()
 	}
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ALL)
-	(me, "nscd configuration refreshed successfully\n");
+	    (me, "nscd configuration refreshed successfully\n");
 
 	return (NSCD_SUCCESS);
 
-	error_exit:
+error_exit:
 
 	if (err != NULL)
 		_nscd_cfg_free_error(err);
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-	(me, "%s\n", errmsg);
+	    (me, "%s\n", errmsg);
 
 	return (rc);
 }

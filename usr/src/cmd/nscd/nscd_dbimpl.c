@@ -482,16 +482,11 @@ _nscd_delete_db_entry_cookie(
  * NSCD_DB_SIZE_TINY specifies an bucket array of size 3.
  */
 nscd_db_t *
-_nscd_alloc_db(
-	int		size)
+_nscd_alloc_db(int size)
 {
 	int		sz;
 	nscd_db_t	*db;
 
-	/* allocate the database */
-	db = (nscd_db_t *)calloc(1, sizeof (nscd_db_t));
-	if (db == NULL)
-		return (NULL);
 
 	/* allocate the bucket array */
 	if (size == NSCD_DB_SIZE_LARGE)
@@ -502,8 +497,16 @@ _nscd_alloc_db(
 		sz = 13;
 	else if (size == NSCD_DB_SIZE_TINY)
 		sz = 3;
+	else
+		return (NULL);
+
+	/* allocate the database */
+	db = (nscd_db_t *)calloc(1, sizeof (nscd_db_t));
+	if (db == NULL)
+		return (NULL);
+
 	db->hash_tbl_p = (nscd_hash_t  **)calloc(sz + 1,
-			sizeof (nscd_hash_t *));
+	    sizeof (nscd_hash_t *));
 	if (db->hash_tbl_p == NULL) {
 		free(db);
 		return (NULL);

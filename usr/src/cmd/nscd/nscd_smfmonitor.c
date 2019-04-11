@@ -44,7 +44,7 @@ static rwlock_t nscd_smf_service_state_lock = DEFAULTRWLOCK;
  * init service state table
  */
 nscd_rc_t
-_nscd_alloc_service_state_table()
+_nscd_alloc_service_state_table(void)
 {
 	int i;
 
@@ -135,7 +135,8 @@ set_smf_state(void *arg)
 }
 
 nscd_rc_t
-_nscd_init_smf_monitor() {
+_nscd_init_smf_monitor(void)
+{
 
 	int	errnum;
 	char	*me = "_nscd_init_smf_monitor";

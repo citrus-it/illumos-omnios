@@ -72,7 +72,7 @@ static nscd_rc_t _nscd_init_getent_ctx_monitor();
  * getent contexts currently being used.
  */
 nscd_db_t *
-_nscd_create_getent_ctxDB()
+_nscd_create_getent_ctxDB(void)
 {
 
 	nscd_db_t	*ret;
@@ -328,7 +328,7 @@ _nscd_free_getent_ctx_base(
 }
 
 void
-_nscd_free_all_getent_ctx_base()
+_nscd_free_all_getent_ctx_base(void)
 {
 	nscd_getent_ctx_base_t	*base;
 	int			i;
@@ -587,7 +587,7 @@ _nscd_init_getent_ctx_base(
 }
 
 nscd_rc_t
-_nscd_init_all_getent_ctx_base()
+_nscd_init_all_getent_ctx_base(void)
 {
 	int			i;
 	nscd_rc_t		rc;
@@ -613,7 +613,7 @@ _nscd_init_all_getent_ctx_base()
 	return (NSCD_SUCCESS);
 }
 nscd_rc_t
-_nscd_alloc_getent_ctx_base()
+_nscd_alloc_getent_ctx_base(void)
 {
 
 	(void) rw_wrlock(&nscd_getent_ctx_base_lock);
@@ -748,7 +748,7 @@ reclaim_getent_ctx(void *arg)
 }
 
 static nscd_rc_t
-_nscd_init_getent_ctx_monitor()
+_nscd_init_getent_ctx_monitor(void)
 {
 
 	int	errnum;

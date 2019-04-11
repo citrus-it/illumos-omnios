@@ -137,7 +137,7 @@ _nscd_free_nsw_state_base(
 }
 
 void
-_nscd_free_all_nsw_state_base()
+_nscd_free_all_nsw_state_base(void)
 {
 	nscd_nsw_state_base_t	*base;
 	int			i;
@@ -169,24 +169,23 @@ _nscd_create_nsw_state(
 {
 	nscd_nsw_state_t	*s;
 	nscd_nsw_config_t	*nsw_cfg;
+	struct __nsw_lookup_v1	*lkp = NULL;
 	nscd_db_t		**be_db_p, *be_db;
 	int			i, nobe = 1;
 	char			*me = "_nscd_create_nsw_state";
 
 
 	_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
-	(me, "creating nsw state...\n");
+	    (me, "creating nsw state...\n");
 
 	s = calloc(1, sizeof (nscd_nsw_state_t));
 	if (s == NULL) {
-		if ((*s->nsw_cfg_p)->nobase  != 1)
-			_nscd_release((nscd_acc_data_t *)params->nswcfg);
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
-		(me, "not able to allocate a nsw state\n");
+		    (me, "not able to allocate a nsw state\n");
 		return (NULL);
 	} else
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "nsw state %p allocated\n", s);
+		    (me, "nsw state %p allocated\n", s);
 
 	s->dbi = params->dbi;
 	s->next = NULL;
@@ -201,49 +200,51 @@ _nscd_create_nsw_state(
 	s->be = calloc(s->max_src, sizeof (nss_backend_t **));
 	if (s->be == NULL) {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
-		(me, "not able to allocate s->be\n");
+		    (me, "not able to allocate s->be\n");
 
 		_nscd_free_nsw_state(s);
 		return (NULL);
 	} else {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "db be array %p allocated\n", s->be);
+		    (me, "db be array %p allocated\n", s->be);
 	}
 
 	s->be_constr = (nss_backend_constr_t *)calloc(s->max_src,
 	    sizeof (nss_backend_constr_t));
 	if (s->be_constr == NULL) {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
-		(me, "not able to allocate s->be_constr\n");
+		    (me, "not able to allocate s->be_constr\n");
 
 		_nscd_free_nsw_state(s);
 		return (NULL);
 	} else {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "db be constructor array %p allocated\n", s->be_constr);
+		    (me, "db be constructor array %p allocated\n",
+		    s->be_constr);
 	}
 
 	s->be_version_p = (void **)calloc(s->max_src, sizeof (void *));
 	if (s->be_version_p == NULL) {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
-		(me, "not able to allocate s->be_version_p\n");
+		    (me, "not able to allocate s->be_version_p\n");
 
 		_nscd_free_nsw_state(s);
 		return (NULL);
 	} else {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "db be version ptr array %p allocated\n", s->be_version_p);
+		    (me, "db be version ptr array %p allocated\n",
+		    s->be_version_p);
 	}
 
 	s->be_db_pp = calloc(s->max_src, sizeof (nscd_db_t ***));
 	if (s->be_db_pp == NULL) {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
-		(me, "not able to allocate s->be_db_pp\n");
+		    (me, "not able to allocate s->be_db_pp\n");
 		_nscd_free_nsw_state(s);
 		return (NULL);
 	} else {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "be_db_pp array %p allocated\n", s->be_db_pp);
+		    (me, "be_db_pp array %p allocated\n", s->be_db_pp);
 	}
 
 	/* create the source:database backends */
@@ -252,13 +253,12 @@ _nscd_create_nsw_state(
 		int			srci;
 		char			*srcn;
 		const char		*dbn;
-		struct __nsw_lookup_v1	*lkp;
 		const nscd_db_entry_t	*dbe;
 		nscd_be_info_t		*be_info;
 
 		if (i == 0)
 			lkp = s->config->lookups;
-		else
+		else if (lkp != NULL)
 			lkp = lkp->next;
 		if (lkp == NULL) {
 			_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
@@ -348,7 +348,7 @@ check_be_array(
 	int			i;
 	char			*dbn;
 	char			*srcn;
-	struct __nsw_lookup_v1	*lkp;
+	struct __nsw_lookup_v1	*lkp = NULL;
 
 	dbn = NSCD_NSW_DB_NAME(s->dbi);
 
@@ -357,7 +357,7 @@ check_be_array(
 
 		if (i == 0)
 			lkp = s->config->lookups;
-		else
+		else if (lpk != NULL)
 			lkp = lkp->next;
 		if (lkp == NULL)
 			return;
@@ -499,8 +499,7 @@ _get_nsw_state_int(
 	(void) rw_rdlock(&nscd_nsw_state_base_lock);
 	base = nscd_nsw_state_base[dbi];
 	(void) rw_unlock(&nscd_nsw_state_base_lock);
-	if (base == NULL)
-		assert(base != NULL);
+	assert(base != NULL);
 
 	/*
 	 * If list is not empty, return the first one on list.
@@ -869,7 +868,7 @@ _nscd_init_nsw_state_base(
 }
 
 nscd_rc_t
-_nscd_init_all_nsw_state_base()
+_nscd_init_all_nsw_state_base(void)
 {
 	int			i;
 	nscd_rc_t		rc;
@@ -900,7 +899,7 @@ _nscd_init_all_nsw_state_base()
 }
 
 nscd_rc_t
-_nscd_alloc_nsw_state_base()
+_nscd_alloc_nsw_state_base(void)
 {
 
 	(void) rw_rdlock(&nscd_nsw_state_base_lock);

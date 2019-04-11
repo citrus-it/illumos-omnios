@@ -40,7 +40,7 @@ static int
 strbreak(char *field[], int array_size, char *s, char *sep)
 {
 	int	i;
-	char	*lasts, *qp;
+	char	*lasts = NULL, *qp;
 	int	inquote;
 
 	qp = strchr(s, '"');
@@ -53,7 +53,7 @@ strbreak(char *field[], int array_size, char *s, char *sep)
 		return (i);
 
 	inquote = 1;
-	while (++qp < lasts) {
+	while (lasts != NULL && ++qp < lasts) {
 
 		switch (*qp) {
 

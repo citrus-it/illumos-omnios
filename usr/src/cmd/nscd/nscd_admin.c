@@ -81,7 +81,7 @@ _nscd_door_getadmin(void *outbuf)
 }
 
 void
-_nscd_client_showstats()
+_nscd_client_showstats(void)
 {
 	(void) printf("nscd configuration:\n\n");
 	(void) printf("%10d  server debug level\n", admin_c.debug_level);
@@ -134,7 +134,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 		    != NSCD_SUCCESS) {
 
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to set debug level %d\n",
+			    (me, "unable to set debug level %d\n",
 			    set->debug_level);
 
 			goto err_exit;
@@ -146,7 +146,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 		if (_nscd_set_log_file(set->logfile) != NSCD_SUCCESS) {
 
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to set log file %s\n", set->logfile);
+			    (me, "unable to set log file %s\n", set->logfile);
 
 			goto err_exit;
 		}
@@ -160,7 +160,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 	if (set->cache_cfg_num > CACHE_CTX_COUNT) {
 
 		_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
-		(me, "number of caches (%d) to change out of bound %s\n",
+		    (me, "number of caches (%d) to change out of bound %s\n",
 		    set->cache_cfg_num);
 
 		goto err_exit;
@@ -175,14 +175,14 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 		dbname = cache_name[j];
 		if (cache_ctx_p[j] == NULL) {
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to find cache context for %s\n",
+			    (me, "unable to find cache context for %s\n",
 			    dbname);
 		}
 
 		rc = _nscd_cfg_get_handle(group, dbname, &h, NULL);
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to get handle for < %s : %s >\n",
+			    (me, "unable to get handle for < %s : %s >\n",
 			    dbname, group);
 
 			goto err_exit;
@@ -191,7 +191,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 		rc = _nscd_cfg_set(h, new_cfg, &err);
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to set admin data for < %s : %s >\n",
+			    (me, "unable to set admin data for < %s : %s >\n",
 			    dbname, group);
 
 			_nscd_cfg_free_handle(h);
@@ -207,7 +207,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 	if (set->cache_flush_num > CACHE_CTX_COUNT) {
 
 		_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
-		(me, "number of caches (%d) to flush out of bound %s\n",
+		    (me, "number of caches (%d) to flush out of bound %s\n",
 		    set->cache_flush_num);
 
 		goto err_exit;
@@ -220,8 +220,7 @@ _nscd_server_setadmin(nscd_admin_mod_t *set)
 
 		if (cache_ctx_p[j] == NULL) {
 			_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to find cache context for %s\n",
-			    dbname);
+			    (me, "unable to find cache context\n");
 		}
 		nsc_invalidate(cache_ctx_p[j], NULL, NULL);
 	}
@@ -245,7 +244,7 @@ _nscd_door_setadmin(void *buf)
 	rc = _nscd_server_setadmin(NSCD_N2N_DOOR_DATA(nscd_admin_mod_t, buf));
 	if (rc != NSCD_SUCCESS) {
 		_NSCD_LOG(NSCD_LOG_ADMIN, NSCD_LOG_LEVEL_ERROR)
-		(me, "SETADMIN call failed\n");
+		    (me, "SETADMIN call failed\n");
 
 		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0, rc);
 	} else {
@@ -402,7 +401,7 @@ _nscd_client_getadmin(char opt)
 }
 
 int
-_nscd_client_setadmin()
+_nscd_client_setadmin(void)
 {
 	return (_nscd_doorcall_data(NSCD_SETADMIN, &admin_mod,
 	    sizeof (admin_mod), NULL, 0, NULL));

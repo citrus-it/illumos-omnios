@@ -194,7 +194,7 @@ dozip(void)
  *
  */
 void
-_nscd_restart_if_cfgfile_changed()
+_nscd_restart_if_cfgfile_changed(void)
 {
 
 	static mutex_t		nsswitch_lock = DEFAULTMUTEX;
@@ -308,7 +308,7 @@ _nscd_restart_if_cfgfile_changed()
 }
 
 uid_t
-_nscd_get_client_euid()
+_nscd_get_client_euid(void)
 {
 	ucred_t	*uc = NULL;
 	uid_t	id;
@@ -437,7 +437,7 @@ _nscd_APP_check_cred(
 	nss_pheader_t	*phdr = (nss_pheader_t *)buf;
 	ucred_t		*uc = NULL;
 	uid_t		ruid;
-	uid_t		euid;
+	uid_t		euid = 0;
 	pid_t		pid;
 	int		errnum;
 	char		*me = "_nscd_APP_check_cred";
@@ -862,7 +862,7 @@ if_selfcred_return_per_user_door(char *argp, size_t arg_size,
 	door_desc_t *dp, int whoami)
 {
 	nss_pheader_t	*phdr = (nss_pheader_t *)((void *)argp);
-	char		*dblist;
+	char		*dblist = NULL;
 	int		door = -1;
 	int		rc = 0;
 	door_desc_t	desc;
@@ -899,6 +899,9 @@ if_selfcred_return_per_user_door(char *argp, size_t arg_size,
 	if (NSCD_GET_STATUS(phdr) != NSS_ALTRETRY) {
 		(void) door_return(argp, phdr->data_off, NULL, 0);
 	}
+
+	if (dblist == NULL)
+		(void) door_return(argp, phdr->data_off, NULL, 0);
 
 	/* return the alternate door descriptor */
 	len = strlen(dblist) + 1;
@@ -1342,7 +1345,7 @@ _nscd_setup_child_server(int did)
 }
 
 nscd_rc_t
-_nscd_alloc_frontend_cfg()
+_nscd_alloc_frontend_cfg(void)
 {
 	frontend_cfg  = calloc(NSCD_NUM_DB, sizeof (nscd_cfg_frontend_t));
 	if (frontend_cfg == NULL)
@@ -1504,11 +1507,11 @@ rts_mon(void)
 			continue;
 		}
 		if (ifam->ifam_version != RTM_VERSION) {
-				_NSCD_LOG(NSCD_LOG_FRONT_END,
-				    NSCD_LOG_LEVEL_ERROR)
-				(me, "rx unknown version (%d) on "
-				    "routing socket.\n",
-				    ifam->ifam_version);
+			_NSCD_LOG(NSCD_LOG_FRONT_END,
+			    NSCD_LOG_LEVEL_ERROR)
+			    (me, "rx unknown version (%d) on "
+			    "routing socket.\n",
+			    ifam->ifam_version);
 			continue;
 		}
 		switch (ifam->ifam_type) {

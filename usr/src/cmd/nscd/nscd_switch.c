@@ -629,13 +629,14 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 	nscd_nsw_state_t	*s = NULL;
 	int			n_src;
 	unsigned int		status_vec = 0;
-	int			dbi, srci = -1;
+	int			dbi = -1, srci = -1;
 	int			check_loopback = 0;
 	int			state_thr = 0;
 	lb_key_t		key, *k = NULL;
 	nss_db_root_t		root_db;
 	nscd_nsw_params_t	params;
 	nscd_sw_return_t	*swret;
+	struct __nsw_lookup_v1	*lkp = NULL;
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "rootp = %p, initf = %p, search_fnum = %d, "
@@ -746,7 +747,6 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 	for (n_src = 0;  n_src < s->max_src;  n_src++) {
 		nss_backend_t		*be = NULL;
 		nss_backend_op_t	funcp = NULL;
-		struct __nsw_lookup_v1	*lkp;
 		int			smf_state;
 		int			n_loop = 0;
 		int			max_retry = 10;
@@ -755,8 +755,11 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 		if (n_src == 0)
 			lkp = s->config->lookups;
-		else
+		else if (lkp != NULL)
 			lkp = lkp->next;
+
+		if (lkp == NULL)
+			break;
 
 		/* set the number of max. retries */
 		if (lkp->actions[__NSW_TRYAGAIN] == __NSW_TRYAGAIN_NTIMES)
@@ -826,23 +829,20 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 			goto free_nsw_state;
 		}
 
-		if (check_loopback && k != NULL) {
+		if (check_loopback && k != NULL &&
+		    k->srci == srci && k->dbi == dbi &&
+		    k->fnum == search_fnum) {
+			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
+			    NSCD_LOG_LEVEL_DEBUG)
+			    (me, "loopback detected: "
+			    "source = %s, database = %s "
+			    "search fnum = %d\n",
+			    NSCD_NSW_SRC_NAME(srci),
+			    NSCD_NSW_DB_NAME(dbi), search_fnum);
 
-			if (k->srci == srci && k->dbi == dbi)
-				if (k->fnum == search_fnum) {
-
-					_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
-					    NSCD_LOG_LEVEL_DEBUG)
-					(me, "loopback detected: "
-					    "source = %s, database = %s "
-					    "search fnum = %d\n",
-					    NSCD_NSW_SRC_NAME(srci),
-					    NSCD_NSW_DB_NAME(dbi), search_fnum);
-
-				NSCD_SW_STATS_G.loopback_nsw_db_skipped_g++;
-				NSCD_SW_STATS(dbi).loopback_nsw_db_skipped++;
-					continue;
-				}
+			NSCD_SW_STATS_G.loopback_nsw_db_skipped_g++;
+			NSCD_SW_STATS(dbi).loopback_nsw_db_skipped++;
+			continue;
 		}
 
 		be = s->be[n_src];
@@ -991,12 +991,14 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 
 	return (NSS_SUCCESS);
 
-	error_exit:
+error_exit:
 
 	NSCD_SW_STATS_G.lookup_request_failed_g++;
 	NSCD_SW_STATS_G.lookup_request_in_progress_g--;
-	NSCD_SW_STATS(dbi).lookup_request_failed++;
-	NSCD_SW_STATS(dbi).lookup_request_in_progress--;
+	if (dbi >= 0) {
+		NSCD_SW_STATS(dbi).lookup_request_failed++;
+		NSCD_SW_STATS(dbi).lookup_request_in_progress--;
+	}
 
 	return (res);
 }
@@ -1235,7 +1237,7 @@ nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 		for (n = 0; n < n_src; n++)
 			lkp = lkp->next;
 
-		if (be == 0) {
+		if (be == NULL) {
 			/* If it's null it's a bug, but let's play safe */
 			res = NSS_UNAVAIL;
 		} else {
@@ -1256,12 +1258,12 @@ nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 			}
 			return (res);
 		}
-		(void) NSS_INVOKE_DBOP(be, NSS_DBOP_ENDENT, 0);
+		if (be != NULL)
+			(void) NSS_INVOKE_DBOP(be, NSS_DBOP_ENDENT, 0);
 		do {
 			n_src++;
-		} while (n_src < s->max_src &&
-		    (be = s->be[n_src]) == 0);
-		if (be == 0) {
+		} while (n_src < s->max_src && (be = s->be[n_src]) == 0);
+		if (be == NULL) {
 			/*
 			 * This is the case where we failed to get the backend
 			 * for the last source. We exhausted all sources.

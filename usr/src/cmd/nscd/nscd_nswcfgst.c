@@ -54,7 +54,7 @@ typedef struct {
 } nsw_cfg_cookie_t;
 
 nscd_rc_t
-_nscd_alloc_switch_cfg()
+_nscd_alloc_switch_cfg(void)
 {
 	nscd_switch_cfg  = calloc(NSCD_NUM_DB, sizeof (nscd_cfg_switch_t));
 	if (nscd_switch_cfg == NULL)
@@ -64,7 +64,7 @@ _nscd_alloc_switch_cfg()
 }
 
 nscd_rc_t
-_nscd_alloc_switch_stats()
+_nscd_alloc_switch_stats(void)
 {
 
 	nscd_switch_stats = calloc(NSCD_NUM_DB,
@@ -182,9 +182,9 @@ _nscd_cfg_switch_verify(
 		nswcfgstr = cfg->nsw_config_string;
 	} else {
 		/* not group, and not the switch policy string, return */
-		if (pdesc->p_offset != offsetof(nscd_cfg_switch_t,
-			nsw_config_string))
-		return (NSCD_SUCCESS);
+		if (pdesc->p_offset !=
+		    offsetof(nscd_cfg_switch_t, nsw_config_string))
+			return (NSCD_SUCCESS);
 
 		/* the data itself is the string */
 		nswcfgstr = (char *)data;

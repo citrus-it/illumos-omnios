@@ -93,7 +93,7 @@ static char	**saved_argv = NULL;
 static char	saved_execname[MAXPATHLEN];
 
 static void
-save_execname()
+save_execname(void)
 {
 	const char *name = getexecname();
 

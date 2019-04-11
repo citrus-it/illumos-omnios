@@ -789,10 +789,7 @@ make_cache(enum db_type dbtype, int dbop, char *name,
 	return (nscdb);
 
 out:
-	if (nscdb->htable)
-		free(nscdb->htable);
-	if (nscdb)
-		free(nscdb);
+	free(nscdb);
 	return (NULL);
 }
 
@@ -2011,7 +2008,7 @@ nsc_invalidate(nsc_ctx_t *ctx, char *dbname, nsc_ctx_t **ctxs)
 
 	for (i = 0; i < CACHE_CTX_COUNT; i++) {
 		if (ctxs[i] != NULL)
-		ctx_invalidate(ctxs[i]);
+			ctx_invalidate(ctxs[i]);
 	}
 }
 
@@ -2057,7 +2054,7 @@ ctx_invalidate(nsc_ctx_t *ctx)
  */
 static void
 delete_entry(nsc_db_t *nscdb, nsc_ctx_t *ctx, nsc_entry_t *entry) {
-	uint_t		hash;
+	uint_t		hash = 0;
 
 	avl_remove(&nscdb->tree, entry);
 	HASH_REMOVE(nscdb, entry, hash, nscd_false);
@@ -2079,7 +2076,7 @@ lookup_cache(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 {
 	nsc_db_t	*nscdb;
 	nsc_ctx_t	*ctx;
-	uint_t		hash;
+	uint_t		hash = 0;
 	avl_index_t	pos;
 	ulong_t		nentries;
 	nsc_entry_t	find_entry, *node;

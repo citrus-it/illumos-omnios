@@ -100,7 +100,7 @@ _nscd_release(
 		access->delete == 1) {
 
 		_NSCD_LOG(NSCD_LOG_ACCESS_INFO, NSCD_LOG_LEVEL_DEBUG)
-		(me, "deleting data %p\n", access->data);
+		    (me, "deleting data %p\n", access->data);
 		(access->free_func)(access->data);
 
 		/*

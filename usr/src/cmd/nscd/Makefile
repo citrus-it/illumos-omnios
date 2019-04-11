@@ -59,14 +59,6 @@ CPPFLAGS +=	-D_REENTRANT -DSUN_THREADS \
 		-I../../lib/libc/port/gen -I../../lib/libc/inc \
 		-I../../lib/libsldap/common
 
-CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	-_gcc=-Wno-uninitialized
-CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-type-limits
-
-# not linted
-SMATCH=off
-
 # nscd interposes on many symbols, and must export others for its own dlsym()
 # use, and dlsym() calls from libc.  Itemizing the interfaces within a mapfile
 # is error-prone, so establish the whole object as an interposer.

@@ -87,7 +87,8 @@ extern "C" {
 	    ((act) == __NSW_TRYAGAIN_FOREVER) || \
 	    ((act) == __NSW_TRYAGAIN_NTIMES))
 #define	__NSW_UNPAUSE_ACTION(act)\
-	(((act) == __NSW_TRYAGAIN_PAUSED) && ((act) = __NSW_TRYAGAIN_NTIMES))
+	if ((act) == __NSW_TRYAGAIN_PAUSED) \
+		(act) = __NSW_TRYAGAIN_NTIMES
 
 #define	__NSW_STR_FOREVER	"forever"
 

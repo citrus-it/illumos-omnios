@@ -97,7 +97,7 @@ _nscd_cfg_get_list(
 
 	if (list == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "invalid argument: list = %p\n", list);
+		    (me, "invalid argument: list = %p\n", list);
 
 		return (NSCD_INVALID_ARGUMENT);
 	}
@@ -130,7 +130,7 @@ _nscd_cfg_get_list(
 
 	default:
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "invalid argument: type (%d)\n", type);
+		    (me, "invalid argument: type (%d)\n", type);
 
 		return (NSCD_INVALID_ARGUMENT);
 	}
@@ -175,7 +175,7 @@ _nscd_cfg_get_param_desc_list(
  * Create the internal config parameter database
  */
 static nscd_db_t *
-_nscd_cfg_create_paramDB()
+_nscd_cfg_create_paramDB(void)
 {
 
 	nscd_db_t	*ret;
@@ -220,6 +220,8 @@ _nscd_cfg_add_index_entry(
 		dbe_type = NSCD_DATA_CFG_PARAM_INDEX;
 	else if (type == NSCD_CFG_LIST_STAT)
 		dbe_type = NSCD_DATA_CFG_STAT_INDEX;
+	else
+		return (NSCD_INVALID_ARGUMENT);
 
 	size = sizeof (int);
 
@@ -302,7 +304,7 @@ _nscd_cfg_verify_group_info(
 		return (NSCD_SUCCESS);
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-	(me, "ERROR: group (%s) info mismatched: group info "
+	    (me, "ERROR: group (%s) info mismatched: group info "
 	    "(%d, %#6.4x) not equal to that of default configuration data "
 	    "(%d, %#6.4x)\n", gdesc->id.name, g_info->num_param,
 	    _nscd_cfg_bitmap_value(g_info->bitmap), gi->num_param,
@@ -314,7 +316,7 @@ _nscd_cfg_verify_group_info(
 
 
 static nscd_rc_t
-_nscd_cfg_init_nsw()
+_nscd_cfg_init_nsw(void)
 {
 	char			*me = "_nscd_cfg_init_nsw";
 	int			i, j, idx, rc, num;
@@ -355,8 +357,8 @@ _nscd_cfg_init_nsw()
 
 				_NSCD_LOG(NSCD_LOG_CONFIG,
 				    NSCD_LOG_LEVEL_ERROR)
-				(me, "unable to add index entry for "
-				"nsswitch entry %s\n", id->name);
+				    (me, "unable to add index entry for "
+				    "nsswitch entry %s\n", id->name);
 
 				_nscd_free_db(cfg_paramDB);
 				return (rc);
@@ -368,7 +370,7 @@ _nscd_cfg_init_nsw()
 }
 
 static nscd_rc_t
-_nscd_cfg_init_param()
+_nscd_cfg_init_param(void)
 {
 	char			*me = "_nscd_cfg_init_param";
 	int			i, gi, fn = 0;
@@ -422,8 +424,8 @@ _nscd_cfg_init_param()
 
 				_NSCD_LOG(NSCD_LOG_CONFIG,
 				    NSCD_LOG_LEVEL_ERROR)
-				(me, "ERROR: first parameter "
-				"description is not for a group\n");
+				    (me, "ERROR: first parameter "
+				    "description is not for a group\n");
 
 				return (NSCD_CFG_PARAM_DESC_ERROR);
 			}
@@ -463,14 +465,14 @@ _nscd_cfg_init_param()
 		    i, type)) != NSCD_SUCCESS) {
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to add index entry for parameter "
-			"%s\n", id->name);
+			    (me, "unable to add index entry for parameter "
+			    "%s\n", id->name);
 
 			_nscd_free_db(cfg_paramDB);
 			return (rc);
 		} else {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-			(me, "index entry for parameter "
+			    (me, "index entry for parameter "
 			"%s added\n", id->name);
 		}
 	}
@@ -479,7 +481,7 @@ _nscd_cfg_init_param()
 }
 
 static nscd_rc_t
-_nscd_cfg_init_stat()
+_nscd_cfg_init_stat(void)
 {
 	char			*me = "_nscd_cfg_init_stat";
 	int			i, gi, fn = 0;
@@ -517,7 +519,7 @@ _nscd_cfg_init_stat()
 
 					_NSCD_LOG(NSCD_LOG_CONFIG,
 					    NSCD_LOG_LEVEL_ERROR)
-					(me, "ERROR: group (%s) "
+					    (me, "ERROR: group (%s) "
 					    "info mismatched: "
 					    "group info (%d, %#6.4x) not "
 					    "equal to the predefined one "
@@ -530,7 +532,6 @@ _nscd_cfg_init_stat()
 					    gdesc->gi.bitmap));
 
 					exit(1);
-					return (NSCD_CFG_STAT_DESC_ERROR);
 				}
 			}
 
@@ -548,7 +549,7 @@ _nscd_cfg_init_stat()
 
 				_NSCD_LOG(NSCD_LOG_CONFIG,
 				    NSCD_LOG_LEVEL_ERROR)
-				(me, "ERROR: first stat "
+				    (me, "ERROR: first stat "
 				    "description is not for a group\n");
 
 				return (NSCD_CFG_STAT_DESC_ERROR);
@@ -585,15 +586,15 @@ _nscd_cfg_init_stat()
 		    i, type)) != NSCD_SUCCESS) {
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to add index entry for stat "
-			"description %s\n", id->name);
+			    (me, "unable to add index entry for stat "
+			    "description %s\n", id->name);
 
 			_nscd_free_db(cfg_paramDB);
 			return (rc);
 		} else {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-			(me, "index entry for stat description "
-			"%s added\n", id->name);
+			    (me, "index entry for stat description "
+			    "%s added\n", id->name);
 		}
 	}
 
@@ -874,13 +875,12 @@ _nscd_cfg_locate_cfg_data(
 		_nscd_cfg_lock(is_read, *cfglock);
 
 	if (get_group != nscd_true &&
-	    _nscd_cfg_flag_is_not_set(desc->pflag,
-	    NSCD_CFG_PFLAG_GROUP) &&
-	    (_nscd_cfg_flag_is_set(desc->pflag,
-	    NSCD_CFG_PFLAG_VLEN_DATA))) {
+	    _nscd_cfg_flag_is_not_set(desc->pflag, NSCD_CFG_PFLAG_GROUP) &&
+	    (_nscd_cfg_flag_is_set(desc->pflag, NSCD_CFG_PFLAG_VLEN_DATA))) {
 		if (vlen_data_addr != NULL)
 			*vlen_data_addr = *cfg_data;
-		*cfg_data = _nscd_cfg_locate_vlen_data(*cfg_data, len);
+		if (len != NULL)
+			*cfg_data = _nscd_cfg_locate_vlen_data(*cfg_data, len);
 		return (NSCD_SUCCESS);
 	}
 
@@ -1004,7 +1004,7 @@ _nscd_cfg_prelim_check(
 		*errorp = _nscd_cfg_make_error(rc, msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-		(me, "invalid argument: %s\n", (*errorp)->msg);
+		    (me, "invalid argument: %s\n", (*errorp)->msg);
 	}
 
 	return (rc);
@@ -1039,7 +1039,7 @@ _nscd_cfg_notify_i(
 	    NSCD_CFG_PFLAG_GROUP)) {
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "ERROR: expect parameter description for group, "
+		    (me, "ERROR: expect parameter description for group, "
 		    "but receive parameter description is for %s\n",
 		    desc->id.name);
 
@@ -1176,8 +1176,8 @@ static nscd_rc_t
 _nscd_cfg_notify_init(
 	nscd_cfg_error_t	**errorp)
 {
-	int			i, j, skip;
-	nscd_rc_t		rc;
+	int			i, j, skip = 0;
+	nscd_rc_t		rc = NSCD_SUCCESS;
 	nscd_cfg_id_t		*nswdb = NULL;
 	nscd_cfg_param_desc_t	*desc;
 
@@ -1234,7 +1234,7 @@ _nscd_cfg_init(
 	nscd_cfg_error_t		**errorp)
 {
 
-	int				i, j, datalen;
+	int				i, j = 0, datalen;
 	int				dbi = 0, dbj = 0;
 	char				*dest, *src;
 	char				*dbni = NULL, *dbnj = NULL;
@@ -1427,7 +1427,7 @@ _nscd_cfg_get_handle_common(
 			*errorp = _nscd_cfg_make_error(rc, msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-		(me, "invalid argument: %s\n", msg);
+		    (me, "invalid argument: %s\n", msg);
 
 		return (rc);
 	}
@@ -1442,7 +1442,7 @@ _nscd_cfg_get_handle_common(
 			*errorp = _nscd_cfg_make_error(rc, msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-		(me, "invalid argument: %s\n");
+		    (me, "invalid argument: %s\n");
 
 		return (rc);
 	}
@@ -1462,7 +1462,7 @@ _nscd_cfg_get_handle_common(
 	if (i != -1) {
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-		(me, "%s: index of %s is %d\n", desc_str, name, i);
+		    (me, "%s: index of %s is %d\n", desc_str, name, i);
 
 		if (type == NSCD_CFG_LIST_PARAM) {
 			pdesc = &_nscd_cfg_param_desc[i];
@@ -1479,7 +1479,7 @@ _nscd_cfg_get_handle_common(
 			    NSCD_CFG_PFLAG_OBSOLETE)) {
 				_NSCD_LOG(NSCD_LOG_CONFIG,
 				    NSCD_LOG_LEVEL_WARNING)
-				(me, gettext("%s: %s is obsolete and "
+				    (me, gettext("%s: %s is obsolete and "
 				    "will be ignored\n"),
 				    desc_str, name);
 			}
@@ -1499,7 +1499,7 @@ _nscd_cfg_get_handle_common(
 			*errorp = _nscd_cfg_make_error(rc, msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "%s\n", msg);
+		    (me, "%s\n", msg);
 
 		free(h);
 		return (rc);
@@ -1519,7 +1519,7 @@ _nscd_cfg_get_handle_common(
 				*errorp = _nscd_cfg_make_error(rc, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "%s for non-global param or stat %s\n",
+			    (me, "%s for non-global param or stat %s\n",
 			    msg, name);
 
 			free(h);
@@ -1536,7 +1536,7 @@ _nscd_cfg_get_handle_common(
 				*errorp = _nscd_cfg_make_error(rc, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "%s %s\n", msg, name);
+			    (me, "%s %s\n", msg, name);
 
 			free(h);
 			return (rc);
@@ -1556,7 +1556,7 @@ _nscd_cfg_get_handle_common(
 			h->nswdb = &_nscd_cfg_nsw_db[i];
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-		(me, "%s: index of %s is %d\n",
+		    (me, "%s: index of %s is %d\n",
 		    desc_str, nswdb_name, i);
 	} else {
 
@@ -1567,7 +1567,7 @@ _nscd_cfg_get_handle_common(
 			*errorp = _nscd_cfg_make_error(rc, msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "%s\n", msg);
+		    (me, "%s\n", msg);
 
 		free(h);
 		return (NSCD_CFG_UNSUPPORTED_SWITCH_DB);
@@ -1705,7 +1705,7 @@ _nscd_cfg_copy_param_data(
 
 	if (desc == NULL || dest == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "input desc == %p, dest == %p\n", desc, dest);
+		    (me, "input desc == %p, dest == %p\n", desc, dest);
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
@@ -1811,7 +1811,7 @@ _nscd_cfg_copy_group_data_out(
 
 	if (group_dest == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "input group_dest = NULL\n");
+		    (me, "input group_dest = NULL\n");
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
@@ -1846,7 +1846,7 @@ _nscd_cfg_copy_group_data_out(
 		    nscd_false, nscd_true);
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to copy param data for %s\n",
+			    (me, "unable to copy param data for %s\n",
 			    desc->id.name);
 
 			_nscd_cfg_free_vlen_data_group(gdesc,
@@ -1893,19 +1893,19 @@ _nscd_cfg_copy_group_data_merge(
 
 	if (group_dest == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "input **group_dest == NULL\n");
+		    (me, "input **group_dest == NULL\n");
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
 	if (group_cfg == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "input **group_cfg == NULL\n");
+		    (me, "input **group_cfg == NULL\n");
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
 	if (param_index != NULL && pdata == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "param_index != NULL but pdata == %p\n", pdata);
+		    (me, "param_index != NULL but pdata == %p\n", pdata);
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
@@ -1963,7 +1963,7 @@ _nscd_cfg_copy_group_data_merge(
 		    nscd_true, nscd_true);
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to copy param data for %s\n",
+			    (me, "unable to copy param data for %s\n",
 			    desc->id.name);
 
 			_nscd_cfg_free_vlen_data_group(gdesc,
@@ -2016,7 +2016,7 @@ _nscd_cfg_get(
 
 	if (data == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "input data = %p\n", data);
+		    (me, "input data = %p\n", data);
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
@@ -2024,7 +2024,7 @@ _nscd_cfg_get(
 
 	if (handle == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "handle is NULL\n");
+		    (me, "handle is NULL\n");
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
@@ -2043,7 +2043,7 @@ _nscd_cfg_get(
 	if (rc != NSCD_SUCCESS) {
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "unable to locate config data\n");
+		    (me, "unable to locate config data\n");
 		return (rc);
 
 	} else if (cfg_data == NULL) /* NULL vlen data */
@@ -2060,8 +2060,8 @@ _nscd_cfg_get(
 		rc = _nscd_cfg_copy_group_data_out(desc, ptr, cfg_data);
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to copy group data %p: "
-			"error = %d\n", cfg_data, rc);
+			    (me, "unable to copy group data %p: "
+			    "error = %d\n", cfg_data, rc);
 
 			goto error_exit;
 		}
@@ -2076,8 +2076,8 @@ _nscd_cfg_get(
 
 		if (rc != NSCD_SUCCESS) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to copy param data %p: "
-			"error = %d\n", cfg_data, rc);
+			    (me, "unable to copy param data %p: "
+			    "error = %d\n", cfg_data, rc);
 
 			goto error_exit;
 		}
@@ -2284,7 +2284,7 @@ _nscd_cfg_str_to_data(
 
 	if (desc == NULL || str == NULL || data == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "ERROR: one of the following is NULL "
+		    (me, "ERROR: one of the following is NULL "
 		    "desc = %p, str = %p, data = %p, data_p = %p\n",
 		    desc, str, data, data_p);
 
@@ -2303,7 +2303,7 @@ _nscd_cfg_str_to_data(
 			    msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "ERROR: %s)\n", msg);
+		    (me, "ERROR: %s)\n", msg);
 
 		return (NSCD_INVALID_ARGUMENT);
 
@@ -2336,7 +2336,7 @@ _nscd_cfg_str_to_data(
 			    msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "ERROR: %s\n", msg);
+		    (me, "ERROR: %s\n", msg);
 
 		return (NSCD_INVALID_ARGUMENT);
 
@@ -2346,22 +2346,21 @@ _nscd_cfg_str_to_data(
 
 	case NSCD_CFG_DATA_BOOLEAN:
 
-		if (strcasecmp(str, "yes") == 0)
+		if (strcasecmp(str, "yes") == 0) {
 			*(nscd_bool_t *)data = nscd_true;
-		else if (strcasecmp(str, "no") == 0)
+		} else if (strcasecmp(str, "no") == 0) {
 			*(nscd_bool_t *)data = nscd_false;
-		else {
+		} else {
+			(void) snprintf(msg, sizeof (msg),
+			gettext("data (%s) must be 'yes' or 'no' for %s"),
+			    str, desc->id.name);
 
-		(void) snprintf(msg, sizeof (msg),
-		gettext("data (%s) must be 'yes' or 'no' for %s"),
-		    str, desc->id.name);
-
-		if (errorp != NULL)
-			*errorp = _nscd_cfg_make_error(NSCD_INVALID_ARGUMENT,
-			    msg);
+			if (errorp != NULL)
+				*errorp = _nscd_cfg_make_error(
+				    NSCD_INVALID_ARGUMENT, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "ERROR: %s\n", msg);
+			    (me, "ERROR: %s\n", msg);
 
 			return (NSCD_INVALID_ARGUMENT);
 		}
@@ -2382,7 +2381,7 @@ _nscd_cfg_str_to_data(
 				*errorp = _nscd_cfg_make_error(rc, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "ERROR: %s\n", msg);
+			    (me, "ERROR: %s\n", msg);
 
 			return (rc);
 		}
@@ -2403,7 +2402,7 @@ _nscd_cfg_str_to_data(
 				*errorp = _nscd_cfg_make_error(rc, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "ERROR: %s\n", msg);
+			    (me, "ERROR: %s\n", msg);
 
 			return (rc);
 		}
@@ -2439,7 +2438,7 @@ _nscd_cfg_set(
 
 	if (handle == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "handle is NULL\n");
+		    (me, "handle is NULL\n");
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
@@ -2454,7 +2453,7 @@ _nscd_cfg_set(
 	if (data == NULL && _nscd_cfg_flag_is_not_set(desc->pflag,
 	    NSCD_CFG_PFLAG_VLEN_DATA)) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "data == NULL\n");
+		    (me, "data == NULL\n");
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
@@ -2471,19 +2470,21 @@ _nscd_cfg_set(
 	    nswdb, get_group, &vdata_addr, &dlen, &lock);
 	if (rc != NSCD_SUCCESS) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "unable to locate config data (rc = %d)\n", rc);
+		    (me, "unable to locate config data (rc = %d)\n", rc);
 		return (rc);
 	}
 
 	if (_nscd_cfg_flag_is_set(desc->pflag, NSCD_CFG_PFLAG_GROUP) &&
+	    (data == NULL ||
 	    ((nscd_cfg_group_info_t *)cfg_data)->num_param !=
-	    ((nscd_cfg_group_info_t *)data)->num_param) {
+	    ((nscd_cfg_group_info_t *)data)->num_param)) {
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "number of parameters in group <%s : %s> not equal: "
+		    (me, "number of parameters in group <%s : %s> not equal: "
 		    "%d in input data, should be %d\n",
 		    NSCD_STR_OR_GLOBAL(nswdb_name),
 		    NSCD_STR_OR_NULL(param_name),
+		    data == NULL ? -1 :
 		    ((nscd_cfg_group_info_t *)data)->num_param,
 		    ((nscd_cfg_group_info_t *)cfg_data)->num_param);
 
@@ -2503,41 +2504,40 @@ _nscd_cfg_set(
 	 * to verify the data or notify the associated
 	 * component
 	 */
-		if (get_group == nscd_true) {
+	if (get_group == nscd_true) {
 
-			gdesc = &_nscd_cfg_param_desc[desc->g_index];
+		gdesc = &_nscd_cfg_param_desc[desc->g_index];
 
-			rc = _nscd_cfg_copy_group_data_merge(
-			    gdesc, &pdata, data, cfg_data,
-			    desc->id.index, data);
-
-			if (rc != NSCD_SUCCESS) {
-				_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-				(me, "unable to copy group data <%s : %s>\n",
-				    NSCD_STR_OR_GLOBAL(nswdb_name),
-				    NSCD_STR_OR_NULL(param_name));
-
-				goto error_exit;
-			}
-
-			rc = _nscd_cfg_notify_s(gdesc, nswdb,
-			    pdata, errorp);
-
-		} else
-			rc = _nscd_cfg_notify_s(desc, nswdb, data,
-			    errorp);
+		rc = _nscd_cfg_copy_group_data_merge(
+		    gdesc, &pdata, data, cfg_data,
+		    desc->id.index, data);
 
 		if (rc != NSCD_SUCCESS) {
-
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "verifying/notifying  of new configuration "
-			    "parameter <%s : %s> failed. %s\n",
+			    (me, "unable to copy group data <%s : %s>\n",
 			    NSCD_STR_OR_GLOBAL(nswdb_name),
-			    param_name, (*errorp && (*errorp)->msg) ?
-			    (*errorp)->msg : "");
+			    NSCD_STR_OR_NULL(param_name));
 
 			goto error_exit;
 		}
+
+		rc = _nscd_cfg_notify_s(gdesc, nswdb, pdata, errorp);
+
+	} else {
+		rc = _nscd_cfg_notify_s(desc, nswdb, data, errorp);
+	}
+
+	if (rc != NSCD_SUCCESS) {
+
+		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
+		    (me, "verifying/notifying  of new configuration "
+		    "parameter <%s : %s> failed. %s\n",
+		    NSCD_STR_OR_GLOBAL(nswdb_name),
+		    param_name, (*errorp && (*errorp)->msg) ?
+		    (*errorp)->msg : "");
+
+		goto error_exit;
+	}
 
 	/*
 	 * Move the new config into the config store
@@ -2565,7 +2565,7 @@ _nscd_cfg_set(
 	if (rc != NSCD_SUCCESS) {
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "unable to make new param data <%s : %s> current\n",
+		    (me, "unable to make new param data <%s : %s> current\n",
 		    NSCD_STR_OR_GLOBAL(nswdb_name),
 		    NSCD_STR_OR_NULL(param_name));
 	}
@@ -2595,7 +2595,7 @@ _nscd_cfg_set_linked(
 
 	if (handle == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "handle is NULL\n");
+		    (me, "handle is NULL\n");
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
@@ -2642,7 +2642,7 @@ _nscd_cfg_set_linked(
 				*errorp = _nscd_cfg_make_error(rc, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-			(me, "ERROR: %s\n", msg);
+			    (me, "ERROR: %s\n", msg);
 
 			return (rc);
 		}

@@ -110,7 +110,7 @@ _nscd_free_nsw_config(
 }
 
 void
-_nscd_free_all_nsw_config()
+_nscd_free_all_nsw_config(void)
 {
 
 	nscd_nsw_config_t	**nsw_cfg;
@@ -151,7 +151,7 @@ free_nsw_backend_info_db(nscd_acc_data_t *data)
 }
 
 void
-_nscd_free_all_nsw_backend_info_db()
+_nscd_free_all_nsw_backend_info_db(void)
 {
 
 	nscd_db_t	**db;
@@ -689,7 +689,7 @@ _nscd_init_all_nsw_be_info_db(void)
 
 
 nscd_rc_t
-_nscd_alloc_nsw_config()
+_nscd_alloc_nsw_config(void)
 {
 	nscd_nsw_config = calloc(NSCD_NUM_DB, sizeof (nscd_nsw_config_t **));
 	if (nscd_nsw_config == NULL)
@@ -699,7 +699,7 @@ _nscd_alloc_nsw_config()
 }
 
 nscd_rc_t
-_nscd_alloc_nsw_be_info_db()
+_nscd_alloc_nsw_be_info_db(void)
 {
 	int	i;
 
@@ -726,7 +726,7 @@ _nscd_alloc_nsw_be_info_db()
 }
 
 nscd_rc_t
-_nscd_populate_nsw_backend_info()
+_nscd_populate_nsw_backend_info(void)
 {
 	int		i;
 	nscd_rc_t	rc;
@@ -736,7 +736,7 @@ _nscd_populate_nsw_backend_info()
 			continue;
 		rc = _nscd_populate_nsw_backend_info_db(i);
 		if (rc != NSCD_SUCCESS)
-		return (rc);
+			return (rc);
 	}
 
 	return (NSCD_SUCCESS);

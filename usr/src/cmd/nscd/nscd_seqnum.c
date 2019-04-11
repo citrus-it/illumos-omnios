@@ -33,7 +33,7 @@ static nscd_cookie_num_t	cookie_num = 1234;
 static mutex_t			cookie_mutex = DEFAULTMUTEX;
 
 nscd_seq_num_t
-_nscd_get_seq_num()
+_nscd_get_seq_num(void)
 {
 	nscd_seq_num_t	seq_num;
 
@@ -46,7 +46,7 @@ _nscd_get_seq_num()
 }
 
 nscd_cookie_num_t
-_nscd_get_cookie_num()
+_nscd_get_cookie_num(void)
 {
 	nscd_cookie_num_t	ret;
 

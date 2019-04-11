@@ -51,7 +51,7 @@ typedef struct nscd_int_addr {
  * memory allocated by _nscd_alloc.
  */
 void *
-_nscd_create_int_addrDB()
+_nscd_create_int_addrDB(void)
 {
 
 	nscd_db_t	*ret;
@@ -239,7 +239,7 @@ _nscd_del_int_addr(
  * Destroy the internal address database.
  */
 void
-_nscd_destroy_int_addrDB()
+_nscd_destroy_int_addrDB(void)
 {
 	(void) rw_wrlock(&addrDB_rwlock);
 	_nscd_free_db(addrDB);
