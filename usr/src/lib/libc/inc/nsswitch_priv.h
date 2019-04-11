@@ -113,7 +113,7 @@ struct __nsw_switchconfig_v1 {
 	((lkp)->next == NULL ? \
 		__NSW_RETURN \
 	: \
-		((err) >= 0 && (err) < __NSW_STD_ERRS_V1 ? \
+		((err) < __NSW_STD_ERRS_V1 ? \
 			(lkp)->actions[err] \
 		: \
 			__nsw_extended_action_v1(lkp, err)))

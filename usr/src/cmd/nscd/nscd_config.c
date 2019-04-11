@@ -89,7 +89,7 @@ _nscd_cfg_get_list(
 {
 	char			*me = "_nscd_cfg_get_list";
 	int			i, num, size;
-	nscd_cfg_id_t		*l;
+	nscd_cfg_id_t		*l = NULL;
 	nscd_cfg_list_t 	*ret;
 	nscd_cfg_param_desc_t	*pl;
 	nscd_cfg_stat_desc_t	*sl;
@@ -373,7 +373,7 @@ static nscd_rc_t
 _nscd_cfg_init_param(void)
 {
 	char			*me = "_nscd_cfg_init_param";
-	int			i, gi, fn = 0;
+	int			i, gi = 0, fn = 0;
 	nscd_cfg_id_t		*id;
 	nscd_cfg_param_desc_t	*desc, *gdesc = NULL;
 	nscd_cfg_group_info_t	g_info;
@@ -484,7 +484,7 @@ static nscd_rc_t
 _nscd_cfg_init_stat(void)
 {
 	char			*me = "_nscd_cfg_init_stat";
-	int			i, gi, fn = 0;
+	int			i, gi = 0, fn = 0;
 	nscd_cfg_id_t		*id;
 	nscd_cfg_stat_desc_t	*desc, *gdesc = NULL;
 	nscd_cfg_group_info_t	g_info;
@@ -493,6 +493,8 @@ _nscd_cfg_init_stat(void)
 	void			*gsfunc;
 
 	desc = &_nscd_cfg_stat_desc[0];
+
+	g_info.bitmap = NSCD_CFG_BITMAP_ZERO;
 
 	/*
 	 * need to loop to the last (+1) stat description
@@ -997,6 +999,9 @@ _nscd_cfg_prelim_check(
 
 		rc = NSCD_SUCCESS;
 
+		break;
+
+	default:
 		break;
 	}
 
@@ -2132,6 +2137,8 @@ _nscd_cfg_notify_s(
 	if (errorp != NULL)
 		*errorp = NULL;
 
+	bitmap_in = NSCD_CFG_BITMAP_ZERO;
+
 	/*
 	 * Set data flag going with data to be sent to the
 	 * verify/notify routines. To allow the config flag
@@ -2411,6 +2418,8 @@ _nscd_cfg_str_to_data(
 
 		break;
 
+	default:
+		break;
 	}
 
 	return (NSCD_SUCCESS);
@@ -2426,7 +2435,7 @@ _nscd_cfg_set(
 	char			*me = "_nscd_cfg_set";
 	int			dlen;
 	nscd_cfg_id_t		*nswdb;
-	nscd_cfg_param_desc_t	*desc, *gdesc;
+	nscd_cfg_param_desc_t	*desc, *gdesc = NULL;
 	nscd_cfg_group_info_t	*gi;
 	char			*nswdb_name, *param_name;
 	void			*pdata = NULL;
@@ -2543,8 +2552,7 @@ _nscd_cfg_set(
 	 * Move the new config into the config store
 	 */
 	rc = NSCD_CFG_SET_PARAM_FAILED;
-	if (_nscd_cfg_flag_is_set(desc->pflag,
-	    NSCD_CFG_PFLAG_GROUP)) {
+	if (_nscd_cfg_flag_is_set(desc->pflag, NSCD_CFG_PFLAG_GROUP)) {
 		gi = _nscd_cfg_get_gi(pdata);
 		rc = _nscd_cfg_copy_group_data_in(gdesc, gi,
 		    cfg_data, pdata);

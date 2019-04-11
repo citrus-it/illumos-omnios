@@ -225,7 +225,7 @@ _nsw_getoneconfig_v1(const char *name, char *linep, enum __nsw_parse_err *errp)
 				lkp->actions[i] = __NSW_CONTINUE;
 
 		/* get criteria for the naming service */
-		if (tokenp = skip(&linep, '[')) { /* got criteria */
+		if ((tokenp = skip(&linep, '[')) != NULL) { /* got criteria */
 
 			/* premature end, illegal char following [ */
 			if (!islabel(*linep))

@@ -144,6 +144,8 @@ scan_hash(
 					if (id_num == db_entry->id_num)
 						id_matched = 1;
 					break;
+				default:
+					break;
 				}
 			}
 		}
@@ -237,6 +239,8 @@ _nscd_add_db_entry(
 			if (strcasecmp(db_entry->name, str) != 0)
 				break;
 			return (NSCD_DB_ENTRY_FOUND);
+		default:
+			break;
 		}
 
 		if (idx_p->next_p == NULL) {
@@ -332,6 +336,9 @@ _nscd_delete_db_entry(
 		case NSCD_DEL_ALL_DB_ENTRY:
 			prev_p = idx_p->prev_p;
 			next_p = idx_p->next_p;
+			break;
+
+		default:
 			break;
 		}
 

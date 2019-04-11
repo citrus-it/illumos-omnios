@@ -50,7 +50,7 @@ _nscd_free_nsw_state(
 	if (s == NULL)
 		return;
 
-	if (s->nsw_cfg_p != NULL)
+	if (s->nsw_cfg_p != NULL) {
 		/*
 		 * an nsw state without base does not reference
 		 * count the nsw config data (ie not using a
@@ -61,6 +61,7 @@ _nscd_free_nsw_state(
 			_nscd_release((nscd_acc_data_t *)s->nsw_cfg_p);
 		else
 			(void) _nscd_set((nscd_acc_data_t *)s->nsw_cfg_p, NULL);
+	}
 
 	if (s->be_db_pp != NULL) {
 		for (i = 0; i < s->max_src; i++) {
@@ -357,7 +358,7 @@ check_be_array(
 
 		if (i == 0)
 			lkp = s->config->lookups;
-		else if (lpk != NULL)
+		else if (lkp != NULL)
 			lkp = lkp->next;
 		if (lkp == NULL)
 			return;
@@ -542,15 +543,16 @@ _get_nsw_state_int(
 		ctrl_p->waiter++;
 
 		while (wait_cond) {
-			if (!thread_only)
+			if (!thread_only) {
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
 				    NSCD_LOG_LEVEL_DEBUG)
-				(me, "waiting for nsw state signal\n");
-			else
+				    (me, "waiting for nsw state signal\n");
+			} else {
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
 				    NSCD_LOG_LEVEL_DEBUG)
-				(me, "waiting for per thread "
+				    (me, "waiting for per thread "
 				    "nsw state signal\n");
+			}
 
 			if (thread_only) {
 				_nscd_cond_wait((nscd_acc_data_t *)base,
@@ -566,17 +568,18 @@ _get_nsw_state_int(
 					wait_cond = 0;
 			}
 
-			if (!thread_only)
+			if (!thread_only) {
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
 				    NSCD_LOG_LEVEL_DEBUG)
-				(me, "woke from cond wait ...wait_cond = %d\n",
-				    wait_cond);
-			else
+				    (me, "woke from cond wait "
+				    "...wait_cond = %d\n", wait_cond);
+			} else {
 
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
 				    NSCD_LOG_LEVEL_DEBUG)
-				(me, "woke from cond wait (per thread) "
+				    (me, "woke from cond wait (per thread) "
 				    "...wait_cond = %d\n", wait_cond);
+			}
 
 		}
 

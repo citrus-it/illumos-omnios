@@ -1486,7 +1486,7 @@ check_user_process(void *arg)
 		}
 
 		/* for each active process */
-		while (ep = readdir(dp)) {
+		while ((ep = readdir(dp)) != NULL) {
 			if (ep->d_name[0] == '.')    /* skip . and .. */
 				continue;
 			if (check_uid(ep->d_name) == 0) {
