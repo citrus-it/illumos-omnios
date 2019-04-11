@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 # Makefile for name service cache daemon
 #
@@ -30,6 +31,8 @@ MANIFEST=	name-service-cache.xml
 SVCMETHOD=	svc-nscd
 
 include ../Makefile.cmd
+include ../Makefile.ctf
+include ../Makefile.cmd.64
 
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 
@@ -55,9 +58,6 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -DSUN_THREADS \
 		-I../../lib/libc/port/gen -I../../lib/libc/inc \
 		-I../../lib/libsldap/common
-LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
-LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS +=	-erroff=E_NAME_DEF_NOT_USED2
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-uninitialized
@@ -87,9 +87,6 @@ all: $(PROG) $(NISPROG)
 ${PROG}: ${OBJS}
 	${LINK.c} ${OPT} -o $@ ${OBJS} ${PROGLIBS}
 	${POST_PROCESS}
-
-lint:
-	$(LINT.c) ${SRCS} ${PROGLIBS}
 
 cstyle:
 	${CSTYLE} ${SRCS}
