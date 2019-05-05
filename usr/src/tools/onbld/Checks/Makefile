@@ -23,39 +23,23 @@
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-# Copyright 2010, Richard Lowe
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016, Joyent, Inc.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 
-include $(SRC)/Makefile.master
 include ../../Makefile.tools
 
-PYSRCS = \
-	CStyle.py	\
-	Cddl.py		\
-	CmtBlk.py	\
-	Comments.py	\
-	Copyright.py	\
-	DbLookups.py	\
-	HdrChk.py	\
-	Keywords.py	\
-	ManLint.py	\
-	Mapfile.py	\
-	ProcessCheck.py \
-	SpellCheck.py \
-	WsCheck.py \
-	__init__.py
+SUBDIRS=
+$(BUILDPY2TOOLS)SUBDIRS += py2
+$(BUILDPY3TOOLS)SUBDIRS += py3
 
-PYOBJS =	$(PYSRCS:%.py=%.pyc)
-PYTOPDIR =	$(ROOTONBLDLIB)
-PYMODDIR =	onbld/Checks
+all :=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
 
-include ../../Makefile.python
+all install clean clobber: $(SUBDIRS)
 
-all: $(PYVERSOJBS)
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-install: all $(ROOTPYFILES)
+FRC:
 
-clean:
-
-clobber: clean pyclobber

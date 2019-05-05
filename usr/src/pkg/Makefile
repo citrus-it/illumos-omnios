@@ -193,6 +193,8 @@ PKGMOG_DEFINES= \
 	PYTHON3_PKGVERS=$(PYTHON3_PKGVERS) \
 	python2_ONLY=$(BUILDPY2) \
 	python3_ONLY=$(BUILDPY3) \
+	python2tools_ONLY=$(BUILDPY2TOOLS) \
+	python3tools_ONLY=$(BUILDPY3TOOLS) \
 	HUMAN_VERSION=$(VERSION)
 
 PKGDEP_TOKENS_i386= \
@@ -266,7 +268,7 @@ PUB_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.pub) $(PKGS:%=$(PDIR)/%.pub)
 #
 #	PKGSTAT		meaning
 #	----------	----------------------------------------------------
-# 	noincorp	Do not include in incorporation or group package
+#	noincorp	Do not include in incorporation or group package
 #	obsolete	Include in incorporation, but not group package
 #	renamed		Include in incorporation, but not group package
 #	current		Include in incorporation and group package
