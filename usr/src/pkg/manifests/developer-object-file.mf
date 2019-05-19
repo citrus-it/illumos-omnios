@@ -33,8 +33,10 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/bin/$(ARCH64)
 dir path=usr/lib
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/elfedit
+dir path=usr/lib/elfedit/$(ARCH32)
 dir path=usr/lib/elfedit/$(ARCH64)
 dir path=usr/share
 dir path=usr/share/lib
@@ -113,7 +115,7 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/backup/dump/THIRDPARTYLICENSE \
     license=usr/src/cmd/backup/dump/THIRDPARTYLICENSE
-link path=usr/lib/elfedit/32 target=.
+link path=usr/lib/elfedit/32 target=$(ARCH32)
 link path=usr/lib/elfedit/64 target=$(ARCH64)
 depend fmri=developer/illumos-gcc type=require
 depend fmri=runtime/perl$(PERL_PKGVERS) type=require

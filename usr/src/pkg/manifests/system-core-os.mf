@@ -207,6 +207,7 @@ dir path=usr/lib/rcm/scripts
 dir path=usr/lib/reparse
 dir path=usr/lib/saf
 dir path=usr/lib/secure
+dir path=usr/lib/secure/$(ARCH32)
 dir path=usr/lib/secure/$(ARCH64)
 dir path=usr/lib/security
 dir path=usr/lib/sysevent
@@ -1339,7 +1340,7 @@ link path=usr/lib/fs/hsfs/mount target=../../../../etc/fs/hsfs/mount
 link path=usr/lib/fs/ufs/mount target=../../../../etc/fs/ufs/mount
 link path=usr/lib/inet/in.mpathd target=../../../lib/inet/in.mpathd
 link path=usr/lib/ld.so.1 target=../../lib/ld.so.1
-link path=usr/lib/secure/32 target=.
+link path=usr/lib/secure/32 target=$(ARCH32)
 link path=usr/lib/secure/64 target=$(ARCH64)
 link path=usr/mail target=../var/mail
 link path=usr/net/nls/listen target=../../lib/saf/listen

@@ -349,14 +349,19 @@ amd64_DIRS64= \
 
 DIRS64= \
 	$($(MACH64)_DIRS64) \
+	/lib/$(MACH32) \
 	/lib/$(MACH64) \
+	/lib/crypto/$(MACH32) \
 	/lib/crypto/$(MACH64) \
 	/lib/fm/$(MACH64) \
+	/lib/secure/$(MACH32) \
 	/lib/secure/$(MACH64) \
 	/usr/bin/$(MACH64) \
+	/usr/lib/$(MACH32) \
 	/usr/lib/$(MACH64) \
 	/usr/lib/$(MACH64)/gss \
 	/usr/lib/brand/sn1/$(MACH64) \
+	/usr/lib/elfedit/$(MACH32) \
 	/usr/lib/elfedit/$(MACH64) \
 	/usr/lib/fm/$(MACH64) \
 	/usr/lib/fs/nfs/$(MACH64) \
@@ -364,6 +369,7 @@ DIRS64= \
 	/usr/lib/inet/$(MACH64) \
 	/usr/lib/krb5/$(MACH64) \
 	/usr/lib/link_audit/$(MACH64) \
+	/usr/lib/lwp/$(MACH32) \
 	/usr/lib/lwp/$(MACH64) \
 	/usr/lib/mdb/kvm/$(MACH64) \
 	/usr/lib/mdb/proc/$(MACH64) \
@@ -372,6 +378,7 @@ DIRS64= \
 	/usr/lib/rcap/$(MACH64) \
 	/usr/lib/sasl/$(MACH64) \
 	/usr/lib/scsi/$(MACH64) \
+	/usr/lib/secure/$(MACH32) \
 	/usr/lib/secure/$(MACH64) \
 	/usr/lib/security/$(MACH64) \
 	/usr/lib/smbsrv/$(MACH64) \
@@ -477,9 +484,9 @@ $(ROOT)/system/object:=		DIRMODE= 555
 #
 $(ROOT)/usr/lib/cron:=			LINKDEST=../../etc/cron.d
 $(ROOT)/bin:=				LINKDEST=usr/bin
-$(ROOT)/lib/32:=			LINKDEST=.
-$(ROOT)/lib/crypto/32:=			LINKDEST=.
-$(ROOT)/lib/secure/32:=			LINKDEST=.
+$(ROOT)/lib/32:=			LINKDEST=i386
+$(ROOT)/lib/crypto/32:=			LINKDEST=i386
+$(ROOT)/lib/secure/32:=			LINKDEST=i386
 $(ROOT)/dev/stdin:=			LINKDEST=fd/0
 $(ROOT)/dev/stdout:=			LINKDEST=fd/1
 $(ROOT)/dev/stderr:=			LINKDEST=fd/2
@@ -494,10 +501,10 @@ $(ROOT)/usr/news:=			LINKDEST=../var/news
 $(ROOT)/usr/preserve:=			LINKDEST=../var/preserve
 $(ROOT)/usr/spool:=			LINKDEST=../var/spool
 $(ROOT)/usr/tmp:=			LINKDEST=../var/tmp
-$(ROOT)/usr/lib/32:=			LINKDEST=.
-$(ROOT)/usr/lib/elfedit/32:=		LINKDEST=.
-$(ROOT)/usr/lib/lwp/32:=		LINKDEST=.
-$(ROOT)/usr/lib/secure/32:=		LINKDEST=.
+$(ROOT)/usr/lib/32:=			LINKDEST=i386
+$(ROOT)/usr/lib/elfedit/32:=		LINKDEST=i386
+$(ROOT)/usr/lib/lwp/32:=		LINKDEST=i386
+$(ROOT)/usr/lib/secure/32:=		LINKDEST=i386
 $(ROOT)/var/ld/32:=			LINKDEST=.
 
 $(BUILD64) $(ROOT)/lib/64:=		LINKDEST=$(MACH64)

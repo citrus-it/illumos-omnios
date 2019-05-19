@@ -77,20 +77,25 @@ dir path=etc/flash/postcreation group=sys mode=0700
 dir path=etc/flash/precreation group=sys mode=0700
 dir path=etc/flash/preexit group=sys mode=0700
 dir path=lib
+dir path=lib/$(ARCH32)
 dir path=lib/$(ARCH64)
 dir path=lib/crypto
+dir path=lib/crypto/$(ARCH32)
 dir path=lib/crypto/$(ARCH64)
 dir path=lib/mpxio
 dir path=lib/secure
+dir path=lib/secure/$(ARCH32)
 dir path=lib/secure/$(ARCH64)
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/cfgadm
 dir path=usr/lib/cfgadm/$(ARCH64)
 dir path=usr/lib/iconv/$(ARCH64)
 dir path=usr/lib/lwp
+dir path=usr/lib/lwp/$(ARCH32)
 dir path=usr/lib/lwp/$(ARCH64)
 dir path=usr/lib/scsi
 dir path=usr/lib/scsi/$(ARCH64)
@@ -566,9 +571,9 @@ link path=lib/$(ARCH64)/libthread_db.so.1 target=libc_db.so.1
 link path=lib/$(ARCH64)/libumem.so target=libumem.so.1
 link path=lib/$(ARCH64)/libuuid.so target=libuuid.so.1
 link path=lib/$(ARCH64)/libw.so target=libw.so.1
-link path=lib/32 target=.
+link path=lib/32 target=$(ARCH32)
 link path=lib/64 target=$(ARCH64)
-link path=lib/crypto/32 target=.
+link path=lib/crypto/32 target=$(ARCH32)
 link path=lib/crypto/64 target=$(ARCH64)
 link path=lib/libadm.so target=libadm.so.1
 link path=lib/libaio.so target=libaio.so.1
@@ -624,7 +629,7 @@ link path=lib/libthread_db.so.1 target=libc_db.so.1
 link path=lib/libumem.so target=libumem.so.1
 link path=lib/libuuid.so target=libuuid.so.1
 link path=lib/libw.so target=libw.so.1
-link path=lib/secure/32 target=.
+link path=lib/secure/32 target=$(ARCH32)
 link path=lib/secure/64 target=$(ARCH64)
 link path=usr/lib/$(ARCH64)/libadm.so \
     target=../../../lib/$(ARCH64)/libadm.so.1
@@ -861,7 +866,7 @@ link path=usr/lib/$(ARCH64)/nss_nis.so.1 \
 link path=usr/lib/$(ARCH64)/nss_user.so.1 \
     target=../../../lib/$(ARCH64)/nss_user.so.1
 link path=usr/lib/$(ARCH64)/straddr.so target=straddr.so.2
-link path=usr/lib/32 target=.
+link path=usr/lib/32 target=$(ARCH32)
 link path=usr/lib/64 target=$(ARCH64)
 link path=usr/lib/cfgadm/$(ARCH64)/ib.so target=./ib.so.1
 link path=usr/lib/cfgadm/$(ARCH64)/pci.so target=./pci.so.1
@@ -1018,7 +1023,7 @@ link path=usr/lib/lwp/$(ARCH64)/libthread.so.1 \
     target=../../$(ARCH64)/libthread.so.1
 link path=usr/lib/lwp/$(ARCH64)/libthread_db.so.1 \
     target=../../$(ARCH64)/libthread_db.so.1
-link path=usr/lib/lwp/32 target=.
+link path=usr/lib/lwp/32 target=$(ARCH32)
 link path=usr/lib/lwp/64 target=$(ARCH64)
 link path=usr/lib/lwp/libthread.so.1 target=../libthread.so.1
 link path=usr/lib/lwp/libthread_db.so.1 target=../libthread_db.so.1
