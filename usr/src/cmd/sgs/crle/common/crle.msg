@@ -141,7 +141,7 @@
 
 @ MSG_DEF_NOCONF	"\nDefault configuration file (%s) not found\n"
 
-@ MSG_DEF_NEWDLP	"  Default Library Path (ELF):\t/lib:/usr/lib  \
+@ MSG_DEF_NEWDLP	"  Default Library Path (ELF):\t/lib/32:/usr/lib/32:/lib:/usr/lib  \
 			 (system default)\n"
 @ MSG_DEF_OLDDLP	"  Default Library Path (ELF):\t/usr/lib  \
 			 (system default)\n"
