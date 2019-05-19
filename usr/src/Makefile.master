@@ -27,6 +27,8 @@
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 include $(SRC)/Makefile.cfgparam
@@ -114,11 +116,13 @@ MCS=		/usr/bin/mcs
 CAT=            /usr/bin/cat
 ELFDUMP=	/usr/bin/elfdump
 M4=		/usr/bin/m4
+GM4=		/usr/bin/gm4
 STRIP=		/usr/bin/strip
 LEX=		/usr/bin/lex
 LFLAGS=		-n
 FLEX=		/usr/bin/flex
 YACC=		/usr/bin/yacc
+BISON=		/usr/bin/bison
 CPP=		$(GNUC_ROOT)/cpp
 ANSI_CPP=	$(GNUC_ROOT)/bin/cpp
 CTFCONVERT=	/usr/bin/ctfconvert
