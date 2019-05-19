@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2017 Toomas Soome <tsoome@me.com>
 #
 
 # cmd/cmd-inet/usr.bin/dns-sd/Makefile
@@ -23,7 +23,9 @@ include ../../Makefile.cmd-inet
 OBJS=		ClientCommon.o dns-sd.o
 SRCS=		ClientCommon.c dns-sd.c
 
+SRCDIR=		$(SRC)/contrib/mDNSResponder
 CFLAGS += $(CSTD_GNU99)
+CPPFLAGS += -I$(SRCDIR)/mDNSShared
 CPPFLAGS += -DMDNS_VERSIONSTR_NODTS
 LDLIBS += -ldns_sd
 
@@ -41,5 +43,9 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
+
+%.o:	$(SRCDIR)/Clients/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 include ../../../Makefile.targ

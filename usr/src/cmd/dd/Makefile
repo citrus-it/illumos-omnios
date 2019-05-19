@@ -29,6 +29,7 @@ PROG= dd
 include ../Makefile.cmd
 
 CERRWARN += -Wno-uninitialized
+LDLIBS += -lcmdutils
 
 .KEEP_STATE:
 
@@ -37,6 +38,5 @@ all: $(PROG)
 install: all $(ROOTPROG)
 
 clean:
-
 
 include ../Makefile.targ
