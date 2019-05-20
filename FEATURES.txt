@@ -9,7 +9,7 @@ was changed.
 
 <next> release
 --------------
- - /etc/log symlink to /var/adm/log
+ - /etc/log symlink & /var/adm/log directory
 
 1.3 release
 -----------

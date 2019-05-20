@@ -237,7 +237,6 @@ dir path=usr/share/misc
 dir path=var group=sys
 dir path=var/adm group=sys mode=0775
 dir path=var/adm/exacct group=adm owner=adm
-dir path=var/adm/log group=adm owner=adm
 dir path=var/adm/streams group=sys
 dir path=var/cores group=sys
 dir path=var/cron group=sys

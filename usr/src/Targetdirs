@@ -282,7 +282,6 @@ DIRS= \
 	/var  \
 	/var/adm  \
 	/var/adm/exacct \
-	/var/adm/log \
 	/var/adm/pool \
 	/var/adm/sa \
 	/var/adm/streams \
