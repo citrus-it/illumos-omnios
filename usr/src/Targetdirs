@@ -388,7 +388,6 @@ SYM.DIRS= \
 	/etc/lib/ld.so.1 \
 	/etc/lib/libdl.so.1 \
 	/etc/lib/nss_files.so.1 \
-	/etc/log \
 	/lib/32 \
 	/lib/crypto/32 \
 	/lib/secure/32 \
@@ -487,7 +486,6 @@ $(ROOT)/usr/adm:=			LINKDEST=../var/adm
 $(ROOT)/etc/lib/ld.so.1:=		LINKDEST=../../lib/ld.so.1
 $(ROOT)/etc/lib/libdl.so.1:=		LINKDEST=../../lib/libdl.so.1
 $(ROOT)/etc/lib/nss_files.so.1:=	LINKDEST=../../lib/nss_files.so.1
-$(ROOT)/etc/log:=			LINKDEST=../var/adm/log
 $(ROOT)/platform/i86pc:=		LINKDEST=.
 $(ROOT)/usr/mail:=			LINKDEST=../var/mail
 $(ROOT)/usr/news:=			LINKDEST=../var/news

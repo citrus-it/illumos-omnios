@@ -1309,7 +1309,6 @@ link path=etc/inetd.conf target=./inet/inetd.conf
 link path=etc/lib/ld.so.1 target=../../lib/ld.so.1
 link path=etc/lib/libdl.so.1 target=../../lib/libdl.so.1
 link path=etc/lib/nss_files.so.1 target=../../lib/nss_files.so.1
-link path=etc/log target=../var/adm/log
 link path=etc/netmasks target=./inet/netmasks
 link path=etc/networks target=./inet/networks
 link path=etc/protocols target=./inet/protocols
