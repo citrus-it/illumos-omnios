@@ -22,6 +22,7 @@
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Milan Jurik. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG = svc.startd
@@ -71,6 +72,8 @@ CERRWARN += -Wno-unused-label
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-uninitialized
 
+# these look like real bugs here, but ...
+SMOFF += impossible_mask,signed_integer_overflow_check
 
 %.o:	../common/%.c
 	$(COMPILE.c) $(OUTPUT_OPTION) $<

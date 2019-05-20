@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		nfs
 LIBPROG=	dfshares
@@ -36,6 +37,10 @@ LDLIBS +=	-lrpcsvc
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-parentheses
+
+# not linted
+SMATCH=off
+
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

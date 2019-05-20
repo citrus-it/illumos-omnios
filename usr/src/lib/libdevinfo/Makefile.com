@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libdevinfo.a
 VERS=		.1
@@ -40,6 +41,9 @@ LDLIBS +=	-lnvpair -lsec -lc -lgen
 CPPFLAGS +=	-I..
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

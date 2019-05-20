@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -129,6 +129,8 @@ ASFLAGS += $(ASFLAGS_$(CURTYPE)) -D_ASM $($(TARGETMACH)_AS_XARCH)
 
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-uninitialized
+
+SMOFF += deref_check
 
 # We need to rename some standard functions so we can easily implement them
 # in consumers.

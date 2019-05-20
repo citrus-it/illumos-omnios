@@ -21,8 +21,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/cmd-inet/usr.lib/in.ndpd/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		in.ndpd
 OBJS=		config.o main.o ndp.o tables.o trace.o
@@ -42,6 +41,9 @@ $(OBJS)		:= CPPFLAGS +=  $(_D_UNIX98_EXTN)
 
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 CTFCONVERT_HOOK = && $(CTFCONVERT_O)
 CTFMERGE_HOOK = && $(CTFMERGE) -L VERSION -o $@ $(OBJS)

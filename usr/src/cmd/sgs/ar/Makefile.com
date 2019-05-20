@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG=		ar
@@ -39,6 +40,9 @@ CPPFLAGS=	-I. -I../../include $(CPPFLAGS.master) -I$(ELFCAP)
 CSTD=	$(CSTD_GNU99)
 
 CERRWARN +=	-Wno-uninitialized
+
+SMOFF += signed
+
 LDLIBS +=	-lelf $(CONVLIBDIR) $(CONV_LIB) -lsendfile
 
 BLTDEFS =	msg.h

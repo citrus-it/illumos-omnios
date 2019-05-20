@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 SBINPROG = keyserv newkey
 BINPROG	= keylogout keylogin domainname chkey
@@ -72,6 +73,9 @@ CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-address
 CERRWARN +=	-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 chkey :=	LDLIBS += -lsldap -lmp -lmd
 keyserv :=	LDLIBS += -lmp -lmd

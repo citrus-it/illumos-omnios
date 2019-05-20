@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 
 PROG= 		passmgmt
@@ -41,6 +42,9 @@ LDLIBS +=	-lsecdb
 CERRWARN +=	-Wno-type-limits
 CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 all: $(PROG) $(TXTS)
 

@@ -2,6 +2,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= kadmind
 MANIFEST=	kadmin.xml
@@ -46,6 +47,9 @@ CERRWARN += -Wno-implicit-function-declaration
 CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-function
+
+# not linted
+SMATCH=off
 
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -lgss -L$(KRB5LIB) \

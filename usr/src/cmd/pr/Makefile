@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= pr
 
@@ -33,6 +34,8 @@ DCFILE = $(PROG).dc
 CERRWARN += -Wno-parentheses
 
 CPPFLAGS += -DXPG4
+SMOFF += indenting
+
 $(POFILE) := XGETFLAGS += -a -x pr.xcl
 
 .KEEP_STATE:

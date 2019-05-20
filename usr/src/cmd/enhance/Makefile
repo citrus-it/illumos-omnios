@@ -23,8 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= enhance
 
@@ -39,6 +38,8 @@ CPPFLAGS += -DSTDC_HEADERS=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 \
 	-DHAVE_SYS_SELECT_H=1 -DHAVE_SELECT=1 -DHAVE_SYSV_PTY=1 \
 	-D__EXTENSIONS__=1
 
+
+SMOFF += all_func_returns
 
 .KEEP_STATE:
 

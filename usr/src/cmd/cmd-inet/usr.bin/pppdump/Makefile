@@ -1,6 +1,7 @@
 #
 # Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG=		pppdump
@@ -15,6 +16,9 @@ CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

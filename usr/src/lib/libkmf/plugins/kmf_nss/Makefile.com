@@ -22,8 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Makefile for KMF Plugins
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	kmf_nss.a
 VERS=		.1
@@ -54,6 +53,9 @@ PICS=	$(OBJECTS:%=pics/%)
 CERRWARN	+=	-Wno-unused-label
 CERRWARN	+=	-Wno-unused-value
 CERRWARN	+=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 LDLIBS32	+=	$(NSSLIBS)
 

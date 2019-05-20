@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 RTLD=		ld.so.1
 
@@ -86,6 +87,9 @@ CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-switch
 
+# not linted
+SMATCH=off
+
 # These definitions require that libc be built in the same workspace
 # as the run-time linker and before the run-time linker is built.
 # This is required for the system's self-consistency in any case.
@@ -97,7 +101,7 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) \
 		$(CPICLIB) $(CLIB) \
 		$(LDDBGLIBDIR) $(LDDBG_LIB) \
 		$(RTLDLIB) -lrtld \
-		$(LDLIB) $(LD_LIB) 
+		$(LDLIB) $(LD_LIB)
 
 # The first few lines are essentially duplicating DYNFLAGS, but without the
 # CW & GCC argument prefixes.

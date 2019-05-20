@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=	ldap_cachemgr
 
@@ -47,6 +48,9 @@ CPPFLAGS += 	-DSUN_THREADS \
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 # Message files
 POFILE=		ldap_cachemgr.po

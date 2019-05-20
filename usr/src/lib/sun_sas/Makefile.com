@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libsun_sas.a
 VERS =		.1
@@ -79,6 +79,9 @@ CPPFLAGS +=	-DBUILD_TIME='"Wed Feb 4 12:00:00 2009"'
 
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-unused-value
+
+# not linted
+SMATCH=off
 
 LDLIBS		+= -ldevinfo
 LDLIBS		+= -lsysevent

@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libscf.a
 VERS =		.1
@@ -60,6 +61,9 @@ CERRWARN +=	-Wno-char-subscripts
 CERRWARN +=	-Wno-unused-label
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 MY_NATIVE_CPPFLAGS =\
 		-DNATIVE_BUILD $(DTEXTDOM) \

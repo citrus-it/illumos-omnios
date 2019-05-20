@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		nfs
 TYPEPROG=	rquotad
@@ -35,6 +36,9 @@ XFILE=	$(ROOT)/usr/include/rpcsvc/rquota.x
 
 CERRWARN += -Wno-implicit-function-declaration
 CERRWARN += -Wno-unused-variable
+
+# unknown type for func
+SMATCH=off
 
 $(TYPEPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(LDLIBS) $(OBJS)

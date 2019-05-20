@@ -23,8 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libraidcfg/Makefile.com
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libraidcfg.a
 VERS =		.1
@@ -38,6 +37,9 @@ LDLIBS +=	-ldevinfo -lc
 SRCDIR =	../common
 
 CERRWARN +=	-Wno-type-limits
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

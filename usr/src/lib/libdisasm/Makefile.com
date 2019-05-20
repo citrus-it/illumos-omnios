@@ -121,6 +121,9 @@ ASFLAGS += $(ASFLAGS_$(CURTYPE)) -D_ASM
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
 
+# not linted
+SMATCH=off
+
 CPPFLAGS_standalone = -DDIS_STANDALONE -I$(SRC)/cmd/mdb/common
 CPPFLAGS +=	-I$(COMDIR) $(CPPFLAGS_$(CURTYPE))
 

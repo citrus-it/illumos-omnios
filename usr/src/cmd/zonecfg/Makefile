@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=	zonecfg
 OBJS=	zonecfg.o zonecfg_lex.o zonecfg_grammar.tab.o
@@ -45,6 +46,8 @@ CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-label
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-implicit-function-declaration
+
+SMOFF += all_func_returns
 
 CLOBBERFILES += $(PROG).ln
 

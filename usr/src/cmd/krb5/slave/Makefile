@@ -2,6 +2,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG1=kprop
 PROG2=kpropd
@@ -62,6 +63,9 @@ CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-value
 CERRWARN +=	-Wno-address
+
+# not linted
+SMATCH=off
 
 LDFLAGS +=	$(KRUNPATH) $(KERBRUNPATH)
 LDLIBS +=	-lmech_krb5

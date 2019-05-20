@@ -11,7 +11,7 @@
 #
 # Copyright (c) 2014 Racktop Systems.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 # Link against libc as per solaris specs
 $(PERLEXT):= LDLIBS += -lc
@@ -31,6 +31,8 @@ PCFLAGS= -DPERL_EUPXS_ALWAYS_EXPORT \
 	-DPERL_USE_SAFE_PUTENV
 PCFLAGS64=-DPERL_EUPXS_ALWAYS_EXPORT \
 	-DPERL_USE_SAFE_PUTENV
+
+SMATCH=off
 
 $(MACH) $(MACH64):
 	$(INS.dir)

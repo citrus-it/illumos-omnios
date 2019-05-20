@@ -20,7 +20,8 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
-# 
+#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libsmbns.a
 VERS= .1
@@ -54,6 +55,9 @@ LDLIBS +=	-lsmb -lads -lgss -lcmdutils -lldap \
 CPPFLAGS +=	-Dsyslog=smb_syslog
 CERRWARN +=	-Wno-unused-function
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 include ../../Makefile.targ
 include ../../../Makefile.targ

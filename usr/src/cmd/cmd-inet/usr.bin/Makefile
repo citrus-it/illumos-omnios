@@ -24,6 +24,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG=		finger rdate ruptime rwho whois
@@ -50,6 +51,8 @@ CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-function
 
+ruptime :=     SMOFF += leaks
+
 finger :=		LDLIBS += -lncurses
 
 .KEEP_STATE:
@@ -69,4 +72,4 @@ clean_local:
 
 clobber: $(SUBDIRS) clobber_local
 clobber_local: clean_local
-	$(RM) $(CLOBBERFILES) 
+	$(RM) $(CLOBBERFILES)

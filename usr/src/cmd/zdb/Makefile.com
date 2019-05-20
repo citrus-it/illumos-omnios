@@ -23,7 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2017 RackTop Systems.
 #
 
 PROG:sh=	cd ..; basename `pwd`
@@ -48,6 +49,8 @@ CPPFLAGS += $(INCS) -DDEBUG
 CERRWARN += -Wmissing-braces
 CERRWARN += -Wsign-compare
 CERRWARN += -Wmissing-field-initializers
+
+SMOFF += 64bit_shift,all_func_returns
 
 .KEEP_STATE:
 

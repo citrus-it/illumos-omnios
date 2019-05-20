@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libsldap.a
 VERS= .1
@@ -50,6 +51,9 @@ CPPFLAGS +=	-I../common -I$(SRC)/lib/libldap5/include/ldap \
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

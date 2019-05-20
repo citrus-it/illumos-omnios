@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libmapid.a
 VERS	=	.1
@@ -54,6 +54,8 @@ CPPFLAGS +=	-I$(SRCDIR) -I$(SMF_DIR)
 CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-uninitialized
+
+SMOFF += all_func_returns
 
 .KEEP_STATE:
 

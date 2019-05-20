@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= shp.a
 VERS= .1
@@ -50,6 +51,9 @@ CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-char-subscripts
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2017 Joyent Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG=iconv
@@ -29,6 +29,9 @@ YFLAGS		= -d -b parser
 $(RELEASE_BUILD) CPPFLAGS += -DNDEBUG
 
 CERRWARN +=	-Wno-unused-label
+
+# not linted
+SMATCH=off
 
 CLEANFILES	= $(OBJS) parser.tab.c parser.tab.h
 CLOBBERFILES	= $(PROG) $(POFILE)

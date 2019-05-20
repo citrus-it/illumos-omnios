@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 MODULE = fabric-xlate
 CLASS = common
@@ -40,3 +41,6 @@ LDLIBS += -luutil -lxml2 -L$(ROOTLIB)/fm -ltopo
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off

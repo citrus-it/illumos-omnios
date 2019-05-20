@@ -26,6 +26,7 @@
 #
 # Copyright 2015 Nexenta Systems, Inc.  All right reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 .KEEP_STATE:
 
@@ -49,3 +50,6 @@ CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-unused-label
+
+# not linted
+SMATCH=off

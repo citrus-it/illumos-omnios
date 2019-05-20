@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 RackTop Systems.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 FSTYPE=		autofs
@@ -92,6 +93,9 @@ CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-label
 CERRWARN +=	-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 OBJS=		$(AUTOOBJS) $(MOUNTOBJS) $(TYPEOBJS) \
 		$(SHAREOBJS) $(UNSHAREOBJS)

@@ -83,6 +83,8 @@ CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-parentheses
 
+# not linted
+SMATCH=off
 
 $(DYNLIB)  := LDLIBS += \
 	-lnvpair -lelf -lumem -lxml2 -lkstat -luuid -ldevinfo \

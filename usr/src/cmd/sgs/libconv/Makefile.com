@@ -90,6 +90,9 @@ include 	$(SRC)/cmd/sgs/Makefile.com
 CERRWARN	+= -Wno-type-limits
 CERRWARN	+= -Wno-switch
 
+# not linted
+SMATCH=off
+
 CTFCONVERT_O=
 
 PICS=		$(OBJECTS:%=pics/%) pics/demangle.o

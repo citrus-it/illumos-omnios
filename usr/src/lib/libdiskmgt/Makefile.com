@@ -23,7 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2016 Nexenta Systems, Inc.
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libdiskmgt.a
 VERS =		.1
@@ -61,6 +61,9 @@ CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
 CPPFLAGS +=	-I$(SRC)/lib/libdiskmgt/common 
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

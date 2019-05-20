@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 NETYPPROG =	rpc.ypupdated
 PROG =		$(NETYPPROG)
@@ -53,6 +54,9 @@ SRCS =			$(OBJS:%.o=%.c)
 
 CERRWARN +=		-Wno-implicit-function-declaration
 CERRWARN +=		-Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 CLOBBERFILES += ypupdated_prot.h
 

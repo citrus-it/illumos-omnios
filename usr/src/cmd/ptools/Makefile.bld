@@ -25,6 +25,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG:sh = basename `cd ..; pwd`
 
@@ -68,6 +69,8 @@ CERRWARN_pstack	+= -Wno-clobbered
 
 CERRWARN_pargs	+= -Wno-clobbered
 CERRWARN_pargs	+= -Wno-type-limits
+
+CERRWARN_pwait	+= -_smatch=off
 
 CERRWARN += $(CERRWARN_$(PROG))
 

@@ -26,6 +26,7 @@
 #
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include		$(SRC)/cmd/Makefile.cmd
 
@@ -34,6 +35,9 @@ SRCS = $(PROG:%=../%.c)
 
 CERRWARN +=	-Wno-unused-value
 CERRWARN +=	-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 LDLIBS +=	-lelf
 

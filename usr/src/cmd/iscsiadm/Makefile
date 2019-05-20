@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG = iscsiadm
 OBJS = cmdparse.o sun_ima.o iscsiadm_main.o
@@ -43,6 +43,9 @@ CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-unused-function
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 FILEMODE= 0555
 

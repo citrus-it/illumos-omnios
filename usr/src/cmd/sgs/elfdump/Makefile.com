@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG=		elfdump
@@ -53,6 +54,9 @@ LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(CONVLIBDIR) $(CONV_LIB)
 
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 BLTDEFS =	msg.h
 BLTDATA =	msg.c

@@ -11,6 +11,7 @@
 
 #
 # Copyright 2010 Chris Love.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 
@@ -25,6 +26,8 @@ CLOBBERFILES=	$(PROG)
 
 CSTD=	$(CSTD_GNU99)
 
+SMOFF += leaks
+
 # install rules
 $(ROOTINC)/% : %
 	$(INS.file)
@@ -33,7 +36,7 @@ $(ROOTINC)/% : %
 
 .PARALLEL: $(OBJS)
 
-all:		$(PROG) 
+all:		$(PROG)
 
 $(PROG):	$(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

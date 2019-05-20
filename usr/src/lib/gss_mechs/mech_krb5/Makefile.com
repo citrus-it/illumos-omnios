@@ -20,6 +20,8 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 # This make file will build mech_krb5.so.1. This shared object
 # contains all the functionality needed to support the Kereros V5 GSS-API
 # mechanism. No other Kerberos libraries are needed.
@@ -261,6 +263,9 @@ CERRWARN +=	-Wno-unused-label
 CERRWARN +=	-Wno-unused-value
 CERRWARN +=	-Wno-empty-body
 CERRWARN +=	-Wno-address
+
+# needs work
+SMATCH=off
 
 MAPFILES =	../mapfile-vers
 

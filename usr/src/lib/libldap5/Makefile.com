@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libldap.a
 VERS= .5
@@ -103,6 +104,9 @@ CERRWARN +=	-Wno-unused-function
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-unused-value
 CERRWARN +=	-Wno-address
+
+# not linted
+SMATCH=off
 
 LDLIBS +=	-lsasl -lmd -lc
 

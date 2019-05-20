@@ -21,8 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Makefile for KMF Plugins
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	kmf_openssl.a
 VERS=		.1
@@ -49,6 +48,9 @@ CPPFLAGS	+=	$(KMFINC) \
 CERRWARN	+=	-Wno-unused-label
 CERRWARN	+=	-Wno-unused-value
 CERRWARN	+=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 PICS=	$(OBJECTS:%=pics/%)
 

@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= pci.a
 VERS= .1
@@ -49,6 +50,9 @@ LDLIBS +=	-lc -ldevice -ldevinfo -lrcm
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-char-subscripts
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

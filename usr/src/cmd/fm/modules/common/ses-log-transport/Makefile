@@ -21,8 +21,8 @@
 #
 #Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
-   	
 MODULE = ses-log-transport
 CLASS = common
 SRCS = ses_log_transport.c
@@ -32,3 +32,6 @@ include ../../Makefile.plugin
 CFLAGS += $(INCS)
 LDLIBS += -L$(ROOTLIB)/fm -ltopo -lseslog
 LDFLAGS += -R/usr/lib/fm
+
+# not linted
+SMATCH=off

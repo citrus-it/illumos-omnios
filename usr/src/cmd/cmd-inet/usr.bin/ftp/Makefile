@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		ftp
 DEFAULTFILES =	ftp.dfl
@@ -41,6 +42,9 @@ CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-clobbered
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-address
+
+# not linted
+SMATCH=off
 
 LDLIBS +=	 -lgss
 

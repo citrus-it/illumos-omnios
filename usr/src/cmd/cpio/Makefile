@@ -21,6 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= cpio
 
@@ -32,12 +33,15 @@ CPPFLAGS += -DSOLARIS_PRIVS
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-uninitialized
 
+# not linted
+SMATCH=off
+
 LDLIBS += -lsec -lcmdutils -lnvpair
 XGETFLAGS += -a -x cpio.xcl
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

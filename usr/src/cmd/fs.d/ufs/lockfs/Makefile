@@ -20,12 +20,10 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1991,1996,2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# cmd/fs.d/ufs/lockfs/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		ufs
 LIBPROG=	lockfs
@@ -37,6 +35,7 @@ LINKVALUE=	../lib/fs/$(FSTYPE)/$(LIBPROG)
 include		../../Makefile.fstype
 
 
+SMOFF += all_func_returns
 
 $(ROOTUSRSBIN)/$(LIBPROG):
 	$(RM) $@; $(SYMLINK) $(LINKVALUE) $@

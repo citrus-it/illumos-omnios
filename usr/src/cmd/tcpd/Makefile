@@ -4,6 +4,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		safe_finger tcpd tcpdchk tcpdmatch try-from
 
@@ -25,6 +26,9 @@ CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-return-type
 CERRWARN +=	-Wno-clobbered
+
+# not linted
+SMATCH=off
 
 MAPFILE.INT.D=	mapfile-intf-tcpdchk
 MAPFILE.INT.M=	mapfile-intf-tcpdmatch

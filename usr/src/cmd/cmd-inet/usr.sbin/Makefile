@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 SYNCPROG=	syncinit syncloop syncstat
@@ -80,6 +81,9 @@ CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-char-subscripts
 CERRWARN += -Wno-extra
 CERRWARN += -Wno-address
+
+# "missing type for func"
+SMATCH=off
 
 #
 # Message catalog

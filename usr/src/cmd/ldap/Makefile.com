@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 # cmd/ldap/Makefile.com
 # Native LDAP II commands (makestyle clean).
@@ -86,6 +87,9 @@ CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-unused-function
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 all:=           TARGET= all
 install:=       TARGET= install

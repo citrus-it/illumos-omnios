@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = libgss.a
 VERS = .1
@@ -106,6 +107,9 @@ CERRWARN +=	-Wno-unused-function
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-empty-body
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

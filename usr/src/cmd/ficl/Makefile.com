@@ -12,6 +12,7 @@
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= ficl-sys
 OBJS= main.o
@@ -22,6 +23,8 @@ include ../../Makefile.ctf
 
 LDLIBS += -lficl-sys -ltecla -lumem
 CPPFLAGS += -I$(SRC)/common/ficl
+
+SMOFF += all_func_returns
 
 .KEEP_STATE:
 

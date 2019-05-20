@@ -23,6 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		crle
 
@@ -35,6 +36,9 @@ BLTOBJ=		msg.o
 TOOLSOBJ=	alist.o
 
 OBJS=		$(BLTOBJ) $(COMOBJ) $(TOOLSOBJ)
+
+# not linted
+SMATCH=off
 
 CPPFLAGS +=	-I$(SRC)/common/sgsrtcid -I$(SRCBASE)/uts/$(ARCH)/sys \
 		-D__EXTENSIONS__

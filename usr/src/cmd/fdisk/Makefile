@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #       Makefile for fdisk
 
@@ -32,6 +32,9 @@ ROOTSBINLINK=	$(ROOTUSRSBIN)/$(PROG)
 
 include ../Makefile.cmd
 
+
+# not linted
+SMATCH=off
 
 LDLIBS_i386= -lfdisk
 LDLIBS_sparc=

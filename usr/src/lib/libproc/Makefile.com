@@ -23,6 +23,7 @@
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = libproc.a
 VERS = .1
@@ -96,6 +97,9 @@ CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-type-limits
 CERRWARN +=	-Wno-unused-label
+
+# not linted
+SMATCH=off
 
 # All interfaces are interposable, therefore don't allow direct binding to
 # libproc.  Disable libproc from directly binding to itself, but allow libperl

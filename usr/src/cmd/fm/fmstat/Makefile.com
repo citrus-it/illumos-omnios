@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -42,6 +43,8 @@ CPPFLAGS += -I. -I../common -I$(STATCOMMONDIR)
 CFLAGS += $(CTF_FLAGS)
 LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_adm
 LDFLAGS += -R/usr/lib/fm
+
+SMOFF += signed
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS)

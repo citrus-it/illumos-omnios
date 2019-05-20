@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # Definitions for targets shared by some subdirs, which have
@@ -34,6 +35,8 @@ LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 CERRWARN += -Wno-unused-function
 CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-parentheses
+
+SMOFF += strcpy_overflow
 
 %.o: $(COMMON_DIR)/%.c
 	$(COMPILE.c) $<

@@ -23,6 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -54,6 +55,9 @@ CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-unused-function
 CERRWARN +=	-Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 all: $(EXES)
 

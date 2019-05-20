@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		mdnsd
 MANIFEST=	multicast.xml
@@ -43,6 +44,13 @@ MDNSFLAGS=	-DNOT_HAVE_SA_LEN \
 		-DMDNS_VERSIONSTR_NODTS
 
 include	../../../Makefile.cmd
+
+CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKDNS)
 $(ROOTMANIFEST)		:= FILEMODE= 444

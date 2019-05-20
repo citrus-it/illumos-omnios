@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 FSTYPE	  =	nfs
@@ -44,6 +45,10 @@ CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
+
 
 $(TYPEPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

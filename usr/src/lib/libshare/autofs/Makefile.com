@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libshare_autofs.a
 VERS =		.1
@@ -40,6 +40,9 @@ LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lshare -lscf -lumem -lc -lxml2
+
+# not linted
+SMATCH=off
 
 #add nfs/lib directory as part of the include path
 CERRWARN +=	-Wno-switch
@@ -61,7 +64,7 @@ pics/%.o:       $(AUTOFSSMFLIB_DIR)/%.c
 
 $(ROOTLIBDIR):
 	$(INS.dir)
- 
+
 $(ROOTLIBDIR64):
 	$(INS.dir)
 

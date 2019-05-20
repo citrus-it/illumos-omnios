@@ -21,6 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= 		syslogd
 ROTATESCRIPT=	newsyslog
@@ -35,6 +36,10 @@ include ../../Makefile.cmd
 
 $(PROG)		:= LDLIBS += -lscf
 CERRWARN	+= -Wno-uninitialized
+
+# not linted
+SMATCH=off
+
 CPPFLAGS	+= -D_POSIX_PTHREAD_SEMANTICS
 CFLAGS		+= -DNDEBUG
 

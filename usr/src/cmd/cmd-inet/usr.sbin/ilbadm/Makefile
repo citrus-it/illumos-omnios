@@ -20,6 +20,7 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		ilbadm
 
@@ -38,6 +39,9 @@ CPPFLAGS +=	-I$(SRC)/lib/libilb/common -I$(SRCTOP)/include
 CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 CSTD =	$(CSTD_GNU99)
 

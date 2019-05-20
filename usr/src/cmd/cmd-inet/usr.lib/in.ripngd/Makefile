@@ -22,10 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/cmd-inet/usr.lib/in.ripngd/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 MANIFEST=	ripng.xml
 
@@ -41,6 +38,9 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKROUTING)
 _D_UNIX98_EXTN= -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 
 $(OBJS) :=	CPPFLAGS +=	$(_D_UNIX98_EXTN)
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

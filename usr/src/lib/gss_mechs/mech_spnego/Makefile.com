@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # This make file will build mech_spnego.so.1. This shared object
@@ -47,6 +47,9 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include $(DEBUG) -I$(SRC)/lib/gss_mechs/m
 
 CERRWARN +=	-Wno-unused-function
 CERRWARN +=	-Wno-type-limits
+
+# needs work
+SMATCH=off
 
 .KEEP_STATE:
 

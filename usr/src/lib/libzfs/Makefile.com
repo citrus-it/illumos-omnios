@@ -22,6 +22,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright (c) 2011, 2017 by Delphix. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY= libzfs.a
@@ -73,6 +74,9 @@ LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
 	-ladm -lidmap -lmd -lumem -lzfs_core -lz -lcmdutils
 CPPFLAGS +=	$(INCS)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
+
+# not linted
+SMATCH=off
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 	$(OBJS_SHARED:%.o=$(SRCTOP)/kernel/fs/zfs/common/%.c)

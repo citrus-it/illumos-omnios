@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= 			xargs
 
@@ -34,6 +35,9 @@ include ../Makefile.cmd
 CPPFLAGS += -I $(SRC)/common/util
 
 CERRWARN += -Wno-parentheses
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

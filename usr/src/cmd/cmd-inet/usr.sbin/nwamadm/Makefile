@@ -23,8 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-# cmd/cmd-inet/usr.sbin/nwamadm/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= nwamadm
 
@@ -36,9 +35,12 @@ LDLIBS +=	-lofmt -linetutil -lnwam -lumem -lscf
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-uninitialized
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 
@@ -46,6 +48,5 @@ check:  $(PROG).c
 	$(CSTYLE) -pP $(PROG).c
 
 clean:
-
 
 include ../../../Makefile.targ

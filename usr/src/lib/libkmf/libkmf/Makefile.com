@@ -67,6 +67,9 @@ CERRWARN	+=	-Wno-switch
 CERRWARN	+=	-Wno-type-limits
 CERRWARN	+=	-Wno-uninitialized
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
 all:    $(LIBS)

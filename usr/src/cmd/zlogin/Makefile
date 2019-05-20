@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG = zlogin
 
@@ -30,6 +31,9 @@ LDLIBS += -lzonecfg -lcontract -lbrand -lsecdb
 FILEMODE = 0555
 
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

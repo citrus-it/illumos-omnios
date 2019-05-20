@@ -21,12 +21,13 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 
 LIBRARY=	libseslog.a
 VERS=		.1
 
-OBJECTS=	libseslog.o 
+OBJECTS=	libseslog.o
 
 include ../../../Makefile.lib
 include ../../Makefile.lib
@@ -39,6 +40,8 @@ INCS +=		-I$(SRCDIR)
 LDLIBS +=	-lc -lnvpair
 CPPFLAGS +=	$(INCS)
 
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

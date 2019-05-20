@@ -22,6 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/Makefile.master
 
@@ -38,6 +39,9 @@ include ../../Makefile.ia32
 include ../../../Makefile.module
 
 %.o := CPPFLAGS += $(PYCPPFLAGS)
+
+# not linted
+SMATCH=off
 
 dmod/$(MODULE) := LDLIBS += -lproc
 

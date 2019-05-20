@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		zonestat
 SRCS =		zonestat.c
@@ -31,6 +32,9 @@ include ../../Makefile.cmd
 LDLIBS 		+= -lscf -lzonestat -lumem
 
 CERRWARN	+= -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

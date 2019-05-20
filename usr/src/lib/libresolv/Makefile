@@ -23,6 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libresolv.a
 VERS= .1
@@ -58,6 +59,9 @@ LDLIBS += -lc
 
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 ROOTDYNLIBS=	$(DYNLIB:%=$(ROOTLIBDIR)/%)
 

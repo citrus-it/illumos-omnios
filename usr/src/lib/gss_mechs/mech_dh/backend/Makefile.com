@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # This make file will build mech_dh.so.1. This shared object
@@ -49,6 +50,9 @@ CPPFLAGS += -I../mech -I../crypto -I$(SRC)/uts/common/gssapi/include
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-uninitialized
+
+# needs work
+SMATCH=off
 
 DYNFLAGS +=	$(ZIGNORE)
 
