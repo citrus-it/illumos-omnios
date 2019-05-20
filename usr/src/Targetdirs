@@ -391,7 +391,6 @@ SYM.DIRS= \
 	/lib/crypto/32 \
 	/lib/secure/32 \
 	/platform/i86pc \
-	/usr/adm \
 	/usr/spool \
 	/usr/news \
 	/usr/preserve \
@@ -481,7 +480,6 @@ $(ROOT)/lib/secure/32:=			LINKDEST=.
 $(ROOT)/dev/stdin:=			LINKDEST=fd/0
 $(ROOT)/dev/stdout:=			LINKDEST=fd/1
 $(ROOT)/dev/stderr:=			LINKDEST=fd/2
-$(ROOT)/usr/adm:=			LINKDEST=../var/adm
 $(ROOT)/etc/lib/ld.so.1:=		LINKDEST=../../lib/ld.so.1
 $(ROOT)/etc/lib/libdl.so.1:=		LINKDEST=../../lib/libdl.so.1
 $(ROOT)/etc/lib/nss_files.so.1:=	LINKDEST=../../lib/nss_files.so.1
