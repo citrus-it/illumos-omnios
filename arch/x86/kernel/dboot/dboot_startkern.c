@@ -1072,7 +1072,7 @@ process_module(int midx)
 				modules[midx].bm_type = BMT_ENV;
 			} else if (strcmp(q, "file") != 0) {
 				dboot_printf("\tmodule #%d: unknown module "
-				    "type '%s'; defaulting to 'file'",
+				    "type '%s'; defaulting to 'file'\n",
 				    midx, q);
 			}
 			continue;

@@ -45,9 +45,9 @@ MDNSFLAGS=	-DNOT_HAVE_SA_LEN \
 
 include	../../../Makefile.cmd
 
-CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	-Wno-unused-variable
+CERRWARN +=	-Wno-implicit-function-declaration
+CERRWARN +=	-Wno-uninitialized
 
 # not linted
 SMATCH=off

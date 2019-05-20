@@ -70,8 +70,6 @@ CERRWARN_pstack	+= -Wno-clobbered
 CERRWARN_pargs	+= -Wno-clobbered
 CERRWARN_pargs	+= -Wno-type-limits
 
-CERRWARN_pwait	+= -_smatch=off
-
 CERRWARN += $(CERRWARN_$(PROG))
 
 # pargs depends on ../../common/elfcap components
