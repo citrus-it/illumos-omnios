@@ -56,7 +56,6 @@ MANIFEST_TOPDIRS=			\
 	rmvolmgr			\
 	rpcbind				\
 	rpcsvc				\
-	sa				\
 	saf				\
 	smserverd			\
 	stmfsvc				\

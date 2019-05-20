@@ -254,7 +254,6 @@ DIRS= \
 	$(PYTHON2_DIRS) \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \
-	/usr/lib/sa  \
 	/usr/lib/saf \
 	/usr/lib/sasl \
 	/usr/lib/scsi \
@@ -293,7 +292,6 @@ DIRS= \
 	/var/log \
 	/var/log/exacct \
 	/var/log/pool \
-	/var/log/sa \
 	/var/log/streams \
 	/var/log/svc \
 	/var/logadm \
@@ -427,8 +425,6 @@ ROOTDIRS=	$(TARGETDIRS:%=$(ROOT)%)
 #
 # The default value for DIRMODE is specified in usr/src/Makefile.master.
 #
-
-$(ROOT)/var/log/sa :=		DIRMODE= 775
 
 $(ROOT)/var/spool/lp:=		DIRMODE= 775
 

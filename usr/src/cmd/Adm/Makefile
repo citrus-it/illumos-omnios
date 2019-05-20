@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-CRON_ENT= adm root sys
+CRON_ENT= adm root
 CRON_LIB= .proto at.deny cron.deny queuedefs
 ETC_SCRIPT= group project ttysrch mailcap mime.types
 ZI_SPECIAL= zones-index
@@ -51,7 +51,6 @@ FILEMODE= 0644
 
 $(CRONLIBD)/.proto :=	FILEMODE =	0744
 $(CRONTABD)/adm :=	FILEMODE =	0600
-$(CRONTABD)/sys :=	FILEMODE =	0600
 $(CRONTABD)/root :=	FILEMODE =	0600
 
 .KEEP_STATE:
