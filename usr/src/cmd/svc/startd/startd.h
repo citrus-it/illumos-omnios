@@ -188,7 +188,7 @@ extern mode_t fmask;
 extern mode_t dmask;
 
 #define	LOG_PREFIX_EARLY	"/etc/svc/volatile/"
-#define	LOG_PREFIX_NORMAL	"/var/svc/log/"
+#define	LOG_PREFIX_NORMAL	"/var/log/svc/"
 
 #define	LOG_SUFFIX		".log"
 

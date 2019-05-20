@@ -13,6 +13,7 @@ was changed.
  - /etc/[uw]tmpx symlink
  - /usr/adm symlink
  * moved all /var/adm files to /var/log
+ * moved /var/svc/log to /var/log/svc
 
 1.3 release
 -----------

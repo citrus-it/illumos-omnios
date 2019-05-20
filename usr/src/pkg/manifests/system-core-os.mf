@@ -245,6 +245,7 @@ dir path=var/ld/$(ARCH64)
 dir path=var/log group=sys
 dir path=var/log/exacct group=adm owner=adm
 dir path=var/log/streams group=sys
+dir path=var/log/svc group=sys
 dir path=var/logadm
 dir path=var/mail group=mail
 dir path=var/news
@@ -258,7 +259,6 @@ dir path=var/spool/cron group=sys
 dir path=var/spool/cron/atjobs group=sys
 dir path=var/spool/cron/crontabs group=sys
 dir path=var/svc group=sys
-dir path=var/svc/log group=sys
 dir path=var/svc/manifest group=sys
 dir path=var/svc/manifest/application group=sys
 dir path=var/svc/manifest/application/management group=sys

@@ -36,14 +36,14 @@ SMF major milestone "svc:/milestone/single-user:default" executes each
 'S' script within /etc/rcS.d/ with the argument 'start'.  Any warnings,
 errors, or output from these scripts are logged to the file:
 
-/var/svc/log/milestone-single-user:default.log
+/var/log/svc/milestone-single-user:default.log
 
 If the system is changing from a higher run-level (for example, through
 an invocation of "init S"), SMF executes all 'K' scripts within
 /etc/rcS.d/ with the argument 'stop'. Any warnings, errors, or output
 from these scripts are logged to the file:
 
-/var/svc/log/rcS.log
+/var/log/svc/rcS.log
 
 Scripts in /etc/rcS.d/ may assume the following:
 

@@ -295,6 +295,7 @@ DIRS= \
 	/var/log/pool \
 	/var/log/sa \
 	/var/log/streams \
+	/var/log/svc \
 	/var/logadm \
 	/var/mail \
 	/var/news \
@@ -312,7 +313,6 @@ DIRS= \
 	/var/spool/cron/atjobs \
 	/var/spool/cron/crontabs \
 	/var/svc \
-	/var/svc/log \
 	/var/svc/manifest \
 	/var/svc/manifest/milestone \
 	/var/svc/manifest/device \

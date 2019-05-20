@@ -29,8 +29,8 @@
  *
  * Logging destinations
  *   svc.startd(8) supports three logging destinations:  the system log, a
- *   daemon-specific log (in the /var/svc/log hierarchy by default), and to the
- *   standard output (redirected to the /var/svc/log/svc.startd.log file by
+ *   daemon-specific log (in the /var/log/svc hierarchy by default), and to the
+ *   standard output (redirected to the /var/log/svc/svc.startd.log file by
  *   default).  Any or all of these destinations may be used to
  *   communicate a specific message; the audiences for each destination differ.
  *
