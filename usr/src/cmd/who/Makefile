@@ -27,7 +27,6 @@ DCFILE=$(PROG).dc
 UTMPS= utmpx
 ROOTADM= $(ROOT)/var/adm
 ROOTUTMPS= $(UTMPS:%=$(ROOTADM)/%)
-SYMSETC= $(UTMPS:%=$(ROOTETC)/%)
 CLOBBERFILES += $(UTMPS)
 
 include ../Makefile.cmd
@@ -48,10 +47,7 @@ all: $(PROG) $(UTMPS)
 $(UTMPS):
 	touch $@
 
-install: all $(ROOTPROG) $(ROOTUTMPS) $(SYMSETC)
-
-$(SYMSETC):
-	-$(RM) $@; $(SYMLINK) ../var/adm/$(@F) $@
+install: all $(ROOTPROG) $(ROOTUTMPS)
 
 clean:
 

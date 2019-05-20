@@ -27,7 +27,6 @@ PROG= last
 UTMPS= wtmpx
 ROOTADM= $(ROOT)/var/adm
 ROOTUTMPS= $(UTMPS:%=$(ROOTADM)/%)
-SYMSETC= $(UTMPS:%=symlinks_%)
 ETCTOVARADM= ../var/adm
 
 include ../Makefile.cmd
@@ -43,14 +42,11 @@ $(ROOTADM)/%: %
 $(UTMPS):
 	touch $@
 
-symlinks_% : %
-	-$(RM) $(ROOTETC)/$< ; $(SYMLINK) $(ETCTOVARADM)/$< $(ROOTETC)/$<
-
 .KEEP_STATE:
 
 all: $(PROG) $(UTMPS)
 
-install: all $(ROOTPROG) $(SYMSETC) $(ROOTUTMPS)
+install: all $(ROOTPROG) $(ROOTUTMPS)
 
 clean:
 	$(RM) $(UTMPS)

@@ -61,7 +61,7 @@
 
 
 #ifndef UTMPX_FILE
-#define	UTMPX_FILE "/etc/utmpx"
+#define	UTMPX_FILE "/var/adm/utmpx"
 #endif	/* UTMPX_FILE */
 
 int	debug = 0;

@@ -44,7 +44,7 @@
  *		its utmpx entry on termination.
  *		The program keeps a list of procs
  *		and uses poll() on their /proc files to detect termination.
- *		Also the  program periodically scans the /etc/utmpx file for
+ *		Also the  program periodically scans the /var/adm/utmpx file for
  *		processes that aren't in the table so they can be watched.
  *
  *		If utmpd doesn't hear back over the pipe from pututline(3) that

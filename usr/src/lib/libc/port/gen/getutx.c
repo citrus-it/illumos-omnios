@@ -39,7 +39,7 @@
 
 
 /*
- * Routines to read and write the /etc/utmpx file. Also contains
+ * Routines to read and write the /var/adm/utmpx file. Also contains
  * binary compatibility routines to support the old utmp interfaces
  * on systems with MAXPID <= SHRT_MAX.
  */
@@ -814,7 +814,7 @@ utmpxname(const char *newfile)
 	endutxent();
 
 	/*
-	 * If the file is being changed to /etc/utmpx or /var/adm/utmpx then
+	 * If the file is being changed to /var/adm/utmpx or /var/adm/utmpx then
 	 * we clear the flag so pututxline invokes utmp_update.  Otherwise
 	 * we set the flag indicating that they changed to another name.
 	 */

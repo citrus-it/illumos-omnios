@@ -1319,8 +1319,6 @@ link path=etc/rc5 target=../sbin/rc5
 link path=etc/rc6 target=../sbin/rc6
 link path=etc/rcS target=../sbin/rcS
 link path=etc/services target=./inet/services
-link path=etc/utmpx target=../var/adm/utmpx
-link path=etc/wtmpx target=../var/adm/wtmpx
 link path=sbin/in.mpathd target=../lib/inet/in.mpathd
 link path=sbin/pfsh target=../usr/bin/pfexec
 link path=usr/adm target=../var/adm
