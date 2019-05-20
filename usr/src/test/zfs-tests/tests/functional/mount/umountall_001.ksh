@@ -40,7 +40,7 @@ done
 # This is the list we check the output of umountall -n against. We seed it
 # with these values because umountall will ignore them, and they're possible
 # (though most are improbable) ZFS filesystem mountpoints.
-zfs_list="/ /lib /sbin /tmp /usr /var /var/adm /var/run"
+zfs_list="/ /lib /sbin /tmp /usr /var /var/log /var/run"
 
 # Append our ZFS filesystems to the list, not worrying about duplicates.
 for fs in $(mount -p | awk '{if ($4 == "zfs") print $3}'); do

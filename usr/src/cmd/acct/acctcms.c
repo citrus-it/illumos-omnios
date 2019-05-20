@@ -44,7 +44,7 @@
  *	-t	process records in total (old) style (tcms.h) format
  *	file	file in [pt]cms.h (if -s seen already) or acct.h (if not)
  *	expected use:
- *	acctcms /var/adm/pacct? > today; acctcms -s old today >new
+ *	acctcms /var/log/pacct? > today; acctcms -s old today >new
  *	cp new old; rm new
  *	acctcms -a today; acctcms -a old
  */

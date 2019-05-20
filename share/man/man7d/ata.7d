@@ -252,7 +252,7 @@ set the feature to revert to defaults during reset.
 .sp
 To determine the string to substitute for <diskmodel>, boot your system (you
 may have to press the reset button or power-cycle) and then view
-\fB/var/adm/messages\fR. Look for the string "IDE device at targ" or "ATAPI
+\fB/var/log/messages\fR. Look for the string "IDE device at targ" or "ATAPI
 device at targ." The next line will contain the word "model" followed by the
 model number and a comma. Ignore all characters except letters, digits, ".",
 "_", and "-". Change uppercase letters to lower case. If the string
@@ -284,7 +284,7 @@ characters.
 
 .sp
 .LP
-Output of \fB/var/adm/messages\fR:
+Output of \fB/var/log/messages\fR:
 
 .sp
 .in +2

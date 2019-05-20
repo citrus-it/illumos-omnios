@@ -195,7 +195,7 @@ accounting are not active.
 .nf
 $ \fBacctadm\fR
             Task accounting: active
-       Task accounting file: /var/adm/exacct/task
+       Task accounting file: /var/log/exacct/task
      Tracked task resources: extended
    Untracked task resources: host
          Process accounting: inactive
@@ -223,7 +223,7 @@ The following command activates basic process accounting:
 .sp
 .in +2
 .nf
-$ \fBacctadm -e basic -f /var/adm/exacct/proc process\fR
+$ \fBacctadm -e basic -f /var/log/exacct/proc process\fR
 .fi
 .in -2
 .sp

@@ -25,6 +25,6 @@
 
 
 #ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
-rm -f /var/adm/acct/sum/wtmp*
-rm -f /var/adm/acct/sum/pacct*
-rm -f /var/adm/acct/nite/lock*
+rm -f /var/log/acct/sum/wtmp*
+rm -f /var/log/acct/sum/pacct*
+rm -f /var/log/acct/nite/lock*

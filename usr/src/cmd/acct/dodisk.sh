@@ -39,7 +39,7 @@ then
 else 
 	format="special dev mnt fstype fsckpass automnt mntflags"
 fi
-_dir=/var/adm
+_dir=/var/log
 _pickup=acct/nite
 set -- `getopt o $*`
 if [ $? -ne 0 ]

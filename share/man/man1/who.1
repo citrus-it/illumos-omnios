@@ -78,9 +78,9 @@ who \- who is on the system
 The \fBwho\fR utility can list the user's name, terminal line, login time,
 elapsed time since activity occurred on the line, and the process-ID of the
 command interpreter (shell) for each current UNIX system user. It examines the
-\fB/var/adm/utmpx\fR file to obtain its information. If \fIfile\fR is given,
+\fB/var/log/utmpx\fR file to obtain its information. If \fIfile\fR is given,
 that file (which must be in \fButmpx\fR(4) format) is examined. Usually,
-\fIfile\fR will be \fB/var/adm/wtmpx\fR, which contains a history of all the
+\fIfile\fR will be \fB/var/log/wtmpx\fR, which contains a history of all the
 logins since the file was last created.
 .sp
 .LP
@@ -177,7 +177,7 @@ The following options are supported:
 \fB\fB-a\fR \fR
 .ad
 .RS 9n
-Processes \fB/var/adm/utmpx\fR or the named \fIfile\fR with \fB-b\fR, \fB-d\fR,
+Processes \fB/var/log/utmpx\fR or the named \fIfile\fR with \fB-b\fR, \fB-d\fR,
 \fB-l\fR, \fB-p\fR, \fB-r\fR, \fB-t\fR, \fB-T\fR, and \fB-u\fR options turned
 on.
 .RE
@@ -395,7 +395,7 @@ Script for \fBinit\fR
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/utmpx\fR \fR
+\fB\fB/var/log/utmpx\fR \fR
 .ad
 .RS 19n
 Current user and accounting information
@@ -404,7 +404,7 @@ Current user and accounting information
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR \fR
+\fB\fB/var/log/wtmpx\fR \fR
 .ad
 .RS 19n
 Historic user and accounting information
@@ -430,6 +430,6 @@ Interface Stability	Standard
 .SH NOTES
 .LP
 \fBSuperuser:\fR After a shutdown to the single-user state, \fBwho\fR returns a
-prompt. Since \fB/var/adm/utmpx\fR is updated at login time and there is no
+prompt. Since \fB/var/log/utmpx\fR is updated at login time and there is no
 login in single-user state, \fBwho\fR cannot report accurately on this state.
 The command, \fBwho\fR \fBam i\fR, however, returns the correct information.

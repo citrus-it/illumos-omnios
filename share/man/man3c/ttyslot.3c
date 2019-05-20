@@ -18,7 +18,7 @@ ttyslot \- find the slot of the current user  in the user accounting database
 .sp
 .LP
 The \fBttyslot()\fR function returns the index of the current user's entry in
-the user accounting database, \fB/var/adm/utmpx\fR. The current user's entry is
+the user accounting database, \fB/var/log/utmpx\fR. The current user's entry is
 an entry for which the \fButline\fR member matches the name of a terminal
 device associated with any of the process's file descriptors 0, 1 or 2. The
 index is an ordinal number representing the record number in the database of
@@ -35,7 +35,7 @@ associated with a terminal device, \fB\(mi1\fR is returned.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/utmpx\fR\fR
+\fB\fB/var/log/utmpx\fR\fR
 .ad
 .RS 18n
 user access and accounting information

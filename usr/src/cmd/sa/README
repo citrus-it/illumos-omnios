@@ -31,7 +31,7 @@ Instruction of daily report generation:
 
 1.  The line
 
-    /usr/lib/sa/sadc /var/adm/sa/sa`date +%d`
+    /usr/lib/sa/sadc /var/log/sa/sa`date +%d`
 
     is executed by the start method for the system/sar:default service,
     if enabled

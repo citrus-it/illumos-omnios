@@ -34,7 +34,7 @@ the samples in \fIfilename\fR in binary format. The default value of \fIn\fR is
 In the second instance, no sampling interval is specified. \fBsar\fR extracts
 data from a previously recorded \fIfilename\fR, either the one specified by the
 \fB-f\fR option or, by default, the standard system activity daily data file
-\fB/var/adm/sa/sa\fIdd\fR\fR for the current day \fIdd\fR. The starting and
+\fB/var/log/sa/sa\fIdd\fR\fR for the current day \fIdd\fR. The starting and
 ending times of the report can be bounded using the \fB-e\fR and \fB-s\fR
 arguments with \fItime\fR specified in the form \fIhh\fR[:\fImm\fR[:\fIss\fR]].
 The \fB-i\fR option selects records at \fIsec\fR second intervals. Otherwise,
@@ -224,7 +224,7 @@ Selects data up to \fBtime\fR. Default is \fB18:00\fR.
 .ad
 .RS 15n
 Uses \fIfilename\fR as the data source for \fBsar\fR. Default is the current
-daily data file \fB/var/adm/sa/sa\fR\fIdd.\fR
+daily data file \fB/var/log/sa/sa\fR\fIdd.\fR
 .RE
 
 .sp
@@ -663,7 +663,7 @@ example% sar -d -f temp
 .SH FILES
 .ne 2
 .na
-\fB\fB/var/adm/sa/sa\fIdd\fR\fR\fR
+\fB\fB/var/log/sa/sa\fIdd\fR\fR\fR
 .ad
 .RS 20n
 daily data file, where \fIdd\fR are digits representing the day of the month

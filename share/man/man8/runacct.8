@@ -109,7 +109,7 @@ records.
 .ad
 .RS 14n
 Merge the daily total accounting records in \fBdaytacct\fR with the summary
-total accounting records in \fB/var/adm/acct/sum/tacct\fR.
+total accounting records in \fB/var/log/acct/sum/tacct\fR.
 .RE
 
 .sp
@@ -157,7 +157,7 @@ The following example starts \fBrunacct\fR:
 .sp
 .in +2
 .nf
-example% nohup runacct 2> /var/adm/acct/nite/fd2log &
+example% nohup runacct 2> /var/log/acct/nite/fd2log &
 .fi
 .in -2
 .sp
@@ -171,7 +171,7 @@ The following example restarts \fBrunacct\fR:
 .sp
 .in +2
 .nf
-example% nohup runacct 0601 2>> /var/adm/acct/nite/fd2log &
+example% nohup runacct 0601 2>> /var/log/acct/nite/fd2log &
 .fi
 .in -2
 .sp
@@ -185,7 +185,7 @@ The following example restarts \fBrunacct\fR at a specific state:
 .sp
 .in +2
 .nf
-example% nohup runacct 0601 MERGE 2>> /var/adm/acct/nite/fd2log &
+example% nohup runacct 0601 MERGE 2>> /var/log/acct/nite/fd2log &
 .fi
 .in -2
 .sp
@@ -194,7 +194,7 @@ example% nohup runacct 0601 MERGE 2>> /var/adm/acct/nite/fd2log &
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR\fR
+\fB\fB/var/log/wtmpx\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -204,7 +204,7 @@ History of user access and administration information
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/pacct\fR\fIincr\fR\fR
+\fB\fB/var/log/pacct\fR\fIincr\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -214,7 +214,7 @@ History of user access and administration information
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/acct/nite/active\fR\fR
+\fB\fB/var/log/acct/nite/active\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -224,7 +224,7 @@ History of user access and administration information
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/acct/nite/daytacct\fR\fR
+\fB\fB/var/log/acct/nite/daytacct\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -234,7 +234,7 @@ History of user access and administration information
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/acct/nite/lock\fR\fR
+\fB\fB/var/log/acct/nite/lock\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -244,7 +244,7 @@ History of user access and administration information
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/acct/nite/lock1\fR\fR
+\fB\fB/var/log/acct/nite/lock1\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -254,7 +254,7 @@ History of user access and administration information
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/acct/nite/lastdate\fR\fR
+\fB\fB/var/log/acct/nite/lastdate\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -264,7 +264,7 @@ History of user access and administration information
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/acct/nite/statefile\fR\fR
+\fB\fB/var/log/acct/nite/statefile\fR\fR
 .ad
 .sp .6
 .RS 4n

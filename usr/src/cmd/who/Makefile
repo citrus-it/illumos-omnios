@@ -25,7 +25,7 @@
 PROG= who
 DCFILE=$(PROG).dc
 UTMPS= utmpx
-ROOTADM= $(ROOT)/var/adm
+ROOTADM= $(ROOT)/var/log
 ROOTUTMPS= $(UTMPS:%=$(ROOTADM)/%)
 CLOBBERFILES += $(UTMPS)
 

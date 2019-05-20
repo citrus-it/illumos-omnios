@@ -299,7 +299,7 @@ sub ProcFile {
 		if ($Secure) {
 			# The execution of a secure application over an nfs file
 			# system mounted nosuid will result in warning messages
-			# being sent to /var/adm/messages.  As this type of
+			# being sent to /var/log/messages.  As this type of
 			# environment can occur with root builds, move the file
 			# being investigated to a safe place first.  In addition
 			# remove its secure permission so that it can be

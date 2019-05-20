@@ -28,9 +28,9 @@
 #
 # NOTE: This script is no longer used -- see logadm(8)
 #
-# Running this script checks to see if /var/log/syslog or /var/adm/messages
+# Running this script checks to see if /var/log/syslog or /var/log/messages
 # need rotating, according to the policies in /etc/logadm.conf.  Since logadm
 # normally runs from root's crontab every morning, running this script is no
 # longer necessary.
 #
-/usr/sbin/logadm /var/log/syslog /var/adm/messages
+/usr/sbin/logadm /var/log/syslog /var/log/messages

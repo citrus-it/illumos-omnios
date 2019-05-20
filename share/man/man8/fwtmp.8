@@ -21,7 +21,7 @@ fwtmp, wtmpfix \- manipulate connect accounting records
 .sp
 .LP
 \fBfwtmp\fR reads from the standard input and writes to the standard output,
-converting binary records of the type found in \fB/var/adm/wtmpx\fR to
+converting binary records of the type found in \fB/var/log/wtmpx\fR to
 formatted ASCII records. The ASCII version is useful when it is necessary to
 edit  bad records.
 .sp
@@ -34,7 +34,7 @@ indicate the standard input. If time/date corrections are not performed,
 .sp
 .LP
 Each time the date is set, a pair of date change records are written to
-\fB/var/adm/wtmpx\fR. The first record is the old date denoted by the string
+\fB/var/log/wtmpx\fR. The first record is the old date denoted by the string
 "\fBold time\fR" placed in the \fBline\fR field and the flag
 \fB\fR\fBOLD_TIME\fR\fB\fR placed in the \fBtype\fR field of the \fButmpx\fR
 structure. The second record specifies the new date and is denoted by the
@@ -64,7 +64,7 @@ form.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR\fR
+\fB\fB/var/log/wtmpx\fR\fR
 .ad
 .RS 18n
 history of user access and administration information

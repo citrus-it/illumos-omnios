@@ -116,7 +116,7 @@ The \fBexacct\fR file is then closed.
 #include <exacct.h>
 
 ea_file_t ef;
-if (ea_open(&ef, "/var/adm/exacct/proc", NULL, EO_HEAD,
+if (ea_open(&ef, "/var/log/exacct/proc", NULL, EO_HEAD,
     O_RDONLY, 0) == -1)
         exit(1);
 (void) ea_close(&ef);

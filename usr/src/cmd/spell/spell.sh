@@ -33,7 +33,7 @@ PATH=/usr/lib/spell:/usr/bin:$PATH
 
 SPELLPROG=/usr/lib/spell/spellprog
 
-H_SPELL=${H_SPELL:-/var/adm/spellhist}
+H_SPELL=${H_SPELL:-/var/log/spellhist}
 V_SPELL=/dev/null
 F_SPELL=
 FT_SPELL=

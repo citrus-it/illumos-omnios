@@ -12,6 +12,7 @@ was changed.
  - /etc/log symlink & /var/adm/log directory
  - /etc/[uw]tmpx symlink
  - /usr/adm symlink
+ * moved all /var/adm files to /var/log
 
 1.3 release
 -----------

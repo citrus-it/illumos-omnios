@@ -133,7 +133,7 @@ main(int ac, char **av)
 	char *crmsg = NULL;
 	long outrec = 0;
 	long maxrec = 0x7fffffffL;
-	char *wtmpfile = "/var/adm/wtmpx";
+	char *wtmpfile = "/var/log/wtmpx";
 	size_t hostf_len;
 
 	(void) setlocale(LC_ALL, "");
@@ -528,7 +528,7 @@ want(struct utmpx *bp, char **host, char **user)
 	}
 		/*
 		 * Both dtremote and dtlocal can have multiple entries in
-		 * /var/adm/wtmpx with these values, so the user and host
+		 * /var/log/wtmpx with these values, so the user and host
 		 * entries are also checked
 		 */
 	if ((bp->ut_type == BOOT_TIME) || (bp->ut_type == DOWN_TIME))

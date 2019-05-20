@@ -201,7 +201,7 @@ rdsv3_vlog(char *name, uint_t level, char *fmt, va_list ap)
 
 	/*
 	 * LINTR, L5-L2 message may go to the rdsv3_debug_buf
-	 * L1 messages will go to the /var/adm/messages (debug & non-debug).
+	 * L1 messages will go to the /var/log/messages (debug & non-debug).
 	 * L0 messages will go to console (debug & non-debug).
 	 */
 	switch (level) {

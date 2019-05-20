@@ -156,7 +156,7 @@ not specified, the default location \fB/var/log/pool\fR is used.
 The \fBsystem.poold.history-file\fR specifies the location of the decision
 history file which is used by \fBpoold\fR to improve the quality of its
 decision making over time. If this property is not specified, the default
-location \fB/var/adm/pool\fR is used.
+location \fB/var/log/pool\fR is used.
 .sp
 .LP
 The \fBsystem.poold.monitor-interval\fR property specifies the monitoring

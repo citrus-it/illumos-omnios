@@ -27,10 +27,10 @@
  * Use is subject to license terms.
  */
 /*
- *	acctwtmp reason /var/adm/wtmpx
+ *	acctwtmp reason /var/log/wtmpx
  *	writes utmpx.h record (with current time) to specific file
- *	acctwtmp `uname` /var/adm/wtmpx as part of startup
- *	acctwtmp pm /var/adm/wtmpx  (taken down for pm, for example)
+ *	acctwtmp `uname` /var/log/wtmpx as part of startup
+ *	acctwtmp pm /var/log/wtmpx  (taken down for pm, for example)
  */
 #include <stdio.h>
 #include <sys/types.h>

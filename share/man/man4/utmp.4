@@ -10,8 +10,8 @@ utmp, wtmp \- utmp and wtmp database entry formats
 .LP
 .nf
 \fB#include <utmp.h>\fR
-\fB/var/adm/utmp\fR
-\fB/var/adm/wtmp\fR
+\fB/var/log/utmp\fR
+\fB/var/log/wtmp\fR
 .fi
 
 .SH DESCRIPTION
@@ -23,7 +23,7 @@ contained in the \fButmpx\fR and \fBwtmpx\fR database files.  See
 \fButmpx\fR(4).
 .sp
 .LP
-It is possible for \fB/var/adm/utmp\fR to reappear on the system. This would
+It is possible for \fB/var/log/utmp\fR to reappear on the system. This would
 most likely occur if a third party application that still uses \fButmp\fR
 recreates the file if it finds it missing. This file should not be allowed to
 remain on the system. The user should investigate to determine which

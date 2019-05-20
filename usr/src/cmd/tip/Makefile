@@ -8,7 +8,7 @@
 #	/etc/remote		remote host description file
 #	/etc/phones		phone number file, owned by uucp and
 #				  mode 6??
-#	/var/adm/aculog		ACU accounting file, owned by uucp and
+#	/var/log/aculog		ACU accounting file, owned by uucp and
 #				  mode 6?? (if ACULOG defined)
 # Presently supports:
 #	BIZCOMP
@@ -51,7 +51,7 @@ include	../Makefile.cmd
 REMOTE=		etc.remote
 ACULOG=		aculog
 ROOTETCREMOTE=	$(ROOTETC)/remote
-ROOTACULOGD=	$(ROOT)/var/adm
+ROOTACULOGD=	$(ROOT)/var/log
 ROOTACULOG=	$(ROOTACULOGD)/aculog
 
 $(ROOTPROG) :=		FILEMODE =	4511

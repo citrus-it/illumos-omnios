@@ -32,9 +32,9 @@
 #	"turnacct on	makes sure it's on"
 #	"turnacct off	turns it off"
 #	"turnacct switch	switches pacct to pacct?, starts fresh one"
-#	"/var/adm/pacct is always the current pacct file"
+#	"/var/log/pacct is always the current pacct file"
 PATH=/usr/lib/acct:/usr/bin:/usr/sbin
-cd /var/adm
+cd /var/log
 case "$1"  in
 on)
 	if test ! -r pacct
@@ -49,7 +49,7 @@ off)
 	_rc=$?
 	;;
 switch)
-	pfexec /usr/sbin/logadm -p now /var/adm/pacct
+	pfexec /usr/sbin/logadm -p now /var/log/pacct
 	if test ! -r pacct
 	then
 		nulladm pacct

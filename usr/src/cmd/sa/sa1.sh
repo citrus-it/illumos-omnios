@@ -28,7 +28,7 @@
 #	sa1.sh 1.5 of 5/8/89
 DATE=`/usr/bin/date +%d`
 ENDIR=/usr/lib/sa
-DFILE=/var/adm/sa/sa$DATE
+DFILE=/var/log/sa/sa$DATE
 cd $ENDIR
 if [ $# = 0 ]
 then

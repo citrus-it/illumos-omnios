@@ -58,7 +58,7 @@ Login incorrect
 .sp
 .LP
 is printed and a new login prompt appears. If you make five incorrect login
-attempts, all five can be logged in \fB/var/adm/loginlog\fR, if it exists. The
+attempts, all five can be logged in \fB/var/log/loginlog\fR, if it exists. The
 \fBTTY\fR line is dropped.
 .sp
 .LP
@@ -375,7 +375,7 @@ User's default command interpreter.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/lastlog\fR\fR
+\fB\fB/var/log/lastlog\fR\fR
 .ad
 .RS 23n
 Time of last login.
@@ -384,7 +384,7 @@ Time of last login.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/loginlog\fR\fR
+\fB\fB/var/log/loginlog\fR\fR
 .ad
 .RS 23n
 Record of failed login attempts.
@@ -393,7 +393,7 @@ Record of failed login attempts.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/utmpx\fR\fR
+\fB\fB/var/log/utmpx\fR\fR
 .ad
 .RS 23n
 Accounting.
@@ -402,7 +402,7 @@ Accounting.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR\fR
+\fB\fB/var/log/wtmpx\fR\fR
 .ad
 .RS 23n
 Accounting.

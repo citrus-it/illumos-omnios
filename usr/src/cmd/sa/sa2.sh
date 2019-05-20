@@ -27,9 +27,9 @@
 #ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.4 */
 #	sa2.sh 1.4 of 5/8/89
 DATE=`/usr/bin/date +%d`
-RPT=/var/adm/sa/sar$DATE
-DFILE=/var/adm/sa/sa$DATE
+RPT=/var/log/sa/sar$DATE
+DFILE=/var/log/sa/sa$DATE
 ENDIR=/usr/bin
 cd $ENDIR
 $ENDIR/sar $* -f $DFILE > $RPT
-/usr/bin/find /var/adm/sa \( -name 'sar*' -o -name 'sa*' \) -mtime +7 -exec /usr/bin/rm {} \;
+/usr/bin/find /var/log/sa \( -name 'sar*' -o -name 'sa*' \) -mtime +7 -exec /usr/bin/rm {} \;

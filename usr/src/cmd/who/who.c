@@ -30,7 +30,7 @@
  */
 
 /*
- *	This program analyzes information found in /var/adm/utmpx
+ *	This program analyzes information found in /var/log/utmpx
  *
  *	Additionally information is gathered from /etc/inittab
  *	if requested.
@@ -41,7 +41,7 @@
  *		who am i	Displays info on yourself
  *
  *		who -a		Displays information about All
- *				entries in /var/adm/utmpx
+ *				entries in /var/log/utmpx
  *
  *		who -b		Displays info on last boot
  *
@@ -716,7 +716,7 @@ process()
 	char *ttname;
 
 	/*
-	 *	Loop over each entry in /var/adm/utmpx
+	 *	Loop over each entry in /var/log/utmpx
 	 */
 
 	setutxent();

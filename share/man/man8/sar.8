@@ -51,7 +51,7 @@ the restart mark to the daily data file using the command entry:
 .sp
 .in +2
 .nf
-su sys -c "/usr/lib/sa/sadc /var/adm/sa/sa\&'date +%d\&'"
+su sys -c "/usr/lib/sa/sadc /var/log/sa/sa\&'date +%d\&'"
 .fi
 .in -2
 .sp
@@ -59,7 +59,7 @@ su sys -c "/usr/lib/sa/sadc /var/adm/sa/sa\&'date +%d\&'"
 .sp
 .LP
 The shell script \fBsa1\fR, a variant of \fBsadc\fR, is used to collect and
-store data in the binary file \fB/var/adm/sa/sa\fR\fIdd,\fR where \fBdd\fR is
+store data in the binary file \fB/var/log/sa/sa\fR\fIdd,\fR where \fBdd\fR is
 the current day. The arguments \fIt\fR and \fIn\fR cause records to be written
 \fIn\fR times at an interval of \fIt\fR seconds, or once if omitted. The
 following entries in \fB/var/spool/cron/crontabs/sys\fR will produce records
@@ -79,7 +79,7 @@ See \fBcrontab\fR(1) for details.
 .sp
 .LP
 The shell script \fBsa2\fR, a variant of \fBsar\fR, writes a daily report in
-the file \fB/var/adm/sa/sar\fR\fIdd.\fR See the \fBOPTIONS\fR section in
+the file \fB/var/log/sa/sar\fR\fIdd.\fR See the \fBOPTIONS\fR section in
 \fBsar\fR(1) for an explanation of the various options. The following entry in
 \fB/var/spool/cron/crontabs/sys\fR will report important activities hourly
 during the working day:
@@ -104,7 +104,7 @@ address file
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/sa/sa\fR\fBdd\fR\fR
+\fB\fB/var/log/sa/sa\fR\fBdd\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -114,7 +114,7 @@ Daily data file
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/sa/sar\fR\fBdd\fR\fR
+\fB\fB/var/log/sa/sar\fR\fBdd\fR\fR
 .ad
 .sp .6
 .RS 4n

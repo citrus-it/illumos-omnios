@@ -27,7 +27,7 @@
 #ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
 #	"chargefee login-name number"
 #	"emits tacct.h/ascii record to charge name $number"
-cd /var/adm
+cd /var/log
 PATH=/usr/lib/acct:/usr/bin:/usr/sbin
 if test $# -lt 2; then
 	echo "usage: chargefee name number" >&2

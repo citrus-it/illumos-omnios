@@ -153,7 +153,7 @@ The messages can be retrieved with the \fBgetmsg\fR(2) system call. The
 sent. \fBstrace\fR(8) receives messages from the \fBlog\fR driver and sends
 them to the standard output. \fBstrerr\fR(8) receives error messages from the
 \fBlog\fR driver and appends them to a file called
-\fB/var/adm/streams/error.\fR\fImm-dd\fR, where \fImm-dd\fR identifies the date
+\fB/var/log/streams/error.\fR\fImm-dd\fR, where \fImm-dd\fR identifies the date
 of the error message.
 .SH RETURN VALUES
 .sp
@@ -169,7 +169,7 @@ context.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/streams/error.\fR\fImm-dd\fR\fR
+\fB\fB/var/log/streams/error.\fR\fImm-dd\fR\fR
 .ad
 .sp .6
 .RS 4n

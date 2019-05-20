@@ -280,11 +280,6 @@ DIRS= \
 	/usr/share/man \
 	/usr/share/misc \
 	/var  \
-	/var/adm  \
-	/var/adm/exacct \
-	/var/adm/pool \
-	/var/adm/sa \
-	/var/adm/streams \
 	/var/cores \
 	/var/cron \
 	/var/db \
@@ -296,7 +291,10 @@ DIRS= \
 	/var/krb5/rcache/root  \
 	/var/ld \
 	/var/log \
+	/var/log/exacct \
 	/var/log/pool \
+	/var/log/sa \
+	/var/log/streams \
 	/var/logadm \
 	/var/mail \
 	/var/news \
@@ -430,8 +428,7 @@ ROOTDIRS=	$(TARGETDIRS:%=$(ROOT)%)
 # The default value for DIRMODE is specified in usr/src/Makefile.master.
 #
 
-$(ROOT)/var/adm \
-$(ROOT)/var/adm/sa :=		DIRMODE= 775
+$(ROOT)/var/log/sa :=		DIRMODE= 775
 
 $(ROOT)/var/spool/lp:=		DIRMODE= 775
 

@@ -457,7 +457,7 @@ Specify \fIsize\fR as a number followed by the letter \fBb\fR for bytes,
 .RS 4n
 Specify the template to use when renaming log files.
 .sp
-\fItemplate\fR can be a simple name, such as \fB/var/adm/oldfile\fR, or it can
+\fItemplate\fR can be a simple name, such as \fB/var/log/oldfile\fR, or it can
 contain special keywords which are expanded by \fBlogadm\fR and are in the form
 \fB$\fR\fIword\fR. Allowed sequences are:
 .sp
@@ -718,9 +718,9 @@ is the same as the actual log file name.
 \fBExample 1 \fRRotating a File and Keeping Previous Versions
 .sp
 .LP
-The following example rotates the \fB/var/adm/exacct/proc\fR file, keeping ten
-previous versions in \fB/var/adm/exacct/proc.0\fR through
-\fB/var/adm/exacct/proc.9\fR.
+The following example rotates the \fB/var/log/exacct/proc\fR file, keeping ten
+previous versions in \fB/var/log/exacct/proc.0\fR through
+\fB/var/log/exacct/proc.9\fR.
 
 .sp
 .LP
@@ -729,7 +729,7 @@ Tell \fBlogadm\fR to copy the file and truncate it.
 .sp
 .in +2
 .nf
- % logadm -c /var/adm/exacct/proc
+ % logadm -c /var/log/exacct/proc
 .fi
 .in -2
 .sp
@@ -750,16 +750,16 @@ files are put in the directory \fB/var/oldlogs\fR instead of \fB/var/log\fR:
 .sp
 
 .LP
-\fBExample 3 \fRRotating /var/adm/sulog and Expiring Based on Age
+\fBExample 3 \fRRotating /var/log/sulog and Expiring Based on Age
 .sp
 .LP
 The following entry in the \fB/etc/logadm.conf\fR file rotates the
-\fB/var/adm/sulog\fR file and expires any copies older than 30 days.
+\fB/var/log/sulog\fR file and expires any copies older than 30 days.
 
 .sp
 .in +2
 .nf
-/var/adm/sulog -A 30d
+/var/log/sulog -A 30d
 .fi
 .in -2
 .sp
@@ -769,13 +769,13 @@ The following entry in the \fB/etc/logadm.conf\fR file rotates the
 .sp
 .LP
 The following entry in the \fB/etc/logadm.conf\fR file rotates the
-\fB/var/adm/sulog\fR file and expires old log files when more than 100
+\fB/var/log/sulog\fR file and expires old log files when more than 100
 megabytes are used by the sum of all the rotated log files.
 
 .sp
 .in +2
 .nf
-/var/adm/sulog -S 100m
+/var/log/sulog -S 100m
 .fi
 .in -2
 .sp

@@ -204,7 +204,7 @@ main(int argc, char **argv)
 		if (fflg == 0) {
 			temp = time(NULL);
 			curt = localtime(&temp);
-			(void) snprintf(flnm, PATH_MAX, "/var/adm/sa/sa%.2d",
+			(void) snprintf(flnm, PATH_MAX, "/var/log/sa/sa%.2d",
 			    curt->tm_mday);
 		}
 		if ((fin = open(flnm, O_RDONLY)) == -1)

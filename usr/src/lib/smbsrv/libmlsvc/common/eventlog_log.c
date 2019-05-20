@@ -45,7 +45,7 @@ typedef struct logr_eventlog {
 } logr_eventlog_t;
 
 logr_eventlog_t logr_eventlog[] = {
-	{ "System",     "/var/adm/messages" },
+	{ "System",     "/var/log/messages" },
 	{ "smbd",       "/var/smb/smbd_log.txt" },
 	{ "smbrdr",     "/var/smb/smbrdr_log.txt" }
 };

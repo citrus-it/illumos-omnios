@@ -25,9 +25,8 @@
 
 PROG= last
 UTMPS= wtmpx
-ROOTADM= $(ROOT)/var/adm
+ROOTADM= $(ROOT)/var/log
 ROOTUTMPS= $(UTMPS:%=$(ROOTADM)/%)
-ETCTOVARADM= ../var/adm
 
 include ../Makefile.cmd
 

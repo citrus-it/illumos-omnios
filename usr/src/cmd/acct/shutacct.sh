@@ -32,5 +32,5 @@
 #	"arg	added to /var/wtmpx to record reason, defaults to shutdown"
 PATH=/usr/lib/acct:/usr/bin:/usr/sbin
 _reason=${1-"acctg off"}
-acctwtmp  "${_reason}" /var/adm/wtmpx
+acctwtmp  "${_reason}" /var/log/wtmpx
 turnacct off

@@ -32,7 +32,7 @@
 
 static struct utmpx utdummy;	/* dummy - used to get member sizes */
 
-#define PACCT		"/var/adm/pacct"
+#define PACCT		"/var/log/pacct"
 #define HOLFILE		"/etc/acct/holidays"
 #define	NHOLIDAYS	200	/* max number of company holidays per year */
 #define NSYS		200	/* number of run state changes */

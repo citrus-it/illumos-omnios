@@ -32,7 +32,7 @@
 . /lib/svc/share/fs_include.sh
 
 # Mount other file systems to be available in single user mode.
-# Currently, these are /var, /var/adm, /var/run and /tmp.  A change
+# Currently, these are /var, /var/log, /var/run and /tmp.  A change
 # here will require a modification to the following programs (and
 # documentation): /sbin/mountall, /sbin/umountall, and
 # /lib/svc/bin/svc.startd.
@@ -44,7 +44,7 @@ if [ "$fstype" = zfs ] ; then
 	be=$special
 fi
 
-for fs in /var /var/adm /tmp; do
+for fs in /var /var/log /tmp; do
 	readvfstab $fs < $vfstab
 	if [ -n "$mountp" ]; then
 		mounted $mountp $mntopts $fstype < /etc/mnttab && continue

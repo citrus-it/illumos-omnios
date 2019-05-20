@@ -142,7 +142,7 @@ is displayed as `\fB^C\fR' and `\fB\e372\fR\&' as `\fBM\(miz\fR'.
 To write to a user who is logged in more than once, the \fIterminal\fR argument
 can be used to indicate which terminal to write to. Otherwise, the recipient's
 terminal is the first writable instance of the user found in
-\fB/var/adm/utmpx\fR, and the following informational message will be written
+\fB/var/log/utmpx\fR, and the following informational message will be written
 to the sender's standard output, indicating which terminal was chosen:
 .sp
 .in +2
@@ -232,7 +232,7 @@ The addressed user is not logged on or the addressed user denies permission.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/utmpx\fR\fR
+\fB\fB/var/log/utmpx\fR\fR
 .ad
 .RS 18n
 User and accounting information for \fBwrite\fR

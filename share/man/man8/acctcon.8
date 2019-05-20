@@ -27,17 +27,17 @@ acctcon, acctcon1, acctcon2 \- connect-time accounting
 .LP
 \fBacctcon\fR converts a sequence of login/logoff records to total accounting
 records (see the \fBtacct\fR format in \fBacct.h\fR(3HEAD)). The login/logoff
-records are read from standard input.  The file \fB/var/adm/wtmpx\fR is usually
+records are read from standard input.  The file \fB/var/log/wtmpx\fR is usually
 the source of the login/logoff records; however, because it might contain
 corrupted records or system date changes, it should first be fixed using
-\fBwtmpfix\fR. The fixed version of file \fB/var/adm/wtmpx\fR can then be
+\fBwtmpfix\fR. The fixed version of file \fB/var/log/wtmpx\fR can then be
 redirected to \fBacctcon\fR. The \fBtacct\fR records are written to standard
 output.
 .sp
 .LP
 \fBacctcon\fR is a combination of the programs \fBacctcon1\fR and
 \fBacctcon2\fR. \fBacctcon1\fR converts login/logoff records, taken from the
-fixed \fB/var/adm/wtmpx\fR file, to ASCII output. \fBacctcon2\fR reads the
+fixed \fB/var/log/wtmpx\fR file, to ASCII output. \fBacctcon2\fR reads the
 ASCII records produced by \fBacctcon1\fR and converts them to \fBtacct\fR
 records. \fBacctcon1\fR can be used with the \fB-l\fR and \fB-o\fR options,
 described below, as well as with the \fB-p\fR and \fB-t\fR options.
@@ -124,7 +124,7 @@ example% acctcon2 < ctmp > ctacct
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR\fR
+\fB\fB/var/log/wtmpx\fR\fR
 .ad
 .RS 18n
 History of user access and administration information
@@ -144,7 +144,7 @@ History of user access and administration information
 .sp
 .LP
 The line usage report is confused by date changes. Use \fBwtmpfix\fR (see
-\fBfwtmp\fR(8)), with the \fB/var/adm/wtmpx\fR file as an argument, to correct
+\fBfwtmp\fR(8)), with the \fB/var/log/wtmpx\fR file as an argument, to correct
 this situation.
 .sp
 .LP

@@ -46,9 +46,9 @@ done
 shift `expr $OPTIND - 1`
 date=`date +%m%d`
 _sysname="`uname -n`"
-_nite=/var/adm/acct/nite
+_nite=/var/log/acct/nite
 _lib=/usr/lib/acct
-_sum=/var/adm/acct/sum
+_sum=/var/log/acct/sum
 
 cd ${_nite}
 if [ `expr "$1" : [01][0-9][0-3][0-9]` -eq 4 -a "$1" != "$date" ]; then

@@ -121,7 +121,7 @@ int acpica_enable_interpreter_slack = 1;
 
 /*
  * For non-DEBUG builds, set the ACPI CA debug level to 0
- * to quiet chatty BIOS output into /var/adm/messages
+ * to quiet chatty BIOS output into /var/log/messages
  * Field-patchable for diagnostic use.
  */
 #ifdef  DEBUG
@@ -408,7 +408,7 @@ acpica_process_user_options()
 
 	/*
 	 * modify default ACPI CA debug output level for non-DEBUG builds
-	 * (to avoid BIOS debug chatter in /var/adm/messages)
+	 * (to avoid BIOS debug chatter in /var/log/messages)
 	 */
 	if (acpica_muzzle_debug_output)
 		AcpiDbgLevel = 0;

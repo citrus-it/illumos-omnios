@@ -46,7 +46,7 @@ case "$arg" in
 'start')
 	if [ $_INIT_RUN_NPREV -eq 0 ]; then
 
-		/usr/lib/sa/sadc /var/adm/sa/sa`date +%d`
+		/usr/lib/sa/sadc /var/log/sa/sa`date +%d`
 
 		if [ ! -f /var/spool/cron/crontabs/sys ]; then
 			cat << EOF > /var/spool/cron/crontabs/sys

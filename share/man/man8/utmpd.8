@@ -16,7 +16,7 @@ utmpd \- utmpx monitoring daemon
 
 .SH DESCRIPTION
 .LP
-The \fButmpd\fR daemon monitors the \fB/var/adm/utmpx\fR file. See
+The \fButmpd\fR daemon monitors the \fB/var/log/utmpx\fR file. See
 \fButmpx\fR(4) (and \fButmp\fR(4) for historical information).
 .sp
 .LP
@@ -24,9 +24,9 @@ The \fButmpd\fR daemon monitors the \fB/var/adm/utmpx\fR file. See
 It maintains a table of processes and uses \fBpoll\fR(2) on \fB/proc\fR files
 to detect process termination. When \fButmpd\fR detects that a process has
 terminated, it checks that the process has removed its \fButmpx\fR entry from
-\fB/var/adm/utmpx\fR. If the process' \fButmpx\fR entry has not been removed,
+\fB/var/log/utmpx\fR. If the process' \fButmpx\fR entry has not been removed,
 \fButmpd\fR removes the entry. By periodically scanning the
-\fB/var/adm/utmpx\fR file, \fButmpd\fR also monitors processes that are not in
+\fB/var/log/utmpx\fR file, \fButmpd\fR also monitors processes that are not in
 its table.
 .SH OPTIONS
 .ne 2
@@ -115,7 +115,7 @@ unavailable. The default is 60.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/utmpx\fR\fR
+\fB\fB/var/log/utmpx\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -141,11 +141,11 @@ monitored.
 \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
 .LP
-If the filesystem holding \fB/var/adm/wtmpx\fR is mounted with options which
+If the filesystem holding \fB/var/log/wtmpx\fR is mounted with options which
 inhibit or defer access time updates, an unknown amount of error will be
 introduced into the \fButmp\fR \fBDOWN_TIME\fR record's timestamp in the event
 of an uncontrolled shutdown (for example, a crash or loss of power ).
-Controlled shutdowns will update the modify time of \fB/var/adm/wtmpx\fR, which
+Controlled shutdowns will update the modify time of \fB/var/log/wtmpx\fR, which
 will be used on the next boot to determine when the previous shutdown occurred,
 regardless of access time deferral or inhibition.
 .sp

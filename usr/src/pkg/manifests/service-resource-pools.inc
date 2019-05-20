@@ -48,7 +48,7 @@ dir path=usr/share/man/man8
 dir path=usr/share/man/man3lib
 dir path=usr/share/man/man3pool
 dir path=var group=sys variant.opensolaris.zone=global
-dir path=var/adm/pool group=sys variant.opensolaris.zone=global
+dir path=var/log/pool group=sys variant.opensolaris.zone=global
 dir path=var/log/pool group=sys variant.opensolaris.zone=global
 driver name=pool perms="pool 0666 root sys" perms="poolctl 0666 root sys"
 file path=lib/svc/manifest/system/pools.xml group=sys mode=0444 \

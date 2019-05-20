@@ -30,7 +30,7 @@
 #	"       because lastlogin is run at 4am and checks the last"
 #	"       24 hrs worth of process accounting info (in pacct)"
 PATH=/usr/lib/acct:/usr/bin:/usr/sbin
-cd /var/adm/acct
+cd /var/log/acct
 if test ! -r sum/loginlog; then
 	nulladm sum/loginlog
 fi

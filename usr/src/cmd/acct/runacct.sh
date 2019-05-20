@@ -30,10 +30,10 @@
 #	"does process, connect, disk, and fee accounting"
 #	"prepares command summaries"
 #	"shell is restartable and provides reasonable diagnostics"
-_adm=/var/adm
-_nite=/var/adm/acct/nite
-_sum=/var/adm/acct/sum
-_wtmpx=/var/adm/wtmpx
+_adm=/var/log
+_nite=/var/log/acct/nite
+_sum=/var/log/acct/sum
+_wtmpx=/var/log/wtmpx
 PATH=/usr/lib/acct:/usr/bin:/usr/sbin
 export PATH
 _statefile=${_nite}/statefile
@@ -57,7 +57,7 @@ if test $? -ne 0; then
 	exit 1
 fi
 
-# Check to see if there is enough space in /var/adm to do nitely accounting
+# Check to see if there is enough space in /var/log to do nitely accounting
 #
 _blocks=`df $_adm | sed 's/.*://' | awk '{ print $1 }'`
 if [ "$_blocks" -le $_MIN_BLKS ];then
@@ -411,7 +411,7 @@ done
 #	" should be done manually, or just cleanup first"
 
 
-#	" FILE USAGE:	all files in /var/adm/acct/nite unless specified"
+#	" FILE USAGE:	all files in /var/log/acct/nite unless specified"
 
 #	" statefile	records progess of runacct"
 #	" lastdate	last day runacct ran in date +%m%d format"
@@ -431,7 +431,7 @@ done
 #	" daycms	ascii daily command summary used by prdaily"
 #	" cms		acsii total command summary used by prdaily"
 
-#	" following files in /var/adm directory"
+#	" following files in /var/log directory"
 
 #	" fee		output from chargefee program"
 #	" pacct		active pacct file"
@@ -439,7 +439,7 @@ done
 #	" Spacctn.MMDD	pacct files for MMDD after SETUP state"
 #	" wtmpx		active wtmpx file"
 
-#	" following files in /var/adm/acct/sum"
+#	" following files in /var/log/acct/sum"
 
 #	" loginlog	output of lastlogin used in prdaily"
 #	" tacct		total tacct file for current fiscal"

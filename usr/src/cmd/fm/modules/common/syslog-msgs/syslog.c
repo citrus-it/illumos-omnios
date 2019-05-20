@@ -100,7 +100,7 @@ static const char SYSLOG_POINTER[] = "syslog-msgs-pointer";
  * We send this message to log(7D) using putmsg() with SL_CONSOLE | SL_LOGONLY
  * set in the log_ctl_t.  The log driver allows us to set SL_LOGONLY when we
  * construct messages ourself, indicating that syslogd should only emit the
- * message to /var/adm/messages and any remote hosts, and skip the console.
+ * message to /var/log/messages and any remote hosts, and skip the console.
  * Then we emit the message a second time, without the special prefix, to the
  * sysmsg(7D) device, which handles console redirection and also permits us
  * to output any characters we like to the console, including \n and \r.

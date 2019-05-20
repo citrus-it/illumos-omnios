@@ -36,14 +36,14 @@ etc/dladm/secobj.conf
 
 etc/dumpdates
 
-# /var/adm stuff added because std cron jobs for sys/adm expect this
-var/adm
-var/adm/acct
-var/adm/acct/fiscal
-var/adm/acct/nite
-var/adm/acct/sum
-var/adm/sa
-var/adm/spellhist
+# /var/log stuff added because std cron jobs for sys/adm expect this
+var/log
+var/log/acct
+var/log/acct/fiscal
+var/log/acct/nite
+var/log/acct/sum
+var/log/sa
+var/log/spellhist
 
 var/mail/:saved
 var/spool/uucppublic

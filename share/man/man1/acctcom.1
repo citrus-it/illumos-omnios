@@ -20,7 +20,7 @@ acctcom \- search and print process accounting files
 .sp
 .LP
 The \fBacctcom\fR utility reads \fIfilename\fRs, the standard input, or
-\fB/var/adm/pacct\fR, in the form described by \fBacct.h\fR(3HEAD) and writes
+\fB/var/log/pacct\fR, in the form described by \fBacct.h\fR(3HEAD) and writes
 selected records to standard output. Each record represents the execution of
 one process. The output shows the \fBCOMMAND NAME\fR, \fBUSER\fR,
 \fBTTYNAME\fR, \fBSTART TIME\fR, \fBEND TIME\fR, \fBREAL (SEC)\fR, \fBCPU
@@ -38,15 +38,15 @@ super-user privileges. If a process is not associated with a known terminal, a
 .LP
 If no  \fIfilename\fR is specified, and if the standard input is associated
 with a terminal or \fB/dev/null\fR (as is the case when using `\fB&\fR\&' in
-the shell), \fB/var/adm/pacct\fR is read; otherwise, the standard input is
+the shell), \fB/var/log/pacct\fR is read; otherwise, the standard input is
 read.
 .sp
 .LP
 If any \fIfilename\fR arguments are given, they are read in their respective
 order. Each file is normally read forward, that is, in chronological order by
-process completion time. The file \fB/var/adm/pacct\fR is usually the current
+process completion time. The file \fB/var/log/pacct\fR is usually the current
 file to be examined; a busy system may need several such files of which all but
-the current file are found in \fB/var/adm/pacct\fIincr\fR\fR.
+the current file are found in \fB/var/log/pacct\fIincr\fR\fR.
 .SH OPTIONS
 .sp
 .LP
@@ -307,7 +307,7 @@ system password file
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/pacct\fIincr\fR\fR\fR
+\fB\fB/var/log/pacct\fIincr\fR\fR\fR
 .ad
 .RS 22n
 active processes accounting file

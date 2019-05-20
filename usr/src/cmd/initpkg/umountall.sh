@@ -267,7 +267,7 @@ doumounts () {
 		/tmp			| \
 		/usr			| \
 		/var			| \
-		/var/adm		| \
+		/var/log		| \
 		/var/run		| \
 		'' )
 			#

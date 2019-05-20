@@ -48,7 +48,7 @@ struct lastlog {
 	char	ll_host[sizeof (((struct utmpx *)0)->ut_host)];
 };
 
-#define	_PATH_LASTLOG	"/var/adm/lastlog"
+#define	_PATH_LASTLOG	"/var/log/lastlog"
 
 #ifdef	__cplusplus
 }

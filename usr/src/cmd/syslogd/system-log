@@ -76,9 +76,9 @@ if smf_is_globalzone; then
 	    	/usr/bin/savecore -m -f $DUMPADM_DEVICE
 	fi
 fi
-if [ ! -f /var/adm/messages ]; then
-	/usr/bin/cp /dev/null /var/adm/messages
-	/usr/bin/chmod 0644 /var/adm/messages
+if [ ! -f /var/log/messages ]; then
+	/usr/bin/cp /dev/null /var/log/messages
+	/usr/bin/chmod 0644 /var/log/messages
 fi
 remote=`awk -F= '
 	/^LOG_FROM_REMOTE=[yY][Ee][Ss]/ {print "true"}

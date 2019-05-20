@@ -235,9 +235,6 @@ dir path=usr/share/man/man8
 dir path=usr/share/man/man8
 dir path=usr/share/misc
 dir path=var group=sys
-dir path=var/adm group=sys mode=0775
-dir path=var/adm/exacct group=adm owner=adm
-dir path=var/adm/streams group=sys
 dir path=var/cores group=sys
 dir path=var/cron group=sys
 dir path=var/games
@@ -246,6 +243,8 @@ dir path=var/inet group=sys
 dir path=var/ld
 dir path=var/ld/$(ARCH64)
 dir path=var/log group=sys
+dir path=var/log/exacct group=adm owner=adm
+dir path=var/log/streams group=sys
 dir path=var/logadm
 dir path=var/mail group=mail
 dir path=var/news
@@ -1181,12 +1180,12 @@ file path=usr/share/misc/less.help
 file path=usr/share/misc/mail.help
 file path=usr/share/misc/mail.tildehelp
 file path=usr/share/misc/more.help
-file path=var/adm/aculog mode=0600 owner=uucp preserve=true
-file path=var/adm/spellhist mode=0666 preserve=true
-file path=var/adm/utmpx preserve=true
-file path=var/adm/wtmpx group=adm owner=adm preserve=true
+file path=var/log/aculog mode=0600 owner=uucp preserve=true
 file path=var/log/authlog group=sys mode=0600 preserve=true
+file path=var/log/spellhist mode=0666 preserve=true
 file path=var/log/syslog group=sys preserve=true
+file path=var/log/utmpx preserve=true
+file path=var/log/wtmpx group=adm owner=adm preserve=true
 file path=var/saf/zsmon/log group=sys preserve=true
 file path=var/spool/cron/crontabs/adm group=sys mode=0600 preserve=true
 file path=var/spool/cron/crontabs/root group=sys mode=0600 preserve=true

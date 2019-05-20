@@ -30,9 +30,9 @@
 #	"startup (acct) - should be called from /etc/rc"
 #	"whenever system is brought up"
 PATH=/usr/lib/acct:/usr/bin:/usr/sbin
-acctwtmp "acctg on" /var/adm/wtmpx
+acctwtmp "acctg on" /var/log/wtmpx
 turnacct switch
 #	"clean up yesterdays accounting files"
-rm -f /var/adm/acct/sum/wtmp*
-rm -f /var/adm/acct/sum/pacct*
-rm -f /var/adm/acct/nite/lock*
+rm -f /var/log/acct/sum/wtmp*
+rm -f /var/log/acct/sum/pacct*
+rm -f /var/log/acct/nite/lock*

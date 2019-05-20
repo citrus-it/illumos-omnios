@@ -48,14 +48,14 @@ programs.
 .sp
 .LP
 Connect time accounting is handled by various programs that write records into
-\fB/var/adm/wtmpx\fR, as described in \fButmpx\fR(4). The programs described in
+\fB/var/log/wtmpx\fR, as described in \fButmpx\fR(4). The programs described in
 \fBacctcon\fR(8) convert this file into session and charging records, which
 are then summarized by \fBacctmerg\fR(8).
 .sp
 .LP
 Process accounting is performed by the system kernel. Upon termination of a
 process, one record per process is written to a file (normally
-\fB/var/adm/pacct\fR). The programs in \fBacctprc\fR(8) summarize this data
+\fB/var/log/pacct\fR). The programs in \fBacctprc\fR(8) summarize this data
 for charging purposes; \fBacctcms\fR(8) is used to summarize command usage.
 Current process data may be examined using \fBacctcom\fR(1).
 .sp
@@ -92,23 +92,23 @@ in reboot and shutdown procedures, respectively:
 .sp
 .in +2
 .nf
-acctwtmp "acctg on" /var/adm/wtmpx
-acctwtmp "acctg off" /var/adm/wtmpx
+acctwtmp "acctg on" /var/log/wtmpx
+acctwtmp "acctg off" /var/log/wtmpx
 .fi
 .in -2
 
 .sp
 .LP
 For each user currently logged on, \fBclosewtmp\fR puts a false
-\fBDEAD_PROCESS\fR record in the \fB/var/adm/wtmpx\fR file. \fBrunacct\fR (see
+\fBDEAD_PROCESS\fR record in the \fB/var/log/wtmpx\fR file. \fBrunacct\fR (see
 \fBrunacct\fR(8)) uses this false \fBDEAD_PROCESS\fR record so that the
 connect accounting procedures can track the time used by users logged on before
 \fBrunacct\fR was invoked.
 .sp
 .LP
 For each user currently logged on, \fBrunacct\fR uses \fButmp2wtmp\fR to create
-an entry in the file \fB/var/adm/wtmpx\fR, created by \fBrunacct\fR. Entries in
-\fB/var/adm/wtmpx\fR enable subsequent invocations of \fBrunacct\fR to account
+an entry in the file \fB/var/log/wtmpx\fR, created by \fBrunacct\fR. Entries in
+\fB/var/log/wtmpx\fR enable subsequent invocations of \fBrunacct\fR to account
 for connect times of users currently logged in.
 .SH OPTIONS
 .sp
@@ -192,7 +192,7 @@ Holds all accounting commands listed in sub-class 8 of this manual.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/pacct\fR\fR
+\fB\fB/var/log/pacct\fR\fR
 .ad
 .RS 18n
 Current process accounting file.
@@ -201,7 +201,7 @@ Current process accounting file.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR\fR
+\fB\fB/var/log/wtmpx\fR\fR
 .ad
 .RS 18n
 History of user access and administration information..

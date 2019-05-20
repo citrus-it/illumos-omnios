@@ -63,7 +63,7 @@ Scripts in /etc/rcS.d/ may assume the following:
                 /dev/fd
                 /tmp
                 /var
-                /var/adm
+                /var/log
                 /var/run
                 /dev
                 /devices

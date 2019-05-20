@@ -65,7 +65,7 @@ getlogin, getlogin_r \- get login name
 .sp
 .LP
 The \fBgetlogin()\fR function returns a pointer to the login name as found in
-\fB/var/adm/utmpx\fR. It can be used in conjunction with \fBgetpwnam\fR(3C) to
+\fB/var/log/utmpx\fR. It can be used in conjunction with \fBgetpwnam\fR(3C) to
 locate the correct password file entry when the same user \fBID\fR is shared by
 several login names.
 .sp
@@ -114,7 +114,7 @@ The size of the buffer is smaller than the result to be returned.
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 10n
-And entry for the current user was not found in the \fB/var/adm/utmpx\fR file.
+And entry for the current user was not found in the \fB/var/log/utmpx\fR file.
 .RE
 
 .sp
@@ -176,7 +176,7 @@ returns the name associated with the real user ID of the process.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/utmpx\fR\fR
+\fB\fB/var/log/utmpx\fR\fR
 .ad
 .RS 18n
 user access and administration information

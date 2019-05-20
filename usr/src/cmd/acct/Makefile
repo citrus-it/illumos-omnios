@@ -65,7 +65,7 @@ acctdusg:= LDLIBS += -lcmdutils
 LIBACCTD=	$(ROOTLIB)/acct
 ETCACCTD=	$(ROOTETC)/acct
 ETCINITD=	$(ROOTETC)/init.d
-VARADMD=	$(ROOT)/var/adm
+VARADMD=	$(ROOT)/var/log
 ACCTDIR=	$(VARADMD)/acct
 ACCTSUBDIRS=	$(ACCTDIR)/nite $(ACCTDIR)/fiscal $(ACCTDIR)/sum
 WKDIRS=		$(ACCTDIR) $(ACCTSUBDIRS)

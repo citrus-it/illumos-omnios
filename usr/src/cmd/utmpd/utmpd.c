@@ -44,7 +44,7 @@
  *		its utmpx entry on termination.
  *		The program keeps a list of procs
  *		and uses poll() on their /proc files to detect termination.
- *		Also the  program periodically scans the /var/adm/utmpx file for
+ *		Also the  program periodically scans the /var/log/utmpx file for
  *		processes that aren't in the table so they can be watched.
  *
  *		If utmpd doesn't hear back over the pipe from pututline(3) that
@@ -1077,7 +1077,7 @@ proc_is_alive(pid_t pid)
 }
 
 /*
- * warn_utmp -	/var/adm/utmp has been deprecated. It should no longer
+ * warn_utmp -	/var/log/utmp has been deprecated. It should no longer
  *		be used.  Applications that try to directly manipulate
  *		it may cause problems. Since the file is no longer
  *		shipped, if it appears on a system it's because an
@@ -1092,7 +1092,7 @@ warn_utmp()
 
 	if (lstat(UTMP_FILE, &s) == 0 &&
 	    s.st_size % sizeof (struct utmp) == 0) {
-		nonfatal("WARNING: /var/adm/utmp exists!\nSee "
+		nonfatal("WARNING: /var/log/utmp exists!\nSee "
 		    "utmp(4) for more information");
 	}
 }

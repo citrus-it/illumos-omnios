@@ -36,7 +36,7 @@
  *		(only way to get repeatable data from old files)
  *	-l file	causes output of line usage summary
  *	-o file	causes first/last/reboots report to be written to file
- *	reads input (normally /var/adm/wtmpx), produces
+ *	reads input (normally /var/log/wtmpx), produces
  *	list of sessions, sorted by ending time in ctmp.h/ascii format
  *	A_TSIZE is max # distinct ttys
  */

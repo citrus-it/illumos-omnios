@@ -48,7 +48,7 @@ extern "C" {
 /*
  * Various constants & tunable values for syslogd
  */
-#define	DEBUGFILE 	"/var/adm/syslog.debug"
+#define	DEBUGFILE 	"/var/log/syslog.debug"
 #define	MAXLINE		1024		/* maximum line length */
 #define	DEFUPRI		(LOG_USER|LOG_INFO)
 #define	DEFSPRI		(LOG_KERN|LOG_CRIT)

@@ -29,13 +29,13 @@
 #
 
 #ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
-#       periodically check the size of /var/adm/pacct
+#       periodically check the size of /var/log/pacct
 #       if over $1 blocks (default: maxi 200, mini 500), execute 
 #	turnacct switch
 
-_adm=/var/adm
+_adm=/var/log
 PATH=/usr/lib/acct:/usr/bin:/usr/sbin
-trap "rm -f /var/adm/cklock*; exit 0" 0 1 2 3 9 15
+trap "rm -f /var/log/cklock*; exit 0" 0 1 2 3 9 15
 export PATH
 
 if [ -f uts -a uts ]
@@ -45,7 +45,7 @@ else
 	_max=${1-500}
 fi
 _MIN_BLKS=500
-cd /var/adm
+cd /var/log
 
 #	set up lock files to prevent simultaneous checking
 
@@ -54,7 +54,7 @@ chmod 400 cklock
 ln cklock cklock1
 if test $? -ne 0 ; then exit 1; fi
 
-#	If there are less than $_MIN_BLKS free blocks left on the /var/adm
+#	If there are less than $_MIN_BLKS free blocks left on the /var/log
 #	file system, turn off the accounting (unless things improve
 #	the accounting wouldn't run anyway).  If something has
 #	returned the file system space, restart accounting.  This

@@ -17,7 +17,7 @@
 
 /*
  * lc_pacct() provides the functionality of lastcomm when applied to the basic
- * SVR4 accounting file, /var/adm/pacct.  Definitions for this accounting file
+ * SVR4 accounting file, /var/log/pacct.  Definitions for this accounting file
  * format are given in <sys/acct.h>.
  */
 

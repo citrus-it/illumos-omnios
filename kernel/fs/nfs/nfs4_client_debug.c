@@ -861,7 +861,7 @@ print_facts(nfs4_debug_msg_t *msg, mntinfo4_t *mi)
 }
 
 /*
- * Print an event message to /var/adm/messages
+ * Print an event message to /var/log/messages
  * The last argument to this fuction dictates the repeat status
  * of the event. If set to 1, it means that we are dumping this
  * event and it will _never_ be printed after this time. Else if
@@ -1081,7 +1081,7 @@ queue_print_event(nfs4_debug_msg_t *msg, mntinfo4_t *mi, int dump)
 }
 
 /*
- * Print a fact message to /var/adm/messages
+ * Print a fact message to /var/log/messages
  */
 static void
 queue_print_fact(nfs4_debug_msg_t *msg, int dump)

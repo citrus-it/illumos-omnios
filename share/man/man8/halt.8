@@ -28,7 +28,7 @@ machine remove power, if possible.
 .LP
 The \fBhalt\fR and \fBpoweroff\fR utilities normally log the system shutdown to
 the system log daemon, \fBsyslogd\fR(8), and place a shutdown record in the
-login accounting file \fB/var/adm/wtmpx\fR. These actions are inhibited if the
+login accounting file \fB/var/log/wtmpx\fR. These actions are inhibited if the
 \fB-n\fR or \fB-q\fR options are present.
 .SH OPTIONS
 .sp
@@ -85,7 +85,7 @@ This option is ignored for backwards compatibility.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR\fR
+\fB\fB/var/log/wtmpx\fR\fR
 .ad
 .RS 18n
 History of user access and administration information.

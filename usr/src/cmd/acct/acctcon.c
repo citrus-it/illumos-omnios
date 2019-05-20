@@ -31,7 +31,7 @@
  *	acctcon [-l file] [-o file] <wtmpx-file
  *	-l file	causes output of line usage summary
  *	-o file	causes first/last/reboots report to be written to file
- *	reads input (normally /var/adm/wtmpx), produces
+ *	reads input (normally /var/log/wtmpx), produces
  *	list of sessions, sorted by ending time in tacct.h format
  */
 

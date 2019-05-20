@@ -26,7 +26,7 @@
 
 #ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
 #	"this procedure should be run periodically ( by month or fiscal )"
-_adm=/var/adm
+_adm=/var/log
 _sum=${_adm}/acct/sum
 _fiscal=${_adm}/acct/fiscal
 PATH=:/usr/lib/acct:/usr/bin:/usr/sbin

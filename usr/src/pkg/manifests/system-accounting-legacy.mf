@@ -51,12 +51,12 @@ dir path=usr/share/man/man1
 dir path=usr/share/man/man4
 dir path=usr/share/man/man8
 dir path=var group=sys
-dir path=var/adm group=sys mode=0775
-dir path=var/adm/acct group=adm mode=0775 owner=adm
-dir path=var/adm/acct/fiscal group=adm mode=0775 owner=adm
-dir path=var/adm/acct/nite group=adm mode=0775 owner=adm
-dir path=var/adm/acct/sum group=adm mode=0775 owner=adm
-dir path=var/adm/sa group=sys mode=0775 owner=adm
+dir path=var/log group=sys
+dir path=var/log/acct group=adm mode=0775 owner=adm
+dir path=var/log/acct/fiscal group=adm mode=0775 owner=adm
+dir path=var/log/acct/nite group=adm mode=0775 owner=adm
+dir path=var/log/acct/sum group=adm mode=0775 owner=adm
+dir path=var/log/sa group=sys mode=0775 owner=adm
 dir path=var/spool
 dir path=var/spool/cron group=sys
 dir path=var/spool/cron/crontabs group=sys
