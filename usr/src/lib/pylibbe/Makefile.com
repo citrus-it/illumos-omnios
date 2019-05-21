@@ -34,7 +34,7 @@ include ../../Makefile.lib
 LIBLINKS = 
 SRCDIR =	../common
 ROOTLIBDIR=	$(ROOT)/usr/lib/python$(PYVER)/vendor-packages
-ROOTLIBDIR64=	$(ROOT)/usr/lib/python$(PYVER)/vendor-packages/64
+ROOTLIBDIR64=	$(ROOT)/usr/lib/python$(PYVER)/vendor-packages
 PYFILES=	$(PYSRCS)
 ROOTPYBEFILES=  $(PYFILES:%=$(ROOTLIBDIR)/%)
 

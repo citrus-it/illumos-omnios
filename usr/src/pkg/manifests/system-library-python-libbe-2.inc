@@ -24,8 +24,6 @@
 
 dir path=usr/lib/python$(PYTHON_VERSION)
 dir path=usr/lib/python$(PYTHON_VERSION)/vendor-packages
-dir path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/64
-file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/64/libbe_py.so
 file path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/libbe_py.so
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

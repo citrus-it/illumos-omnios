@@ -28,7 +28,6 @@
 include	../Makefile.lib
 
 SUBDIRS=
-$(BUILDPY2)SUBDIRS += $(MACH)
 $(BUILD64)$(BUILDPY2)SUBDIRS += $(MACH64)
 $(BUILD64)$(BUILDPY3)SUBDIRS += py3
 
