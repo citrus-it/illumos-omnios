@@ -28,5 +28,5 @@
 
 /usr/bin/echo
 /usr/bin/date
-/usr/bin/cat -sv `/usr/bin/ls -tr1 /var/adm/messages.? 2>/dev/null` \
-	/var/adm/messages | /usr/bin/tail -200
+/usr/bin/cat -sv `/usr/bin/ls -tr1 /var/log/messages.? 2>/dev/null` \
+	/var/log/messages | /usr/bin/tail -200

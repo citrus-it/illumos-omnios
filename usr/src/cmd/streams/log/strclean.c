@@ -40,7 +40,7 @@
 #define	MSGSIZE 128
 #define	NSECDAY (60*60*24)
 #define	LOGDELAY 2
-#define	LOGDEFAULT "/var/adm/streams"
+#define	LOGDEFAULT "/var/log/streams"
 #define	AGEDEFAULT 3
 #define	DIRECTORY 040000
 #define	ACCESS 07

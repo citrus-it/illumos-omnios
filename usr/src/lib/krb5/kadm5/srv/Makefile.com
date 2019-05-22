@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libkadm5srv.a
 VERS= .1
@@ -92,6 +93,8 @@ CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-type-limits
 CERRWARN +=	-Wno-uninitialized
+
+SMOFF += all_func_returns,indenting
 
 .KEEP_STATE:
 

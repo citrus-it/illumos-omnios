@@ -436,7 +436,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	if (istatus.bits.w0.bad_cksum_cnt_ovfl) {
 		/*
 		 * Do not send FMA ereport or log error message
-		 * in /var/adm/messages because this error does not
+		 * in /var/log/messages because this error does not
 		 * indicate a HW failure.
 		 *
 		 * Clear bit BAD_CS_MX of register IPP_INT_STAT
@@ -448,7 +448,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	if (istatus.bits.w0.pkt_discard_cnt_ovfl) {
 		/*
 		 * Do not send FMA ereport or log error message
-		 * in /var/adm/messages because this error does not
+		 * in /var/log/messages because this error does not
 		 * indicate a HW failure.
 		 *
 		 * Clear bit PKT_DIS_MX of register IPP_INT_STAT

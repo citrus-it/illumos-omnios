@@ -87,3 +87,4 @@ export PKGFMT_OUTPUT='v1'
 
 # Don't build python 3 versions of libs.
 export BUILDPY3='#'
+export BUILDPY3TOOLS='#'

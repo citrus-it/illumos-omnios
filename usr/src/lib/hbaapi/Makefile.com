@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 
 LIBRARY =	libHBAAPI.a
@@ -44,6 +45,9 @@ CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-value
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 LDLIBS +=	-lc
 

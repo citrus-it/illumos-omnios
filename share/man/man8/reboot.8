@@ -42,7 +42,7 @@ successful reboot.
 .LP
 The \fBreboot\fR utility normally logs the reboot to the system log daemon,
 \fBsyslogd\fR(8), and places a shutdown record in the login accounting file
-\fB/var/adm/wtmpx\fR. These actions are inhibited if the \fB-n\fR or \fB-q\fR
+\fB/var/log/wtmpx\fR. These actions are inhibited if the \fB-n\fR or \fB-q\fR
 options are present.
 .sp
 .LP
@@ -114,7 +114,7 @@ who executed \fBreboot\fR.
 .sp .6
 .RS 4n
 Avoid calling \fBsync\fR(2) and do not log the reboot to \fBsyslogd\fR(8) or
-to \fB/var/adm/wtmpx\fR. The kernel still attempts to sync filesystems prior to
+to \fB/var/log/wtmpx\fR. The kernel still attempts to sync filesystems prior to
 reboot, except if the \fB-d\fR option is also present. If \fB-d\fR is used with
 \fB-n\fR, the kernel does not attempt to sync file systems.
 .RE
@@ -346,7 +346,7 @@ example# \fBreboot 2\fR
 .SH FILES
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR\fR
+\fB\fB/var/log/wtmpx\fR\fR
 .ad
 .sp .6
 .RS 4n

@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/modload/Makefile.com
+# Copyright (c) 2018, Joyent, Inc.
 #
 # makefile for loadable module utilities
 
@@ -52,6 +52,9 @@ COMMONSRC = $(DRVCOMMONSRC) $(MODCOMMONSRC)
 CLOBBERFILES = $(PROG)
 
 CERRWARN += -Wno-parentheses
+
+# not linted
+SMATCH=off
 
 # install specifics
 

@@ -251,7 +251,6 @@ DIRS= \
 	$(PYTHON2_DIRS) \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \
-	/usr/lib/sa  \
 	/usr/lib/saf \
 	/usr/lib/sasl \
 	/usr/lib/scsi \
@@ -277,12 +276,6 @@ DIRS= \
 	/usr/share/man \
 	/usr/share/misc \
 	/var  \
-	/var/adm  \
-	/var/adm/exacct \
-	/var/adm/log \
-	/var/adm/pool \
-	/var/adm/sa \
-	/var/adm/streams \
 	/var/cores \
 	/var/cron \
 	/var/db \
@@ -294,7 +287,10 @@ DIRS= \
 	/var/krb5/rcache/root  \
 	/var/ld \
 	/var/log \
+	/var/log/exacct \
 	/var/log/pool \
+	/var/log/streams \
+	/var/log/svc \
 	/var/logadm \
 	/var/mail \
 	/var/news \
@@ -312,7 +308,6 @@ DIRS= \
 	/var/spool/cron/atjobs \
 	/var/spool/cron/crontabs \
 	/var/svc \
-	/var/svc/log \
 	/var/svc/manifest \
 	/var/svc/manifest/milestone \
 	/var/svc/manifest/device \
@@ -392,12 +387,10 @@ SYM.DIRS= \
 	/etc/lib/ld.so.1 \
 	/etc/lib/libdl.so.1 \
 	/etc/lib/nss_files.so.1 \
-	/etc/log \
 	/lib/32 \
 	/lib/crypto/32 \
 	/lib/secure/32 \
 	/platform/i86pc \
-	/usr/adm \
 	/usr/spool \
 	/usr/news \
 	/usr/preserve \
@@ -436,9 +429,6 @@ ROOTDIRS=	$(TARGETDIRS:%=$(ROOT)%)
 #
 # The default value for DIRMODE is specified in usr/src/Makefile.master.
 #
-
-$(ROOT)/var/adm \
-$(ROOT)/var/adm/sa :=		DIRMODE= 775
 
 $(ROOT)/var/spool/lp:=		DIRMODE= 775
 
@@ -487,11 +477,9 @@ $(ROOT)/lib/secure/32:=			LINKDEST=i386
 $(ROOT)/dev/stdin:=			LINKDEST=fd/0
 $(ROOT)/dev/stdout:=			LINKDEST=fd/1
 $(ROOT)/dev/stderr:=			LINKDEST=fd/2
-$(ROOT)/usr/adm:=			LINKDEST=../var/adm
 $(ROOT)/etc/lib/ld.so.1:=		LINKDEST=../../lib/ld.so.1
 $(ROOT)/etc/lib/libdl.so.1:=		LINKDEST=../../lib/libdl.so.1
 $(ROOT)/etc/lib/nss_files.so.1:=	LINKDEST=../../lib/nss_files.so.1
-$(ROOT)/etc/log:=			LINKDEST=../var/adm/log
 $(ROOT)/platform/i86pc:=		LINKDEST=.
 $(ROOT)/usr/mail:=			LINKDEST=../var/mail
 $(ROOT)/usr/news:=			LINKDEST=../var/news

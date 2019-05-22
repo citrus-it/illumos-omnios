@@ -21,8 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2015, Joyent, Inc.
  * Copyright 2015, Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1832,7 +1832,7 @@ seg_can_change_zones(struct seg *seg)
 		if (svd->type == MAP_SHARED &&
 		    svd->amp != NULL &&
 		    svd->amp->swresv > 0)
-		return (B_FALSE);
+			return (B_FALSE);
 	}
 	return (B_TRUE);
 }

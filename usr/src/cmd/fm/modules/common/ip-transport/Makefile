@@ -24,6 +24,7 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 MODULE = ip-transport
 CLASS = common
@@ -32,3 +33,6 @@ SRCS = ip.c
 include ../../Makefile.plugin
 
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off

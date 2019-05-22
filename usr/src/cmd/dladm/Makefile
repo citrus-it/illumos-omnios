@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		dladm
 ROOTFS_PROG=	$(PROG)
@@ -43,9 +42,12 @@ LDLIBS +=	-L$(ROOT)/lib
 LDLIBS +=	-ldladm -ldlpi -lkstat -lsecdb -lofmt -linetutil -ldevinfo
 LDLIBS +=	$(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD)
 
+SMOFF += snprintf_overflow
+
 CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-unused-label
 CERRWARN +=	-Wno-uninitialized
+
 $(ROOTCFGDIR)/secobj.conf := FILEMODE= 660
 
 .KEEP_STATE:

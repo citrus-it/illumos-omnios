@@ -23,6 +23,7 @@
 # Copyright (c) 1989,1996 by Sun Microsystems, Inc.
 # All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		ufs
 LIBPROG=	ff
@@ -39,6 +40,9 @@ POFILE=
 
 
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

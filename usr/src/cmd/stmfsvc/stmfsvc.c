@@ -167,7 +167,7 @@ svcStart(int operandLen, char *operands[], cmdOptions_t *options,
 			default:
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("Unable to load the configuration. "
-				    "See /var/adm/messages for details"));
+				    "See /var/log/messages for details"));
 				(void) fprintf(stderr, "%s: %s\n", cmdName,
 				    gettext("For information on reverting the "
 				    "stmf:default instance to a previously "

@@ -2,6 +2,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= krb5kdc
 MANIFEST=	krb5kdc.xml
@@ -55,6 +56,9 @@ CERRWARN += -Wno-unused-function
 CERRWARN += -Wno-type-limits
 CERRWARN += -Wno-implicit-function-declaration
 CERRWARN += -Wno-parentheses
+
+# not linted
+SMATCH=off
 
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -L$(ROOT_KLIBDIR) -L$(KRB5LIB) \

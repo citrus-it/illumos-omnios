@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/lib/cfgadm_plugins/Makefile.com
 
@@ -54,6 +55,9 @@ CPPFLAGS +=	-I$(ROOT)/usr/platform/include
 CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

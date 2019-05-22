@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		cpustat
 OBJS =		$(PROG).o caps.o time.o setgrp.o strtoset.o
@@ -39,6 +40,9 @@ CFLAGS		+= $(CTF_FLAGS)
 CERRWARN	+= -Wno-uninitialized
 CPPFLAGS	+= -I$(SRC)/lib/libcpc/common -I$(STATCOMMONDIR)
 LDLIBS +=	-lcpc -lkstat
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

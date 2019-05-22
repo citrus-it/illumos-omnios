@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libMPAPI.a
 VERS=		.1
@@ -44,6 +45,9 @@ DYNFLAGS +=	-Wl,-zinitarray=InitLibrary
 CERRWARN +=	-Wno-type-limits
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 ROOTETC =	$(ROOT)/etc
 CONFDIR =	../common

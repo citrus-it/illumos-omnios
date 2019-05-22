@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= dc
 EXOBJS= dc.o
@@ -33,6 +34,9 @@ CERRWARN += -Wno-implicit-function-declaration
 CERRWARN += -Wno-unused-value
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

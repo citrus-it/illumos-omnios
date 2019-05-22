@@ -7616,9 +7616,9 @@ sd_unit_attach(dev_info_t *devi)
 		/*
 		 * If enter here, it should be non-CDROM and FM-capable
 		 * device, and it will not keep the old scsi_log as before
-		 * in /var/adm/messages. However, the property
+		 * in /var/log/messages. However, the property
 		 * "fm-scsi-log" will control whether the FM telemetry will
-		 * be logged in /var/adm/messages.
+		 * be logged in /var/log/messages.
 		 */
 		int fm_scsi_log;
 		fm_scsi_log = ddi_prop_get_int(DDI_DEV_T_ANY, SD_DEVINFO(un),

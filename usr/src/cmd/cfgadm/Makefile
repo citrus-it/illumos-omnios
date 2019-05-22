@@ -23,11 +23,9 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/cfgadm/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
-PROG= cfgadm 
+PROG= cfgadm
 
 include ../Makefile.cmd
 
@@ -38,11 +36,13 @@ OBJS= $(PROG).o getresponse.o
 XGETFLAGS += -a -x cfgadm.xcl
 CPPFLAGS += -I$(SRC)/common/util
 
-LDLIBS += -lcfgadm 
+LDLIBS += -lcfgadm
+
+SMOFF += snprintf_overflow
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

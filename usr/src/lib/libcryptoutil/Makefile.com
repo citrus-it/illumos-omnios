@@ -20,6 +20,7 @@
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libcryptoutil.a
 VERS=	.1
@@ -50,6 +51,9 @@ CPPFLAGS +=	-D_POSIX_PTHREAD_SEMANTICS -I$(SRCDIR)
 
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 all: $(LIBS)
 

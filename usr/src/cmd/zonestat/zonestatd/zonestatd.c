@@ -81,7 +81,7 @@
 
 #define	MAX_PSET_NAME	1024	/* Taken from PV_NAME_MAX_LEN */
 #define	ZSD_PSET_UNLIMITED	UINT16_MAX
-#define	ZONESTAT_EXACCT_FILE	"/var/adm/exacct/zonestat-process"
+#define	ZONESTAT_EXACCT_FILE	"/var/log/exacct/zonestat-process"
 
 /*
  * zonestatd implements gathering cpu and memory utilization data for

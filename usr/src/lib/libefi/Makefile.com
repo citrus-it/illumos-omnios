@@ -23,6 +23,7 @@
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libefi.a
 VERS =		.1
@@ -37,6 +38,8 @@ SRCDIR =	../common
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-luuid -lsmbios -lc
+
+SMOFF += kmalloc_wrong_size
 
 .KEEP_STATE:
 

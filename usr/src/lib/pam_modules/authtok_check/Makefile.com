@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	pam_authtok_check.a
 VERS=		.1
@@ -33,6 +34,9 @@ include		../../Makefile.pam_modules
 LDLIBS		+= -lpam -lc
 
 CERRWARN	+= -Wno-parentheses
+
+# not linted
+SMATCH=off
 
 all:	$(LIBS)
 

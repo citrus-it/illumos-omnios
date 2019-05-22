@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= fiocompress
 
@@ -37,6 +38,8 @@ include ../Makefile.com
 LDLIBS +=	-lz
 
 CFLAGS +=	-I../../../uts/common
+
+SMOFF += 	leaks
 
 all: $(PROG)
 

@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		rmmount
 LOCAL_OBJS =	rmmount.o
@@ -46,6 +47,9 @@ CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-function
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

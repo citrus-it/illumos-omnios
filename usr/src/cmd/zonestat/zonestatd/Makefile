@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 MANIFEST =	zonestat.xml
 SVCMETHOD =	svc-zonestat
@@ -40,6 +41,9 @@ LDLIBS 		+= -lkstat -lpool -lexacct -lscf \
 CERRWARN 	+= -Wno-parentheses
 CERRWARN 	+= -Wno-unused-label
 CERRWARN 	+= -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 OBJS =		$(SRCS:%.c=%.o)
 

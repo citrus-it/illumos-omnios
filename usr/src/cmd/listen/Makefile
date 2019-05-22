@@ -23,6 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+
 PROG= listen nlps_server
 
 DBGOBJ	= doprnt.o
@@ -60,6 +62,9 @@ CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-empty-body
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 $(LIBSAFD)/% : %
 	$(INS.file)

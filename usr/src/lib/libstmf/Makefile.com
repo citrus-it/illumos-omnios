@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libstmf.a
 VERS= .1
@@ -41,6 +42,9 @@ LDLIBS +=	-lc -lnvpair -lscf -lm
 CPPFLAGS +=	$(INCS)
 
 CERRWARN +=	-Wno-unused-label
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

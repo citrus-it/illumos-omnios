@@ -22,12 +22,16 @@
 #
 # Copyright (c) 1990 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= grpck
 
 include ../Makefile.cmd
 
 CERRWARN += -Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 RELUSRSBIN=	../usr/sbin
 

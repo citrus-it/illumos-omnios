@@ -1027,7 +1027,7 @@ parse_fastboot_args(char *bootargs_buf, size_t buf_size,
 	    (uintptr_t)bootargs_saved) != 0) {
 		(void) fprintf(stderr, gettext("%s: Not all drivers "
 		    "have implemented quiesce(9E)\n"
-		    "\tPlease see /var/adm/messages for drivers that haven't\n"
+		    "\tPlease see /var/log/messages for drivers that haven't\n"
 		    "\timplemented quiesce(9E).\n"), cmdname);
 	} else if (*is_dryrun) {
 		(void) fprintf(stderr, gettext("%s: All drivers have "

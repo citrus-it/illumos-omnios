@@ -25,6 +25,7 @@
 #
 # usr/src/lib/hal/libhal/Makefile.com
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libhal.a
 VERS =		.1.0.0
@@ -41,6 +42,8 @@ SRCDIR =	../common
 
 CPPFLAGS +=	$(HAL_CONFIG_CPPFLAGS)
 CPPFLAGS +=	-DGETTEXT_PACKAGE=\"$(HAL_GETTEXT_PACKAGE)\" -DENABLE_NLS
+
+SMOFF += all_func_returns,leaks
 
 ROOTMAJLINK =	$(ROOTLIBDIR)/$(LIBRARY:.a=.so)$(VERS_MAJ)
 ROOTMAJLINK64 =	$(ROOTLIBDIR64)/$(LIBRARY:.a=.so)$(VERS_MAJ)

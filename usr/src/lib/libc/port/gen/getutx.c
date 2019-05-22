@@ -39,7 +39,7 @@
 
 
 /*
- * Routines to read and write the /etc/utmpx file. Also contains
+ * Routines to read and write the /var/log/utmpx file. Also contains
  * binary compatibility routines to support the old utmp interfaces
  * on systems with MAXPID <= SHRT_MAX.
  */
@@ -71,7 +71,7 @@
 #define	IPIPE		"/var/run/initpipe"	/* FIFO to send pids to init */
 #define	UPIPE		"/var/run/utmppipe"	/* FIFO to send pids to utmpd */
 
-#define	VAR_UTMPX_FILE	"/var/adm/utmpx" /* for sanity check only */
+#define	VAR_UTMPX_FILE	"/var/log/utmpx" /* for sanity check only */
 
 
 /*
@@ -814,7 +814,7 @@ utmpxname(const char *newfile)
 	endutxent();
 
 	/*
-	 * If the file is being changed to /etc/utmpx or /var/adm/utmpx then
+	 * If the file is being changed to /var/log/utmpx or /var/log/utmpx then
 	 * we clear the flag so pututxline invokes utmp_update.  Otherwise
 	 * we set the flag indicating that they changed to another name.
 	 */
@@ -829,12 +829,12 @@ utmpxname(const char *newfile)
 
 /*
  * "utmpname" allows the user to read a file other than the
- * normal "utmp" file. If the file specified is "/var/adm/utmp"
- * or "/var/adm/wtmp", it is translated to the corresponding "utmpx"
+ * normal "utmp" file. If the file specified is "/var/log/utmp"
+ * or "/var/log/wtmp", it is translated to the corresponding "utmpx"
  * format name, and all "utmp" operations become wrapped calls
  * to the equivalent "utmpx" routines, with data conversions
  * as appropriate.  In the event the application wishes to read
- * an actual "old" utmp file (named something other than /var/adm/utmp),
+ * an actual "old" utmp file (named something other than /var/log/utmp),
  * calling this function with that name enables backward compatibility
  * mode, where we actually call the old utmp routines to operate on
  * the old file.
@@ -847,8 +847,8 @@ utmpname(const char *newfile)
 	if (strlen(newfile) > MAXFILE)
 		return (0);
 
-	if (strcmp(newfile, "/var/adm/utmp") == 0 ||
-	    strcmp(newfile, "/var/adm/wtmp") == 0) {
+	if (strcmp(newfile, "/var/log/utmp") == 0 ||
+	    strcmp(newfile, "/var/log/wtmp") == 0) {
 		(void) strcpy(name, newfile);
 		(void) strcat(name, "x");
 		compat_utmpflag = 0;	/* turn off old compat mode */
@@ -882,7 +882,7 @@ done:
 }
 
 /*
- * Add record to wtmp (actually wtmpx). If not updating /var/adm/wtmp,
+ * Add record to wtmp (actually wtmpx). If not updating /var/log/wtmp,
  * use the old utmp compatibility routine to write a utmp-format
  * record to the file specified.
  */
@@ -892,7 +892,7 @@ updwtmp(const char *file, struct utmp *ut)
 	struct utmpx utmpx;
 	char xfile[MAXFILE + 1];
 
-	if (strcmp(file, "/var/adm/wtmp") == 0) {
+	if (strcmp(file, "/var/log/wtmp") == 0) {
 		(void) strlcpy(xfile, file, sizeof (xfile) - 1);
 		(void) strcat(xfile, "x");
 		getutmpx(ut, &utmpx);

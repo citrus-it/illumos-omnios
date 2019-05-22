@@ -39,7 +39,7 @@ start scripts in the directories /etc/rcS.d/ and /etc/rc2.d/ will have
 been run as part of the earlier major milestones.  Any warnings, errors,
 or output from the scripts in /etc/rc3.d/ are logged to the file:
 
-/var/svc/log/milestone-multi-user-server:default.log
+/var/log/svc/milestone-multi-user-server:default.log
 
 Scripts in /etc/rc3.d/ may assume the following:
 

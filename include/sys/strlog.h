@@ -76,7 +76,7 @@ typedef struct log_ctl {
  * Private flags for log messages -- used by internal implementation only
  */
 #define	SL_CONSONLY	0x1000	/* send message only to /dev/console */
-#define	SL_LOGONLY	0x2000	/* send message only to /var/adm/messages */
+#define	SL_LOGONLY	0x2000	/* send message only to /var/log/messages */
 #define	SL_USER		0x4000	/* send message to user's terminal */
 #define	SL_PANICMSG	0x8000	/* message was created while panicking */
 

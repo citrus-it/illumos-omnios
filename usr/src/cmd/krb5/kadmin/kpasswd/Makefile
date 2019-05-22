@@ -2,6 +2,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= kpasswd
 
@@ -34,6 +35,9 @@ COPTFLAG += #-I$(KINCDIR)
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-unused-function
+
+# not linted
+SMATCH=off
 
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -L $(KRB5LIBDIR)

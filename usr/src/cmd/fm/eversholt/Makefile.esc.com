@@ -17,12 +17,12 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-# 
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright 2018 RackTop Systems.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 FMADIR = $(SRC)/cmd/fm
@@ -46,6 +46,8 @@ CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-unused-label
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-switch
+
+SMOFF += all_func_returns
 
 CTFCONVO = $(CTFCONVERT_O)
 CTFMRG = $(CTFMERGE) -L VERSION -o $@ $(OBJS)

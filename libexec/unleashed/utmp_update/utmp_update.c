@@ -24,7 +24,7 @@
  */
 
 /*
- * utmp_update		- Update the /var/adm/utmpx file
+ * utmp_update		- Update the /var/log/utmpx file
  *
  *			As of on28, the utmp interface is obsolete,
  *			so we only handle updating the utmpx file now.
@@ -33,7 +33,7 @@
  *
  *			This program runs set uid root on behalf of
  *			non-privileged user programs.  Normal programs cannot
- *			write to /var/adm/utmpx. Non-root callers of pututxline
+ *			write to /var/log/utmpx. Non-root callers of pututxline
  *			will invoke this program to write the utmpx entry.
  */
 

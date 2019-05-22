@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include		$(SRC)/lib/Makefile.lib
 
@@ -37,6 +38,9 @@ CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-address
+
+# not linted
+SMATCH=off
 
 LDLIBS +=	-lc
 HSONAME =

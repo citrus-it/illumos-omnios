@@ -31,7 +31,7 @@
  * Compatibility routines to read and write alternate
  * utmp-like files.  These routines are only used in
  * the case where utmpname() is used to change to a file
- * other than /var/adm/utmp or /var/adm/wtmp.  In this case,
+ * other than /var/log/utmp or /var/log/wtmp.  In this case,
  * we assume that someone really wants to read old utmp-format
  * files.  Otherwise, the getutent, setutent, getutid, setutline,
  * and pututline functions are actually wrappers around the

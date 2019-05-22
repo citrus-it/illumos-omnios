@@ -84,7 +84,7 @@ main(int argc, char *argv[])
 		 * accounting.
 		 */
 		if (acctctl(AC_PROC | AC_FILE_GET, buf, PATH_MAX) < 0)
-			return (lc_pacct("/var/adm/pacct", argc, argv, optind));
+			return (lc_pacct("/var/log/pacct", argc, argv, optind));
 		else
 			return (lc_exacct(buf, argc, argv, optind));
 	} else {

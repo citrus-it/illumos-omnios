@@ -21,6 +21,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 
 PROG=		in.rdisc
 MANIFEST=	rdisc.xml
@@ -32,6 +34,9 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKROUTING)
 
 CPPFLAGS +=	-DSYSV -DBSD_COMP
 CERRWARN +=	-Wno-extra
+
+# "missing type for func"
+SMATCH =	off
 
 .KEEP_STATE:
 

@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =	rpc.smserverd
 OBJS =	smediad.o smediad_err.o smed_svc.o smed_xdr.o
@@ -42,6 +43,9 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKRPC)
 
 CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

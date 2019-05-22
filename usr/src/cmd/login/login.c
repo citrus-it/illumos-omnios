@@ -126,7 +126,7 @@ static int	retry = MAXTRYS;
 /*
  * Login logging support
  */
-#define	LOGINLOG	"/var/adm/loginlog"	/* login log file */
+#define	LOGINLOG	"/var/log/loginlog"	/* login log file */
 #define	LNAME_SIZE	20	/* size of logged logname */
 #define	TTYN_SIZE	15	/* size of logged tty name */
 #define	TIME_SIZE	30	/* size of logged time string */

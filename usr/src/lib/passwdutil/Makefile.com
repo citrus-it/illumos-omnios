@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	passwdutil.a
 VERS=		.1
@@ -43,7 +44,7 @@ OBJECTS=	$(OBJ)
 include	../../Makefile.lib
 
 #
-# Since our name doesn't start with "lib", Makefile.lib incorrectly 
+# Since our name doesn't start with "lib", Makefile.lib incorrectly
 # calculates LIBNAME. Therefore, we set it here.
 #
 LIBNAME=	passwdutil
@@ -58,6 +59,8 @@ CERRWARN	+= -Wno-switch
 CERRWARN	+= -Wno-uninitialized
 CERRWARN	+= -Wno-unused-label
 
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

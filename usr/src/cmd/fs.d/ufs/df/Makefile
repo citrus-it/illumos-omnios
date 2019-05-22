@@ -23,6 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		ufs
 LIBPROG=	df
@@ -38,6 +39,9 @@ CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-unused-label
 CERRWARN +=	-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 # for messaging catalogue file
 #

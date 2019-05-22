@@ -22,6 +22,7 @@
 # Copyright 2015 Gary Mills
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 BINPROG = ypmatch ypwhich ypcat
@@ -146,6 +147,9 @@ CERRWARN +=	-Wno-extra
 CERRWARN +=	-Wno-unused-label
 CERRWARN +=	-Wno-address
 CERRWARN +=	-Wno-unused-function
+
+# too many unknown types
+SMATCH =	off
 
 #conditional assignments
 ypalias.o :=	CPPFLAGS= -DMAIN $(CPPFLAGS.master)

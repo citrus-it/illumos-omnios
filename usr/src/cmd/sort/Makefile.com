@@ -23,6 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # Debugging targets
@@ -80,6 +81,9 @@ CFLAGS64 +=	$(SORT_DEBUG)
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 CFLAGS += -DXPG4
 

@@ -24,7 +24,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2018, Joyent, Inc.
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -42,6 +42,9 @@ CPPFLAGS += -I. -I../common
 CFLAGS += $(CTF_FLAGS)
 LDLIBS += -L$(ROOT)/usr/lib/fm -ltopo -lnvpair
 LDFLAGS += -R/usr/lib/fm
+
+# not linted
+SMATCH=off
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS)

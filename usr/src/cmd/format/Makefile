@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= format
 
@@ -50,6 +50,9 @@ CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-label
 CERRWARN += -Wno-clobbered
+
+# not linted
+SMATCH=off
 
 SRCS= $(OBJS:.o=.c)
 

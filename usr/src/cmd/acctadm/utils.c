@@ -124,7 +124,7 @@ ac_type_name(int type)
  * pathname and the existing contents of the file (if any) must be of the
  * requested type.  Needs euid 0 to open the root-owned accounting file.
  * file_dac_write is required to create a new file in a directory not owned
- * by root (/var/adm/exacct is owned by 'adm').  Assumes sys_acct privilege is
+ * by root (/var/log/exacct is owned by 'adm').  Assumes sys_acct privilege is
  * already asserted by caller.
  */
 int

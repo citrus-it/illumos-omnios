@@ -50,8 +50,8 @@ vector<string> Trace::indent;
 
 #define MAX_MSG_PREFIX_LEN 128
 #define	CTIME_LEN	26
-#define	DEBUG_FILE	"/var/adm/sun_fc.debug"
-#define	LOG_FILE	"/var/adm/sun_fc"
+#define	DEBUG_FILE	"/var/log/sun_fc.debug"
+#define	LOG_FILE	"/var/log/sun_fc"
 
 /**
  * @memo	    Log a message

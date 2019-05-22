@@ -1,5 +1,4 @@
-MAN = acctcom.1 \
-      adb.1 \
+MAN = adb.1 \
       appcert.1 \
       apptrace.1 \
       ar.1 \
@@ -194,7 +193,6 @@ MAN = acctcom.1 \
       ruptime.1 \
       rusers.1 \
       rwho.1 \
-      sar.1 \
       script.1 \
       sdiff.1 \
       set.1 \
@@ -226,7 +224,6 @@ MAN = acctcom.1 \
       tftp.1 \
       time.1 \
       times.1 \
-      timex.1 \
       tip.1 \
       touch.1 \
       tput.1 \

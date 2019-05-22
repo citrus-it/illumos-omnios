@@ -23,8 +23,7 @@
 # Copyright (c) 2016 by Delphix. All rights reserved.
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# cmd/truss/Makefile.com
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG=	truss
@@ -39,6 +38,9 @@ include ../../Makefile.cmd
 
 CERRWARN	+= -Wno-uninitialized
 CERRWARN	+= -Wno-switch
+
+# not linted
+SMATCH=off
 
 CSTD=	$(CSTD_GNU99)
 

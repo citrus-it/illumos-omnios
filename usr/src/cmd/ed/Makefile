@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= ed
 
@@ -36,6 +37,10 @@ CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-unused-function
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
+
 CFLAGS += -DXPG4 -DXPG6 -I$(SRC)/lib/libc/inc
 LDLIBS += -lmapmalloc -lgen -lcrypt_i
 XGETFLAGS += -a -x ed.xcl

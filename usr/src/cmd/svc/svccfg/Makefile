@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 MYPROG =	svccfg
@@ -81,6 +81,10 @@ CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-parentheses
 
 LFLAGS += -t
+
+# not linted
+SMATCH=off
+
 YFLAGS = -d
 
 CLOBBERFILES += svccfg_lex.c svccfg_grammar.c svccfg_grammar.h \

@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		hsfs
 LIBPROG=	labelit
@@ -32,4 +33,5 @@ include		../../Makefile.fstype
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-unused-variable
 
-
+# not linted
+SMATCH=off

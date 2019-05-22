@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
 
@@ -78,6 +79,9 @@ CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-unused-function
+
+# not linted
+SMATCH=off
 
 $(DFPROG) :=	LDLIBS += -lcmdutils
 $(SPPROG) :=	LDLIBS += -lkstat

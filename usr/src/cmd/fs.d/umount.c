@@ -119,7 +119,7 @@ static const char   *keeplist[] = {
 	"/tmp",
 	"/usr",
 	"/var",
-	"/var/adm",
+	"/var/log",
 	"/var/run",
 	SHARETAB,
 	NULL

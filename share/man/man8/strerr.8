@@ -17,7 +17,7 @@ strerr \- STREAMS error logger daemon
 .LP
 \fBstrerr\fR receives error log messages from the STREAMS-based log driver (see
 \fBlog\fR(7D)) and appends them to a log file. The resultant error log files
-reside in the directory \fB/var/adm/streams\fR, and are named
+reside in the directory \fB/var/log/streams\fR, and are named
 \fBerror.\fR\fImm\fR\fB-\fR\fBdd\fR, where \fImm\fR is the month and \fBdd\fR
 is the day of the messages contained in each log file.
 .sp
@@ -109,7 +109,7 @@ It is commonly executed asynchronously.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/streams/error.\fR\fImm\fR\fB-\fR\fBdd\fR\fR
+\fB\fB/var/log/streams/error.\fR\fImm\fR\fB-\fR\fBdd\fR\fR
 .ad
 .sp .6
 .RS 4n

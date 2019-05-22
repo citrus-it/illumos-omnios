@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 RackTop Systems.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 .KEEP_STATE:
@@ -119,6 +120,9 @@ CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-clobbered
+
+# not linted
+SMATCH=off
 
 $(PROG) := LDFLAGS += -R/usr/lib/fm
 $(PROG) := LDLIBS += -L$(ROOTLIB)/fm -ltopo -ldiagcode -lsysevent -lsmbios \

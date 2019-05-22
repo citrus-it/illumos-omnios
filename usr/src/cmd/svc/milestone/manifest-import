@@ -229,7 +229,7 @@ function import_manifests {
 
 		if [ $failures -eq 0 -a "$console_print" = "true" ]; then
 			msg="svccfg import warnings.  See"
-			msg="$msg /var/svc/log/system-manifest-import:default.log ."
+			msg="$msg /var/log/svc/system-manifest-import:default.log ."
 			echo $msg > /dev/msglog
 		fi
 	fi

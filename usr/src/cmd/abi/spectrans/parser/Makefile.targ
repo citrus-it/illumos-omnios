@@ -23,6 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 .KEEP_STATE:
 
@@ -42,6 +43,9 @@ CLOBBERFILES += $(LIBRARY)
 CERRWARN	+= -Wno-parentheses
 CERRWARN	+= -Wno-unused-label
 CERRWARN	+= -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 objs/%.o: ../%.c
 	$(COMPILE.c) -o $@ $<

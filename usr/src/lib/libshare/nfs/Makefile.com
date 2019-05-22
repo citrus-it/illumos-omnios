@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libshare_nfs.a
 VERS =		.1
@@ -48,6 +49,9 @@ CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-uninitialized
 CPPFLAGS +=	-I$(NFSLIB_DIR) \
 		-I$(ADJUNCT_PROTO)/usr/include/libxml2 -I$(SRCDIR)/../common
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

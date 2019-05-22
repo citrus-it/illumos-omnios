@@ -3,6 +3,7 @@
 # Use is subject to license terms.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 # Make the SO name unlikely to conflict with any other
@@ -96,6 +97,9 @@ CERRWARN += -Wno-implicit-function-declaration
 CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-unused-function
 CERRWARN += -Wno-unused-label
+
+# not linted
+SMATCH=off
 
 MAPFILES = ../mapfile-sqlite
 

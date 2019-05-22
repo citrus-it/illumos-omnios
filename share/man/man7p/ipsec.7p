@@ -128,7 +128,7 @@ If 1, allow inbound cleartext PIM messages to bypass IPsec policy.
 \fBipsec_policy_log_interval\fR
 .ad
 .RS 30n
-IPsec logs policy failures and errors to \fB/var/adm/messages\fR. To prevent
+IPsec logs policy failures and errors to \fB/var/log/messages\fR. To prevent
 syslog from being overloaded, the IPsec kernel modules limit the rate at which
 errors can be logged. You can query/set ipsec_policy_log_interval using
 \fBndd\fR(8). The value is in milliseconds. Only one message can be logged per

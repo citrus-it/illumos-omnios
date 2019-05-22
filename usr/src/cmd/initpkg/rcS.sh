@@ -37,7 +37,7 @@
 #	mount /usr (if a separate file system)
 #	set the system name
 #	check the root (/) and /usr file systems
-#	check and mount /var and /var/adm (if a separate file system)
+#	check and mount /var and /var/log (if a separate file system)
 #	mount pseudo file systems (/dev/fd)
 #	if this is a reconfiguration boot, [re]build the device entries
 #	check and mount other file systems to be mounted in single user mode

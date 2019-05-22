@@ -23,6 +23,7 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		ufs
 LIBPROG=	quotacheck
@@ -41,6 +42,8 @@ SRCS=		$(OBJS:.o=.c)
 CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-type-limits
 
+# not linted
+SMATCH=off
 
 $(FSOBJS): $(FSSRCS)
 	$(COMPILE.c) -o $@ $(FSSRCS)

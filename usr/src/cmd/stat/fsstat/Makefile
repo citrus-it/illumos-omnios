@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG = fsstat
 OBJS = fsstat.o
@@ -38,6 +39,8 @@ CFLAGS += -I${STATCOMMONDIR}
 CERRWARN += -Wno-parentheses
 FILEMODE= 0555
 
+
+SMOFF += signed
 
 .KEEP_STATE:
 

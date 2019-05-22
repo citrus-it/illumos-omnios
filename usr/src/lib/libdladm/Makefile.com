@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY = libdladm.a
@@ -46,6 +47,9 @@ CERRWARN +=	-Wno-unused-label
 CERRWARN +=	-Wno-uninitialized
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I$(SRCTOP)/include
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

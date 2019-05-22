@@ -20,12 +20,10 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/ufs/quot/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		ufs
 LIBPROG=	quot
@@ -38,7 +36,8 @@ include		../../Makefile.fstype
 
 LDLIBS	+=	-ladm
 
-
+# not linted
+SMATCH=off
 
 $(ROOTUSRSBIN)/$(LIBPROG):
 		-$(RM) $@; $(SYMLINK) $(LINKVALUE) $@

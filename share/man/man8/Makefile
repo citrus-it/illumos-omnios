@@ -5,13 +5,7 @@ MAN_amd64 = acpidump.8 \
 
 MAN = 6to4relay.8 \
       Intro.8 \
-      acct.8 \
       acctadm.8 \
-      acctcms.8 \
-      acctcon.8 \
-      acctmerg.8 \
-      acctprc.8 \
-      acctsh.8 \
       add_drv.8 \
       arcstat.8 \
       arp.8 \
@@ -98,7 +92,6 @@ MAN = 6to4relay.8 \
       fstyp.8 \
       fuser.8 \
       fwflash.8 \
-      fwtmp.8 \
       getdev.8 \
       getdevpolicy.8 \
       getdgrp.8 \
@@ -316,12 +309,10 @@ MAN = 6to4relay.8 \
       rsh.8 \
       rtc.8 \
       rtquery.8 \
-      runacct.8 \
       rwall.8 \
       sac.8 \
       sacadm.8 \
       saf.8 \
-      sar.8 \
       sasinfo.8 \
       savecore.8 \
       sbdadm.8 \

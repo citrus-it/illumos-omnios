@@ -21,6 +21,7 @@
 #
 # Copyright 2015 Gary Mills
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY=	libelf.a
@@ -61,6 +62,8 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
+
+SMOFF += indenting
 
 BUILD.AR=	$(RM) $@ ; \
 		$(AR) q $@ `$(LORDER) $(OBJECTS:%=$(DIR)/%)| $(TSORT)`

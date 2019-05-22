@@ -96,7 +96,7 @@ Control the level of global service logging for \fBsvc.startd\fR. An
 \fIastring\fR (as defined in \fBscf_value_is_type\fR; see
 \fBscf_value_is_type\fR(3SCF)) that describes the default level of messages to
 log to \fBsyslog\fR (see \fBsyslog\fR(3C) and \fBsvc.startd\fR's global
-logfile, \fB/var/svc/log/svc.startd.log\fR. The supported message options
+logfile, \fB/var/log/svc/svc.startd.log\fR. The supported message options
 include \fBquiet\fR, \fBverbose\fR, and \fBdebug\fR. The \fBquiet\fR option
 sends error messages requiring administrative intervention to the console,
 \fBsyslog\fR and \fBsvc.startd\fR's global logfile. The \fBverbose\fR option
@@ -245,8 +245,8 @@ is executing.
 .LP
 By default, \fBsvc.startd\fR provides logging of significant restarter actions
 for the service as well as method standard output and standard error file
-descriptors to \fB/var/svc/log/\fIservice\fR:\fIinstance\fR.log\fR. The level
-of logging to system global locations like \fB/var/svc/log/svc.startd.log\fR
+descriptors to \fB/var/log/svc/\fIservice\fR:\fIinstance\fR.log\fR. The level
+of logging to system global locations like \fB/var/log/svc/svc.startd.log\fR
 and \fBsyslog\fR is controlled by the \fBoptions/logging\fR property.
 .SS "SERVICE DEFINITION"
 .sp
@@ -545,7 +545,7 @@ captured as a convenience for the administrator.
 .sp
 .ne 2
 .na
-\fB\fB/var/svc/log\fR\fR
+\fB\fB/var/log/svc\fR\fR
 .ad
 .RS 21n
 Directory where \fBsvc.startd\fR stores log files.

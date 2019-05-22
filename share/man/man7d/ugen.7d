@@ -52,7 +52,7 @@ to control. \fBupdate_drv\fR(8) adds an additional device type to the list of
 device types being managed by the driver.
 .sp
 .LP
-Names used to bind drivers can be found in \fB/var/adm/messages\fR. When a
+Names used to bind drivers can be found in \fB/var/log/messages\fR. When a
 device is on-lined after hot insertion, and no driver is found, there will be
 an entry containing:
 .sp

@@ -46,8 +46,8 @@
 extern "C" {
 #endif
 
-#define	_UTMPX_FILE	"/var/adm/utmpx"
-#define	_WTMPX_FILE	"/var/adm/wtmpx"
+#define	_UTMPX_FILE	"/var/log/utmpx"
+#define	_WTMPX_FILE	"/var/log/wtmpx"
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 #define	UTMPX_FILE	_UTMPX_FILE
 #define	WTMPX_FILE	_WTMPX_FILE

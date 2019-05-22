@@ -38,14 +38,14 @@ scripts in the directory /etc/rcS.d/ will have been run as part of the
 earlier single user milestone.  Any warnings, errors, or output from the
 scripts in /etc/rc2.d/ are logged to the file:
 
-/var/svc/log/milestone-multi-user:default.log
+/var/log/svc/milestone-multi-user:default.log
 
 If the system is changing from a higher run-level (for example, through
 an invocation of "init 2"), SMF executes all 'K' scripts within
 /etc/rc2.d/ with the argument 'stop'.  Any warnings, errors, or output
 from these scripts are logged to the file:
 
-/var/svc/log/rc2.log
+/var/log/svc/rc2.log
 
 Scripts in /etc/rc2.d/ may assume the following:
 

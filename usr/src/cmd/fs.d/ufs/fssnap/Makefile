@@ -21,8 +21,9 @@
 #
 #
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms. 
+# Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		ufs
 LIBPROG=	fssnap
@@ -42,6 +43,10 @@ CERRWARN +=	-Wno-type-limits
 CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
+
 LDLIBS +=	-lkstat -ldevinfo
 
 # message catalog

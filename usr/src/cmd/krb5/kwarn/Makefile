@@ -23,6 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 TESTPROG = kwarndtest 
 
@@ -54,6 +55,9 @@ CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-unused-function
 CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 CPPFLAGS += -I../../lib/gss_mechs/mech_krb5/include \
                  -I$(SRC)/lib/gss_mechs/mech_krb5 \

@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= sac sacadm pmadm
 
@@ -57,6 +58,9 @@ LDFLAGS += $(MAPFILE.NGB:%=-Wl,-M%)
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-extra
+
+# too many untyped funcs
+SMATCH=off
 
 util1.o := CPPFLAGS += -DSAC
 util2.o := CPPFLAGS += -USAC

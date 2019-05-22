@@ -156,8 +156,8 @@ The \fBendutxent()\fR function closes the currently open database.
 .SS "\fButmpxname()\fR"
 .LP
 The \fButmpxname()\fR function allows the user to change the name of the
-database file examined from \fB/var/adm/utmpx\fR to any other file, most often
-\fB/var/adm/wtmpx\fR. If the file does not exist, this will not be apparent
+database file examined from \fB/var/log/utmpx\fR to any other file, most often
+\fB/var/log/wtmpx\fR. If the file does not exist, this will not be apparent
 until the first attempt to reference the file is made.  The \fButmpxname()\fR
 function does not open the file, but closes the old file if it is currently
 open and saves the new file name. The new file name must end with the "x"
@@ -181,14 +181,14 @@ structure. (See \fBgetutent\fR(3C) for  \fButmp\fR structure)
 The \fBupdwtmp()\fR function can be used in two ways.
 .sp
 .LP
-If \fIwfile\fR is \fB/var/adm/wtmp\fR, the \fButmp\fR format record supplied by
+If \fIwfile\fR is \fB/var/log/wtmp\fR, the \fButmp\fR format record supplied by
 the caller is converted to a \fButmpx \fRformat record and the
-\fB/var/adm/wtmpx\fR file is updated (because the \fB/var/adm/wtmp\fR file no
+\fB/var/log/wtmpx\fR file is updated (because the \fB/var/log/wtmp\fR file no
 longer exists, operations on \fBwtmp\fR are converted to operations on
 \fBwtmpx\fR by the library functions.
 .sp
 .LP
-If \fIwfile\fR is a file other than \fB/var/adm/wtmp\fR, it is assumed to be an
+If \fIwfile\fR is a file other than \fB/var/log/wtmp\fR, it is assumed to be an
 old file in \fButmp\fR format and is updated directly with the \fButmp\fR
 format record supplied by the caller.
 .SS "\fBupdwtmpx()\fR"
@@ -265,7 +265,7 @@ maintained consistently.
 .SH FILES
 .ne 2
 .na
-\fB\fB/var/adm/utmpx\fR\fR
+\fB\fB/var/log/utmpx\fR\fR
 .ad
 .RS 18n
 user access and accounting information
@@ -274,7 +274,7 @@ user access and accounting information
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR\fR
+\fB\fB/var/log/wtmpx\fR\fR
 .ad
 .RS 18n
 history of user access and accounting information

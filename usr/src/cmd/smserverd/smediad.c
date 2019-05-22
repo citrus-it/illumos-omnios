@@ -99,7 +99,7 @@
  * ---------------------
  * 	This is a predefined descriptor used by client to establish a
  * connection with the server. This descriptor is available to the client
- * as /var/adm/smedia_svc
+ * as /var/log/smedia_svc
  * The client uses the main_door_descriptor to obtain a dedicated
  * client_door_descriptor for itself. The smedia_get_handle call communicates
  * to the server using the main_door_descriptor and obtains the

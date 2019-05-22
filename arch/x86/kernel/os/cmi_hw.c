@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -118,6 +119,7 @@ struct cmi_hdl_ops {
 	const char *(*cmio_chiprevstr)(cmi_hdl_impl_t *);
 	uint32_t (*cmio_getsockettype)(cmi_hdl_impl_t *);
 	const char *(*cmio_getsocketstr)(cmi_hdl_impl_t *);
+	uint_t (*cmio_chipsig)(cmi_hdl_impl_t *);
 
 	id_t (*cmio_logical_id)(cmi_hdl_impl_t *);
 	/*
@@ -678,6 +680,12 @@ static const char *
 ntv_getsocketstr(cmi_hdl_impl_t *hdl)
 {
 	return (cpuid_getsocketstr(HDLPRIV(hdl)));
+}
+
+static uint_t
+ntv_chipsig(cmi_hdl_impl_t *hdl)
+{
+	return (cpuid_getsig(HDLPRIV(hdl)));
 }
 
 static id_t
@@ -1289,6 +1297,7 @@ CMI_HDL_OPFUNC(logical_id, id_t)
 CMI_HDL_OPFUNC(smbiosid, uint16_t)
 CMI_HDL_OPFUNC(smb_chipid, uint_t)
 CMI_HDL_OPFUNC(smb_bboard, nvlist_t *)
+CMI_HDL_OPFUNC(chipsig, uint_t)
 /* END CSTYLED */
 
 boolean_t
@@ -1657,6 +1666,7 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	ntv_chiprevstr,		/* cmio_chiprevstr */
 	ntv_getsockettype,	/* cmio_getsockettype */
 	ntv_getsocketstr,	/* cmio_getsocketstr */
+	ntv_chipsig,		/* cmio_chipsig */
 	ntv_logical_id,		/* cmio_logical_id */
 	ntv_getcr4,		/* cmio_getcr4 */
 	ntv_setcr4,		/* cmio_setcr4 */

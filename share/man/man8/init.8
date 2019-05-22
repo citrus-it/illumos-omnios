@@ -158,9 +158,9 @@ change depends on.
 .sp
 .LP
 When \fBinit\fR receives a signal telling it that a process it spawned has
-died, it records the fact and the reason it died in \fB/var/adm/utmpx\fR and
-\fB/var/adm/wtmpx\fR if it exists (see \fBwho\fR(1)). A history of the
-processes spawned is kept in \fB/var/adm/wtmpx.\fR
+died, it records the fact and the reason it died in \fB/var/log/utmpx\fR and
+\fB/var/log/wtmpx\fR if it exists (see \fBwho\fR(1)). A history of the
+processes spawned is kept in \fB/var/log/wtmpx.\fR
 .sp
 .LP
 If \fBinit\fR receives a \fBpowerfail\fR signal (\fBSIGPWR\fR) it scans
@@ -493,7 +493,7 @@ entered.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/utmpx\fR\fR
+\fB\fB/var/log/utmpx\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -503,7 +503,7 @@ User access and administration information.
 .sp
 .ne 2
 .na
-\fB\fB/var/adm/wtmpx\fR\fR
+\fB\fB/var/log/wtmpx\fR\fR
 .ad
 .sp .6
 .RS 4n

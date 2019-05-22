@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libkdb.a
 VERS= .1
@@ -86,6 +87,8 @@ CERRWARN +=	-Wno-unused-function
 CERRWARN +=	-Wno-type-limits
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-parentheses
+
+SMOFF += indenting,all_func_returns,deref_check,signed
 
 DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB)
 LDLIBS +=	-lc

@@ -25,6 +25,7 @@
 #
 # eft.so (the eversholt DE)
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 .KEEP_STATE:
 
@@ -48,6 +49,9 @@ CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 $(PROG) := LDFLAGS += -R/usr/lib/fm
 $(PROG) := LDLIBS += -L$(ROOTLIB)/fm -ltopo

@@ -23,6 +23,7 @@
 # Copyright (c) 1989,1996, by Sun Microsystems, Inc.
 # All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		ufs
 LIBPROG=	tunefs
@@ -38,6 +39,8 @@ LDLIBS	+=	-ladm
 CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
 
+# not linted
+SMATCH=off
 
 $(ROOTUSRSBIN)/$(LIBPROG):	FRC
 		-$(RM) $@; $(SYMLINK) $(LINKVALUE) $@

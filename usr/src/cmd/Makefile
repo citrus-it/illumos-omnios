@@ -52,7 +52,6 @@ COMMON_SUBDIRS=		\
 	perl		\
 	Adm		\
 	abi		\
-	acct		\
 	acctadm		\
 	ahciem		\
 	ast		\
@@ -300,7 +299,6 @@ COMMON_SUBDIRS=		\
 	rpcinfo		\
 	rpcsvc		\
 	runat		\
-	sa		\
 	saf		\
 	sasinfo		\
 	savecore	\

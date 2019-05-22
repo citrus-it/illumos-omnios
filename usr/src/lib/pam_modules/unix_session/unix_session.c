@@ -54,7 +54,7 @@
 #include <assert.h>
 #include <nss_dbdefs.h>
 
-#define	LASTLOG_LEGACY		"/var/adm/lastlog"
+#define	LASTLOG_LEGACY		"/var/log/lastlog"
 struct lastlog_legacy {
 #ifdef _LP64
 	time32_t ll_time;

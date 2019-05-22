@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= loadkeys dumpkeys
 sparc_SUBDIRS= type_4 type_6 type_101
@@ -41,6 +42,9 @@ CERRWARN += -Wno-switch
 CERRWARN += -Wno-implicit-function-declaration
 CERRWARN += -Wno-unused-label
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 CLOBBERFILES = $(PROG) loadkeys.c
 

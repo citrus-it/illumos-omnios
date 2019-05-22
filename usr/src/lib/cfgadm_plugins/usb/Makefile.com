@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= usb.a
 VERS= .1
@@ -43,6 +44,9 @@ CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-char-subscripts
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-value
+
+# not linted
+SMATCH=off
 
 LDLIBS +=	-lc -ldevice -ldevinfo -lrcm -lnvpair
 

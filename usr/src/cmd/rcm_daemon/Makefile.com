@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 include ../../Makefile.cmd
@@ -118,6 +119,9 @@ CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-label
 CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-unused-function
+
+# not linted
+SMATCH=off
 
 MAPFILES = ../common/mapfile-intf $(MAPFILE.NGB)
 rcm_daemon := LDFLAGS += $(MAPFILES:%=-Wl,-M%)

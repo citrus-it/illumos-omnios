@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 # Message catalog requires no special processing because messages
 # only occur in ./nl.c, not in ../expr/compile.c.
 
@@ -36,6 +38,9 @@ LDLIBS += -lgen
 CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-unused-variable
 CPPFLAGS += -DXPG4
+
+# not linted
+SMATCH=off
 
 MAPFILE.INT =	../expr/mapfile-intf
 LDFLAGS +=	$(MAPFILE.INT:%=-Wl,-M%)

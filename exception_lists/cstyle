@@ -1323,5 +1323,6 @@ usr/src/uts/intel/sys/acpi/platform/acmsvc.h
 usr/src/uts/intel/sys/acpi/platform/acnetbsd.h
 usr/src/uts/intel/sys/acpi/platform/acos2.h
 usr/src/uts/intel/sys/acpi/platform/acsolaris.h
+usr/src/uts/intel/sys/acpi/platform/acunleashed.h
 usr/src/uts/intel/sys/acpi/platform/acwin.h
 usr/src/uts/intel/sys/acpi/platform/acwin64.h

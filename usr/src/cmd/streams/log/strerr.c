@@ -47,9 +47,9 @@
 #define	DATSIZE 8192
 #define	ADMSTR "root"
 #define	LOGDEV "/dev/log"
-#define	ERRFILE "/var/adm/streams/error.xxxxx"
+#define	ERRFILE "/var/log/streams/error.xxxxx"
 #define	NSECDAY 86400
-#define	LOGDEFAULT "/var/adm/streams"
+#define	LOGDEFAULT "/var/log/streams"
 #define	DIRECTORY 040000
 #define	ACCESS 07
 

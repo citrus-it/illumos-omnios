@@ -27,6 +27,8 @@
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 include $(SRC)/Makefile.cfgparam
@@ -114,11 +116,13 @@ MCS=		/usr/bin/mcs
 CAT=            /usr/bin/cat
 ELFDUMP=	/usr/bin/elfdump
 M4=		/usr/bin/m4
+GM4=		/usr/bin/gm4
 STRIP=		/usr/bin/strip
 LEX=		/usr/bin/lex
 LFLAGS=		-n
 FLEX=		/usr/bin/flex
 YACC=		/usr/bin/yacc
+BISON=		/usr/bin/bison
 CPP=		$(GNUC_ROOT)/cpp
 ANSI_CPP=	$(GNUC_ROOT)/bin/cpp
 CTFCONVERT=	/usr/bin/ctfconvert
@@ -144,6 +148,8 @@ PYTHON3_VERSION=	3.5
 PYTHON3_PKGVERS=	-35
 PYTHON3_SUFFIX=		m
 PYTHON3=		/usr/bin/python$(PYTHON3_VERSION)
+$(BUILDPY3TOOLS)TOOLS_PYTHON=		$(PYTHON3)
+$(BUILDPY2TOOLS)TOOLS_PYTHON=		$(PYTHON)
 SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
@@ -214,7 +220,10 @@ PYSHEBANG=	$(PYTHON)
 # files we must make certain to not adjust the mtime of the source
 # (.py) file.
 #
-INS.pyfile=	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYSHEBANG):" < $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
+INS.pyfile=	$(RM) $@; $(SED) \
+		-e "1s:^\#!@PYTHON@:\#!$(PYSHEBANG):" \
+		-e "1s:^\#!@TOOLS_PYTHON@:\#!$(TOOLS_PYTHON):" \
+		< $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
 
 # MACH must be set in the shell environment per uname -p on the build host
 # More specific architecture variables should be set in lower makefiles.
@@ -887,7 +896,10 @@ PKGPUBLISHER=	unleashed
 	$(CHMOD) +x $@
 
 .py:
-	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYSHEBANG):" < $< > $@; $(CHMOD) +x $@
+	$(RM) $@; $(SED) \
+		-e "1s:^\#!@PYTHON@:\#!$(PYSHEBANG):" \
+		-e "1s:^\#!@TOOLS_PYTHON@:\#!$(TOOLS_PYTHON):" \
+		< $< > $@; $(CHMOD) +x $@
 
 .py.pyc:
 	$(RM) $@

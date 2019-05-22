@@ -22,7 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= dlstat
 
@@ -34,6 +34,9 @@ CERRWARN += -Wno-implicit-function-declaration
 CERRWARN += -Wno-unused-label
 CERRWARN += -Wno-unused-variable
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 XGETFLAGS += -a -x $(PROG).xcl
 LDLIBS += -L$(ROOT)/lib

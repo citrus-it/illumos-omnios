@@ -1475,9 +1475,9 @@ fslog(void)
 {
 	FILE *fp = NULL;
 
-	fp = fopen("/var/adm/filesave.log", "a");
+	fp = fopen("/var/log/filesave.log", "a");
 	if (fp == NULL) {
-		perr(1, "volcopy: cannot open /var/adm/filesave.log\n");
+		perr(1, "volcopy: cannot open /var/log/filesave.log\n");
 	}
 
 	fprintf(fp, "%s%c%.6s%c%.6s -> %s%c%.6s%c%.6s on %.24s\n",

@@ -23,6 +23,7 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= bc
 EXOBJS= bc.o
@@ -35,6 +36,9 @@ include ../Makefile.cmd
 CERRWARN += -Wno-implicit-function-declaration
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-label
+
+# nothing lintable
+SMATCH=off
 
 CFLAGS += -DXPG6
 ROOTLIBB= $(LIBB:%=$(ROOTLIB)/%)

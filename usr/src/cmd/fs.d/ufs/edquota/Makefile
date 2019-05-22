@@ -23,6 +23,7 @@
 # Copyright (c) 1989,1996 by Sun Microsystems, Inc.
 # All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		ufs
 LIBPROG=	edquota
@@ -34,6 +35,9 @@ LINKVALUE=	../lib/fs/$(FSTYPE)/$(LIBPROG)
 include		../../Makefile.fstype
 
 CERRWARN +=	-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 $(ROOTUSRSBIN)/$(LIBPROG):
 		-$(RM) $@; $(SYMLINK) $(LINKVALUE) $@

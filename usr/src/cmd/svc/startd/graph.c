@@ -3628,7 +3628,7 @@ do_uadmin(void)
 	}
 
 	fork_with_timeout("/sbin/umountall -l", 0, 5);
-	fork_with_timeout("/sbin/umount /tmp /var/adm /var/run /var "
+	fork_with_timeout("/sbin/umount /tmp /var/log /var/run /var "
 	    ">/dev/null 2>&1", 0, 5);
 
 	/*

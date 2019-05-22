@@ -22,8 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/gprof/Makefile.com
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		gprof
 
@@ -43,6 +42,9 @@ CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
 CSTD=	$(CSTD_GNU99)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 ROOTLIBBLURB=	$(BLURBS:%=$(ROOTSHLIBCCS)/%)
 

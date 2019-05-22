@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBS =		$(DYNLIB)
@@ -40,3 +41,5 @@ MAPFILEDIR =	$(SRCDIR)
 
 CPPFLAGS +=	-I$(SRCDIR)
 LDLIBS +=	-lc
+
+SMOFF += 64bit_shift

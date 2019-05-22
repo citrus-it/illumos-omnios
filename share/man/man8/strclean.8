@@ -17,7 +17,7 @@ strclean \- STREAMS error logger cleanup program
 .LP
 \fBstrclean\fR is used to clean up the STREAMS error logger directory on a
 regular basis (for example, by using \fBcron\fR. By default, all files with
-names matching \fBerror.*\fR in  \fB/var/adm/streams\fR that have not been
+names matching \fBerror.*\fR in  \fB/var/log/streams\fR that have not been
 modified in the last three days are removed.
 .SH OPTIONS
 .sp
@@ -39,7 +39,7 @@ option.
 \fB\fB-d\fR \fIlogdir\fR\fR
 .ad
 .RS 13n
-A directory other than \fB/var/adm/streams\fR can be specified using the
+A directory other than \fB/var/log/streams\fR can be specified using the
 \fB-d\fR option.
 .RE
 
@@ -53,7 +53,7 @@ This example has the same result as running  \fBstrclean\fR with no arguments:
 .sp
 .in +2
 .nf
-example%  \fBstrclean \fR\fB-d\fR\fB /var/adm/streams \fR\fB-a\fR\fB 3\fR
+example%  \fBstrclean \fR\fB-d\fR\fB /var/log/streams \fR\fB-a\fR\fB 3\fR
 .fi
 .in -2
 .sp
@@ -61,7 +61,7 @@ example%  \fBstrclean \fR\fB-d\fR\fB /var/adm/streams \fR\fB-a\fR\fB 3\fR
 .SH FILES
 .sp
 .LP
-\fB/var/adm/streams/error.\fR*
+\fB/var/log/streams/error.\fR*
 .SH SEE ALSO
 .sp
 .LP

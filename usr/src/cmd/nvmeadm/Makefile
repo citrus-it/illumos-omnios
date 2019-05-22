@@ -28,6 +28,9 @@ include ../Makefile.ctf
 LDLIBS +=	-ldevinfo
 CSTD=	$(CSTD_GNU99)
 
+# error: cannot size expression
+SMATCH=off
+
 all: $(PROG)
 
 $(PROG): $(OBJS)

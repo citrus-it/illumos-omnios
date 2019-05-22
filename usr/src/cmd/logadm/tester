@@ -285,13 +285,13 @@ sub set_testconffile {
 # logadm typically runs early every morning via an entry in
 # root's crontab (see crontab(1)).
 #
-/var/adm/messages -C 4 -P 'Thu Nov  1 16:56:42 2001' -a 'kill -HUP `cat /var/run/*syslog*pid`'
+/var/log/messages -C 4 -P 'Thu Nov  1 16:56:42 2001' -a 'kill -HUP `cat /var/run/*syslog*pid`'
 /var/cron/log -s 512k -t /var/cron/olog
 /var/lp/logs/lpsched -C 2 -N -t '$file.$N'
 #
 # The entry below is used by turnacct(8)
 #
-/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+/var/log/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
 apache -C 24 -a '/usr/apache/bin/apachectl graceful' -p 1m -t '/var/apache/old-logs/$basename.%Y-%m' '/var/apache/logs/*{access,error}_log'
 /var/log/syslog -C 8 -P 'Thu Nov  1 09:16:38 2001' -a 'kill -HUP `cat /var/run/*syslog*pid`'
 /var/apache/logs/access_log -P 'Thu Nov  1 08:27:56 2001'
@@ -822,10 +822,10 @@ sub logadmV1 {
 	set_testconffile;
 
 	set_file('std.out.expect', <<'EOF');
-/var/adm/messages -C 4 -P 'Thu Nov  1 16:56:42 2001' -a 'kill -HUP `cat /var/run/*syslog*pid`'
+/var/log/messages -C 4 -P 'Thu Nov  1 16:56:42 2001' -a 'kill -HUP `cat /var/run/*syslog*pid`'
 /var/cron/log -s 512k -t /var/cron/olog
 /var/lp/logs/lpsched -C 2 -N -t '$file.$N'
-/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+/var/log/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
 apache -C 24 -a '/usr/apache/bin/apachectl graceful' -p 1m -t '/var/apache/old-logs/$basename.%Y-%m' '/var/apache/logs/*{access,error}_log'
 /var/log/syslog -C 8 -P 'Thu Nov  1 09:16:38 2001' -a 'kill -HUP `cat /var/run/*syslog*pid`'
 /var/apache/logs/access_log -P 'Thu Nov  1 08:27:56 2001'
@@ -857,7 +857,7 @@ sub logadmV2 {
 
 	set_file('std.out.expect', <<'EOF');
 /var/cron/log -s 512k -t /var/cron/olog
-/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+/var/log/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
 EOF
 
 	set_file('checktest', <<'EOF');
@@ -868,7 +868,7 @@ EOF
 	set_file('runtest', <<"EOF");
 # test "logadmV2"
 $envsetup
-exec $bindir/logadm -f testfile.conf -F testfile.conf -V /var/cron/log /var/adm/pacct >std.out 2>std.err
+exec $bindir/logadm -f testfile.conf -F testfile.conf -V /var/cron/log /var/log/pacct >std.out 2>std.err
 EOF
 }
 
@@ -885,7 +885,7 @@ sub logadmr {
 18d17
 < /var/cron/log -s 512k -t /var/cron/olog
 23d21
-< /var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+< /var/log/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
 EOF
 
 	set_file('checktest', <<'EOF');
@@ -897,7 +897,7 @@ EOF
 	set_file('runtest', <<"EOF");
 # test "logadmr"
 $envsetup
-exec $bindir/logadm -f testfile.conf -F testfile.conf -r /var/cron/log /var/adm/pacct >std.out 2>std.err
+exec $bindir/logadm -f testfile.conf -F testfile.conf -r /var/cron/log /var/log/pacct >std.out 2>std.err
 EOF
 }
 
@@ -1188,7 +1188,7 @@ dir2/messages -C 4 -a 'echo kill -HUP `cat /var/run/*syslog*pid` >> cmd.out'
 #
 # The entry below is used by turnacct(8)
 #
-/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+/var/log/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
 EOF
 
 	system("/bin/cp logadm.conf logadm.conf.orig");
@@ -1757,7 +1757,7 @@ dir2/messages -C 4 -a 'echo kill -HUP `cat /var/run/*syslog*pid` >> cmd.out'
 #
 # The entry below is used by turnacct(8)
 #
-/var/adm/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
+/var/log/pacct -C 0 -a '/usr/lib/acct/accton pacct' -g adm -m 664 -o adm -p never
 EOF
 
 	$gid = $);
@@ -1808,7 +1808,7 @@ EOF
 chown $>:$gid dir2/messages
 EOF
 chmod 664 dir2/messages
-# processing logname: /var/adm/pacct
+# processing logname: /var/log/pacct
 #     using default template: $file.$n
 sh -c echo kill -HUP `cat /var/run/*syslog*pid` >> cmd.out # -a cmd
 # logadm.conf and logadm.timestamps unchanged

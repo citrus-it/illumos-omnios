@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 DEFAULTFILES =	cron.dfl
 
@@ -40,6 +41,9 @@ CERRWARN +=	-Wno-unused-variable
 CERRWARN +=	-Wno-unused-value
 
 CFLAGS += -DXPG4
+
+# not linted
+SMATCH=off
 
 ROOTVAR =	$(ROOT)/var
 

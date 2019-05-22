@@ -22,12 +22,12 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= fp.a
 VERS= .1
 
-OBJECTS = cfga_fp.o cfga_rcm.o cfga_cs.o cfga_utils.o 
+OBJECTS = cfga_fp.o cfga_rcm.o cfga_cs.o cfga_utils.o
 OBJECTS += cfga_cvt.o cfga_list.o cfga_rep.o
 
 # include library definitions
@@ -46,6 +46,9 @@ CERRWARN +=	-Wno-char-subscripts
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-switch
 CERRWARN +=	-Wno-address
+
+# not linted
+SMATCH=off
 
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS
 CPPFLAGS += -I$(SRCTOP)/include

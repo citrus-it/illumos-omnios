@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/swap/Makefile.com
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=	swap
 OBJS=	$(PROG).o
@@ -31,6 +31,9 @@ SRCS=	$(OBJS:%.o=../%.c)
 include ../../Makefile.cmd
 
 CERRWARN +=	-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 FILEMODE=02555
 

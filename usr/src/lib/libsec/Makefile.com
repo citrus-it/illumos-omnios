@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libsec.a
 VERS= .1
@@ -48,6 +49,9 @@ CERRWARN +=	-Wno-parentheses
 CERRWARN +=	-Wno-uninitialized
 CERRWARN +=	-Wno-unused-label
 CERRWARN +=	-Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 CLOBBERFILES += acl.output
 

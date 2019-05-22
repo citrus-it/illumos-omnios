@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= init 
 ROOTFS_PROG= $(PROG)
@@ -36,6 +37,9 @@ LDLIBS += -lpam -lcontract -lscf
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-uninitialized
 CLOBBERFILES= $(STATIC)
+
+# needs work
+SMATCH=off
 
 .KEEP_STATE:
 

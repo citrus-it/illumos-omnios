@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= expr
 
@@ -31,6 +32,8 @@ include ../Makefile.cmd
 
 CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-extra
+# "missing type for func"
+SMATCH=off
 CFLAGS += -DXPG4 -DXPG6
 
 XGETFLAGS += -a -x expr.xcl

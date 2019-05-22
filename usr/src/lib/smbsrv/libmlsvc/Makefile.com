@@ -22,6 +22,7 @@
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libmlsvc.a
 VERS =		.1
@@ -91,6 +92,10 @@ CPPFLAGS += -Dsyslog=smb_syslog
 
 CERRWARN += -Wno-unused-function
 CERRWARN += -Wno-uninitialized
+
+# not linted
+SMATCH=off
+
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)
 

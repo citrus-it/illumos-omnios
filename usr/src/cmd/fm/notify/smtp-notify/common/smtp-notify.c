@@ -60,7 +60,7 @@
  * # svccfg -s svc:/system/fm/smtp-notify setprop config/debug=true
  *
  * Debug messages will be spooled to the service log at:
- * <root>/var/svc/log/system-fm-smtp-notify:default.log
+ * <root>/var/log/svc/system-fm-smtp-notify:default.log
  */
 #define	PP_SCRIPT "usr/lib/fm/notify/process_msg_template.sh"
 

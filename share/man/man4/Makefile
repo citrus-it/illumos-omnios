@@ -42,7 +42,6 @@ MAN = Intro.4 \
       group.4 \
       gsscred.conf.4 \
       hba.conf.4 \
-      holidays.4 \
       hosts.4 \
       hosts.equiv.4 \
       hosts_access.4 \

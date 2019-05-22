@@ -4861,7 +4861,7 @@ i_mdi_report_path_state(mdi_client_t *ct, mdi_pathinfo_t *pip)
 		/*
 		 * NOTE: Keeping "multipath status: %s" and
 		 * "Load balancing: %s" format unchanged in case someone
-		 * scrubs /var/adm/messages looking for these messages.
+		 * scrubs /var/log/messages looking for these messages.
 		 */
 		if (report_lb_c && report_lb_p) {
 			if (ct->ct_lb == LOAD_BALANCE_LBA) {

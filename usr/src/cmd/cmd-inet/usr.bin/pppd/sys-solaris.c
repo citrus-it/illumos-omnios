@@ -2856,7 +2856,7 @@ GetMask(addr)
 /*
  * logwtmp()
  *
- * Write an accounting record to the /var/adm/wtmp file.
+ * Write an accounting record to the /var/log/wtmp file.
  */
 /*ARGSUSED*/
 void
@@ -2881,7 +2881,7 @@ logwtmp(line, name, host)
 		utmpx.ut_type = DEAD_PROCESS;
 	}
 	(void) gettimeofday(&utmpx.ut_tv, NULL);
-	updwtmpx("/var/adm/wtmpx", &utmpx);
+	updwtmpx("/var/log/wtmpx", &utmpx);
 }
 
 /*

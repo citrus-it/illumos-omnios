@@ -47,8 +47,8 @@ extern "C" {
 #endif
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
-#define	UTMP_FILE	"/var/adm/utmp"
-#define	WTMP_FILE	"/var/adm/wtmp"
+#define	UTMP_FILE	"/var/log/utmp"
+#define	WTMP_FILE	"/var/log/wtmp"
 #endif
 
 #define	ut_name	ut_user
