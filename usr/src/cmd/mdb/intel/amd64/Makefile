@@ -25,7 +25,7 @@
 
 include ../../Makefile.common
 
-MODULES = $(COMMON_MODULES_PROC) $(COMMON_MODULES_KVM) uhci
+MODULES = $(COMMON_MODULES_PROC) $(COMMON_MODULES_KVM) uhci libpython
 
 SUBDIRS = mdb mdb_ks kmdb libstandctf libstand .WAIT $(MODULES)
 
