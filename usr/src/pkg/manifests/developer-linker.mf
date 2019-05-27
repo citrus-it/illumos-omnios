@@ -94,8 +94,6 @@ file path=usr/share/man/man1/regcmp.1
 file path=usr/share/man/man1/strings.1
 file path=usr/share/man/man1/truss.1
 file path=usr/share/man/man4/a.out.4
-link path=usr/bin/$(ARCH64)/ld target=ld.sun
-link path=usr/bin/ld target=ld.sun
 hardlink path=usr/bin/gcore target=../../usr/lib/isaexec
 hardlink path=usr/bin/plimit target=../../usr/lib/isaexec
 hardlink path=usr/bin/strings target=../../usr/lib/isaexec
