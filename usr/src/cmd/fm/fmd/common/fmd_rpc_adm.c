@@ -909,6 +909,7 @@ fmd_adm_caseinfo_1_svc(char *uuid, struct fmd_rpc_caseinfo *rvp,
 	fmd_case_t *cp;
 	nvlist_t *nvl;
 	int err = 0;
+	size_t len;
 
 	bzero(rvp, sizeof (struct fmd_rpc_caseinfo));
 
@@ -930,8 +931,10 @@ fmd_adm_caseinfo_1_svc(char *uuid, struct fmd_rpc_caseinfo *rvp,
 
 	nvl = fmd_case_mkevent(cp, FM_LIST_SUSPECT_CLASS);
 
+	len = rvp->rci_evbuf.rci_evbuf_len;
 	err = nvlist_pack(nvl, &rvp->rci_evbuf.rci_evbuf_val,
-	    &rvp->rci_evbuf.rci_evbuf_len, NV_ENCODE_XDR, 0);
+	    &len, NV_ENCODE_XDR, 0);
+	rvp->rci_evbuf.rci_evbuf_len = len;
 
 	nvlist_free(nvl);
 

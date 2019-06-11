@@ -1271,7 +1271,7 @@ fcf_sec_walk_init(mdb_walk_state_t *wsp)
 static int
 fcf_sec_walk_step(mdb_walk_state_t *wsp)
 {
-	uint_t i = (uint_t)wsp->walk_arg;
+	uintptr_t i = (uintptr_t)wsp->walk_arg;
 	size_t off = sizeof (fcf_hdr_t) + sizeof (fcf_sec_t) * i;
 	fcf_hdr_t *hp = wsp->walk_data;
 	fcf_sec_t *sp = (fcf_sec_t *)((uintptr_t)hp + off);
