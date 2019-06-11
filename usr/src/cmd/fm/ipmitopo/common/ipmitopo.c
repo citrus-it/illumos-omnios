@@ -103,7 +103,7 @@ sdr_print(ipmi_handle_t *ihp, ipmi_entity_t *ep, const char *name,
 static int
 entity_print(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 {
-	int indentation = (uintptr_t)data;
+	uintptr_t indentation = (uintptr_t)data;
 	char name[128];
 	boolean_t present;
 
