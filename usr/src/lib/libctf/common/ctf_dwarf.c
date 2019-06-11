@@ -2805,7 +2805,7 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 {
 	int err, ret, ndies, i;
 	Dwarf_Debug dw;
-	Dwarf_Error derr;
+	Dwarf_Error derr = NULL;
 	ctf_die_t *cdies = NULL, *cdp;
 	workq_t *wqp = NULL;
 
