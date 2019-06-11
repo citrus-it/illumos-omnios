@@ -83,5 +83,3 @@ CPPFLAGS +=	-I$(SRC)/lib/libctf/common 	\
 		-I$(SRC)/lib/libdwarf/common	\
 		-I$(SRC)/lib/mergeq		\
 		-DCTF_OLD_VERSIONS
-
-CERRWARN += -Wno-uninitialized
