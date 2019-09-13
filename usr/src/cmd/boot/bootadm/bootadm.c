@@ -25,7 +25,7 @@
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2017 Nexenta Systems, Inc.
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -161,7 +161,10 @@ typedef enum {
 #define	STAGE2			"/boot/grub/stage2"
 
 #define	ETC_SYSTEM_DIR		"etc/system.d"
-#define	SELF_ASSEMBLY		"etc/system.d/.self-assembly"
+#define	SELF_ASSEMBLY_SYSTEM	ETC_SYSTEM_DIR "/.self-assembly"
+
+#define	ETC_VERSIONS_DIR	"etc/versions"
+#define	SELF_ASSEMBLY_BUILD	ETC_VERSIONS_DIR "/build"
 
 /*
  * Default file attributes
@@ -248,7 +251,6 @@ static int bam_lock_fd = -1;
 static int bam_zfs;
 static int bam_mbr;
 char rootbuf[PATH_MAX] = "/";
-static char self_assembly[PATH_MAX];
 static int bam_update_all;
 static int bam_alt_platform;
 static char *bam_platform;
@@ -287,7 +289,6 @@ static error_t read_list(char *, filelist_t *);
 static error_t set_option(menu_t *, char *, char *);
 static error_t set_kernel(menu_t *, menu_cmd_t, char *, char *, size_t);
 static error_t get_kernel(menu_t *, menu_cmd_t, char *, size_t);
-static error_t build_etc_system_dir(char *);
 static char *expand_path(const char *);
 
 static long s_strtol(char *);
@@ -1340,7 +1341,7 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	 * Menu sub-command only applies to GRUB (i.e. x86)
 	 */
 	if (!is_grub(bam_alt_root ? bam_root : "/")) {
-		bam_error(_("not a GRUB 0.97 based Illumos instance. "
+		bam_error(_("not a GRUB 0.97 based illumos instance. "
 		    "Operation not supported\n"));
 		return (BAM_ERROR);
 	}
@@ -1932,7 +1933,7 @@ list2file(char *root, char *tmp, char *final, line_t *start)
 	ret = chown(tmpfile, root_uid, sys_gid);
 	if (ret == -1 &&
 	    errno != EINVAL && errno != ENOTSUP) {
-		bam_error(_("chgrp operation on %s failed - %s\n"),
+		bam_error(_("chown operation on %s failed - %s\n"),
 		    tmpfile, strerror(errno));
 		return (BAM_ERROR);
 	}
@@ -2279,19 +2280,14 @@ update_dircache(const char *path, int flags)
 	return (rc);
 }
 
-/*ARGSUSED*/
 static int
-cmpstat(
-	const char *file,
-	const struct stat *st,
-	int flags,
-	struct FTW *ftw)
+cmpstat(const char *file, const struct stat *st, int flags, struct FTW *ftw)
 {
 	uint_t		sz;
 	uint64_t	*value;
 	uint64_t	filestat[2];
 	int		error, ret, status;
-
+	char		path[PATH_MAX];
 	struct safefile *safefilep;
 	FILE		*fp;
 	struct stat	sb;
@@ -2465,11 +2461,28 @@ cmpstat(
 		}
 
 		/*
-		 * Update self-assembly file if there are changes in
+		 * Update self-assembly file if there are changes in the
 		 * /etc/system.d directory
 		 */
 		if (strstr(file, ETC_SYSTEM_DIR)) {
-			ret = update_dircache(self_assembly, flags);
+			(void) snprintf(path, sizeof (path), "%s%s", bam_root,
+			    SELF_ASSEMBLY_SYSTEM);
+			ret = update_dircache(path, flags);
+			if (ret == BAM_ERROR) {
+				bam_error(_("directory cache update failed "
+				    "for %s\n"), file);
+				return (-1);
+			}
+		}
+
+		/*
+		 * Update self-assembly file if there are changes in the
+		 * /etc/versions directory
+		 */
+		if (strstr(file, ETC_VERSIONS_DIR)) {
+			(void) snprintf(path, sizeof (path), "%s%s", bam_root,
+			    SELF_ASSEMBLY_BUILD);
+			ret = update_dircache(path, flags);
 			if (ret == BAM_ERROR) {
 				bam_error(_("directory cache update failed "
 				    "for %s\n"), file);
@@ -3810,7 +3823,7 @@ out_path_err:
 }
 
 static int
-assemble_systemfile(char *infilename, char *outfilename)
+assemble_file(char *infilename, char *outfilename)
 {
 	char buf[BUFSIZ];
 	FILE *infile, *outfile;
@@ -3846,34 +3859,61 @@ assemble_systemfile(char *infilename, char *outfilename)
 }
 
 /*
- * Concatenate all files (except those starting with a dot)
- * from /etc/system.d directory into a single /etc/system.d/.self-assembly
- * file. The kernel reads it before /etc/system file.
+ * Assemble a set of fragment files into a combined file. File fragments
+ * must begin with the provided prefix (if it is specified) and all files
+ * starting with a . are ignored.
  */
+
 static error_t
-build_etc_system_dir(char *root)
+assemble_files(char *root, char *dir, char *target, char *prefix)
 {
 	struct dirent **filelist;
-	char path[PATH_MAX], tmpfile[PATH_MAX];
+	char self_assembly[PATH_MAX], path[PATH_MAX], tmpfile[PATH_MAX];
 	int i, files, sysfiles = 0;
 	int ret = BAM_SUCCESS;
 	struct stat st;
 	timespec_t times[2];
+	mode_t sa_mode;
+	uid_t sa_uid;
+	gid_t sa_gid;
 
-	(void) snprintf(path, sizeof (path), "%s/%s", root, ETC_SYSTEM_DIR);
+	(void) snprintf(path, sizeof (path), "%s/%s", root, dir);
 	(void) snprintf(self_assembly, sizeof (self_assembly),
-	    "%s%s", root, SELF_ASSEMBLY);
+	    "%s%s", root, target);
 	(void) snprintf(tmpfile, sizeof (tmpfile), "%s.%ld",
 	    self_assembly, (long)getpid());
 
 	if (stat(self_assembly, &st) >= 0 && (st.st_mode & S_IFMT) == S_IFREG) {
 		times[0] = times[1] = st.st_mtim;
+		sa_mode = st.st_mode;
+		sa_uid = st.st_uid;
+		sa_gid = st.st_gid;
 	} else {
+		struct passwd *pw;
+		struct group *gp;
+
 		times[1].tv_nsec = 0;
+		sa_mode = DEFAULT_DEV_MODE;
+		if ((pw = getpwnam(DEFAULT_DEV_USER)) != NULL) {
+			sa_uid = pw->pw_uid;
+		} else {
+			bam_error(_("getpwnam: uid for %s failed, "
+			    "defaulting to %d\n"),
+			    DEFAULT_DEV_USER, DEFAULT_DEV_UID);
+			sa_uid = (uid_t)DEFAULT_DEV_UID;
+		}
+		if ((gp = getgrnam(DEFAULT_DEV_GROUP)) != NULL) {
+			sa_gid = gp->gr_gid;
+		} else {
+			bam_error(_("getgrnam: gid for %s failed, "
+			    "defaulting to %d\n"),
+			    DEFAULT_DEV_GROUP, DEFAULT_DEV_GID);
+			sa_gid = (gid_t)DEFAULT_DEV_GID;
+		}
 	}
 
 	if ((files = scandir(path, &filelist, NULL, alphasort)) < 0) {
-		/* Don't fail the update if <ROOT>/etc/system.d doesn't exist */
+		/* Don't fail the update if <ROOT>/<DIR> doesn't exist */
 		if (errno == ENOENT)
 			return (BAM_SUCCESS);
 		bam_error(_("can't read %s: %s\n"), path, strerror(errno));
@@ -3889,28 +3929,52 @@ build_etc_system_dir(char *root)
 		fname = filelist[i]->d_name;
 
 		/* skip anything that starts with a dot */
-		if (strncmp(fname, ".", 1) == 0) {
-			free(filelist[i]);
-			continue;
-		}
+		if (strncmp(fname, ".", 1) == 0)
+			goto nextfile;
+
+		if (prefix != NULL &&
+		    strncmp(fname, prefix, strlen(prefix)) != 0)
+			goto nextfile;
 
 		if (bam_verbose)
-			bam_print(_("/etc/system.d adding %s/%s\n"),
-			    path, fname);
+			bam_print(_("/%s adding %s/%s\n"), dir, path, fname);
 
 		(void) snprintf(filepath, sizeof (filepath), "%s/%s",
 		    path, fname);
 
-		if ((assemble_systemfile(filepath, tmpfile)) < 0) {
+		if ((assemble_file(filepath, tmpfile)) < 0) {
 			bam_error(_("failed to append file: %s: %s\n"),
 			    filepath, strerror(errno));
 			ret = BAM_ERROR;
 			break;
 		}
 		sysfiles++;
+
+nextfile:
+		free(filelist[i]);
 	}
+	free(filelist);
 
 	if (sysfiles > 0) {
+		/*
+		 * Set up desired attributes. Ignore failures on filesystems
+		 * not supporting these operations - pcfs reports unsupported
+		 * operations as EINVAL.
+		 */
+		ret = chmod(tmpfile, sa_mode);
+		if (ret == -1 && errno != EINVAL && errno != ENOTSUP) {
+			bam_error(_("chmod operation on %s failed - %s\n"),
+			    tmpfile, strerror(errno));
+			return (BAM_ERROR);
+		}
+
+		ret = chown(tmpfile, sa_uid, sa_gid);
+		if (ret == -1 && errno != EINVAL && errno != ENOTSUP) {
+			bam_error(_("chown operation on %s failed - %s\n"),
+			    tmpfile, strerror(errno));
+			return (BAM_ERROR);
+		}
+
 		if (rename(tmpfile, self_assembly) < 0) {
 			bam_error(_("failed to rename file: %s: %s\n"), tmpfile,
 			    strerror(errno));
@@ -4300,7 +4364,16 @@ update_archive(char *root, char *opt)
 	/*
 	 * Process the /etc/system.d/.self-assembly file.
 	 */
-	if (build_etc_system_dir(bam_root) == BAM_ERROR)
+	if (assemble_files(bam_root, ETC_SYSTEM_DIR, SELF_ASSEMBLY_SYSTEM,
+	    NULL) == BAM_ERROR)
+		return (BAM_ERROR);
+
+	/*
+	 * Process the /etc/versions/build file.
+	 */
+	if (assemble_files(bam_root, ETC_VERSIONS_DIR, SELF_ASSEMBLY_BUILD,
+	    "build.")
+	    == BAM_ERROR)
 		return (BAM_ERROR);
 
 	/*

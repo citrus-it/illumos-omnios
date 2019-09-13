@@ -24,7 +24,7 @@
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 RackTop Systems.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include $(SRC)/Makefile.master
@@ -177,6 +177,7 @@ $(BLD_JAVA_8)JAVA_7_ONLY=$(POUND_SIGN)
 $(JAVA_7_ONLY)JAVA_8_ONLY=$(POUND_SIGN)
 
 PKGMOG_DEFINES= \
+	PROJECT=$(PROJECT) \
 	i386_ONLY=$(POUND_SIGN) \
 	sparc_ONLY=$(POUND_SIGN) \
 	$(PKGMACH)_ONLY= \
