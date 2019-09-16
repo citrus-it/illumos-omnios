@@ -612,8 +612,8 @@ get_all_sect(struct man_node *manp)
 
 		if (entries == maxentries) {
 			maxentries += MAXTOKENS;
-			if ((manp->secv = realloc(manp->secv,
-			    sizeof (char *) * maxentries)) == NULL)
+			if ((manp->secv = reallocarray(manp->secv,
+			    maxentries, sizeof (char *))) == NULL)
 				err(1, "realloc");
 			p = manp->secv + entries;
 		}
@@ -677,8 +677,8 @@ getdirs(char *path, char ***dirv, int flag)
 				int	entries = maxentries;
 
 				maxentries += MAXTOKENS;
-				if ((*dirv = realloc(*dirv,
-				    sizeof (char *) * maxentries)) == NULL)
+				if ((*dirv = reallocarray(*dirv,
+				    maxentries, sizeof (char *))) == NULL)
 					err(1, "realloc");
 				dv = *dirv + entries;
 			}
@@ -810,8 +810,8 @@ split(char *s1, char sep)
 		entries++;
 		if (entries == maxentries) {
 			maxentries += MAXTOKENS;
-			if ((tokv = realloc(tokv,
-			    maxentries * sizeof (char *))) == NULL)
+			if ((tokv = reallocarray(tokv,
+			    maxentries, sizeof (char *))) == NULL)
 				err(1, "realloc");
 			vp = tokv + entries;
 		}
@@ -1100,8 +1100,8 @@ sortdir(DIR *dp, char ***dirv)
 			entries++;
 			if (entries == maxentries) {
 				maxentries += MAXDIRS;
-				if ((*dirv = realloc(*dirv,
-				    sizeof (char *) * maxentries)) == NULL)
+				if ((*dirv = reallocarray(*dirv,
+				    maxentries, sizeof (char *))) == NULL)
 					err(1, "realloc");
 				dv = *dirv + entries;
 			}
