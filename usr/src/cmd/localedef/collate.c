@@ -250,7 +250,7 @@ new_pri(void)
 
 	if (numpri >= maxpri) {
 		maxpri = maxpri ? maxpri * 2 : 1024;
-		prilist = realloc(prilist, sizeof (collpri_t) * maxpri);
+		prilist = reallocf(prilist, sizeof (collpri_t) * maxpri);
 		if (prilist == NULL) {
 			errf(_("out of memory"));
 			return (-1);
