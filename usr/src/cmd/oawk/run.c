@@ -544,11 +544,12 @@ format(wchar_t *s, NODE *a)
 		 */
 		if (p + wslen(str) + wslen(s) + 1 >= ep) {
 			int newlen, oldlen;
-	
+
 			oldlen = p - buf;
 			/* Add RECSIZE for additional space */
 			newlen = oldlen + wslen(str) + RECSIZE;
-			buf = realloc(buf, (unsigned) newlen * sizeof(wchar_t));
+			buf = reallocarray(buf, (unsigned) newlen,
+			    sizeof(wchar_t));
 			if (buf == NULL)
 				error(FATAL, "out of format space");
 			p = buf + oldlen;
@@ -1123,7 +1124,7 @@ print(NODE **a, int n)
 
 			if (oldbp == s)
 				bp = NULL;
-			bp = realloc(bp, sizeof (wchar_t) * (newlen + 1));
+			bp = reallocarray(bp, newlen + 1, sizeof (wchar_t));
 			if (bp == NULL)
 				error(FATAL, "out of space in print");
 			ep = bp + newlen + 1;
