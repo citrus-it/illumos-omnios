@@ -135,7 +135,10 @@ addref(char *sl_path, char *svc_type, int optind, int argc, char *argv[])
 	for (i = optind; i < argc; i++) {
 		bzero(buf, sizeof (buf));
 		len += add_escape(argv[i], buf, SYMLINK_MAX) + 2;
-		location = realloc(location, len);
+		if ((location = reallocf(location, len)) == NULL) {
+			reparse_free(nvl);
+			return (ENOMEM);
+		}
 		location[oldlen] = '\0';
 		oldlen = len;
 		strlcat(location, buf, len);
