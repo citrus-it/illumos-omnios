@@ -138,7 +138,7 @@ conn_walk(int fd, connstat_proto_t *proto, conn_walk_state_t *state)
 		VERIFY3S(r, ==, MOREDATA);
 
 		/* Allocate a buffer to hold the data portion of the message */
-		if ((dbuf.buf = realloc(dbuf.buf, hdr->len)) == NULL) {
+		if ((dbuf.buf = reallocf(dbuf.buf, hdr->len)) == NULL) {
 			warn("failed to realloc() buffer");
 			err = -1;
 			break;
