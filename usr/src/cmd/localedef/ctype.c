@@ -380,11 +380,15 @@ dump_ctype(void)
 		    (last_ct->wc + 1 == wc)) {
 			ct[rl.runetype_ext_nranges-1].max = wc;
 		} else {
+			char *oldct = ct;
+
 			rl.runetype_ext_nranges++;
-			ct = realloc(ct,
-			    sizeof (*ct) * rl.runetype_ext_nranges);
-			if (ct == NULL)
+			ct = reallocarray(ct, rl.runetype_ext_nranges,
+			    sizeof (*ct));
+			if (ct == NULL) {
+				free(oldct);
 				goto fail;
+			}
 			ct[rl.runetype_ext_nranges - 1].min = wc;
 			ct[rl.runetype_ext_nranges - 1].max = wc;
 			ct[rl.runetype_ext_nranges - 1].map = ctn->ctype;
@@ -397,11 +401,15 @@ dump_ctype(void)
 			lo[rl.maplower_ext_nranges-1].max = wc;
 			last_lo = ctn;
 		} else {
+			char *oldlo = lo;
+
 			rl.maplower_ext_nranges++;
-			lo = realloc(lo,
-			    sizeof (*lo) * rl.maplower_ext_nranges);
-			if (lo == NULL)
+			lo = reallocarray(lo, rl.maplower_ext_nranges,
+			    sizeof (*lo));
+			if (lo == NULL) {
+				free(oldlo);
 				goto fail;
+			}
 			lo[rl.maplower_ext_nranges - 1].min = wc;
 			lo[rl.maplower_ext_nranges - 1].max = wc;
 			lo[rl.maplower_ext_nranges - 1].map = ctn->tolower;
@@ -415,11 +423,15 @@ dump_ctype(void)
 			up[rl.mapupper_ext_nranges-1].max = wc;
 			last_up = ctn;
 		} else {
+			char *oldup = up;
+
 			rl.mapupper_ext_nranges++;
-			up = realloc(up,
-			    sizeof (*up) * rl.mapupper_ext_nranges);
-			if (up == NULL)
+			up = reallocarray(up, rl.mapupper_ext_nranges,
+			    sizeof (*up));
+			if (up == NULL) {
+				free(up);
 				goto fail;
+			}
 			up[rl.mapupper_ext_nranges - 1].min = wc;
 			up[rl.mapupper_ext_nranges - 1].max = wc;
 			up[rl.mapupper_ext_nranges - 1].map = ctn->toupper;
