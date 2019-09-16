@@ -518,10 +518,14 @@ ndmpd_mover_set_record_size_v2(ndmp_connection_t *connection, void *body)
 	request = (ndmp_mover_set_record_size_request *) body;
 
 	session->ns_mover.md_record_size = request->len;
-	session->ns_mover.md_buf = realloc(session->ns_mover.md_buf,
+	session->ns_mover.md_buf = reallocf(session->ns_mover.md_buf,
 	    request->len);
 
-	reply.error = NDMP_NO_ERR;
+	if (session_ns_mover.md_buf == NULL)
+		reply.error = NDMP_NO_MEM_ERR;
+	else
+		reply.error = NDMP_NO_ERR;
+
 	ndmp_send_reply(connection, &reply,
 	    "sending mover_set_record_size reply");
 }
@@ -1004,7 +1008,7 @@ ndmpd_mover_set_record_size_v3(ndmp_connection_t *connection, void *body)
 		    request->len, ndmp_max_mover_recsize);
 	} else if (request->len == session->ns_mover.md_record_size)
 		reply.error = NDMP_NO_ERR;
-	else if (!(cp = realloc(session->ns_mover.md_buf, request->len))) {
+	else if (!(cp = reallocf(session->ns_mover.md_buf, request->len))) {
 		reply.error = NDMP_NO_MEM_ERR;
 	} else {
 		reply.error = NDMP_NO_ERR;
