@@ -102,7 +102,6 @@
 #define	DEFAULT_CONSOLE	"/dev/console"
 
 static char	shell[]	= "/bin/sh";
-static char	su[]	= "/usr/bin/su";
 static int	sleeptime	= SLEEPTIME;
 static int	nchild = 0;
 static pid_t	pidlist[10];
@@ -571,7 +570,7 @@ checkauth:
 		(void) wait(NULL);
 		free(user);
 		free(pass);
-		single(su, devname);
+		single(shell, devname);
 		/* single never returns */
 
 sorry:
