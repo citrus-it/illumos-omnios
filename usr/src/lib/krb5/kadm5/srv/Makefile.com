@@ -57,7 +57,7 @@ include ../../../Makefile.lib
 SRCS=		$(SRV_OBJS:%.o=../%.c) \
 		$(SHARED_OBJS:%.o=../../%.c)
 
-KRB5LIB= 	$(ROOT)/usr/lib/krb5
+KRB5LIB= 	$(ROOTLIBDIR)
 LIBS=		$(DYNLIB)
 
 

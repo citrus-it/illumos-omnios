@@ -23,7 +23,7 @@
 
 include ../Makefile.com
 
-LDLIBS += -L$(ROOT)/usr/lib/fm -lfmevent -lnvpair
-LDFLAGS += -R/usr/lib/fm
+LDLIBS += -L$(ROOT)/usr/lib/fm/i386 -lfmevent -lnvpair
+LDFLAGS += -R/usr/lib/fm/i386
 
 install: all $(ROOTPROG32)

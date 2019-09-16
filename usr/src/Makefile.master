@@ -77,8 +77,8 @@ BUILD_TOOLS=		/opt
 ONBLD_TOOLS=		$(BUILD_TOOLS)/onbld
 
 GNUC_ROOT=	/opt/gcc/4.4.4
-GCCLIBDIR=	$(GNUC_ROOT)/lib
-GCCLIBDIR64=	$(GNUC_ROOT)/lib/$(MACH64)
+GCCLIBDIR=	$(GNUC_ROOT)/lib/$(MACH32)
+GCCLIBDIR64=	$(GNUC_ROOT)/lib
 
 DOCBOOK_XSL_ROOT=	/usr/share/sgml/docbook/xsl-stylesheets
 
@@ -527,15 +527,16 @@ MAPFILE.INT =		mapfile-intf
 # LDLIBS32 and LDLIBS64 can be set in the environment to override the following
 # assignments.
 #
-LDLIBS32 =	$(ENVLDLIBS1) $(ENVLDLIBS2) $(ENVLDLIBS3)
-LDLIBS32 +=	$(ADJUNCT_PROTO:%=-L%/usr/lib -L%/lib)
+LDLIBS64 =	$(ENVLDLIBS1) $(ENVLDLIBS2) $(ENVLDLIBS3)
+LDLIBS32 =	$(ENVLDLIBS1:%=%/$(MACH32)) \
+		$(ENVLDLIBS2:%=%/$(MACH32)) \
+		$(ENVLDLIBS3:%=%/$(MACH32))
+
+LDLIBS32 +=	$(ADJUNCT_PROTO:%=-L%/usr/lib/$(MACH32) -L%/lib/$(MACH32))
 LDLIBS.cmd = 	$(LDLIBS32)
 LDLIBS.lib =	$(LDLIBS32)
 
-LDLIBS64 =	$(ENVLDLIBS1:%=%/$(MACH64)) \
-		$(ENVLDLIBS2:%=%/$(MACH64)) \
-		$(ENVLDLIBS3:%=%/$(MACH64))
-LDLIBS64 +=     $(ADJUNCT_PROTO:%=-L%/usr/lib/$(MACH64) -L%/lib/$(MACH64))
+LDLIBS64 +=     $(ADJUNCT_PROTO:%=-L%/usr/lib -L%/lib)
 
 #
 # Define compilation macros.
@@ -555,7 +556,7 @@ COMPILE64.b=	$(ELFWRAP) $(ELFWRAP_FLAGS$(CLASS))
 #
 # Link time macros
 #
-CCNEEDED	= -L$(GCCLIBDIR) -lstdc++ -lgcc
+CCNEEDED	= -L$(GCCLIBDIR) -lstdc++ -lgcc -R$(GCCLIBDIR)
 CCEXTNEEDED	= $(CCNEEDED)
 
 LINK.c=		$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)

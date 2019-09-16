@@ -31,7 +31,7 @@ dir path=usr group=sys
 dir path=usr/include
 dir path=usr/include/sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/devfsadm group=sys
 dir path=usr/lib/devfsadm/linkmod group=sys
 dir path=usr/lib/dtrace
@@ -43,7 +43,7 @@ dir path=usr/lib/mdb/raw group=sys
 dir path=usr/lib/mdb/raw/$(ARCH64) group=sys
 dir path=usr/sbin
 dir path=usr/sbin/$(ARCH32)
-dir path=usr/sbin/$(ARCH64)
+dir path=usr/sbin/$(ARCH32)
 dir path=usr/share
 dir path=usr/share/lib
 dir path=usr/share/man/man8
@@ -56,7 +56,7 @@ file path=usr/include/sys/fasttrap_impl.h
 file path=usr/include/sys/fasttrap_isa.h
 file path=usr/include/sys/lockstat.h
 file path=usr/include/sys/sdt.h
-file path=usr/lib/$(ARCH64)/libdtrace.so.1
+file path=usr/lib/$(ARCH32)/libdtrace.so.1
 file path=usr/lib/devfsadm/linkmod/SUNW_dtrace_link.so group=sys
 file path=usr/lib/dtrace/64/drti.o mode=0444
 file path=usr/lib/dtrace/64/libdtrace_forceload.so mode=0555
@@ -103,5 +103,5 @@ hardlink path=usr/sbin/lockstat target=../../usr/lib/isaexec
 hardlink path=usr/sbin/plockstat target=../../usr/lib/isaexec
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/$(ARCH64)/libdtrace.so target=libdtrace.so.1
+link path=usr/lib/$(ARCH32)/libdtrace.so target=libdtrace.so.1
 link path=usr/lib/libdtrace.so target=libdtrace.so.1

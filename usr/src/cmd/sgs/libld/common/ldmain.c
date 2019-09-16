@@ -58,9 +58,9 @@ Target		ld_targ;
  * part of the path processing.
  */
 #if	defined(_ELF64)
-static char	def_Plibpath[] = "/lib/64:/usr/lib/64";
+static char	def_Plibpath[] = "/lib/64:/lib:/usr/lib/64:/usr/lib";
 #else
-static char	def_Plibpath[] = "/lib/32:/lib:/usr/lib/32:/usr/lib";
+static char	def_Plibpath[] = "/lib/32:/usr/lib/32";
 #endif
 
 /*

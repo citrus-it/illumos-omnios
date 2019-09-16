@@ -34,6 +34,6 @@ SRCS = fmevt_main.c \
 
 include ../../Makefile.plugin
 
-CFLAGS += $(INCS)
-LDLIBS += -L$(ROOTLIB)/fm -lsysevent -lfmevent -ltopo -luuid -lscf -lc
-LDFLAGS += -R/usr/lib/fm
+CFLAGS64 += $(INCS)
+LDLIBS += -L$(ROOT)/usr/lib/fm -lsysevent -lfmevent -ltopo -luuid -lscf -lc
+LDLIBS += -R/usr/lib/fm

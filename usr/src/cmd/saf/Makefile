@@ -46,7 +46,7 @@ PMADMSRC= $(PMADMOBJ:%.o=%.c)
 PMADMSRCS= $(PMADMSRC) util.c
 OBJS= $(SACOBJS) $(SACADMOBJS) $(PMADMOBJS)
 
-LIBSAFD = $(ROOTLIB)/saf
+LIBSAFD = $(ROOT)/usr/lib/saf
 DIRS= $(LIBSAFD)
 SACF= sac
 ADMF= sacadm pmadm

@@ -55,7 +55,7 @@ dir path=kernel/drv group=sys
 # lib dirs:
 #
 dir path=lib/fm variant.opensolaris.zone=__NODEFAULT
-dir path=lib/fm/$(ARCH64) variant.opensolaris.zone=__NODEFAULT
+dir path=lib/fm/$(ARCH32) variant.opensolaris.zone=__NODEFAULT
 #
 # Our service manifests are common to global and non-global zones
 #
@@ -82,13 +82,13 @@ dir path=usr/include
 dir path=usr/include/fm
 dir path=usr/lib variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/fm variant.opensolaris.zone=__NODEFAULT
-dir path=usr/lib/fm/$(ARCH64) variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/$(ARCH32) variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/fm/dict variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/fm/eft
 dir path=usr/lib/fm/fmd variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/fm/fmd/plugins variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/fm/fmd/schemes variant.opensolaris.zone=__NODEFAULT
-dir path=usr/lib/fm/fmd/schemes/$(ARCH64) variant.opensolaris.zone=__NODEFAULT
+dir path=usr/lib/fm/fmd/schemes/$(ARCH32) variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/fm/notify variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/fm/topo variant.opensolaris.zone=__NODEFAULT
 dir path=usr/lib/fm/topo/maps variant.opensolaris.zone=__NODEFAULT
@@ -140,7 +140,7 @@ file path=kernel/drv/fm.conf group=sys
 #
 # Some libraries need to be in lib for install
 #
-file path=lib/fm/$(ARCH64)/libfmevent.so.1 \
+file path=lib/fm/$(ARCH32)/libfmevent.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 file path=lib/fm/libfmevent.so.1 variant.opensolaris.zone=__NODEFAULT
 #
@@ -174,22 +174,22 @@ file path=usr/include/fm/topo_mod.h mode=0644
 #
 #	64-bit .so.1
 #
-file path=usr/lib/fm/$(ARCH64)/libdiagcode.so.1 \
+file path=usr/lib/fm/$(ARCH32)/libdiagcode.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/$(ARCH64)/libdiskstatus.so.1 \
+file path=usr/lib/fm/$(ARCH32)/libdiskstatus.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/$(ARCH64)/libfmd_adm.so.1 \
+file path=usr/lib/fm/$(ARCH32)/libfmd_adm.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/$(ARCH64)/libfmd_agent.so.1 \
+file path=usr/lib/fm/$(ARCH32)/libfmd_agent.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/$(ARCH64)/libfmd_log.so.1 \
+file path=usr/lib/fm/$(ARCH32)/libfmd_log.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/$(ARCH64)/libfmd_msg.so.1 \
+file path=usr/lib/fm/$(ARCH32)/libfmd_msg.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/$(ARCH64)/libfmnotify.so.1 \
+file path=usr/lib/fm/$(ARCH32)/libfmnotify.so.1 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/$(ARCH64)/libseslog.so.1
-file path=usr/lib/fm/$(ARCH64)/libtopo.so.1 \
+file path=usr/lib/fm/$(ARCH32)/libseslog.so.1
+file path=usr/lib/fm/$(ARCH32)/libtopo.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 #
 # Dictionaries, whether they are hardware-specific or not, are
@@ -302,27 +302,27 @@ file path=usr/lib/fm/fmd/plugins/zfs-retire.so mode=0555
 #
 # fmri scheme support: all are common to both global and non-global zones
 #
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/cpu.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/cpu.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/dev.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/dev.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/fmd.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/fmd.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/hc.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/hc.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/legacy-hc.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/legacy-hc.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mem.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/mem.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/mod.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/mod.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/pkg.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/pkg.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/svc.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/svc.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/sw.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/sw.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
-file path=usr/lib/fm/fmd/schemes/$(ARCH64)/zfs.so mode=0555 \
+file path=usr/lib/fm/fmd/schemes/$(ARCH32)/zfs.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/schemes/cpu.so mode=0555 \
     variant.opensolaris.zone=__NODEFAULT
@@ -474,39 +474,39 @@ license lic_CDDL license=lic_CDDL
 #
 # libraries .so symlinks in lib
 #
-link path=lib/fm/$(ARCH64)/libfmevent.so target=./libfmevent.so.1 \
+link path=lib/fm/$(ARCH32)/libfmevent.so target=./libfmevent.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 link path=lib/fm/libfmevent.so target=libfmevent.so.1 \
     variant.opensolaris.zone=__NODEFAULT
 
 #
-#	64-bit .so symlinks
-#
-link path=usr/lib/fm/$(ARCH64)/libdiagcode.so target=./libdiagcode.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libdiskstatus.so target=./libdiskstatus.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libfmd_adm.so target=./libfmd_adm.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libfmd_agent.so target=./libfmd_agent.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libfmd_log.so target=./libfmd_log.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libfmd_msg.so target=./libfmd_msg.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libfmevent.so \
-    target=../../../../lib/fm/$(ARCH64)/libfmevent.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libfmevent.so.1 \
-    target=../../../../lib/fm/$(ARCH64)/libfmevent.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libfmnotify.so target=./libfmnotify.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-link path=usr/lib/fm/$(ARCH64)/libseslog.so target=./libseslog.so.1
-link path=usr/lib/fm/$(ARCH64)/libtopo.so target=libtopo.so.1 \
-    variant.opensolaris.zone=__NODEFAULT
-#
 #	32-bit .so symlinks
+#
+link path=usr/lib/fm/$(ARCH32)/libdiagcode.so target=./libdiagcode.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH32)/libdiskstatus.so target=./libdiskstatus.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH32)/libfmd_adm.so target=./libfmd_adm.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH32)/libfmd_agent.so target=./libfmd_agent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH32)/libfmd_log.so target=./libfmd_log.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH32)/libfmd_msg.so target=./libfmd_msg.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH32)/libfmevent.so \
+    target=../../../../lib/fm/$(ARCH32)/libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH32)/libfmevent.so.1 \
+    target=../../../../lib/fm/$(ARCH32)/libfmevent.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH32)/libfmnotify.so target=./libfmnotify.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+link path=usr/lib/fm/$(ARCH32)/libseslog.so target=./libseslog.so.1
+link path=usr/lib/fm/$(ARCH32)/libtopo.so target=libtopo.so.1 \
+    variant.opensolaris.zone=__NODEFAULT
+#
+#	64-bit .so symlinks
 #
 link path=usr/lib/fm/libdiagcode.so target=libdiagcode.so.1 \
     variant.opensolaris.zone=__NODEFAULT

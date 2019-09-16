@@ -28,7 +28,7 @@
 
 include ../Makefile.com
 
-ROOTLIBDIR64=	$(ROOT)/usr/lib/link_audit/$(MACH64)
+ROOTLIBDIR64=	$(ROOT)/usr/lib/link_audit
 ROOTDYNLIB64=	$(DYNLIB:%=$(ROOTLIBDIR64)/%)
 
 CFLAGS64 +=	$(C_PICFLAGS64) -D_ELF64

@@ -41,7 +41,7 @@ SRCS= $(LSSRC) $(NLPSSRC)
 
 include ../Makefile.cmd
 
-LIBSAFD = $(ROOTLIB)/saf
+LIBSAFD = $(ROOT)/usr/lib/saf
 NETD = $(ROOT)/usr/net
 NETNLSD = $(NETD)/nls
 

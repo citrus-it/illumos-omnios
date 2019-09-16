@@ -28,8 +28,8 @@ include ../../Makefile.com
 
 SRCS = cpu.c
 LDLIBS += -lkstat \
-	-L$(ROOTLIB)/fm -ltopo
-LDFLAGS += -R/usr/lib/fm
+	-L$(ROOT)/usr/lib/fm/$(MACH32) -ltopo
+LDFLAGS += -R/usr/lib/fm/$(MACH32)
 
 CERRWARN += -Wno-parentheses
 

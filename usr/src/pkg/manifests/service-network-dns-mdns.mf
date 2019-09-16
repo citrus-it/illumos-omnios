@@ -41,7 +41,7 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/include
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/inet
 dir path=usr/share
 dir path=usr/share/man
@@ -51,8 +51,8 @@ dir path=usr/share/man/man8
 file path=lib/svc/manifest/network/dns/multicast.xml group=sys mode=0444
 file path=usr/bin/dns-sd mode=0555
 file path=usr/include/dns_sd.h
-file path=usr/lib/$(ARCH64)/libdns_sd.so.1
-file path=usr/lib/$(ARCH64)/nss_mdns.so.1
+file path=usr/lib/$(ARCH32)/libdns_sd.so.1
+file path=usr/lib/$(ARCH32)/nss_mdns.so.1
 file path=usr/lib/inet/mdnsd mode=0555
 file path=usr/lib/libdns_sd.so.1
 file path=usr/lib/nss_mdns.so.1
@@ -75,5 +75,5 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/contrib/mDNSResponder/LICENSE \
     license=usr/src/contrib/mDNSResponder/LICENSE
-link path=usr/lib/$(ARCH64)/libdns_sd.so target=libdns_sd.so.1
+link path=usr/lib/$(ARCH32)/libdns_sd.so target=libdns_sd.so.1
 link path=usr/lib/libdns_sd.so target=libdns_sd.so.1

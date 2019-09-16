@@ -35,7 +35,7 @@ dir path=usr/include
 dir path=usr/kernel group=sys
 dir path=usr/kernel/drv group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/rcm
 dir path=usr/lib/rcm/modules
 dir path=usr/sbin
@@ -58,7 +58,7 @@ file path=usr/bin/poolstat mode=0555
 file path=usr/include/pool.h
 file path=usr/kernel/drv/pool group=sys
 file path=usr/kernel/drv/pool.conf group=sys
-file path=usr/lib/$(ARCH64)/libpool.so.1
+file path=usr/lib/$(ARCH32)/libpool.so.1
 file path=usr/lib/libpool.so.1
 file path=usr/lib/rcm/modules/SUNW_pool_rcm.so mode=0555
 file path=usr/sbin/pooladm mode=0555
@@ -84,5 +84,5 @@ file path=usr/share/man/man3pool/pool_value_alloc.3pool
 file path=usr/share/man/man3pool/pool_walk_components.3pool
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/$(ARCH64)/libpool.so target=libpool.so.1
+link path=usr/lib/$(ARCH32)/libpool.so target=libpool.so.1
 link path=usr/lib/libpool.so target=./libpool.so.1

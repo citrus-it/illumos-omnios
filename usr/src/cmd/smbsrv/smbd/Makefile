@@ -73,7 +73,7 @@ LDLIBS += -lmlsvc -lmlrpc -lsmbns -lsmb -lsmbfs -lgss
 LDLIBS += -lzfs -lscf -lcmdutils -lumem
 $(PROG) := LDLIBS += -lkrb5
 
-ROOTSMBDDIR = $(ROOTLIB)/smbsrv
+ROOTSMBDDIR = $(ROOT)/usr/lib/smbsrv
 ROOTSMBDFILE = $(PROG:%=$(ROOTSMBDDIR)/%)
 
 FILEMODE = 0444

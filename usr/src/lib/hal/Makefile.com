@@ -31,8 +31,8 @@ CPPFLAGS =	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(CPPFLAGS.master)
 
 LIBDIR =	/usr/lib
 LIBDIR64 =	/usr/lib/$(MACH64)
-ROOTLIBPCDIR =	$(ROOT)/usr/lib/pkgconfig
-ROOTLIBPCDIR64 = $(ROOT)/usr/lib/$(MACH64)/pkgconfig
+ROOTLIBPCDIR64 = $(ROOT)/usr/lib/pkgconfig
+ROOTLIBPCDIR = $(ROOT)/usr/lib/$(MACH32)/pkgconfig
 ROOTLIBPC =	$(LIBPCSRC:%=$(ROOTLIBPCDIR)/%)
 ROOTLIBPC64 =	$(LIBPCSRC:%=$(ROOTLIBPCDIR64)/%)
 

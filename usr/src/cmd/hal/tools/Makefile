@@ -58,6 +58,7 @@ CLOBBERFILES += $(HAL_PROG) $(STORAGE_PROG) $(SCRIPT_BIN) $(SCRIPT_LIB) $(HAL_LI
 CLEANFILES += $(STORAGE_SHAREDOBJS) $(STORAGE_OBJS) hal-storage-zpool.o
 
 include ../../Makefile.cmd
+include ../../Makefile.cmd.64
 include ../Makefile.hal
 
 $(HAL_PROG) :=		LDLIBS += -lc -ldbus-1 -lhal

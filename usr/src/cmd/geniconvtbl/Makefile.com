@@ -64,8 +64,8 @@ YACCSED	= ../yacc.sed
 include ../../Makefile.cmd
 
 
-ROOTDIRS32=	$(ROOTLIB)/iconv
-ROOTDIRS64=	$(ROOTLIB)/iconv/$(MACH64)
+ROOTDIRS32=	$(ROOTLIB64)/iconv
+ROOTDIRS64=	$(ROOTLIB64)/iconv/$(MACH64)
 ROOTITM32 =	$(ROOTDIRS32)/$(ITM)
 ROOTITM64 =	$(ROOTDIRS64)/$(ITM)
 
@@ -166,13 +166,13 @@ $(ROOTDIRS32)/%: $(ROOTDIRS32) %
 $(ROOTDIRS64)/%: $(ROOTDIRS64) %
 	-$(INS.file)
 
-$(ROOTDIRS32): $(ROOTLIB)
+$(ROOTDIRS32): $(ROOTLIB64)
 	-$(INS.dir)
 
 $(ROOTDIRS64): $(ROOTDIRS32)
 	-$(INS.dir)
 
-$(ROOTLIB) $(ROOTBIN):
+$(ROOTLIB64) $(ROOTBIN):
 	-$(INS.dir)
 
 include ../../Makefile.targ

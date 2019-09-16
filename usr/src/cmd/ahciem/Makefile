@@ -17,7 +17,7 @@ PROG= ahciem
 
 include ../Makefile.cmd
 
-ROOTCMDDIR = $(ROOTLIB)/ahci
+ROOTCMDDIR = $(ROOTLIB64)/ahci
 CPPFLAGS += -I$(SRCTOP)/include
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -ldevinfo

@@ -34,7 +34,7 @@ DERIVED_FILES = smed.h smed_xdr.c smed_svc.c
 
 # install specifics
 
-ROOTLIBSMSERVERDIR= $(ROOTLIB)/smedia
+ROOTLIBSMSERVERDIR= $(ROOTLIB64)/smedia
 ROOTLIBSMSERVERD= $(PROG:%=$(ROOTLIBSMSERVERDIR)/%)
 
 include ../Makefile.cmd

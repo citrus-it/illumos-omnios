@@ -33,6 +33,7 @@ MANIFEST =	hal.xml
 SVCMETHOD =	svc-hal
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../../Makefile.hal
 
 ROOTMANIFESTDIR =	$(ROOTSVCSYSTEM)

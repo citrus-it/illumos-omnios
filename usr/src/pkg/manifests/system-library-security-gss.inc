@@ -25,16 +25,16 @@
 
 dir path=usr group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/$(ARCH64)/gss
+dir path=usr/lib/$(ARCH32)
+dir path=usr/lib/$(ARCH32)/gss
 dir path=usr/lib/gss
 dir path=usr/lib/sasl
-dir path=usr/lib/sasl/$(ARCH64)
+dir path=usr/lib/sasl/$(ARCH32)
 dir path=usr/sbin
 dir path=usr/share/man/man8
 dir path=usr/share/man/man3gss
 dir path=usr/share/man/man3lib
-file path=usr/lib/$(ARCH64)/libgss.so.1
+file path=usr/lib/$(ARCH32)/libgss.so.1
 file path=usr/lib/gss/gsscred_clean group=sys mode=0744
 file path=usr/lib/gss/gssd mode=0555
 file path=usr/lib/libgss.so.1
@@ -90,5 +90,5 @@ license usr/src/lib/sasl_plugins/gssapi/THIRDPARTYLICENSE \
     license=usr/src/lib/sasl_plugins/gssapi/THIRDPARTYLICENSE
 license usr/src/uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE \
     license=usr/src/uts/common/gssapi/mechs/krb5/THIRDPARTYLICENSE
-link path=usr/lib/$(ARCH64)/libgss.so target=libgss.so.1
+link path=usr/lib/$(ARCH32)/libgss.so target=libgss.so.1
 link path=usr/lib/libgss.so target=libgss.so.1

@@ -71,8 +71,8 @@ SED = sed
 CSRCS= $(MECH:%.o=../mech/%.c) $(CRYPTO:%.o=../crypto/%.c)
 SRCS=	$(CSRCS)
 
-ROOTLIBDIR = $(ROOT)/usr/lib/gss
-ROOTLIBDIR64 = $(ROOT)/usr/lib/$(MACH64)/gss
+ROOTLIBDIR = $(ROOT)/usr/lib/$(MACH32)/gss
+ROOTLIBDIR64 = $(ROOT)/usr/lib/gss
 
 
 

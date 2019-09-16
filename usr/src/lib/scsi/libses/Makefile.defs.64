@@ -25,4 +25,4 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-DYNFLAGS += -R/usr/lib/scsi/$(MACH64)
+DYNFLAGS += -R/usr/lib/scsi

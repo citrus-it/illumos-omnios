@@ -274,10 +274,9 @@ smp_plugin_load_dir(smp_target_t *tp, const char *pluginroot)
 	    pluginroot, LIBSMP_PLUGIN_FRAMEWORK);
 
 #if defined(_LP64)
-	if (sysinfo(SI_ARCHITECTURE_64, isa, sizeof (isa)) < 0)
-		isa[0] = '\0';
-#else
 	isa[0] = '\0';
+#else
+	strcpy(isa, "i386");
 #endif
 
 	if ((dirp = opendir(path)) != NULL) {

@@ -30,6 +30,7 @@ OBJS =		main.o runner.o utils.o
 SRCS =		$(OBJS:%.o=%.c)
 
 include ../../Makefile.cmd
+include ../../Makefile.cmd.64
 include ../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)

@@ -33,7 +33,7 @@ OBJECTS=	$(COMOBJS) $(BLTOBJ)
 include		../../../../lib/Makefile.lib
 include		../../Makefile.com
 
-ROOTLIBDIR=	$(ROOT)/usr/lib/link_audit
+ROOTLIBDIR=	$(ROOT)/usr/lib/link_audit/i386
 
 MAPFILES =	../common/mapfile-vers
 

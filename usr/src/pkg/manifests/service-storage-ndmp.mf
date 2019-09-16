@@ -44,7 +44,7 @@ dir path=lib/svc/method
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/ndmp
 dir path=usr/sbin
 dir path=usr/share/man
@@ -53,7 +53,7 @@ dir path=usr/share/man/man8
 file path=lib/svc/manifest/system/ndmp.xml group=sys mode=0444
 file path=lib/svc/method/svc-ndmp mode=0555
 file path=usr/include/libndmp.h
-file path=usr/lib/$(ARCH64)/libndmp.so.1
+file path=usr/lib/$(ARCH32)/libndmp.so.1
 file path=usr/lib/libndmp.so.1
 file path=usr/lib/ndmp/ndmpd mode=0555
 file path=usr/sbin/ndmpadm mode=0555
@@ -64,5 +64,5 @@ file path=usr/share/man/man8/ndmpd.8
 file path=usr/share/man/man8/ndmpstat.8
 license cr_Sun license=cr_Sun
 license usr/src/cmd/ndmpd/LICENSE license=usr/src/cmd/ndmpd/LICENSE
-link path=usr/lib/$(ARCH64)/libndmp.so target=libndmp.so.1
+link path=usr/lib/$(ARCH32)/libndmp.so target=libndmp.so.1
 link path=usr/lib/libndmp.so target=libndmp.so.1

@@ -35,7 +35,7 @@ ROOTMANIFESTDIR = $(ROOTSVCNETWORKNIS)
 
 #installed directories
 RPCSVC=		$(ROOT)/usr/include/rpcsvc
-NETSVC =	$(ROOTLIB)/netsvc
+NETSVC =	$(ROOTLIB64)/netsvc
 NETYP =		$(NETSVC)/yp
 ROOTDIRS =	$(NETSVC) $(NETYP)
 

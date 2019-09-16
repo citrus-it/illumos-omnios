@@ -30,6 +30,6 @@ include		../Makefile.com
 
 .KEEP_STATE:
 
-install:	$(ROOTLIBPROG)
+install:	$(ROOTLIBEXEC32)/$(PROG)
 
 include		../Makefile.targ

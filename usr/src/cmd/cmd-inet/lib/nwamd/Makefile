@@ -48,7 +48,7 @@ include		../../../Makefile.cmd
 
 $(ROOTCFGFILES) := FILEMODE= 644
 
-ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
+ROOTCMDDIR=	$(ROOTFS_LIBDIR64)/inet
 
 LDLIBS +=	-ldhcpagent -ldhcputil -ldladm -ldlpi -lgen \
 		-linetutil -lipadm -lkstat -lnvpair -lnwam \

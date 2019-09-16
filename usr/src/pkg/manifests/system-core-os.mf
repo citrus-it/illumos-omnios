@@ -751,7 +751,7 @@ file path=usr/bin/wracct mode=0555
 file path=usr/bin/write group=tty mode=2555
 file path=usr/bin/xargs mode=0555
 file path=usr/bin/xstr mode=0555
-file path=usr/lib/$(ARCH64)/libshare.so.1
+file path=usr/lib/$(ARCH32)/libshare.so.1
 file path=usr/lib/class/FX/FXdispadmin mode=0555
 file path=usr/lib/class/FX/FXpriocntl mode=0555
 file path=usr/lib/class/IA/IAdispadmin mode=0555
@@ -1305,7 +1305,7 @@ link path=etc/ftpusers target=./ftpd/ftpusers
 link path=etc/hosts target=./inet/hosts
 link path=etc/inet/ipnodes target=./hosts
 link path=etc/inetd.conf target=./inet/inetd.conf
-link path=etc/lib/ld.so.1 target=../../lib/ld.so.1
+link path=etc/lib/ld.so.1 target=../../usr/libexec/ld.so
 link path=etc/lib/libdl.so.1 target=../../lib/libdl.so.1
 link path=etc/lib/nss_files.so.1 target=../../lib/nss_files.so.1
 link path=etc/netmasks target=./inet/netmasks
@@ -1326,14 +1326,14 @@ link path=usr/bin/strclean target=../sbin/strclean
 link path=usr/bin/strerr target=../sbin/strerr
 link path=usr/bin/sync target=../../sbin/sync
 link path=usr/bin/tar target=../sbin/tar
-link path=usr/lib/$(ARCH64)/ld.so.1 target=../../../lib/$(ARCH64)/ld.so.1
+link path=usr/lib/$(ARCH64)/ld.so.1 target=../../libexec/ld.so
 link path=usr/lib/cron target=../../etc/cron.d
 link path=usr/lib/devfsadm/devfsadmd target=../../sbin/devfsadm
 link path=usr/lib/fs/dev/mount target=../../../../etc/fs/dev/mount
 link path=usr/lib/fs/hsfs/mount target=../../../../etc/fs/hsfs/mount
 link path=usr/lib/fs/ufs/mount target=../../../../etc/fs/ufs/mount
 link path=usr/lib/inet/in.mpathd target=../../../lib/inet/in.mpathd
-link path=usr/lib/ld.so.1 target=../../lib/ld.so.1
+link path=usr/lib/ld.so.1 target=../libexec/$(ARCH32)/ld.so
 link path=usr/lib/secure/32 target=$(ARCH32)
 link path=usr/lib/secure/64 target=$(ARCH64)
 link path=usr/mail target=../var/mail

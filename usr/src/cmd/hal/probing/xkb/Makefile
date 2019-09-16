@@ -29,6 +29,7 @@ OBJS =		probe-xkb.o logger.o
 SRCS =		probe-xkb.c
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)

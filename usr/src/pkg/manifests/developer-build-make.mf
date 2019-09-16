@@ -20,7 +20,7 @@ set name=variant.arch value=$(ARCH)
 dir path=usr/share/lib/make
 dir path=usr/share/man/man1
 file path=usr/bin/dmake mode=0555
-file path=usr/lib/$(ARCH64)/libmakestate.so.1
+file path=usr/lib/$(ARCH32)/libmakestate.so.1
 file path=usr/lib/libmakestate.so.1
 file path=usr/share/lib/make/make.rules
 file path=usr/share/lib/make/svr4.make.rules

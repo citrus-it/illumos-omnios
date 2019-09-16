@@ -30,6 +30,6 @@
 
 include ../Makefile.com
 
-DYNFLAGS += $(ROOT)/usr/lib/passwdutil.so.1
+DYNFLAGS += $(ROOTLIB32)/passwdutil.so.1
 
 install: all $(ROOTLIBS) $(ROOTLINKS)

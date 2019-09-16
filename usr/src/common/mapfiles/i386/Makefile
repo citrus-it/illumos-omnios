@@ -20,24 +20,34 @@
 #
 
 #
-# Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
 include		$(SRC)/Makefile.master
 
-ROOTDIR=	$(ROOT)/usr/lib/ld
+ROOTDIR=	$(ROOT)/usr/lib/ld/$(MACH32)
 
 DIRS=		$(ROOTDIR)
 FILES=
 
-install: $(DIRS) $(FILES)
+install: $(DIRS) $(FILES) map.link
 
 $(FILES):=	FILEMODE=444
 
 $(DIRS):=	DIRMODE=755
 
+map.link:
+	$(RM) $(ROOTDIR)/map.default \
+		$(ROOTDIR)/map.above4G $(ROOTDIR)/map.below4G
+	$(SYMLINK) ../map.default $(ROOTDIR)/map.default
+	$(SYMLINK) ../map.above4G $(ROOTDIR)/map.above4G
+	$(SYMLINK) ../map.below4G $(ROOTDIR)/map.below4G
+
 $(DIRS):
 	$(INS.dir)
 
 $(ROOTDIR)/%: %
+	$(INS.file)
+
+$(ROOTDIR64)/%: %
 	$(INS.file)

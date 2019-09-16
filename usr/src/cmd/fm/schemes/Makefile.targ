@@ -69,7 +69,7 @@ $(ROOT)/usr/lib/fm/fmd: $(ROOT)/usr/lib/fm
 $(ROOT)/usr/lib/fm/fmd/schemes: $(ROOT)/usr/lib/fm/fmd
 	$(INS.dir)
 
-$(ROOT)/usr/lib/fm/fmd/schemes/$(MACH64): $(ROOT)/usr/lib/fm/fmd/schemes
+$(ROOT)/usr/lib/fm/fmd/schemes/$(MACH32): $(ROOT)/usr/lib/fm/fmd/schemes
 	$(INS.dir)
 
 $(ROOTPROG): $$(@D) $(PROG)

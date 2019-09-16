@@ -36,7 +36,7 @@ dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
@@ -51,12 +51,12 @@ file path=lib/svc/manifest/system/ibsrp/target.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
 file path=lib/svc/method/svc-srpt mode=0555 variant.opensolaris.zone=global
 file path=usr/include/libsrpt.h
-file path=usr/lib/$(ARCH64)/libsrpt.so.1
+file path=usr/lib/$(ARCH32)/libsrpt.so.1
 file path=usr/lib/libsrpt.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/srpt.so group=sys mode=0555
 file path=usr/sbin/srptadm mode=0555
 file path=usr/share/man/man7d/srpt.7d
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/$(ARCH64)/libsrpt.so target=libsrpt.so.1
+link path=usr/lib/$(ARCH32)/libsrpt.so target=libsrpt.so.1
 link path=usr/lib/libsrpt.so target=libsrpt.so.1

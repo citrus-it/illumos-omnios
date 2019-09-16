@@ -34,7 +34,7 @@ include ../../Makefile.plugin
 
 CPPFLAGS += -I../disk
 
-LDLIBS += -L$(ROOTLIBDIR)/scsi -R/usr/lib/scsi -lses
+LDLIBS += -L$(ROOT)/usr/lib/scsi/$(MACH32) -R/usr/lib/scsi/$(MACH32) -lses
 LDLIBS += -ldevinfo -ldevid -ldiskstatus -lcontract -lsysevent -ldiskmgt
 
 CLOBBERFILES += disk_common.ln

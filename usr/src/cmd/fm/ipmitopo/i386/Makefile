@@ -25,4 +25,5 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../Makefile.com

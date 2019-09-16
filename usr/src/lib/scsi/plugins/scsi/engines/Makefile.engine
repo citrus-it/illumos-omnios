@@ -44,13 +44,13 @@ OBJS = $(YOBJS) $(SRCS:%.c=%.o)
 # DMOD, if set, must match PROG above (for mdb autoloading) so it will
 # be built in a subdirectory.
 #
-ROOTDMOD = $(DMOD:%.so=$(ROOT)/usr/lib/mdb/proc/%.so)
-ROOTDMOD64 = $(DMOD:%.so=$(ROOT)/usr/lib/mdb/proc/$(MACH64)/%.so)
+ROOTDMOD = $(DMOD:%.so=$(ROOT)/usr/lib/mdb/proc/$(MACH32)/%.so)
+ROOTDMOD64 = $(DMOD:%.so=$(ROOT)/usr/lib/mdb/proc/%.so)
 DMODPROG = $(DMOD:%=dmod/%)
 DMOD_OBJS = $(DMOD_SRCS:%.c=%.o)
 
-ROOTPROG = $(ROOTPLUGINLIBDIR)/scsi/engines/$(PROG)
-ROOTPROG64 = $(ROOTPLUGINLIBDIR)/scsi/engines/$(MACH64)/$(PROG)
+ROOTPROG = $(ROOTPLUGINLIBDIR)/scsi/engines/$(MACH32)/$(PROG)
+ROOTPROG64 = $(ROOTPLUGINLIBDIR)/scsi/engines/$(PROG)
 
 
 

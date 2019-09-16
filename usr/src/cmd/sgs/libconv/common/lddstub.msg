@@ -23,10 +23,10 @@
 # Use is subject to license terms.
 #
 
-@ MSG_ORG_32LDD_32STUB	"/../lib/lddstub"
-@ MSG_ORG_32LDD_64STUB	"/../lib/64/lddstub"
-@ MSG_ORG_64LDD_32STUB	"/../../lib/lddstub"
-@ MSG_ORG_64LDD_64STUB	"/../../lib/64/lddstub"
+@ MSG_ORG_32LDD_32STUB	"/lddstub"
+@ MSG_ORG_32LDD_64STUB	"/../lddstub"
+@ MSG_ORG_64LDD_32STUB	"/i386/lddstub"
+@ MSG_ORG_64LDD_64STUB	"/lddstub"
 
-@ MSG_PTH_LDDSTUB	"/usr/lib/lddstub"
-@ MSG_PTH_LDDSTUB_64	"/usr/lib/64/lddstub"
+@ MSG_PTH_LDDSTUB	"/usr/libexec/i386/lddstub"
+@ MSG_PTH_LDDSTUB_64	"/usr/libexec/lddstub"

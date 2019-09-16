@@ -53,7 +53,7 @@ CERRWARN +=	-Wno-implicit-function-declaration
 CERRWARN +=	-Wno-unused-label
 LDLIBS +=	-lncurses
 LDLIBS +=	-lmech_krb5 
-LDFLAGS +=	$(KRUNPATH) -L$(ROOT)$(KLIBDIR_DO) -L$(ROOT)$(KLIBDIR_GL)
+LDFLAGS +=	$(KRUNPATH) -L$(ROOT)$(KLIBDIR)
 
 # "missing type for func"
 SMATCH=off

@@ -30,6 +30,7 @@ OBJS =		probe-acpi.o logger.o acpi.o util_pm.o
 SRCS =		probe-acpi.c
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)

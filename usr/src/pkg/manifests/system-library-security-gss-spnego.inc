@@ -25,12 +25,12 @@
 
 dir path=usr group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/$(ARCH64)/gss
+dir path=usr/lib/$(ARCH32)
+dir path=usr/lib/$(ARCH32)/gss
 dir path=usr/lib/gss
 dir path=usr/share/man
 dir path=usr/share/man/man5
-file path=usr/lib/$(ARCH64)/gss/mech_spnego.so.1
+file path=usr/lib/$(ARCH32)/gss/mech_spnego.so.1
 file path=usr/lib/gss/mech_spnego.so.1
 file path=usr/share/man/man5/mech_spnego.5
 license cr_Sun license=cr_Sun

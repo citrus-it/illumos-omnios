@@ -25,8 +25,9 @@
 # Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd.64
 
-PROG_BIN =	$(ROOTLIB)/abi/$(PROG)
+PROG_BIN =	$(ROOTLIB64)/abi/$(PROG)
 .PRECIOUS:	$(PROG)
 
 U_LIB	=	parse

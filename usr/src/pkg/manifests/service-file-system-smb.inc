@@ -37,7 +37,7 @@ dir path=usr/kernel/kmdb group=sys
 dir path=usr/lib
 dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/smb group=sys
-dir path=usr/lib/fs/smb/$(ARCH64) group=sys
+dir path=usr/lib/fs/smb/$(ARCH32) group=sys
 dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys

@@ -47,14 +47,14 @@ OBJS = $(SRCS:%.c=%.o) inj_grammar.o inj_lex.o
 CLEANFILES += inj_grammar.c inj_grammar.h inj_lex.c y.tab.h y.tab.c
 
 CPPFLAGS += -I. -I../common
-CFLAGS += $(CTF_FLAGS)
+CFLAGS64 += $(CTF_FLAGS)
 CERRWARN += -Wno-switch
 CERRWARN += -Wno-uninitialized
 CERRWARN += -Wno-type-limits
 CERRWARN += -Wno-unused-label
 CERRWARN += -Wno-unused-variable
-LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_log -lsysevent -lnvpair -lumem
-LDFLAGS += -R/usr/lib/fm
+LDLIBS64 += -L$(ROOT)/usr/lib/fm -lfmd_log -lsysevent -lnvpair -lumem
+LDFLAGS64 += -R/usr/lib/fm
 STRIPFLAG =
 
 LFLAGS += -t

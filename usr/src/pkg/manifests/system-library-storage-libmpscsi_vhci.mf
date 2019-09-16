@@ -38,10 +38,10 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir path=etc group=sys
 dir path=lib
-dir path=lib/$(ARCH64)
-file path=lib/$(ARCH64)/libmpscsi_vhci.so.1
+dir path=lib/$(ARCH32)
+file path=lib/$(ARCH32)/libmpscsi_vhci.so.1
 file path=lib/libmpscsi_vhci.so.1
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=lib/$(ARCH64)/libmpscsi_vhci.so target=libmpscsi_vhci.so.1
+link path=lib/$(ARCH32)/libmpscsi_vhci.so target=libmpscsi_vhci.so.1
 link path=lib/libmpscsi_vhci.so target=libmpscsi_vhci.so.1

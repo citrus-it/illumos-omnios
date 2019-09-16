@@ -41,7 +41,7 @@ dir path=usr group=sys
 dir path=usr/platform group=sys
 dir path=usr/platform/lib
 dir path=usr/platform/lib/cfgadm
-dir path=usr/platform/lib/cfgadm/$(ARCH64)
+dir path=usr/platform/lib/cfgadm/$(ARCH32)
 driver name=dr alias=acpidr_sbd
 file path=lib/svc/manifest/platform/acpihpd.xml group=sys mode=0444
 file path=lib/svc/method/svc-acpihpd mode=0555

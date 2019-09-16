@@ -39,9 +39,9 @@ ROOTPROG = $(ROOTLIBFMD)/$(PROG)
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I. -I../common
-CFLAGS += $(CTF_FLAGS)
-LDLIBS += -L$(ROOT)/usr/lib/fm -ltopo -lnvpair
-LDFLAGS += -R/usr/lib/fm
+CFLAGS64 += $(CTF_FLAGS)
+LDLIBS64 += -L$(ROOT)/usr/lib/fm -ltopo -lnvpair
+LDFLAGS64 += -R/usr/lib/fm
 
 # not linted
 SMATCH=off

@@ -29,6 +29,6 @@
 include ../Makefile.com
 include ../../../Makefile.lib.64
 
-DYNFLAGS += $(ROOT)/usr/lib/$(MACH64)/passwdutil.so.1
+DYNFLAGS += $(ROOTLIB64)/passwdutil.so.1
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)

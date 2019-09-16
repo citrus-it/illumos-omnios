@@ -29,6 +29,6 @@ SRCS = sensor_transport.c
 
 include ../../Makefile.plugin
 
-CFLAGS += $(INCS)
-LDLIBS += -L$(ROOTLIB)/fm -ltopo
-LDFLAGS += -R/usr/lib/fm
+CFLAGS64 += $(INCS)
+LDLIBS += -L$(ROOT)/usr/lib/fm -ltopo
+LDLIBS += -R/usr/lib/fm

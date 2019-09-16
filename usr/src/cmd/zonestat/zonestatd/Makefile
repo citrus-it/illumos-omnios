@@ -29,7 +29,7 @@ PROG =		zonestatd
 
 include ../../Makefile.cmd
 
-ROOTCMDDIR =		$(ROOTLIB)/zones
+ROOTCMDDIR =		$(ROOTLIB64)/zones
 ROOTMANIFESTDIR =	$(ROOTSVCSYSTEM)
 
 SRCS =	zonestatd.c

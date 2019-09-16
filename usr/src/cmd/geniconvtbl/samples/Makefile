@@ -46,7 +46,7 @@ GENICONVTBL= ../native/geniconvtbl
 include ../../Makefile.cmd
 
 
-ROOTICONVDIRS	=	$(ROOTLIB)/iconv
+ROOTICONVDIRS	=	$(ROOTLIB64)/iconv
 ROOTDIRS	=	$(ROOTICONVDIRS)/geniconvtbl
 SRCSDIRS	=	$(ROOTDIRS)/srcs
 BTSDIRS		=	$(ROOTDIRS)/binarytables

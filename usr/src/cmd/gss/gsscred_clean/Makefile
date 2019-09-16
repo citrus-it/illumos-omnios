@@ -36,6 +36,7 @@ include ../../Makefile.cmd
 # Override $ROOTLIB
 #
 ROOTLIB=	$(ROOT)/usr/lib/gss
+ROOTLIBPROG=	$(ROOTLIB)/$(PROG)
 
 DIRS=	$(ROOTLIB)
 

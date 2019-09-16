@@ -27,7 +27,7 @@
 include ../Makefile.com
 include ../../Makefile.targ
 
-LDLIBS += -L$(ROOTLIB)/fm -lfmd_agent -ltopo
-LDFLAGS += -R/usr/lib/fm
+LDLIBS += -L$(ROOT)/usr/lib/fm/$(MACH32) -lfmd_agent -ltopo
+LDFLAGS += -R/usr/lib/fm/$(MACH32)
 
 install: all $(ROOTPROG)

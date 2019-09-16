@@ -32,8 +32,8 @@ include ../../Makefile.lib
 ROOTFMHDRDIR = $(ROOTHDRDIR)/fm
 ROOTFMHDRS   = $(FMHDRS:%=$(ROOTFMHDRDIR)/%)
 
-ROOTLIBDIR=     $(ROOTFS_LIBDIR)/fm
-ROOTLIBDIR64=   $(ROOTFS_LIBDIR)/fm/$(MACH64)
+ROOTLIBDIR=     $(ROOT)/lib/fm/$(MACH32)
+ROOTLIBDIR64=   $(ROOT)/lib/fm
 
 FMHDRS = libfmevent.h libfmevent_ruleset.h
 HDRDIR = common

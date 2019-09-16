@@ -64,8 +64,8 @@ DCFILES = $(DCNAMES:%=%.dict)
 POFILES = $(DCNAMES:%=%.po)
 MOFILES = $(DCNAMES:%=%.mo)
 
-ROOTDCDIR = $(ROOTLIB)/fm/dict
-ROOTLCDIR = $(ROOTLIB)/locale/C/LC_MESSAGES
+ROOTDCDIR = $(ROOTLIB64)/fm/dict
+ROOTLCDIR = $(ROOTLIB64)/locale/C/LC_MESSAGES
 
 ROOTDCFILES = $(DCNAMES:%=$(ROOTDCDIR)/%.dict)
 ROOTPOFILES = $(DCNAMES:%=$(ROOTLCDIR)/%.po)
@@ -85,13 +85,13 @@ _msg: $(ROOTALLPOFILES)
 $(ROOTDCDIR):
 	$(INS.dir)
 
-$(ROOTLIB)/locale:
+$(ROOTLIB64)/locale:
 	$(INS.dir)
 
-$(ROOTLIB)/locale/C: $(ROOTLIB)/locale
+$(ROOTLIB64)/locale/C: $(ROOTLIB64)/locale
 	$(INS.dir)
 
-$(ROOTLCDIR): $(ROOTLIB)/locale/C
+$(ROOTLCDIR): $(ROOTLIB64)/locale/C
 	$(INS.dir)
 
 $(ROOTDCDIR)/%: %

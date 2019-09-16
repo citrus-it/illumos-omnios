@@ -64,11 +64,11 @@ $(SD_LIB):=     SONAME = $(SD_LIB)
 $(HERMON_LIB):=	MAPFILES += ../common/mapfile-vers-hermon
 $(SD_LIB):=	MAPFILES += ../common/mapfile-vers-plus
 
-$(SES_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lses -lnvpair
-$(SD_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lumem
+$(SES_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi/$(MACH32) -lscsi -lses -lnvpair
+$(SD_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi/$(MACH32) -lscsi -lumem
 
-$(SES_LIB):=	DYNFLAGS += -R/usr/lib/scsi 
-$(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi 
+$(SES_LIB):=	DYNFLAGS += -R/usr/lib/scsi/$(MACH32) 
+$(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi/$(MACH32) 
 
 .KEEP STATE:
 

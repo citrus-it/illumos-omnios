@@ -24,6 +24,7 @@
 #
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 include Makefile.hal
 
 SUBDIRS1 =	hald hald-runner addons probing tools

@@ -6,11 +6,11 @@
 # plug in.
 
 # 32 bit library directories
-KLIBDIR = /usr/lib/gss
+KLIBDIR = /usr/lib/$(MACH32)/gss
 ROOT_KLIBDIR = $(ROOT)/$(KLIBDIR)
 
 # 64 bit library directories
-KLIBDIR64 = /usr/lib/$(MACH64)/gss
+KLIBDIR64 = /usr/lib/gss
 ROOT_KLIBDIR64 = $(ROOT)/$(KLIBDIR64)
 
 # Kerberos V GSS-API Mechanism library
@@ -20,7 +20,7 @@ KMECHLIB64 = $(ROOT)/$(KLIBDIR64)/mech_krb5.so
 
 # KADM5 client library
 KERBLIBDIR = /usr/lib/krb5
-KERBLIBDIR64 = /usr/lib/krb5/$(MACH64)
+KERBLIBDIR64 = /usr/lib/krb5/amd64
 KCLNTLIB = $(ROOT)$(KERBLIBDIR)/libkadm5clnt.so
 KCLNTLIB64 = $(ROOT)$(KERBLIBDIR64)/libkadm5clnt.so
 

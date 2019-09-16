@@ -82,7 +82,7 @@ ETCFILES= rpc
 
 TXTS= $(ETCFILES:%=net_files/%)
 
-NETSVC=	$(ROOTLIB)/netsvc
+NETSVC=	$(ROOTLIB64)/netsvc
 NIS = $(NETSVC)/nis
 RWALL= $(NETSVC)/rwall
 RUSERS= $(NETSVC)/rusers

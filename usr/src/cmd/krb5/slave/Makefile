@@ -68,7 +68,7 @@ CERRWARN +=	-Wno-address
 SMATCH=off
 
 LDFLAGS +=	$(KRUNPATH) $(KERBRUNPATH)
-LDLIBS +=	-lmech_krb5
+LDLIBS +=	-L$(ROOT_KLIBDIR) -lmech_krb5
 $(PROG1) :=	LDLIBS += -L$(KRB5LIB) -lkadm5srv
 $(PROG2) :=	LDLIBS += -L$(KRB5LIB) -lkdb -lkadm5clnt
 

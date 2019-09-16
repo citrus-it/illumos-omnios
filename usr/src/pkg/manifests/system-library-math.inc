@@ -16,21 +16,21 @@
 <include system-library-math.man3m.inc>
 <include system-library-math.man3mvec.inc>
 dir path=lib
-dir path=lib/$(ARCH64)
-dir path=lib/libmvec
+dir path=lib/$(ARCH32)
+dir path=lib/$(ARCH32)/libmvec
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/include/iso
 dir path=usr/include/sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/share/man/man3m
 dir path=usr/share/man/man3mvec
-file path=lib/$(ARCH64)/libm.so.2
-file path=lib/$(ARCH64)/libmvec.so.1
+file path=lib/$(ARCH32)/libm.so.2
+file path=lib/$(ARCH32)/libmvec.so.1
+file path=lib/$(ARCH32)/libmvec/libmvec_hwcap1.so.1
 file path=lib/libm.so.2
 file path=lib/libmvec.so.1
-file path=lib/libmvec/libmvec_hwcap1.so.1
 file path=usr/include/complex.h
 file path=usr/include/fenv.h
 file path=usr/include/floatingpoint.h
@@ -39,16 +39,16 @@ file path=usr/include/iso/math_iso.h
 file path=usr/include/math.h
 file path=usr/include/sys/ieeefp.h
 file path=usr/include/tgmath.h
-link path=lib/$(ARCH64)/libm.so target=libm.so.2
-link path=lib/$(ARCH64)/libmvec.so target=libmvec.so.1
+link path=lib/$(ARCH32)/libm.so target=libm.so.2
+link path=lib/$(ARCH32)/libmvec.so target=libmvec.so.1
 link path=lib/libm.so target=libm.so.2
 link path=lib/libmvec.so target=libmvec.so.1
-link path=usr/lib/$(ARCH64)/libm.so target=../../../lib/$(ARCH64)/libm.so.2
-link path=usr/lib/$(ARCH64)/libm.so.2 target=../../../lib/$(ARCH64)/libm.so.2
-link path=usr/lib/$(ARCH64)/libmvec.so \
-    target=../../../lib/$(ARCH64)/libmvec.so.1
-link path=usr/lib/$(ARCH64)/libmvec.so.1 \
-    target=../../../lib/$(ARCH64)/libmvec.so.1
+link path=usr/lib/$(ARCH32)/libm.so target=../../../lib/$(ARCH32)/libm.so.2
+link path=usr/lib/$(ARCH32)/libm.so.2 target=../../../lib/$(ARCH32)/libm.so.2
+link path=usr/lib/$(ARCH32)/libmvec.so \
+    target=../../../lib/$(ARCH32)/libmvec.so.1
+link path=usr/lib/$(ARCH32)/libmvec.so.1 \
+    target=../../../lib/$(ARCH32)/libmvec.so.1
 link path=usr/lib/libm.so target=../../lib/libm.so.2
 link path=usr/lib/libm.so.2 target=../../lib/libm.so.2
 link path=usr/lib/libmvec.so target=../../lib/libmvec.so.1

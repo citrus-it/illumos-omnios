@@ -19,7 +19,7 @@ dir path=usr/bin
 dir path=usr/include
 dir path=usr/include/openssl
 dir path=usr/lib
-dir path=usr/lib/amd64
+dir path=usr/lib/i386
 dir path=usr/lib/pkgconfig group=other
 dir path=usr/share
 dir path=usr/share/man
@@ -102,9 +102,9 @@ file path=usr/include/openssl/x509.h
 file path=usr/include/openssl/x509_vfy.h
 file path=usr/include/openssl/x509v3.h
 file path=usr/include/tls.h
-file path=usr/lib/amd64/libcrypto.so.44.1 mode=0555
-file path=usr/lib/amd64/libssl.so.46.1 mode=0555
-file path=usr/lib/amd64/libtls.so.18.1 mode=0555
+file path=usr/lib/i386/libcrypto.so.44.1 mode=0555
+file path=usr/lib/i386/libssl.so.46.1 mode=0555
+file path=usr/lib/i386/libtls.so.18.1 mode=0555
 file path=usr/lib/libcrypto.so.44.1 mode=0555
 file path=usr/lib/libssl.so.46.1 mode=0555
 file path=usr/lib/libtls.so.18.1 mode=0555
@@ -546,12 +546,12 @@ file path=usr/share/man/man3/tls_ocsp_process_response.3
 file path=usr/share/man/man3/tls_read.3
 file path=usr/share/man/man5/openssl.cnf.5
 file path=usr/share/man/man5/x509v3.cnf.5
-link path=usr/lib/amd64/libcrypto.so target=libcrypto.so.44.1
-link path=usr/lib/amd64/libcrypto.so.44 target=libcrypto.so.44.1
-link path=usr/lib/amd64/libssl.so target=libssl.so.46.1
-link path=usr/lib/amd64/libssl.so.46 target=libssl.so.46.1
-link path=usr/lib/amd64/libtls.so target=libtls.so.18.1
-link path=usr/lib/amd64/libtls.so.18 target=libtls.so.18.1
+link path=usr/lib/i386/libcrypto.so target=libcrypto.so.44.1
+link path=usr/lib/i386/libcrypto.so.44 target=libcrypto.so.44.1
+link path=usr/lib/i386/libssl.so target=libssl.so.46.1
+link path=usr/lib/i386/libssl.so.46 target=libssl.so.46.1
+link path=usr/lib/i386/libtls.so target=libtls.so.18.1
+link path=usr/lib/i386/libtls.so.18 target=libtls.so.18.1
 link path=usr/lib/libcrypto.so target=libcrypto.so.44.1
 link path=usr/lib/libcrypto.so.44 target=libcrypto.so.44.1
 link path=usr/lib/libssl.so target=libssl.so.46.1

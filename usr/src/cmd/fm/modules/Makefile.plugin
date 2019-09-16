@@ -27,6 +27,7 @@
 .SUFFIXES:
 
 include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd.64
 MODCLASS = plugins
 
 #
@@ -73,17 +74,17 @@ ROOTCONF = $($(CLASS)_ROOTCONF)
 APIMAP = $(SRC)/cmd/fm/fmd/common/fmd_api.map
 FMRIMAP = $(SRC)/cmd/fm/fmd/common/fmd_fmri.map
 
-CFLAGS += $(CTF_FLAGS) $(CC_PICFLAGS)
-CFLAGS += $(GSHARED) $(XREGSFLAG) 
+CFLAGS64 += $(CTF_FLAGS) $(CC_PICFLAGS)
+CFLAGS64 += $(GSHARED) $(XREGSFLAG) 
 
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS
-LDFLAGS += $(ZDEFS) $(ZTEXT) $(ZIGNORE)
+LDFLAGS64 += $(ZDEFS) $(ZTEXT) $(ZIGNORE)
 
 MAPFILE-DMOD = $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
 
 
-$(PROG) := LDFLAGS += -Wl,-M$(APIMAP) -Wl,-M$(FMRIMAP)
-$(PROG) := LDLIBS += -lnvpair -lc
+$(PROG) := LDFLAGS64 += -Wl,-M$(APIMAP) -Wl,-M$(FMRIMAP)
+$(PROG) := LDLIBS64 += -lnvpair -lc
 
 all: $(PROG) $(DMODPROG)
 

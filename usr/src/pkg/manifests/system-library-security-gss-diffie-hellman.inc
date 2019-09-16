@@ -25,20 +25,20 @@
 
 dir path=usr group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/$(ARCH64)/gss
+dir path=usr/lib/$(ARCH32)
+dir path=usr/lib/$(ARCH32)/gss
 dir path=usr/lib/gss
-file path=usr/lib/$(ARCH64)/gss/dh1024-0.so.1
-file path=usr/lib/$(ARCH64)/gss/dh640-0.so.1
-file path=usr/lib/$(ARCH64)/gss/mech_dh.so.1
+file path=usr/lib/$(ARCH32)/gss/dh1024-0.so.1
+file path=usr/lib/$(ARCH32)/gss/dh640-0.so.1
+file path=usr/lib/$(ARCH32)/gss/mech_dh.so.1
 file path=usr/lib/gss/dh1024-0.so.1
 file path=usr/lib/gss/dh640-0.so.1
 file path=usr/lib/gss/mech_dh.so.1
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/$(ARCH64)/gss/dh1024-0.so target=dh1024-0.so.1
-link path=usr/lib/$(ARCH64)/gss/dh640-0.so target=dh640-0.so.1
-link path=usr/lib/$(ARCH64)/gss/mech_dh.so target=mech_dh.so.1
+link path=usr/lib/$(ARCH32)/gss/dh1024-0.so target=dh1024-0.so.1
+link path=usr/lib/$(ARCH32)/gss/dh640-0.so target=dh640-0.so.1
+link path=usr/lib/$(ARCH32)/gss/mech_dh.so target=mech_dh.so.1
 link path=usr/lib/gss/dh1024-0.so target=dh1024-0.so.1
 link path=usr/lib/gss/dh640-0.so target=dh640-0.so.1
 link path=usr/lib/gss/mech_dh.so target=mech_dh.so.1

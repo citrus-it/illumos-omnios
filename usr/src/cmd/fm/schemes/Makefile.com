@@ -41,8 +41,8 @@ PROG = $(SCHEME:%=%.so)
 SRCS = scheme.c
 OBJS = $(SRCS:%.c=%.o)
 
-ROOTPROG = $(ROOT)/usr/lib/fm/fmd/schemes/$(PROG)
-ROOTPROG64 = $(ROOT)/usr/lib/fm/fmd/schemes/$(MACH64)/$(PROG)
+ROOTPROG64 = $(ROOT)/usr/lib/fm/fmd/schemes/$(PROG)
+ROOTPROG = $(ROOT)/usr/lib/fm/fmd/schemes/$(MACH32)/$(PROG)
 MAPFILE = ../../../fmd/common/fmd_fmri.map
 
 

@@ -17,7 +17,7 @@ PROG= dltraninfo dlsend dlrecv dlled
 
 include ../Makefile.cmd
 
-ROOTCMDDIR = $(ROOTLIB)/dl
+ROOTCMDDIR = $(ROOTLIB64)/dl
 CFLAGS += $(CCVERBOSE)
 
 dltraninfo :=   LDLIBS += -ldladm -lsff -lnvpair
@@ -30,7 +30,7 @@ dlled.ln :=	LDLIBS += -ldladm
 dlsend.ln :=	LDLIBS += -ldlpi
 dlrecv.ln :=	LDLIBS += -ldlpi
 
-ROOTLIBDLFILES = $(PROG:%=$(ROOTLIB)/dl/%)
+ROOTLIBDLFILES = $(PROG:%=$($(ROOTCMDDIR)/%)
 
 .KEEP_STATE:
 

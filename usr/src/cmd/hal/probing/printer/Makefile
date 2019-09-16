@@ -30,6 +30,7 @@ OBJS =		probe-printer.o logger.o printer.o
 SRCS =		probe-printer.c
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)

@@ -273,8 +273,8 @@ MAPFILES =	../mapfile-vers
 LIBS = $(DYNLIB) $(K5LIBLINK)
 
 # override ROOTLIBDIR and ROOTLINKS
-ROOTLIBDIR=	$(ROOT)/usr/lib/gss
-ROOTLIBDIR64=	$(ROOT)/usr/lib/$(MACH64)/gss
+ROOTLIBDIR=	$(ROOT)/usr/lib/$(MACH32)/gss
+ROOTLIBDIR64=	$(ROOT)/usr/lib/gss
 
 K5MECHLINK=	$(K5LIBLINK:%=$(ROOT)/usr/lib/%)
 K5MECHLINK64=	$(K5LIBLINK:%=$(ROOT)/usr/lib/$(MACH64)/%)

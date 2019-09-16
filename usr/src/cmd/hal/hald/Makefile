@@ -36,6 +36,7 @@ OBJS_ALL =	$(OBJS) $(OBJS_SOL:%=solaris/%)
 SRCS =		$(OBJS:%.o=%.c)
 
 include ../../Makefile.cmd
+include ../../Makefile.cmd.64
 include ../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)

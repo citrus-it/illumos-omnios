@@ -24,7 +24,7 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 
-RTLD=		ld.so.1
+RTLD=		ld.so
 
 AVLOBJ=		avl.o
 DTROBJ=		dtrace_data.o
@@ -65,8 +65,11 @@ ROOTFS_DYNLIB64=	$(RTLD:%=$(ROOTFS_LIBDIR64)/%)
 ETCLIBDIR=	$(ROOT)/etc/lib
 ETCDYNLIB=	$(RTLD:%=$(ETCLIBDIR)/%)
 
-ROOTDYNLIB=	$(RTLD:%=$(ROOTFS_LIBDIR)/%)
-ROOTDYNLIB64=	$(RTLD:%=$(ROOTFS_LIBDIR64)/%)
+ROOTLIBEXEC=	$(ROOT)/usr/libexec
+ROOTLIBEXEC32=	$(ROOT)/usr/libexec/$(MACH32)
+
+ROOTDYNLIB=	$(RTLD:%=$(ROOTLIBEXEC32)/%)
+ROOTDYNLIB64=	$(RTLD:%=$(ROOTLIBEXEC)/%)
 
 
 FILEMODE =	755

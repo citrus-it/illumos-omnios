@@ -37,10 +37,10 @@ dir path=usr/kernel/drv group=sys
 dir path=usr/kernel/fs group=sys
 dir path=usr/kernel/kmdb group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/smbfs group=sys
-dir path=usr/lib/fs/smbfs/$(ARCH64) group=sys
+dir path=usr/lib/fs/smbfs/$(ARCH32) group=sys
 dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
@@ -62,7 +62,7 @@ file path=usr/kernel/drv/nsmb.conf group=sys
 file path=usr/kernel/fs/smbfs group=sys mode=0755
 file path=usr/kernel/kmdb/nsmb group=sys mode=0555
 file path=usr/kernel/kmdb/smbfs group=sys mode=0555
-file path=usr/lib/$(ARCH64)/libsmbfs.so.1
+file path=usr/lib/$(ARCH32)/libsmbfs.so.1
 file path=usr/lib/fs/smbfs/$(ARCH64)/libshare_smbfs.so.1
 file path=usr/lib/fs/smbfs/dfshares mode=0555
 file path=usr/lib/fs/smbfs/libshare_smbfs.so.1
@@ -94,6 +94,6 @@ license usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.bsd4 \
     license=usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.bsd4
 license usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.microsoft \
     license=usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.microsoft
-link path=usr/lib/security/$(ARCH64)/pam_smbfs_login.so \
+link path=usr/lib/security/$(ARCH32)/pam_smbfs_login.so \
     target=pam_smbfs_login.so.1
 link path=usr/lib/security/pam_smbfs_login.so target=pam_smbfs_login.so.1

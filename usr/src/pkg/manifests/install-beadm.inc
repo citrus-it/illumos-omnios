@@ -31,18 +31,18 @@ dir path=sbin group=sys
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/sbin
 dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man8
 file path=sbin/beadm mode=0555
 file path=usr/include/libbe.h
-file path=usr/lib/$(ARCH64)/libbe.so.1
+file path=usr/lib/$(ARCH32)/libbe.so.1
 file path=usr/lib/libbe.so.1
 file path=usr/share/man/man8/beadm.8
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/$(ARCH64)/libbe.so target=./libbe.so.1
+link path=usr/lib/$(ARCH32)/libbe.so target=./libbe.so.1
 link path=usr/lib/libbe.so target=./libbe.so.1
 link path=usr/sbin/beadm target=../../sbin/beadm

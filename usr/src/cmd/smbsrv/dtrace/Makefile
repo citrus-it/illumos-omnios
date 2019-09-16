@@ -30,7 +30,7 @@ SRCS=	smbd-all.d smbd-authsvc.d smbd-doorsvc.d smbd-pipesvc.d \
 
 include ../../Makefile.cmd
 
-ROOTSMBDTRACEDIR = $(ROOTLIB)/smbsrv/dtrace
+ROOTSMBDTRACEDIR = $(ROOT)/usr/lib/smbsrv/dtrace
 ROOTSMBDTRACEFILE = $(SRCS:%=$(ROOTSMBDTRACEDIR)/%)
 
 $(ROOTSMBDTRACEFILE):= FILEMODE = 0555

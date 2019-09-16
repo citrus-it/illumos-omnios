@@ -40,11 +40,11 @@ dir path=kernel/drv group=sys
 dir path=kernel/fs group=sys
 dir path=kernel/kmdb group=sys
 dir path=lib
-dir path=lib/$(ARCH64)
+dir path=lib/$(ARCH32)
 dir path=sbin group=sys
 dir path=usr group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/devfsadm group=sys
 dir path=usr/lib/devfsadm/linkmod group=sys
 dir path=usr/lib/fs group=sys
@@ -53,13 +53,13 @@ dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/lib/mdb/proc group=sys
-dir path=usr/lib/mdb/proc/$(ARCH64)
+dir path=usr/lib/mdb/proc/$(ARCH32)
 dir path=usr/lib/sysevent
 dir path=usr/lib/sysevent/modules
 dir path=usr/lib/zfs
 dir path=usr/sbin
 dir path=usr/sbin/$(ARCH32)
-dir path=usr/sbin/$(ARCH64)
+dir path=usr/sbin/$(ARCH32)
 dir path=usr/share/man/man8
 driver name=zfs perms="* 0600 root sys" perms="zfs 0666 root sys"
 file \
@@ -68,13 +68,13 @@ file \
 file path=kernel/drv/zfs group=sys
 file path=kernel/drv/zfs.conf group=sys
 file path=kernel/kmdb/zfs group=sys mode=0555
-file path=lib/$(ARCH64)/libzfs.so.1
-file path=lib/$(ARCH64)/libzfs_core.so.1
+file path=lib/$(ARCH32)/libzfs.so.1
+file path=lib/$(ARCH32)/libzfs_core.so.1
 file path=lib/libzfs.so.1
 file path=lib/libzfs_core.so.1
 file path=sbin/zfs mode=0555
 file path=sbin/zpool mode=0555
-file path=usr/lib/$(ARCH64)/libzpool.so.1
+file path=usr/lib/$(ARCH32)/libzpool.so.1
 file path=usr/lib/devfsadm/linkmod/SUNW_zfs_link.so group=sys
 file path=usr/lib/fs/zfs/bootinstall mode=0555
 file path=usr/lib/fs/zfs/fstyp.so.1 mode=0555
@@ -103,19 +103,19 @@ license kernel/fs/zfs/THIRDPARTYLICENSE.lz4 \
 license lic_CDDL license=lic_CDDL
 link path=etc/fs/zfs/mount target=../../../sbin/zfs
 link path=etc/fs/zfs/umount target=../../../sbin/zfs
-link path=lib/$(ARCH64)/libzfs.so target=libzfs.so.1
-link path=lib/$(ARCH64)/libzfs_core.so target=libzfs_core.so.1
+link path=lib/$(ARCH32)/libzfs.so target=libzfs.so.1
+link path=lib/$(ARCH32)/libzfs_core.so target=libzfs_core.so.1
 link path=lib/libzfs.so target=libzfs.so.1
 link path=lib/libzfs_core.so target=libzfs_core.so.1
-link path=usr/lib/$(ARCH64)/libzfs.so \
-    target=../../../lib/$(ARCH64)/libzfs.so.1
-link path=usr/lib/$(ARCH64)/libzfs.so.1 \
-    target=../../../lib/$(ARCH64)/libzfs.so.1
-link path=usr/lib/$(ARCH64)/libzfs_core.so \
-    target=../../../lib/$(ARCH64)/libzfs_core.so.1
-link path=usr/lib/$(ARCH64)/libzfs_core.so.1 \
-    target=../../../lib/$(ARCH64)/libzfs_core.so.1
-link path=usr/lib/$(ARCH64)/libzpool.so target=libzpool.so.1
+link path=usr/lib/$(ARCH32)/libzfs.so \
+    target=../../../lib/$(ARCH32)/libzfs.so.1
+link path=usr/lib/$(ARCH32)/libzfs.so.1 \
+    target=../../../lib/$(ARCH32)/libzfs.so.1
+link path=usr/lib/$(ARCH32)/libzfs_core.so \
+    target=../../../lib/$(ARCH32)/libzfs_core.so.1
+link path=usr/lib/$(ARCH32)/libzfs_core.so.1 \
+    target=../../../lib/$(ARCH32)/libzfs_core.so.1
+link path=usr/lib/$(ARCH32)/libzpool.so target=libzpool.so.1
 link path=usr/lib/fs/zfs/mount target=../../../../sbin/zfs
 link path=usr/lib/fs/zfs/umount target=../../../../sbin/zfs
 link path=usr/lib/libzfs.so target=../../lib/libzfs.so.1

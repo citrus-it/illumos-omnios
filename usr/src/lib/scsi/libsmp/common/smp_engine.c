@@ -195,10 +195,9 @@ smp_engine_hold(const char *name)
 	}
 
 #if defined(_LP64)
-	if (sysinfo(SI_ARCHITECTURE_64, isa, sizeof (isa)) < 0)
-		isa[0] = '\0';
-#else
 	isa[0] = '\0';
+#else
+	strcpy(isa, "i386");
 #endif
 
 	if ((pluginpath = getenv("SMP_PLUGINPATH")) == NULL)

@@ -36,10 +36,10 @@ VERS=		.1
 # and it must be built in the same workspace as libc.
 LIB_PIC= libc_pic.a
 
-ROOTLIB=	$(ROOT)/usr/lib
-ROOTFS_LIB=	$(ROOT)/lib
-ROOTLIB64=	$(ROOTLIB)/$(MACH64)
-ROOTFS_LIB64=	$(ROOTFS_LIB)/$(MACH64)
+ROOTLIB=	$(ROOT)/usr/lib/$(MACH32)
+ROOTFS_LIB=	$(ROOT)/lib/$(MACH32)
+ROOTLIB64=	$(ROOT)/usr/lib
+ROOTFS_LIB64=	$(ROOT)/lib
 
 # include common library definitions
 include ../Makefile.lib

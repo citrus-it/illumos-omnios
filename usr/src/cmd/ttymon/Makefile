@@ -79,7 +79,7 @@ POFILES= $(STTYOBJ:sttyobjs/%.o=%.po)
 POFILE= ttymon.po
 
 
-LIBSAFD= $(ROOTLIB)/saf
+LIBSAFD= $(ROOTLIB64)/saf
 DIRS= $(LIBSAFD)
 LIBSAF= ttymon
 USRSBINF= sttydefs ttyadm

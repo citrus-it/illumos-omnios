@@ -25,7 +25,7 @@
 include ../Makefile.com
 include ../../Makefile.cmd.64
 
-LDLIBS += -L$(ROOT)/usr/lib/fm/amd64 -lfmevent -lnvpair
-LDFLAGS += -R/usr/lib/fm/amd64
+LDLIBS += -L$(ROOT)/usr/lib/fm -lfmevent -lnvpair
+LDFLAGS += -R/usr/lib/fm
 
 install: all $(ROOTPROG64)

@@ -56,7 +56,7 @@ XGETFLAGS += -a -x spell.xcl
 
 CLOBBERFILES += htemp1 htemp2
 
-ROOTSPELLD = $(ROOTLIB)/spell
+ROOTSPELLD = $(ROOTLIB64)/spell
 ROOTVARADMD = $(ROOT)/var/log
 ROOTDIRS= $(ROOTSPELLD)
 

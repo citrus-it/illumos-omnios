@@ -35,6 +35,7 @@ OBJECTS =	errlog.o	\
 		main.o
 
 include	$(SRC)/lib/Makefile.lib
+include	$(SRC)/lib/Makefile.lib.64
 
 SRCS	=	$(OBJECTS:%.o=../%.c)
 

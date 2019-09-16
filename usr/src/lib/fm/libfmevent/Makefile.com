@@ -43,8 +43,8 @@ include ../../../Makefile.lib
 ROOTFMHDRDIR = $(ROOTHDRDIR)/fm
 ROOTFMHDRS   = $(FMHDRS:%=$(ROOTFMHDRDIR)/%)
 
-ROOTLIBDIR=     $(ROOTFS_LIBDIR)/fm
-ROOTLIBDIR64=   $(ROOTFS_LIBDIR)/fm/$(MACH64)
+ROOTLIBDIR=     $(ROOT)/lib/fm/$(MACH32)
+ROOTLIBDIR64=   $(ROOT)/lib/fm
 
 SRCS = $(LIBSRCS:%.c=../common/%.c)
 LIBS = $(DYNLIB)
@@ -63,8 +63,8 @@ CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-function
 CERRWARN += -Wno-uninitialized
 
-FMLIBDIR=usr/lib/fm
-$(BUILD64)FMLIBDIR64=usr/lib/fm/$(MACH64)
+FMLIBDIR=usr/lib/fm/$(MACH32)
+FMLIBDIR64=usr/lib/fm
 
 $(DYNLIB) := LDLIBS += -lumem -lnvpair -luutil -lsysevent \
 	-L$(ROOT)/$(FMLIBDIR) -ltopo -lc

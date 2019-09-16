@@ -38,7 +38,7 @@ MODS=		dlcosmk		\
 
 TYPES=		$(MODS:%=%.types)
 
-ROOTLIBIPQOSCONF=	$(ROOTLIB)/ipqosconf
+ROOTLIBIPQOSCONF=	$(ROOTLIB64)/ipqosconf
 ROOTLIBIPQOSCONFTYPES =	$(TYPES:%=$(ROOTLIBIPQOSCONF)/%)
 
 include	../../../Makefile.cmd

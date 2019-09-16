@@ -38,8 +38,8 @@ ROOTPROG = $(ROOTLIBSCSI)/$(PROG)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I. -I../common
 CFLAGS += $(CTF_FLAGS)
-LDLIBS += -L$(ROOT)/usr/lib/scsi -lsmp
-LDFLAGS += -R/usr/lib/scsi
+LDLIBS += -L$(ROOT)/usr/lib/scsi/$(MACH32) -lsmp
+LDFLAGS += -R/usr/lib/scsi/$(MACH32)
 
 CERRWARN += -Wno-unused-variable
 

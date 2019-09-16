@@ -35,6 +35,6 @@ SRCS = $(SWRP_SRCS) $(CMN_SRCS:%=../%) $(SUBRP_SRCS:%=../%)
 
 include ../../../Makefile.plugin
 
-CFLAGS += $(INCS)
-LDLIBS += -L$(ROOTLIB)/fm -ltopo -lscf
-LDFLAGS += -R/usr/lib/fm
+CFLAGS64 += $(INCS)
+LDLIBS += -L$(ROOT)/usr/lib/fm -ltopo -lscf
+LDLIBS += -R/usr/lib/fm

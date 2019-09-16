@@ -45,7 +45,7 @@ $(ROOTCFGFILES)	:= OWNER= ipadm
 $(ROOTCFGFILES)	:= GROUP= sys
 $(ROOTCFGFILES)	:= FILEMODE= 644
 
-ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
+ROOTCMDDIR=	$(ROOTFS_LIBDIR64)/inet
 
 LDLIBS += -lipadm -lnvpair -lsecdb -lumem -lscf
 

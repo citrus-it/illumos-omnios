@@ -39,5 +39,8 @@ LIBS=		$(DYNLIB)
 ROOTLIBDIR=	$(ROOT)/usr/lib/security
 ROOTLIBDIR64=	$(ROOT)/usr/lib/security/$(MACH64)
 
+ROOTLIB32=	$(ROOT)/usr/lib/$(MACH32)
+ROOTLIB64=	$(ROOT)/usr/lib
+
 .KEEP_STATE:
 .PARALLEL:

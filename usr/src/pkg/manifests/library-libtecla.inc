@@ -28,7 +28,7 @@ dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/include
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/share/man
 dir path=usr/share/man/man1
 dir path=usr/share/man/man3lib
@@ -36,7 +36,7 @@ dir path=usr/share/man/man3tecla
 dir path=usr/share/man/man5
 file path=usr/bin/enhance mode=0555
 file path=usr/include/libtecla.h
-file path=usr/lib/$(ARCH64)/libtecla.so.1
+file path=usr/lib/$(ARCH32)/libtecla.so.1
 file path=usr/lib/libtecla.so.1
 file path=usr/share/man/man1/enhance.1
 file path=usr/share/man/man3lib/libtecla.3lib
@@ -49,5 +49,5 @@ file path=usr/share/man/man3tecla/pca_lookup_file.3tecla
 file path=usr/share/man/man5/tecla.5
 license usr/src/lib/libtecla/THIRDPARTYLICENSE \
     license=usr/src/lib/libtecla/THIRDPARTYLICENSE
-link path=usr/lib/$(ARCH64)/libtecla.so target=libtecla.so.1
+link path=usr/lib/$(ARCH32)/libtecla.so target=libtecla.so.1
 link path=usr/lib/libtecla.so target=libtecla.so.1

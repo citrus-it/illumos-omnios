@@ -15,19 +15,19 @@
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/lib
-dir path=usr/lib/amd64
+dir path=usr/lib/i386
 dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man3
 dir path=usr/share/man/man5
 dir path=usr/share/man/man7
 file path=usr/include/histedit.h
-file path=usr/lib/amd64/libedit.so.5.2 mode=0555
+file path=usr/lib/i386/libedit.so.5.2 mode=0555
 file path=usr/lib/libedit.so.5.2 mode=0555
 file path=usr/share/man/man3/editline.3
 file path=usr/share/man/man5/editrc.5
 file path=usr/share/man/man7/editline.7
-link path=usr/lib/amd64/libedit.so target=libedit.so.5.2
-link path=usr/lib/amd64/libedit.so.5 target=libedit.so.5.2
+link path=usr/lib/i386/libedit.so target=libedit.so.5.2
+link path=usr/lib/i386/libedit.so.5 target=libedit.so.5.2
 link path=usr/lib/libedit.so target=libedit.so.5.2
 link path=usr/lib/libedit.so.5 target=libedit.so.5.2

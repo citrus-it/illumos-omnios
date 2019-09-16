@@ -29,5 +29,5 @@ SRCS = zfs_retire.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -lzfs -L$(ROOTLIB)/fm -ltopo
+LDLIBS += -lzfs -L$(ROOT)/usr/lib/fm -ltopo
 LDFLAGS += -R/usr/lib/fm

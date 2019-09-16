@@ -20,7 +20,7 @@ include ../../Makefile.cmd
 include ../Makefile.smbsrv.defs
 
 
-ROOTLIBSMBSRVDIR = $(ROOTLIB)/smbsrv
+ROOTLIBSMBSRVDIR = $(ROOT)/usr/lib/smbsrv
 ROOTLIBSMBSRVPROG = $(PROG:%=$(ROOTLIBSMBSRVDIR)/%)
 
 .KEEP_STATE:

@@ -65,10 +65,9 @@ get_engine(libscsi_hdl_t *hp, const char *name)
 		engine_path = LIBSCSI_DEFAULT_ENGINE_PATH;
 
 #if defined(_LP64)
-	if (sysinfo(SI_ARCHITECTURE_64, isa, sizeof (isa)) < 0)
-		isa[0] = '\0';
-#else
 	isa[0] = '\0';
+#else
+	strcpy(isa, "i386");
 #endif
 
 	for (p = engine_path; p != NULL; p = q) {

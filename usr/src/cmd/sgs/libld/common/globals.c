@@ -52,8 +52,8 @@ char		*Ulibdir;	/* User specified -YU */
  * line.  Note: these strings can not use MSG_ORIG() since they are modified as
  * part of the path processing.
  */
-char		def64_Plibpath[] = "/lib/64:/usr/lib/64";
-char		def32_Plibpath[] = "/lib/32:/lib:/usr/lib/32:/usr/lib";
+char		def64_Plibpath[] = "/lib/64:/lib:/usr/lib/64:/usr/lib";
+char		def32_Plibpath[] = "/lib/32:/usr/lib/32";
 
 /*
  * Rejected file error messages (indexed to match SGS_REJ_ values).

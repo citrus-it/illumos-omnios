@@ -42,6 +42,11 @@ $(PROG):	$(OBJS)
 		$(LD) -o $@ $(REMOVE_GCC_PREFIX:sh) $(OBJS)
 		$(POST_PROCESS)
 
+$(ROOTLIBEXEC)/%: %
+	$(INS.file)
+$(ROOTLIBEXEC32)/%: %
+	$(INS.file)
+
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
 

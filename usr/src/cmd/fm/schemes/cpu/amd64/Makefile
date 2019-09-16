@@ -29,8 +29,8 @@ include $(SRC)/Makefile.master.64
 
 SRCS = cpu.c
 LDFLAGS += -lkstat \
-	-L$(ROOTLIB)/fm/$(MACH64) -ltopo
-LDFLAGS += -R/usr/lib/fm/$(MACH64)
+	-L$(ROOT)/usr/lib/fm -ltopo
+LDFLAGS += -R/usr/lib/fm
 
 CERRWARN += -Wno-parentheses
 

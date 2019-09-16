@@ -38,7 +38,7 @@ LDLIBS += -lcontract
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-uninitialized
 
-CLASSD = $(ROOTLIB)/class
+CLASSD = $(ROOTLIB64)/class
 RTD = $(CLASSD)/RT
 SDCD = $(CLASSD)/SDC
 TSD = $(CLASSD)/TS

@@ -32,7 +32,7 @@ file path=usr/include/pcap/pcap.h mode=0444
 file path=usr/include/pcap/sll.h mode=0444
 file path=usr/include/pcap/usb.h mode=0444
 file path=usr/include/pcap/vlan.h mode=0444
-file path=usr/lib/amd64/libpcap.so.1.8.1 mode=0555
+file path=usr/lib/libpcap.so.1.8.1 mode=0555
 file path=usr/share/man/man3/pcap.3
 file path=usr/share/man/man3/pcap_activate.3
 file path=usr/share/man/man3/pcap_breakloop.3
@@ -88,5 +88,5 @@ file path=usr/share/man/man3/pcap_statustostr.3
 file path=usr/share/man/man3/pcap_strerror.3
 file path=usr/share/man/man3/pcap_tstamp_type_name_to_val.3
 file path=usr/share/man/man3/pcap_tstamp_type_val_to_name.3
-link path=usr/lib/amd64/libpcap.so target=libpcap.so.1.8.1
-link path=usr/lib/amd64/libpcap.so.1 target=libpcap.so.1.8.1
+link path=usr/lib/libpcap.so target=libpcap.so.1.8.1
+link path=usr/lib/libpcap.so.1 target=libpcap.so.1.8.1

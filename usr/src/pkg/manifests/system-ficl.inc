@@ -21,12 +21,12 @@
 dir path=usr group=sys
 dir path=usr/bin group=bin
 dir path=usr/bin/$(ARCH32) group=bin
-dir path=usr/bin/$(ARCH64) group=bin
+dir path=usr/bin/$(ARCH32) group=bin
 dir path=usr/lib group=bin
-dir path=usr/lib/$(ARCH64) group=bin
+dir path=usr/lib/$(ARCH32) group=bin
 file path=usr/bin/$(ARCH32)/ficl-sys group=sys mode=0555
 file path=usr/bin/$(ARCH64)/ficl-sys group=sys mode=0555
-file path=usr/lib/$(ARCH64)/libficl-sys.so.4.1.0 group=sys mode=0755
+file path=usr/lib/$(ARCH32)/libficl-sys.so.4.1.0 group=sys mode=0755
 file path=usr/lib/libficl-sys.so.4.1.0 group=sys mode=0755
 hardlink path=usr/bin/ficl-sys target=../../usr/lib/isaexec
 license lic_CDDL license=lic_CDDL

@@ -31,6 +31,7 @@ OBJS =		addon-cpufreq.o logger.o
 SRCS =		addon-cpufreq.c ../../hald/logger.c
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)

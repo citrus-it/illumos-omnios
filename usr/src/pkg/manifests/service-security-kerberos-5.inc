@@ -33,15 +33,15 @@ dir path=lib/svc/manifest/network/security group=sys
 dir path=usr group=sys
 dir path=usr/bin
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/$(ARCH64)/gss
+dir path=usr/lib/$(ARCH32)
+dir path=usr/lib/$(ARCH32)/gss
 dir path=usr/lib/gss
 dir path=usr/lib/krb5
-dir path=usr/lib/krb5/$(ARCH64)
+dir path=usr/lib/krb5/$(ARCH32)
 dir path=usr/lib/krb5/plugins
 dir path=usr/lib/krb5/plugins/preauth
 dir path=usr/lib/security
-dir path=usr/lib/security/$(ARCH64)
+dir path=usr/lib/security/$(ARCH32)
 dir path=usr/share/man
 dir path=usr/share/man/man1
 dir path=usr/share/man/man8
@@ -62,8 +62,8 @@ file path=usr/bin/klist mode=0555
 file path=usr/bin/kpasswd mode=0555
 file path=usr/bin/krb5-config mode=0555
 file path=usr/bin/ktutil mode=0555
-file path=usr/lib/$(ARCH64)/gss/mech_krb5.so.1
-file path=usr/lib/$(ARCH64)/libkrb5.so.1
+file path=usr/lib/$(ARCH32)/gss/mech_krb5.so.1
+file path=usr/lib/$(ARCH32)/libkrb5.so.1
 file path=usr/lib/gss/mech_krb5.so.1
 file path=usr/lib/krb5/$(ARCH64)/libkadm5clnt.so.1
 file path=usr/lib/krb5/ktkt_warnd mode=0555
@@ -89,8 +89,8 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/gss_mechs/mech_krb5/THIRDPARTYLICENSE \
     license=usr/src/lib/gss_mechs/mech_krb5/THIRDPARTYLICENSE
-link path=usr/lib/$(ARCH64)/gss/mech_krb5.so target=./mech_krb5.so.1
-link path=usr/lib/$(ARCH64)/libkrb5.so target=./libkrb5.so.1
+link path=usr/lib/$(ARCH32)/gss/mech_krb5.so target=./mech_krb5.so.1
+link path=usr/lib/$(ARCH32)/libkrb5.so target=./libkrb5.so.1
 link path=usr/lib/gss/mech_krb5.so target=./mech_krb5.so.1
 link path=usr/lib/krb5/$(ARCH64)/libkadm5clnt.so target=./libkadm5clnt.so.1
 link path=usr/lib/krb5/libkadm5clnt.so target=./libkadm5clnt.so.1

@@ -26,7 +26,7 @@ include ../Makefile.com
 
 install: all $(ROOTLIBS) $(ROOTLINKS)
 
-MACH_LDLIBS = -L$(ROOT)/usr/lib/fm
+MACH_LDLIBS = -L$(ROOT)/usr/lib/fm/$(MACH32)
 
-DYNFLAGS += -R/usr/lib/fm
+DYNFLAGS += -R/usr/lib/fm/$(MACH32)
 

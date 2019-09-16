@@ -30,7 +30,7 @@ PROG= zoneadmd
 
 include ../Makefile.cmd
 
-ROOTCMDDIR=	$(ROOTLIB)/zones
+ROOTCMDDIR=	$(ROOTLIB64)/zones
 
 OBJS= zoneadmd.o zcons.o vplat.o
 SRCS = $(OBJS:.o=.c)

@@ -323,11 +323,11 @@ elf_config(Rt_map *lmp, int aout)
 #ifndef	SGS_PRE_UNIFIED_PROCESS
 		if ((head->ch_cnflags & RTC_HDR_UPM) == 0) {
 #if	defined(_ELF64)
-			str = conv_config_upm(str, MSG_ORIG(MSG_PTH_USRLIB_64),
-			    MSG_ORIG(MSG_PTH_LIB_64), MSG_PTH_LIB_64_SIZE);
-#else
 			str = conv_config_upm(str, MSG_ORIG(MSG_PTH_USRLIB),
 			    MSG_ORIG(MSG_PTH_LIB), MSG_PTH_LIB_SIZE);
+#else
+			str = conv_config_upm(str, MSG_ORIG(MSG_PTH_USRLIB_32),
+			    MSG_ORIG(MSG_PTH_LIB_32), MSG_PTH_LIB_32_SIZE);
 #endif
 		}
 #endif

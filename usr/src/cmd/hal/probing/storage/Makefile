@@ -30,6 +30,7 @@ OBJS =		probe-storage.o cdutils.o fsutils.o logger.o
 SRCS =		addon-storage.c
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)

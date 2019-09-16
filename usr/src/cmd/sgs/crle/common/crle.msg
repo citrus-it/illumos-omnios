@@ -141,7 +141,7 @@
 
 @ MSG_DEF_NOCONF	"\nDefault configuration file (%s) not found\n"
 
-@ MSG_DEF_NEWDLP	"  Default Library Path (ELF):\t/lib/32:/usr/lib/32:/lib:/usr/lib  \
+@ MSG_DEF_NEWDLP	"  Default Library Path (ELF):\t/lib/32:/usr/lib/32  \
 			 (system default)\n"
 @ MSG_DEF_OLDDLP	"  Default Library Path (ELF):\t/usr/lib  \
 			 (system default)\n"
@@ -149,7 +149,7 @@
 			 /lib/secure:/usr/lib/secure  (system default)\n"
 @ MSG_DEF_OLDTD		"  Trusted Directories (ELF):\t/usr/lib/secure  \
 			 (system default)\n"
-@ MSG_DEF_NEWDLP_64	"  Default Library Path (ELF):\t/lib/64:/usr/lib/64  \
+@ MSG_DEF_NEWDLP_64	"  Default Library Path (ELF):\t/lib/64:/lib:/usr/lib/64:/usr/lib  \
 			 (system default)\n"
 @ MSG_DEF_OLDDLP_64	"  Default Library Path (ELF):\t/usr/lib/64  \
 			 (system default)\n"

@@ -54,7 +54,7 @@ CERRWARN += -Wno-implicit-function-declaration
 SMATCH=off
 
 $(PROG) := LDFLAGS += -R/usr/lib/fm
-$(PROG) := LDLIBS += -L$(ROOTLIB)/fm -ltopo
+$(PROG) := LDLIBS += -L$(ROOT)/usr/lib/fm -ltopo
 
 CLEANFILES += y.tab.h y.tab.c
 

@@ -61,7 +61,7 @@ POFILES= $(SOBJS:%.o=%.po) $(GOBJS:%.o=%.po) $(COBJS:%.o=%.po) \
 CLOBBERFILES += gmsgfmt_rev
 
 ROOTBINPROG= $(BINPROG:%=$(ROOTBIN)/%)
-ROOTLIBPROG= $(LIBPROG:%=$(ROOTLIB)/%)
+ROOTLIBPROG= $(LIBPROG:%=$(ROOTLIB64)/%)
 
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-unused-label

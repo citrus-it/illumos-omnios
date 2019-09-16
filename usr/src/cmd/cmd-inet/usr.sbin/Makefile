@@ -110,7 +110,7 @@ $(SYNCPROG)		:=	LDLIBS += -ldlpi
 $(PAMPROG)		:=	LDLIBS += -lpam
 $(RPCSVCPROG)		:=	LDLIBS += -lrpcsvc
 $(K5PROGS)		:=	LDFLAGS += $(KRUNPATH) \
-				-L$(ROOT)$(KLIBDIR_DO) -L$(ROOT)$(KLIBDIR_GL)
+				-L$(ROOT)$(KLIBDIR)
 $(K5PROGS)		:=	K5LIBS=  -lmech_krb5
 $(K5PROGS)		:=	CPPFLAGS += -I$(SRCTOP)/include \
 				-I$(SRC)/uts/common/ \

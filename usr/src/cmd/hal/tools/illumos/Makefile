@@ -37,6 +37,7 @@ OBJS =		$(HAL_PROG:%=%.o)
 CLOBBERFILES += $(HAL_PROGS)
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../../Makefile.hal
 
 $(HAL_PROGS) :=		LDLIBS += -lc $(ZIGNORE) -lglib-2.0

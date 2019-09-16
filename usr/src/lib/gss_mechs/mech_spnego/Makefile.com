@@ -37,8 +37,8 @@ OBJECTS = 	spnego_mech.o spnego_disp_status.o spnego_kerrs.o
 include ../../../Makefile.lib
 
 LIBS = 		$(DYNLIB)
-ROOTLIBDIR =	$(ROOT)/usr/lib/gss
-ROOTLIBDIR64 = 	$(ROOT)/usr/lib/$(MACH64)/gss
+ROOTLIBDIR =	$(ROOT)/usr/lib/$(MACH32)/gss
+ROOTLIBDIR64 = 	$(ROOT)/usr/lib/gss
 SRCDIR =	../mech
 
 MAPFILES =	../mapfile-vers

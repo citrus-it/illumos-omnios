@@ -127,16 +127,16 @@ MAPFILES = ../common/mapfile-intf $(MAPFILE.NGB)
 rcm_daemon := LDFLAGS += $(MAPFILES:%=-Wl,-M%)
 
 
-LDLIBS_MODULES =
-SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool
-SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
-SUNW_vlan_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
-SUNW_vnic_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
-SUNW_ibpart_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
-SUNW_aggr_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
-SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil -ldladm -lipmp -lipadm
-SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
-SUNW_bridge_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
+LDLIBS_MODULES = -L$(ROOT)/lib/$(MACH32) -L$(ROOT)/usr/lib
+SUNW_pool_rcm.so := LDLIBS_MODULES += -lpool
+SUNW_network_rcm.so := LDLIBS_MODULES += -ldladm
+SUNW_vlan_rcm.so := LDLIBS_MODULES += -ldladm
+SUNW_vnic_rcm.so := LDLIBS_MODULES += -ldladm
+SUNW_ibpart_rcm.so := LDLIBS_MODULES += -ldladm
+SUNW_aggr_rcm.so := LDLIBS_MODULES += -ldladm
+SUNW_ip_rcm.so := LDLIBS_MODULES += -linetutil -ldladm -lipmp -lipadm
+SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -linetutil
+SUNW_bridge_rcm.so := LDLIBS_MODULES += -ldladm
 
 LDLIBS += -lgen -lelf -lrcm -lnvpair -ldevinfo
 
@@ -151,7 +151,7 @@ RCM_SCRIPTS = $(PERL_SCRIPTS) $(SHELL_SCRIPTS)
 
 # install specifics
 
-ROOTLIB_RCM = $(ROOTLIB)/$(RCM_DIR)
+ROOTLIB_RCM = $(ROOTLIB64)/$(RCM_DIR)
 ROOTLIB_RCM_MOD = $(ROOTLIB_RCM)/$(MOD_DIR)
 ROOTLIB_RCM_DAEMON = $(RCM_DAEMON:%=$(ROOTLIB_RCM)/%)
 ROOTLIB_RCM_MODULES = $(COMMON_RCM_MODS:%=$(ROOTLIB_RCM_MOD)/%) \

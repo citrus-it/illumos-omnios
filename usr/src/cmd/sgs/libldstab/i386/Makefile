@@ -24,6 +24,8 @@
 
 DUPOBJS=    stab64.o
 
+ROOTLIBDIR=	$(ROOT)/usr/lib/$(MACH32)
+
 include ../Makefile.com
 
 .KEEP_STATE:

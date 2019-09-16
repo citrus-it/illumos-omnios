@@ -28,7 +28,7 @@ include ../Makefile.com
 
 .KEEP_STATE:
 
-ROOTLIBDIR=	$(ROOT)/usr/lib/$(MACH64)
+ROOTLIBDIR=	$(ROOT)/usr/lib
 ROOTDYNLIB64=	$(DYNLIB:%=$(ROOTLIBDIR)/%)
 
 CONVLIBDIR=	$(CONVLIBDIR64)

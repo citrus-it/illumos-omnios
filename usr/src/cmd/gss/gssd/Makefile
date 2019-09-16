@@ -62,6 +62,7 @@ POFILES = generic.po
 # Override $ROOTLIB
 #
 ROOTLIB=	$(ROOT)/usr/lib/gss
+ROOTLIBPROG=	$(ROOTLIB)/$(PROG)
 
 DIRS=	$(ROOTLIB)
 

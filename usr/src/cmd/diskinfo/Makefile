@@ -18,6 +18,7 @@ OBJS=		diskinfo.o
 SRCS=		$(OBJS:%.o=%.c)
 
 include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/Makefile.cmd.64
 include		$(SRC)/cmd/Makefile.ctf
 
 CSTD=	$(CSTD_GNU99)

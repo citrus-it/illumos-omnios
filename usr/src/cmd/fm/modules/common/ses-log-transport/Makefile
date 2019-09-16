@@ -29,9 +29,9 @@ SRCS = ses_log_transport.c
 
 include ../../Makefile.plugin
 
-CFLAGS += $(INCS)
-LDLIBS += -L$(ROOTLIB)/fm -ltopo -lseslog
-LDFLAGS += -R/usr/lib/fm
+CFLAGS64 += $(INCS)
+LDLIBS += -L$(ROOT)/usr/lib/fm -ltopo -lseslog
+LDLIBS += -R/usr/lib/fm
 
 # not linted
 SMATCH=off

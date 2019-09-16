@@ -27,7 +27,7 @@ OBJS=			inityp2l ypmap2src
 include $(SRC)/cmd/Makefile.cmd
 
 # install directories
-NETSVC = $(ROOTLIB)/netsvc
+NETSVC = $(ROOTLIB64)/netsvc
 NETYP = $(NETSVC)/yp
 ROOTNETYPFILES=		$(OBJS:%=$(NETYP)/%)
 

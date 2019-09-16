@@ -57,8 +57,8 @@ dir path=lib/svc/manifest/system group=sys variant.opensolaris.zone=global
 dir path=lib/svc/method variant.opensolaris.zone=global
 dir path=usr group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-dir path=usr/lib/$(ARCH64)/pkgconfig group=other
+dir path=usr/lib/$(ARCH32)
+dir path=usr/lib/$(ARCH32)/pkgconfig group=other
 dir path=usr/lib/hal
 dir path=usr/lib/hal/illumos
 dir path=usr/lib/pkgconfig group=other
@@ -111,10 +111,10 @@ file path=etc/hal/fdi/preprobe/10osvendor/20-printers.fdi mode=0444 \
 file path=lib/svc/manifest/system/hal.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
 file path=lib/svc/method/svc-hal mode=0555 variant.opensolaris.zone=global
-file path=usr/lib/$(ARCH64)/libhal-storage.so.1.0.0
-file path=usr/lib/$(ARCH64)/libhal.so.1.0.0
-file path=usr/lib/$(ARCH64)/pkgconfig/hal-storage.pc
-file path=usr/lib/$(ARCH64)/pkgconfig/hal.pc
+file path=usr/lib/$(ARCH32)/libhal-storage.so.1.0.0
+file path=usr/lib/$(ARCH32)/libhal.so.1.0.0
+file path=usr/lib/$(ARCH32)/pkgconfig/hal-storage.pc
+file path=usr/lib/$(ARCH32)/pkgconfig/hal.pc
 file path=usr/lib/hal/hal-functions mode=0555
 file path=usr/lib/hal/hal-is-caller-privileged mode=0555
 file path=usr/lib/hal/hal-storage-cleanup-all-mountpoints mode=0555
@@ -169,11 +169,11 @@ file path=usr/share/man/man8/hald.8
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/cmd/hal/LICENSE license=usr/src/cmd/hal/LICENSE
-link path=usr/lib/$(ARCH64)/libhal-storage.so target=./libhal-storage.so.1.0.0
-link path=usr/lib/$(ARCH64)/libhal-storage.so.1 \
+link path=usr/lib/$(ARCH32)/libhal-storage.so target=./libhal-storage.so.1.0.0
+link path=usr/lib/$(ARCH32)/libhal-storage.so.1 \
     target=./libhal-storage.so.1.0.0
-link path=usr/lib/$(ARCH64)/libhal.so target=./libhal.so.1.0.0
-link path=usr/lib/$(ARCH64)/libhal.so.1 target=./libhal.so.1.0.0
+link path=usr/lib/$(ARCH32)/libhal.so target=./libhal.so.1.0.0
+link path=usr/lib/$(ARCH32)/libhal.so.1 target=./libhal.so.1.0.0
 link path=usr/lib/libhal-storage.so target=./libhal-storage.so.1.0.0
 link path=usr/lib/libhal-storage.so.1 target=./libhal-storage.so.1.0.0
 link path=usr/lib/libhal.so target=./libhal.so.1.0.0

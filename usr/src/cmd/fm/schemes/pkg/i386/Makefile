@@ -29,8 +29,8 @@
 include ../../Makefile.com
 
 LDLIBS += \
-	-L$(ROOTLIB)/fm -ltopo
-LDFLAGS += -R/usr/lib/fm
+	-L$(ROOT)/usr/lib/fm/$(MACH32) -ltopo
+LDFLAGS += -R/usr/lib/fm/$(MACH32)
 
 include ../../Makefile.targ
 

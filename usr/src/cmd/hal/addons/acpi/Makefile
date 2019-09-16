@@ -30,6 +30,7 @@ OBJS =		addon-acpi.o logger.o util_helper.o acpi.o util_pm.o
 SRCS =		addon-acpi.c ../../hald/logger.c ../../hald/util_helper.c
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)

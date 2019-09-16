@@ -36,7 +36,7 @@ dir path=usr/bin
 dir path=usr/kernel group=sys
 dir path=usr/kernel/drv group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/brand
 dir path=usr/lib/brand/ipkg group=bin
 dir path=usr/lib/brand/shared group=sys
@@ -69,9 +69,9 @@ file path=lib/svc/method/svc-zonestat mode=0555 \
     variant.opensolaris.zone=global
 file path=usr/bin/zonestat mode=0555
 file path=usr/kernel/drv/zcons group=sys
-file path=usr/lib/$(ARCH64)/libbrand.so.1
-file path=usr/lib/$(ARCH64)/libzonecfg.so.1
-file path=usr/lib/$(ARCH64)/libzonestat.so.1
+file path=usr/lib/$(ARCH32)/libbrand.so.1
+file path=usr/lib/$(ARCH32)/libzonecfg.so.1
+file path=usr/lib/$(ARCH32)/libzonestat.so.1
 file path=usr/lib/brand/ipkg/config.xml mode=0444
 file path=usr/lib/brand/ipkg/platform.xml mode=0444
 file path=usr/lib/brand/shared/common.ksh mode=0444

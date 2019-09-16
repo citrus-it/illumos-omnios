@@ -63,9 +63,9 @@ file path=usr/bin/ypcat group=other mode=0555
 file path=usr/bin/ypmatch group=other mode=0555
 file path=usr/bin/yppasswd mode=0555
 file path=usr/bin/ypwhich group=other mode=0555
+file path=usr/lib/$(ARCH32)/libnisdb.so.2
 file path=usr/lib/ldap/idsconfig mode=0555
 file path=usr/lib/ldap/ldap_cachemgr mode=0555
-file path=usr/lib/libnisdb.so.2
 file path=usr/lib/netsvc/yp/ypbind mode=0555
 file path=usr/lib/netsvc/yp/ypstart mode=0555
 file path=usr/lib/netsvc/yp/ypstop mode=0555
@@ -100,5 +100,5 @@ file path=var/yp/aliases mode=0555 preserve=true
 file path=var/yp/nicknames preserve=true
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/libnisdb.so target=./libnisdb.so.2
+link path=usr/lib/$(ARCH32)/libnisdb.so target=libnisdb.so.2
 depend fmri=pkg:/developer/build/make type=require

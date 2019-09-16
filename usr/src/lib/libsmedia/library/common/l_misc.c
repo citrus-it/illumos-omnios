@@ -54,10 +54,10 @@
 #ifdef __sparc
 #define	PATHNAME "/usr/lib/smedia/sparcv9"
 #else
-#define	PATHNAME "/usr/lib/smedia/amd64"
+#define	PATHNAME "/usr/lib/smedia"
 #endif
 #else
-#define	PATHNAME "/usr/lib/smedia"
+#define	PATHNAME "/usr/lib/smedia/i386"
 #endif
 
 #define	PERROR(string)	my_perror(gettext(string))

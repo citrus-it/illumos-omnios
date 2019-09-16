@@ -57,8 +57,8 @@ all: $(LIBS)
 include ../../../Makefile.targ
 include ../../Makefile.targ
 
-LDLIBS_$(MACH) = -L$(ROOT)/usr/lib/fm -R$(ROOT)/usr/lib/fm
-LDLIBS_$(MACH64) = -L$(ROOT)/usr/lib/fm/$(MACH64) -R$(ROOT)/usr/lib/fm/$(MACH64)
+LDLIBS_$(MACH) = -L$(ROOT)/usr/lib/fm/$(MACH32) -R$(ROOT)/usr/lib/fm/$(MACH32)
+LDLIBS_$(MACH64) = -L$(ROOT)/usr/lib/fm -R$(ROOT)/usr/lib/fm
 
 #
 # To ease the development and maintenance of libfmd_msg, a test suite is built

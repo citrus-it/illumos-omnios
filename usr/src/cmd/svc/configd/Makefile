@@ -85,7 +85,7 @@ FILEMODE = 0555
 
 OBJSQLITE =
 LIBSQLITE = -lsqlite-sys
-$(NATIVE_BUILD)OBJSQLITE = $(ROOT)/lib/libsqlite-native.o
+$(NATIVE_BUILD)OBJSQLITE = $(ROOT)/lib/$(MACH32)/libsqlite-native.o
 $(NATIVE_BUILD)LIBSQLITE =
 
 OBJS += $(OBJSQLITE)

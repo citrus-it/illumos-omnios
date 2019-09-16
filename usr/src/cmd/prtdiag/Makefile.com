@@ -25,6 +25,7 @@
 #
 
 include $(SRCDIR)/../Makefile.cmd
+include $(SRCDIR)/../Makefile.cmd.64
 include $(SRCDIR)/../../Makefile.psm
 
 PROG		= prtdiag

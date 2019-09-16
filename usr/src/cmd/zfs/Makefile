@@ -38,7 +38,7 @@ include ../Makefile.ctf
 FSTYPE=         zfs
 LINKPROGS=	mount umount
 ROOTETCFSTYPE=  $(ROOTETC)/fs/$(FSTYPE)
-USRLIBFSTYPE=	$(ROOTLIB)/fs/$(FSTYPE)
+USRLIBFSTYPE=	$(ROOT)/usr/lib/fs/$(FSTYPE)
 
 LDLIBS += -lzfs_core -lzfs -luutil -lumem -lnvpair -lsec -lidmap
 

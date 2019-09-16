@@ -26,14 +26,14 @@
 
 dir path=usr group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
+dir path=usr/lib/$(ARCH32)
 dir path=usr/lib/sasl
-dir path=usr/lib/sasl/$(ARCH64)
+dir path=usr/lib/sasl/$(ARCH32)
 dir path=usr/share/man
 dir path=usr/share/man/man3lib
 dir path=usr/share/man/man3sasl
 dir path=usr/share/man/man4
-file path=usr/lib/$(ARCH64)/libsasl.so.1
+file path=usr/lib/$(ARCH32)/libsasl.so.1
 file path=usr/lib/libsasl.so.1
 file path=usr/lib/sasl/$(ARCH64)/crammd5.so.1
 file path=usr/lib/sasl/$(ARCH64)/digestmd5.so.1
@@ -101,5 +101,5 @@ file path=usr/share/man/man4/sasl_appname.conf.4
 license cr_Sun license=cr_Sun
 license usr/src/lib/libsasl/THIRDPARTYLICENSE \
     license=usr/src/lib/libsasl/THIRDPARTYLICENSE
-link path=usr/lib/$(ARCH64)/libsasl.so target=libsasl.so.1
+link path=usr/lib/$(ARCH32)/libsasl.so target=libsasl.so.1
 link path=usr/lib/libsasl.so target=libsasl.so.1

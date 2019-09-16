@@ -53,7 +53,7 @@ SMATCH=off
 
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -lgss -L$(KRB5LIB) \
-	-lmech_krb5 -lkadm5srv -lkdb -lresolv -lpam
+	-L$(ROOT_KLIBDIR) -lmech_krb5 -lkadm5srv -lkdb -lresolv -lpam
 
 .KEEP_STATE:
 

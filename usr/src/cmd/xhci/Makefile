@@ -15,7 +15,7 @@
 
 PROG= xhci_portsc
 
-ROOTLIBXHCI = $(ROOTLIB)/xhci
+ROOTLIBXHCI = $(ROOTLIB64)/xhci
 ROOTLIBXHCIPROG = $(PROG:%=$(ROOTLIBXHCI)/%)
 
 include ../Makefile.cmd

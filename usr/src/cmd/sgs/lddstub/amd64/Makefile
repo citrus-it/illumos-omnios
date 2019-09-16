@@ -34,7 +34,7 @@ CONVLIBDIR=	$(CONVLIBDIR64)
 
 ASFLAGS +=	-D__amd64 $(amd64_AS_XARCH)
 
-install:	all $(ROOTLIB64)/$(PROG)
+install:	all $(ROOTLIBEXEC)/$(PROG)
 
 include		../Makefile.targ
 include		../../Makefile.sub.64

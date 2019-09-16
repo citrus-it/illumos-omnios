@@ -25,10 +25,10 @@
 
 dir path=usr group=sys
 dir path=usr/lib
-dir path=usr/lib/$(ARCH64)
-file path=usr/lib/$(ARCH64)/libdiskmgt.so.1
+dir path=usr/lib/$(ARCH32)
+file path=usr/lib/$(ARCH32)/libdiskmgt.so.1
 file path=usr/lib/libdiskmgt.so.1
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-link path=usr/lib/$(ARCH64)/libdiskmgt.so target=./libdiskmgt.so.1
+link path=usr/lib/$(ARCH32)/libdiskmgt.so target=./libdiskmgt.so.1
 link path=usr/lib/libdiskmgt.so target=./libdiskmgt.so.1

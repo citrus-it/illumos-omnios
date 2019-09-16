@@ -31,7 +31,7 @@ i386_SUBDIRS= type_6 type_101
 SUBDIRS= $($(MACH)_SUBDIRS)
 SRCS=	$(PROG:%=%.c)
 
-ROOTHELPER= $(ROOTLIB)/set_keyboard_layout
+ROOTHELPER= $(ROOTLIB64)/set_keyboard_layout
 sparc_EXTRA_INSTALL_TARGETS=$(ROOTHELPER)
 i386_EXTRA_INSTALL_TARGETS=$(ROOTHELPER)
 EXTRA_INSTALL_TARGETS= $($(MACH)_EXTRA_INSTALL_TARGETS)
@@ -56,7 +56,7 @@ all:  $(PROG) $(SUBDIRS)
 
 install: $(PROG) $(ROOTPROG) $(SUBDIRS) $(EXTRA_INSTALL_TARGETS)
 
-$(ROOTLIB)/%: %
+$(ROOTLIB64)/%: %
 	$(INS.file)
 
 # explicit yacc work for the NSE

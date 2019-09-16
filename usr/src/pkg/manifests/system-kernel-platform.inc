@@ -31,7 +31,7 @@
 # information about overriding the defaults.
 #
 dir path=platform group=sys
-dir path=platform/$(ARCH64) group=sys
+dir path=platform/$(ARCH32) group=sys
 dir path=platform/kernel group=sys
 dir path=platform/kernel/cpu group=sys
 dir path=platform/kernel/dacf group=sys

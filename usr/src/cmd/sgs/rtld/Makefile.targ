@@ -73,6 +73,10 @@ delete:
 
 $(ROOTFS_LIBDIR)/%:	%
 		$(INS.file)
+$(ROOTLIBEXEC)/%:	%
+		$(INS.file)
+$(ROOTLIBEXEC32)/%:	%
+		$(INS.file)
 
 $(ETCLIBDIR)/%:		%
 		$(INS.file)

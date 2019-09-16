@@ -63,7 +63,7 @@ all clean:    $(SUBDIRS)
 install: install_dir all .WAIT $(SUBDIRS)
 
 # override ROOTLIBDIR and ROOTLINKS
-ROOTLIBDIR=     $(ROOT)/usr/lib/gss
+ROOTLIBDIR=     $(ROOT)/usr/lib/$(MACH32)/gss
 
 install_dir:	$(ROOTLIBDIR) $(BUILD64)
 

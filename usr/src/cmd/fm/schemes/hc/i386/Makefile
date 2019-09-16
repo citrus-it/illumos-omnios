@@ -30,6 +30,6 @@ include ../../Makefile.com
 include ../../Makefile.targ
 
 LDLIBS += -ltopo
-LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
+LDFLAGS += -L$(ROOT)/usr/lib/fm/$(MACH32) -R/usr/lib/fm/$(MACH32)
 
 install: all $(ROOTPROG)

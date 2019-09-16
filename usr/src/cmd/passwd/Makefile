@@ -27,6 +27,7 @@ PROG= passwd
 DEFAULTFILES= passwd.dfl
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
 passwd := LDLIBS += $(ROOT)/usr/lib/passwdutil.so.1 
 LDFLAGS += $(ZIGNORE)

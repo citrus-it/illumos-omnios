@@ -30,6 +30,7 @@ OBJS =		probe-volume.o cdutils.o fsutils.o logger.o
 SRCS =		probe-volume.c
 
 include ../../../Makefile.cmd
+include ../../../Makefile.cmd.64
 include ../../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)

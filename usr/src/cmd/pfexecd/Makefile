@@ -40,7 +40,7 @@ LDLIBS += -lsecdb
 # install macros and rule
 #
 GROUP=		bin
-ROOTPROG=	$(ROOTLIB)/$(PROG)
+ROOTPROG=	$(ROOTLIB64)/$(PROG)
 $(ROOTPROG)	:= FILEMODE= 555
 
 .KEEP_STATE:
