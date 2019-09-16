@@ -72,7 +72,7 @@ getsysinfo(int cmd)
 			return (NULL);
 		if (ret > bufsize) {
 			bufsize = ret;
-			buf = realloc(buf, bufsize);
+			buf = reallocf(buf, bufsize);
 		} else
 			break;
 	} while (buf != NULL);
