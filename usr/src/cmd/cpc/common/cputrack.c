@@ -335,9 +335,12 @@ pinit_lwp(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 		return (0);
 
 	if (state->maxlwpid < lwpid) {
-		state->sgrps = realloc(state->sgrps,
-		    lwpid * sizeof (state->sgrps));
+		void *old = state->sgrps;
+
+		state->sgrps = reallocarray(state->sgrps,
+		    lwpid, sizeof (state->sgrps));
 		if (state->sgrps == NULL) {
+			free(old);
 			(void) fprintf(stderr, gettext(
 			    "%6d: init_lwp: out of memory\n"), (int)pid);
 			return (-1);
