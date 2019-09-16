@@ -148,11 +148,11 @@ main(int argc, char **argv)
 			/*
 			 * hsp points into an area about to be moved,
 			 * so we first remember its offset into hs[],
-			 * then restore it after realloc() has moved
+			 * then restore it after reallocarray() has moved
 			 * the data.
 			 */
 			hoff = hsp - hs;
-			hs = realloc(hs, hostslim * sizeof (struct hs));
+			hs = reallocarray(hs, hostslim, sizeof (struct hs));
 			if (hs == NULL) {
 				(void) fprintf(stderr, "too many hosts\n");
 				exit(1);
