@@ -494,8 +494,8 @@ retry:
 
 		if (nent >= entsize) {
 			entsize *= 2;
-			psent = (struct psent *)realloc((char *)psent,
-			    entsize * sizeof (struct psent));
+			psent = (struct psent *)reallocarray((char *)psent,
+			    entsize, sizeof (struct psent));
 			if (psent == NULL) {
 				(void) fprintf(stderr, "ps: no memory\n");
 				exit(1);
@@ -766,7 +766,7 @@ devadd(char *name, dev_t ddev)
 
 	if (ndev == maxdev) {
 		maxdev += DNINCR;
-		devl = realloc(devl, maxdev * sizeof (struct devl));
+		devl = reallocarray(devl, maxdev, sizeof (struct devl));
 		if (devl == NULL) {
 			(void) fprintf(stderr,
 			    "ps: not enough memory for %d devices\n", maxdev);
