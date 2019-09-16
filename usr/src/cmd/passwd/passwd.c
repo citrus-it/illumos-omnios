@@ -1461,9 +1461,12 @@ get_namelist_local(char ***namelist_p, int *num_user)
 			return (FMERR);
 		}
 		if (++nuser == alloced) {
+			voi *old = n1;
+
 			alloced += 100;
-			nl = realloc(nl, alloced * (sizeof (*nl)));
+			nl = reallocarray(nl, alloced, (sizeof (*nl)));
 			if (nl == NULL) {
+				free(old);
 				_lc_endspent();
 				return (FMERR);
 			}
