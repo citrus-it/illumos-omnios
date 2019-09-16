@@ -1859,8 +1859,8 @@ add_to_mlist(char *magic_file, int first)
 	if ((mlistp - mlist) >= mlist_sz) {
 		mlistp_off = mlistp - mlist;
 		mlist_sz *= 2;
-		if ((mlist = realloc(mlist,
-		    mlist_sz * sizeof (char *))) == NULL) {
+		if ((mlist = reallocarray(mlist,
+		    mlist_sz, sizeof (char *))) == NULL) {
 			int err = errno;
 			(void) fprintf(stderr, gettext("%s: malloc "
 			    "failed: %s\n"), File, strerror(err));
