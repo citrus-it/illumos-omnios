@@ -127,8 +127,8 @@ main(int argc, char *argv[], char *envp[])
 			break;
 		case 'f':	/* next argument is program filename */
 			if (argv[1][2] != 0) {  /* arg is -fsomething */
-				pfile = realloc(pfile,
-				    sizeof (char *) * (npfile + 1));
+				pfile = reallocarray(pfile,
+				    npfile + 1, sizeof (char *));
 				if (pfile == NULL)
 					FATAL("out of space in main");
 				pfile[npfile++] = &argv[1][2];
@@ -136,8 +136,8 @@ main(int argc, char *argv[], char *envp[])
 				argc--; argv++;
 				if (argc <= 1)
 					FATAL("no program filename");
-				pfile = realloc(pfile,
-				    sizeof (char *) * (npfile + 1));
+				pfile = reallocarray(pfile,
+				    npfile + 1, sizeof (char *));
 				if (pfile == NULL)
 					FATAL("out of space in main");
 				pfile[npfile++] = argv[1];
