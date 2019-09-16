@@ -3732,7 +3732,7 @@ quote_ws_string(const char *str)
 		 * Not first run, so check if we have a big enough buffer
 		 * and if not reallocate the buffer to a sufficient size.
 		 */
-		buf = realloc(buf, strlen(str) + 3);
+		buf = reallocf(buf, strlen(str) + 3);
 	}
 	if (buf == NULL)
 		return ("");
@@ -4783,14 +4783,11 @@ char **token)
 					 */
 					} else {
 						bufsize *= 2;
-						tmp = realloc(buf, bufsize);
-						if (tmp == NULL) {
+						buf = reallocf(buf, bufsize);
+						if (buf == NULL) {
 							ipqos_msg(MT_ENOSTR,
 							    "realloc");
-							free(buf);
 							return (IPQOS_CONF_ERR);
-						} else {
-							buf = tmp;
 						}
 
 						/*
@@ -5460,7 +5457,7 @@ int *nitems)
 
 			/* extend items array to accomodate new item */
 
-			tmp = realloc(items, (cnt + 1) * sizeof (char *));
+			tmp = reallocarray(items, cnt + 1, sizeof (char *));
 			if (tmp == NULL) {
 				ipqos_msg(MT_ENOSTR, "realloc");
 				goto fail;
