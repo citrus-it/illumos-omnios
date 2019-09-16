@@ -307,10 +307,13 @@ npivAddRemoveNPIVEntry(char *ppwwn, char *vnwwn,
 			i++;
 
 			if (i >= lastAlloc) {
+				void *old = valueSet;
+
 				lastAlloc += PORT_LIST_ALLOC;
-				valueSet = realloc(valueSet,
-				    sizeof (*valueSet) * lastAlloc);
+				valueSet = reallocarray(valueSet,
+				    lastAlloc, sizeof (*valueSet));
 				if (valueSet == NULL) {
+					free(old);
 					ret = NPIV_ERROR;
 					break;
 				}
