@@ -171,9 +171,12 @@ loadpolicy(const char *infile)
 	while ((fep = fgetline(in)) != NULL && fep->entry != NULL) {
 		line = fep->entry;
 		if (cnt >= nalloc) {
+			char *oldmem = mem;
+
 			nalloc += PLCY_CHUNK;
-			mem = realloc(mem, nalloc * devplcysys_sz);
+			mem = reallocarray(mem, nalloc, devplcysys_sz);
 			if (mem == NULL) {
+				free(oldmem);
 				err_print(MALLOC_FAILED,
 					nalloc * devplcysys_sz);
 				return (-1);
