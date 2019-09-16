@@ -73,7 +73,7 @@ free_replica(struct replica *list, int count)
 struct replica *
 parse_replica(char *special, int *count)
 {
-	struct replica *list = NULL;
+	struct replica *list = NULL, *olist = NULL;
 	char *root, *special2;
 	char *proot, *x, *y;
 	int scount, v6addr, i;
@@ -109,9 +109,11 @@ parse_replica(char *special, int *count)
 			proot = root + 1;
 			root = y + 1;
 			v6addr = 1;
-			if ((list = realloc(list, (*count + 1) *
-			    sizeof (struct replica))) == NULL)
+			if ((list = reallocarray(olist = list, *count + 1,
+			    sizeof (struct replica))) == NULL) {
+				free(olist);
 				goto bad;
+			}
 			bzero(&list[(*count)++], sizeof (struct replica));
 			*y = '\0';
 			list[*count-1].host = strdup(proot);
@@ -142,9 +144,12 @@ parse_replica(char *special, int *count)
 			if (v6addr == 1)
 				v6addr = 0;
 			else {
-				if ((list = realloc(list, (*count + 1) *
-				    sizeof (struct replica))) == NULL)
+				if ((list = reallocarray(olist = list,
+				    *count + 1, sizeof (struct replica)))
+				    == NULL) {
+					free(olist);
 					goto bad;
+				}
 				bzero(&list[(*count)++],
 				    sizeof (struct replica));
 				list[*count-1].host = strdup(proot);
@@ -175,9 +180,12 @@ parse_replica(char *special, int *count)
 			} else {
 				*root = '\0';
 				root++;
-				if ((list = realloc(list, (*count + 1) *
-				    sizeof (struct replica))) == NULL)
+				if ((list = reallocarray(olist = list,
+				    *count + 1, sizeof (struct replica)))
+				    == NULL) {
+					free(olist);
 					goto bad;
+				}
 				bzero(&list[(*count)++],
 				    sizeof (struct replica));
 				list[*count-1].host = strdup(proot);
