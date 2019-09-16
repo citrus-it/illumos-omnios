@@ -384,7 +384,7 @@ onalrm(void)
 		if (entries > utmpxent) {
 			utmpxent = entries;
 			utmpxsize = utmpxent * sizeof (struct utmpx);
-			utmpx = realloc(utmpx, utmpxsize);
+			utmpx = reallocf(utmpx, utmpxsize);
 			if (utmpx == NULL) {
 				syslog(LOG_ERR, "onalrm: realloc: %m");
 				utmpxsize = 0;
