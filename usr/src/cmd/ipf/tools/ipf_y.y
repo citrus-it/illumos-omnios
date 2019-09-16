@@ -2012,7 +2012,7 @@ char *phrase;
 
 			for (i = 0, s = strtok(phrase, " \r\n\t"); s != NULL;
 			     s = strtok(NULL, " \r\n\t"), i++) {
-				fb = realloc(fb, (i / 4 + 1) * sizeof(*fb));
+				fb = reallocarray(fb, i / 4 + 1, sizeof(*fb));
 				if (fb == NULL)
 					yyerror("sorry, out of memory");
 				l = (u_32_t)strtol(s, NULL, 0);
