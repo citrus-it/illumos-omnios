@@ -900,7 +900,7 @@ smbd_authsvc_gettoken(authsvc_context_t *ctx)
 	 */
 	len = xdr_sizeof(smb_token_xdr, token);
 	if (len > ctx->ctx_orawlen) {
-		if ((ctx->ctx_orawbuf = realloc(ctx->ctx_orawbuf, len)) ==
+		if ((ctx->ctx_orawbuf = reallocf(ctx->ctx_orawbuf, len)) ==
 		    NULL) {
 			return (NT_STATUS_INTERNAL_ERROR);
 		}
