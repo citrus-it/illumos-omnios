@@ -233,7 +233,7 @@ add_tok(int c)
 {
 	if ((tokidx + 1) >= toksz) {
 		toksz += 64;
-		if ((token = realloc(token, toksz)) == NULL) {
+		if ((token = reallocf(token, toksz)) == NULL) {
 			yyerror(_("out of memory"));
 			tokidx = 0;
 			toksz = 0;
