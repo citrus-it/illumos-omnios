@@ -216,7 +216,11 @@ main(int argc, char *argv[])
 			}
 			if (n <= nids)
 				break;
-			ids = realloc(ids, (nids = n) * sizeof (int));
+			ids = reallocarray(ids, nids = n, sizeof (int));
+			if (ids == NULL) {
+				(void) fprintf(stderr, "Out of memory.\n");
+				exit(1);
+			}
 		}
 
 		(void) printf("%s%s%s%s%s%s%s%s\n", chdr,
@@ -275,7 +279,11 @@ main(int argc, char *argv[])
 			}
 			if (n <= nids)
 				break;
-			ids = realloc(ids, (nids = n) * sizeof (int));
+			ids = reallocarray(ids, nids = n, sizeof (int));
+			if (ids == NULL) {
+				(void) fprintf(stderr, "Out of memory.\n");
+				exit(1);
+			}
 		}
 
 		if (!qflg || oflg || bflg || pflg || tflg || iflg)
@@ -341,7 +349,11 @@ main(int argc, char *argv[])
 			}
 			if (n <= nids)
 				break;
-			ids = realloc(ids, (nids = n) * sizeof (int));
+			ids = reallocarray(ids, nids = n, sizeof (int));
+			if (ids == NULL) {
+				(void) fprintf(stderr, "Out of memory.\n");
+				exit(1);
+			}
 		}
 
 		if (bflg || tflg || (!qflg && !mflg))
@@ -469,6 +481,10 @@ dumpmsgq(int msqid)
 	/* allocate the minimum required buffer size on first time through */
 	if (buf == NULL)
 		buf = malloc(bufsize = sizeof (struct msgsnap_head));
+	if (buf == NULL) {
+		(void) fprintf(stderr, "Out of memory.\n");
+		return;
+	}
 
 	/*
 	 * Fetch all messages specified by mtype from
@@ -487,7 +503,11 @@ dumpmsgq(int msqid)
 			break;
 		}
 		/* The buffer is too small; allocate a bigger buffer */
-		buf = realloc(buf, bufsize = buf->msgsnap_size);
+		buf = reallocf(buf, bufsize = buf->msgsnap_size);
+		if (buf == NULL) {
+			(void) fprintf(stderr, "Out of memory.\n");
+			return;
+		}
 	}
 
 	/*
