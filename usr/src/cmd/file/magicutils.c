@@ -272,7 +272,7 @@ f_mkmtab(char *magfile, int cflg, int first)
 		if (ep >= (mend - 1)) {
 			oldsize = mend - mtab;
 			tbsize = (NENT + oldsize) * sizeof (Entry);
-			if ((mtab = realloc(mtab, tbsize)) == NULL) {
+			if ((mtab = reallocf(mtab, tbsize)) == NULL) {
 				int err = errno;
 				(void) fprintf(stderr, gettext("%s: malloc "
 				    "failed: %s\n"), File, strerror(err));
