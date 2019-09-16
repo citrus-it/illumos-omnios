@@ -1429,7 +1429,7 @@ slc_start_reply(size_t len)
 	 * SLC triplets may contain escaped characters, allow for
 	 * worst case by allocating 2 bytes for every character.
 	 */
-	slc_reply = realloc(slc_reply, (len * 2) + SLC_WRAPPER_SIZE);
+	slc_reply = reallocf(slc_reply, (len * 2) + SLC_WRAPPER_SIZE);
 	if (slc_reply == NULL) {
 		fprintf(stderr, "telnet: error allocating SLC reply memory\n");
 		return;
@@ -1591,7 +1591,7 @@ static unsigned char *opt_replyend;
 static void
 env_opt_start()
 {
-	opt_reply = realloc(opt_reply, OPT_REPLY_INITIAL_SIZE);
+	opt_reply = reallocf(opt_reply, OPT_REPLY_INITIAL_SIZE);
 	if (opt_reply == NULL) {
 		(void) printf(
 		    "telnet: error allocating environment option memory\n");
@@ -1649,7 +1649,7 @@ env_opt_add(ep)
 	    (vp == NULL ? 0 : (2 * strlen((char *)vp)));
 
 	if (opt_reply_size > (opt_replyend - opt_reply)) {
-		opt_reply = realloc(opt_reply, opt_reply_size);
+		opt_reply = reallocf(opt_reply, opt_reply_size);
 		if (opt_reply == NULL) {
 			(void) printf(
 			    "telnet: can't allocate environment option "
