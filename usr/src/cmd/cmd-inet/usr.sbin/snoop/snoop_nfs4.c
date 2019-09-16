@@ -4778,7 +4778,7 @@ utf8localize(utf8string *utf8str)
 		newsize = len + 1;
 	}
 	if (newsize != oldsize) {
-		utf_buf[cur_utf_buf] = realloc(utf_buf[cur_utf_buf],
+		utf_buf[cur_utf_buf] = reallocf(utf_buf[cur_utf_buf],
 		    newsize);
 		if (utf_buf[cur_utf_buf] == NULL) {
 			pr_err("out of memory\n");
