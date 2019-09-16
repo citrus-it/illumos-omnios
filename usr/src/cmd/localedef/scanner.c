@@ -335,7 +335,7 @@ add_tok(int c)
 {
 	if ((tokidx + 1) >= toksz) {
 		toksz += 64;
-		if ((token = realloc(token, toksz)) == NULL) {
+		if ((token = reallocf(token, toksz)) == NULL) {
 			yyerror(_("out of memory"));
 			tokidx = 0;
 			toksz = 0;
@@ -351,7 +351,7 @@ add_wcs(wchar_t c)
 {
 	if ((wideidx + 1) >= widesz) {
 		widesz += 64;
-		widestr = realloc(widestr, (widesz * sizeof (wchar_t)));
+		widestr = reallocf(widestr, (widesz * sizeof (wchar_t)));
 		if (widestr == NULL) {
 			yyerror(_("out of memory"));
 			wideidx = 0;
