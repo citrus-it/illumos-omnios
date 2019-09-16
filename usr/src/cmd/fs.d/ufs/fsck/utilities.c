@@ -1467,7 +1467,7 @@ is_errorlocked(caddr_t fs)
 		    (caddr_t)calloc(LOCKFS_MAXCOMMENTLEN, sizeof (char));
 	else
 		elock_combuf =
-		    (caddr_t)realloc(elock_combuf, LOCKFS_MAXCOMMENTLEN);
+		    (caddr_t)reallocf(elock_combuf, LOCKFS_MAXCOMMENTLEN);
 
 	if (elock_combuf == NULL)
 		goto out;
