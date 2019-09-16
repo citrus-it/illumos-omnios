@@ -59,12 +59,16 @@ sl_init(void)
 int
 sl_add(stringlist *sl, char *name)
 {
-
 	if (sl->sl_cur == sl->sl_max - 1) {
+		char *old = sl->sl_str;
+
 		sl->sl_max += _SL_CHUNKSIZE;
-		sl->sl_str = realloc(sl->sl_str, sl->sl_max * sizeof (char *));
-		if (sl->sl_str == NULL)
+		sl->sl_str = reallocarray(sl->sl_str,
+		    sl->sl_max, sizeof (char *));
+		if (sl->sl_str == NULL) {
+			free(old);
 			return (-1);
+		}
 	}
 	sl->sl_str[sl->sl_cur++] = name;
 
