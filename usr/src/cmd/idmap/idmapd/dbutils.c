@@ -193,7 +193,7 @@ tolower_u8(const char *s)
 	while ((rc = u8_textprep_str((char *)s, &inbytesleft, outs,
 	    &outbytesleft, U8_TEXTPREP_TOLOWER, U8_UNICODE_LATEST, &err)) < 0 &&
 	    err == E2BIG) {
-		if ((res = realloc(res, outlen + inbytesleft)) == NULL)
+		if ((res = reallocf(res, outlen + inbytesleft)) == NULL)
 			return (NULL);
 		/* adjust input/output buffer pointers */
 		s += (inlen - inbytesleft);
@@ -743,7 +743,7 @@ validate_list_cb_data(list_cb_data_t *cb_data, int argc, char **argv,
 	/* alloc in bulk to reduce number of reallocs */
 	if (cb_data->next >= cb_data->len) {
 		nsize = (cb_data->len + SIZE_INCR) * valsize;
-		tmplist = realloc(*list, nsize);
+		tmplist = reallocf(*list, nsize);
 		if (tmplist == NULL) {
 			idmapdlog(LOG_ERR, "Out of memory");
 			return (IDMAP_ERR_MEMORY);
