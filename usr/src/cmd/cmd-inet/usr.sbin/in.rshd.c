@@ -1374,7 +1374,7 @@ add_to_envinit(char *string)
 
 	if ((envinit == NULL) || (index == size)) {
 		size *= 2;
-		envinit = realloc(envinit, (size + 1) * sizeof (char *));
+		envinit = reallocarray(envinit, size + 1, sizeof (char *));
 		if (envinit == NULL) {
 			perror("malloc");
 			exit(1);
