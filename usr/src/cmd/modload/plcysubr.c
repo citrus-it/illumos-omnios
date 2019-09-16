@@ -134,7 +134,7 @@ fgetline(FILE *fp)
 
 		if (i == sz) {
 			sz *= 2;
-			fe.rawbuf = buf = realloc(buf, sz);
+			fe.rawbuf = buf = reallocf(buf, sz);
 			if (buf == NULL)
 				return (NULL);
 		}
@@ -518,7 +518,7 @@ add2str(char **dstp, const char *str, size_t *sz)
 		*sz *= 2;
 		if (*sz < len)
 			*sz = len;
-		*dstp = p = realloc(p, *sz);
+		*dstp = p = reallocf(p, *sz);
 		if (p == NULL) {
 			(void) fprintf(stderr, gettext(ERR_NO_MEM));
 			return (-1);
