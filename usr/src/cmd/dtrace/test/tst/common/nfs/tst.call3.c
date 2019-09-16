@@ -393,8 +393,8 @@ dotest(void)
 	client->cl_auth = auth;
 
 	for (test = call3_tests; test->arginit; ++test) {
-		argbuf = realloc(argbuf, test->argsize);
-		resbuf = realloc(resbuf, test->ressize);
+		argbuf = reallocf(argbuf, test->argsize);
+		resbuf = reallocf(resbuf, test->ressize);
 		if ((argbuf == NULL) || (resbuf == NULL)) {
 			perror("realloc() failed");
 			return (1);
