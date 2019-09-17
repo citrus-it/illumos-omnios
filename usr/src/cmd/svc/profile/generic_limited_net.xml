@@ -39,11 +39,6 @@
 <service_bundle type='profile' name='generic_limited_net'
 	 xmlns:xi='http://www.w3.org/2003/XInclude' >
   <!--
-      Include name service profile, as set by system id tools.
-  -->
-  <xi:include href='file:/etc/svc/profile/name_service.xml' />
-
-  <!--
       svc.startd(8) services
   -->
   <service name='system/coreadm' version='1' type='service'>
