@@ -19,10 +19,14 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
-ENVFILES= \
-	illumos
+DISTRIBUTIONS= \
+	omnios \
+	openindiana
+
+ENVFILES= illumos $(DISTRIBUTIONS)
 
 include ../Makefile.tools
 
@@ -35,6 +39,13 @@ CLOBBERFILES= $(ENVFILES)
 all:	$(ENVFILES)
 
 install: all .WAIT $(ROOTONBLDENVFILES)
+
+$(DISTRIBUTIONS):
+	$(RM) $@
+	$(CAT) illumos.sh > $@
+	$(SED) '/^# CDDL HEADER START/,/^# CDDL HEADER END/d' \
+		< distribution/$@.sh >> $@
+	$(CHMOD) +x $@
 
 clean:
 
