@@ -1653,13 +1653,13 @@ devinfo_storage_foreach_nick (HalDeviceStore *store, HalDevice *d, gpointer user
 {
 	struct enum_nick *en = (struct enum_nick *) user_data;
 	const char *media_type;
-	int media_num;
+	intptr_t media_num;
 
 	media_type = hal_device_property_get_string (d, "storage.solaris.legacy.media_type");
 	media_num = hal_device_property_get_int (d, "storage.solaris.legacy.media_num");
 	if ((media_type != NULL) && (strcmp (media_type, en->type) == 0) &&
 	    (media_num >= 0)) {
-		en->nums = g_slist_prepend (en->nums, GINT_TO_POINTER(media_num));
+		en->nums = g_slist_prepend (en->nums, (gpointer)media_num);
 	}
 	return TRUE;
 }
@@ -1681,7 +1681,7 @@ devinfo_storage_set_nicknames (HalDevice *d)
 {
 	int media;
 	const char *media_type;
-	int media_num;
+	intptr_t media_num;
 	GSList *i;
 	struct enum_nick en;
 	char buf[64];
@@ -1699,7 +1699,7 @@ devinfo_storage_set_nicknames (HalDevice *d)
 	/* find a free number */
 	for (media_num = 0; ; media_num++) {
 		for (i = en.nums; i != NULL; i = g_slist_next (i)) {
-        		if (GPOINTER_TO_INT (i->data) == media_num) {
+        		if ((intptr_t)(i->data) == media_num) {
 				break;
 			}
 		}
