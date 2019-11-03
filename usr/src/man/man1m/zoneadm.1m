@@ -1,14 +1,14 @@
 '\" te
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright (c) 2009 Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ZONEADM 1M "May 13, 2017"
+.TH ZONEADM 1M "Nov 4, 2019"
 .SH NAME
 zoneadm \- administer zones
 .SH SYNOPSIS
-.LP
 .nf
 \fBzoneadm\fR \fB-z\fR \fIzonename\fR [\fB-u\fR \fIuuid-match\fR] \fIsubcommand\fR
      [\fIsubcommand_options\fR]
@@ -26,20 +26,17 @@ zoneadm \- administer zones
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBzoneadm\fR utility is used to administer system zones. A zone is an
 application container that is maintained by the operating system runtime.
 .SH SECURITY
-.LP
 Once a process has been placed in a zone other than zone \fB0\fR, the process
 or any of its children cannot change zones.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-R\fR \fIroot\fR\fR
+\fB-R\fR \fIroot\fR
 .ad
 .sp .6
 .RS 4n
@@ -50,7 +47,7 @@ conjunction with the "\fBlist\fR" and "\fBmark\fR" subcommands.
 .sp
 .ne 2
 .na
-\fB\fB-u\fR \fIuuid-match\fR\fR
+\fB-u\fR \fIuuid-match\fR
 .ad
 .sp .6
 .RS 4n
@@ -63,7 +60,7 @@ option, if such a zone is present.
 .sp
 .ne 2
 .na
-\fB\fB-z\fR \fIzonename\fR\fR
+\fB-z\fR \fIzonename\fR
 .ad
 .sp .6
 .RS 4n
@@ -71,7 +68,6 @@ String identifier for a zone.
 .RE
 
 .SH SUBCOMMANDS
-.LP
 Subcommands which can result in destructive actions or loss of work have a
 \fB-F\fR flag to force the action. If input is from a terminal device, the user
 is prompted if such a command is given without the \fB-F\fR flag; otherwise, if
@@ -85,8 +81,8 @@ The following subcommands are supported:
 .sp
 .ne 2
 .na
-\fB\fBattach\fR [\fB-F\fR] [\fB-n\fR \fIpath\fR] [\fIbrand-specific
-options\fR]\fR
+\fBattach\fR [\fB-F\fR] [\fB-n\fR \fIpath\fR] [\fIbrand-specific
+options\fR]
 .ad
 .sp .6
 .RS 4n
@@ -128,7 +124,7 @@ Use the following command to attach a zone:
 .sp
 .ne 2
 .na
-\fB\fBboot\fR [\fB--\fR \fIboot_options\fR]\fR
+\fBboot\fR [\fB--\fR \fIboot_options\fR]
 .ad
 .sp .6
 .RS 4n
@@ -138,7 +134,7 @@ The following \fIboot_options\fR are supported:
 .sp
 .ne 2
 .na
-\fB\fB-i\fR \fIaltinit\fR\fR
+\fB-i\fR \fIaltinit\fR
 .ad
 .sp .6
 .RS 4n
@@ -150,7 +146,7 @@ a valid path to an executable. The default primordial process is
 .sp
 .ne 2
 .na
-\fB\fB-m\fR \fIsmf_options\fR\fR
+\fB-m\fR \fIsmf_options\fR
 .ad
 .sp .6
 .RS 4n
@@ -166,7 +162,7 @@ boot the system. See \fBkernel\fR(1M) for a listing of the \fB-m\fR suboptions.
 .sp
 .ne 2
 .na
-\fB\fB-s\fR\fR
+\fB-s\fR
 .ad
 .sp .6
 .RS 4n
@@ -180,7 +176,7 @@ milestone is equivalent to init level \fBs\fR. See \fBsvc.startd\fR(1M) and
 .sp
 .ne 2
 .na
-\fB\fBclone\fR [\fB-m\fR \fIcopy\fR] [\fB-s\fR \fIzfs_snapshot\fR]
+\fBclone\fR [\fB-m\fR \fIcopy\fR] [\fB-s\fR \fIzfs_snapshot\fR]
 \fIsource_zone\fR\fR
 .ad
 .sp .6
@@ -190,7 +186,7 @@ alternative way to install the zone.
 .sp
 .ne 2
 .na
-\fB\fB-m\fR \fIcopy\fR\fR
+\fB-m\fR \fIcopy\fR
 .ad
 .sp .6
 .RS 4n
@@ -200,7 +196,7 @@ Force the clone to be a copy, even if a "\fBZFS\fR clone" is possible.
 .sp
 .ne 2
 .na
-\fB\fB-s\fR \fIzfs_snapshot\fR\fR
+\fB-s\fR \fIzfs_snapshot\fR
 .ad
 .sp .6
 .RS 4n
@@ -215,7 +211,7 @@ The source zone must be halted before this subcommand can be used.
 .sp
 .ne 2
 .na
-\fB\fBdetach\fR [\fB-n\fR]\fR
+\fBdetach\fR [\fB-n\fR]
 .ad
 .sp .6
 .RS 4n
@@ -248,7 +244,7 @@ The source zone must be halted before this subcommand can be used.
 .sp
 .ne 2
 .na
-\fB\fBhalt\fR\fR
+\fBhalt\fR
 .ad
 .sp .6
 .RS 4n
@@ -259,7 +255,7 @@ inside the zone. It also removes run time resources of the zone.
 .sp
 .ne 2
 .na
-\fB\fBhelp\fR [\fIsubcommand\fR]\fR
+\fBhelp\fR [\fIsubcommand\fR]
 .ad
 .sp .6
 .RS 4n
@@ -270,7 +266,7 @@ Display general help. If you specify \fIsubcommand\fR, displays help on
 .sp
 .ne 2
 .na
-\fB\fBinstall\fR [\fB-x\fR \fInodataset\fR] [\fIbrand-specific options\fR]\fR
+\fBinstall\fR [\fB-x\fR \fInodataset\fR] [\fIbrand-specific options\fR]
 .ad
 .sp .6
 .RS 4n
@@ -280,7 +276,7 @@ attempts to verify first, most verification errors are fatal. See the
 .sp
 .ne 2
 .na
-\fB\fB-x\fR \fInodataset\fR\fR
+\fB-x\fR \fInodataset\fR
 .ad
 .sp .6
 .RS 4n
@@ -295,7 +291,7 @@ information.
 .sp
 .ne 2
 .na
-\fB\fBlist\fR [\fIlist_options\fR]\fR
+\fBlist\fR [\fIlist_options\fR]
 .ad
 .sp .6
 .RS 4n
@@ -313,7 +309,7 @@ The following \fIlist_options\fR are supported:
 .sp
 .ne 2
 .na
-\fB\fB-c\fR\fR
+\fB-c\fR
 .ad
 .sp .6
 .RS 4n
@@ -323,7 +319,7 @@ Display all configured zones. This option overrides the \fB-i\fR option.
 .sp
 .ne 2
 .na
-\fB\fB-i\fR\fR
+\fB-i\fR
 .ad
 .sp .6
 .RS 4n
@@ -333,7 +329,7 @@ Expand the display to all installed zones.
 .sp
 .ne 2
 .na
-\fB\fB-n\fR\fR
+\fB-n\fR
 .ad
 .sp .6
 .RS 4n
@@ -343,7 +339,17 @@ Do not include the global zone in the list of zones returned.
 .sp
 .ne 2
 .na
-\fB\fB-p\fR\fR
+\fB-j\fR
+.ad
+.sp .6
+.RS 4n
+Display zone information in JSON format.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-p\fR
 .ad
 .sp .6
 .RS 4n
@@ -368,31 +374,29 @@ to the zone and can be used by tools such as DTrace to track zones across
 reboots (since \fIzoneid\fR will change).
 Any software that parses the output of the "\fBzoneadm list -p\fR" command must
 be able to handle any fields that may be added in the future.
-.sp
-The \fB-v\fR and \fB-p\fR options are mutually exclusive. If neither \fB-v\fR
-nor \fB-p\fR is used, just the zone name is listed.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-v\fR\fR
+\fB-v\fR
 .ad
 .sp .6
 .RS 4n
 Display verbose information, including zone name, id, current state, root
 directory, brand type, ip-type, and options.
-.sp
-The \fB-v\fR and \fB-p\fR options are mutually exclusive. If neither \fB-v\fR
-nor \fB-p\fR is used, just the zone name is listed.
 .RE
+
+.sp
+The \fB-j\fR, \fB-v\fR and \fB-p\fR options are mutually exclusive.
+If none of these options are used, just the zone name is listed.
 
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBmark incomplete\fR\fR
+\fBmark incomplete\fR
 .ad
 .sp .6
 .RS 4n
@@ -405,7 +409,7 @@ the zone).
 .sp
 .ne 2
 .na
-\fB\fBmove\fR \fInew_zonepath\fR\fR
+\fBmove\fR \fInew_zonepath\fR
 .ad
 .sp .6
 .RS 4n
@@ -417,7 +421,7 @@ and normal restrictions for \fIzonepath\fR apply.
 .sp
 .ne 2
 .na
-\fB\fBready\fR\fR
+\fBready\fR
 .ad
 .sp .6
 .RS 4n
@@ -428,7 +432,7 @@ in the zone.
 .sp
 .ne 2
 .na
-\fB\fBreboot\fR\ [\fB--\fR \fIboot_options\fR]]\fR
+\fBreboot\fR\ [\fB--\fR \fIboot_options\fR]]
 .ad
 .sp .6
 .RS 4n
@@ -440,7 +444,7 @@ for the boot options.
 .sp
 .ne 2
 .na
-\fB\fBshutdown\fR [\fB-r\fR [\fB--\fR \fIboot_options\fR]]\fR
+\fBshutdown\fR [\fB-r\fR [\fB--\fR \fIboot_options\fR]]
 .ad
 .sp .6
 .RS 4n
@@ -453,7 +457,7 @@ zone. See \fIboot\fR subcommand for the boot options.
 .sp
 .ne 2
 .na
-\fB\fBuninstall [\fR\fB-F\fR\fB]\fR\fR
+\fBuninstall [\fR\fB-F\fR\fB]\fR
 .ad
 .sp .6
 .RS 4n
@@ -465,7 +469,7 @@ You can use the \fB-F\fR flag to force the action.
 .sp
 .ne 2
 .na
-\fB\fBverify\fR\fR
+\fBverify\fR
 .ad
 .sp .6
 .RS 4n
@@ -475,7 +479,7 @@ installed on the machine. Following is a break-down of the checks by
 .sp
 .ne 2
 .na
-\fB\fBzonepath\fR\fR
+\fBzonepath\fR
 .ad
 .sp .6
 .RS 4n
@@ -496,7 +500,7 @@ wrong.
 .sp
 .ne 2
 .na
-\fB\fBfs\fR\fR
+\fBfs\fR
 .ad
 .sp .6
 .RS 4n
@@ -516,7 +520,7 @@ there is no \fBfsck\fR binary for a given filesystem type at
 .sp
 .ne 2
 .na
-\fB\fBnet\fR\fR
+\fBnet\fR
 .ad
 .sp .6
 .RS 4n
@@ -553,7 +557,7 @@ cannot be set.
 .sp
 .ne 2
 .na
-\fB\fBrctl\fR\fR
+\fBrctl\fR
 .ad
 .sp .6
 .RS 4n
@@ -566,7 +570,6 @@ action agrees with the actions that are valid for the given resource control.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the \fB-m\fR Option
 .sp
 .LP
@@ -609,12 +612,11 @@ The following command illustrates the use of the \fB-s\fR option.
 .sp
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
 .na
-\fB\fB0\fR\fR
+\fB0\fR
 .ad
 .sp .6
 .RS 4n
@@ -624,7 +626,7 @@ Successful completion.
 .sp
 .ne 2
 .na
-\fB\fB1\fR\fR
+\fB1\fR
 .ad
 .sp .6
 .RS 4n
@@ -634,7 +636,7 @@ An error occurred.
 .sp
 .ne 2
 .na
-\fB\fB2\fR\fR
+\fB2\fR
 .ad
 .sp .6
 .RS 4n
@@ -642,7 +644,6 @@ Invalid usage.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -657,14 +658,12 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBread\fR(1), \fBsvcs\fR(1), \fBzlogin\fR(1), \fBzonename\fR(1),
 \fBinit\fR(1M), \fBkernel\fR(1M), \fBsvcadm\fR(1M), \fBsvc.startd\fR(1M),
 \fBsvc.startd\fR(1M), \fBzonecfg\fR(1M), \fBlibuuid\fR(3LIB),
 \fBattributes\fR(5), \fBbrands\fR(5), \fBnative\fR(5), \fBsmf\fR(5),
 \fBzones\fR(5)
 .SH NOTES
-.LP
 The \fBzones\fR(5) service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:
 .sp

@@ -24,6 +24,7 @@
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2015, Joyent Inc. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -105,6 +106,13 @@ typedef struct zone_entry {
 	zoneid_t	zdid;
 } zone_entry_t;
 
+typedef enum {
+	LF_DEFAULT,
+	LF_PARSABLE,
+	LF_VERBOSE,
+	LF_JSON
+} list_format_t;
+
 #define	CLUSTER_BRAND_NAME	"cluster"
 
 static zone_entry_t *zents;
@@ -136,7 +144,7 @@ struct cmd {
 #define	SHELP_READY	"ready"
 #define	SHELP_SHUTDOWN	"shutdown [-r [-- boot_arguments]]"
 #define	SHELP_REBOOT	"reboot [-- boot_arguments]"
-#define	SHELP_LIST	"list [-cinpv]"
+#define	SHELP_LIST	"list [-cijnpv]"
 #define	SHELP_VERIFY	"verify"
 #define	SHELP_INSTALL	"install [brand-specific args]"
 #define	SHELP_UNINSTALL	"uninstall [-F] [brand-specific args]"
@@ -256,13 +264,14 @@ long_help(int cmd_num)
 		    "option.  When used with the general -z <zone> and/or -u "
 		    "<uuid-match>\n\toptions, lists only the specified "
 		    "matching zone, but lists it\n\tregardless of its state, "
-		    "and the -i, -c, and -n options are disallowed.  The\n\t-v "
-		    "option can be used to display verbose information: zone "
-		    "name, id,\n\tcurrent state, root directory and options.  "
-		    "The -p option can be used\n\tto request machine-parsable "
-		    "output.  The -v and -p options are mutually\n\texclusive."
-		    "  If neither -v nor -p is used, just the zone name is "
-		    "listed."));
+		    "and the -i, -c, and -n options are disallowed.\n\t"
+		    "The -v option can be used to display verbose information: "
+		    "zone name, id,\n\tcurrent state, root directory and "
+		    "options.  The -p option can be used\n\tto request "
+		    "machine-parsable output.  The -j option outputs data "
+		    "in\n\tJSON format.  The -j, -v and -p options are "
+		    "mutually exclusive.\n\tIf neither -j, -v nor -p is "
+		    "used, just the zone name is listed."));
 	case CMD_VERIFY:
 		return (gettext("Check to make sure the configuration "
 		    "can safely be instantiated\n\ton the machine: "
@@ -422,7 +431,27 @@ safe_calloc(size_t nelem, size_t elsize)
 }
 
 static void
-zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
+zone_print_start(list_format_t format)
+{
+	if (format == LF_VERBOSE) {
+		(void) printf("%*s %-16s %-10s %-30s %-8s %-6s\n",
+		    ZONEID_WIDTH, "ID", "NAME", "STATUS", "PATH", "BRAND",
+		    "IP");
+	}
+
+	if (format == LF_JSON)
+		(void) printf("[\n");
+}
+
+static void
+zone_print_end(list_format_t format)
+{
+	if (format == LF_JSON)
+		(void) printf("\n]\n");
+}
+
+static void
+zone_print(zone_entry_t *zent, list_format_t format)
 {
 	static boolean_t firsttime = B_TRUE;
 	char *ip_type_str;
@@ -436,21 +465,16 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 	else
 		ip_type_str = "shared";
 
-	assert(!(verbose && parsable));
-	if (firsttime && verbose) {
-		firsttime = B_FALSE;
-		(void) printf("%*s %-16s %-10s %-30s %-8s %-6s\n",
-		    ZONEID_WIDTH, "ID", "NAME", "STATUS", "PATH", "BRAND",
-		    "IP");
-	}
-	if (!verbose) {
+	switch (format) {
+
+	case LF_DEFAULT:
+		(void) printf("%s\n", zent->zname);
+		break;
+
+	case LF_PARSABLE: {
 		char *cp, *clim;
 		char zdid[80];
 
-		if (!parsable) {
-			(void) printf("%s\n", zent->zname);
-			return;
-		}
 		if (zent->zid == ZONE_ID_UNDEFINED)
 			(void) printf("-");
 		else
@@ -467,16 +491,53 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 			(void) snprintf(zdid, sizeof (zdid), "%d", zent->zdid);
 		(void) printf("%s:%s:%s:%s:%s\n", cp, zent->zuuid, zent->zbrand,
 		    ip_type_str, zdid);
-		return;
+		break;
 	}
-	if (zent->zstate_str != NULL) {
+
+	case LF_JSON: {
+		char *cp, *clim;
+
+		if (!firsttime)
+			(void) printf(",\n");
+		(void) printf("{");
+		(void) printf("\"name\":\"%s\",", zent->zname);
+		(void) printf("\"uuid\":\"%s\",", zent->zuuid);
+		(void) printf("\"status\":\"%s\",", zent->zstate_str);
+		if (zent->zid == ZONE_ID_UNDEFINED)
+			(void) printf("\"id\": \"-\",");
+		else
+			(void) printf("\"id\":\"%lu\",", zent->zid);
+		(void) printf("\"brand\":\"%s\",", zent->zbrand);
+		(void) printf("\"ip\":\"%s\",", ip_type_str);
+		(void) printf("\"path\":\"");
+		cp = zent->zroot;
+		while ((clim = strchr(cp, '"')) != NULL) {
+			(void) printf("%.*s\\\"", clim - cp, cp);
+			cp = clim + 1;
+		}
+		(void) printf("%s\",", cp);
+		if (zent->zdid == -1)
+			(void) printf("\"did\":\"-\"");
+		else
+			(void) printf("\"did\":\"%d\"", zent->zdid);
+		(void) printf("}");
+		break;
+	}
+
+	case LF_VERBOSE:
+		if (zent->zstate_str == NULL)
+			break;
 		if (zent->zid == ZONE_ID_UNDEFINED)
 			(void) printf("%*s", ZONEID_WIDTH, "-");
 		else
 			(void) printf("%*lu", ZONEID_WIDTH, zent->zid);
 		(void) printf(" %-16s %-10s %-30s %-8s %-6s\n", zent->zname,
 		    zent->zstate_str, zent->zroot, zent->zbrand, ip_type_str);
+		break;
+
 	}
+
+	firsttime = B_FALSE;
 }
 
 static int
@@ -724,7 +785,7 @@ again:
 }
 
 static int
-zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable,
+zone_print_list(zone_state_t min_state, list_format_t format,
     boolean_t exclude_global)
 {
 	int i;
@@ -743,13 +804,14 @@ zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable,
 		 */
 		return (i);
 	}
+	zone_print_start(format);
 	for (i = 0; i < nzents; i++) {
 		if (exclude_global && zents[i].zid == GLOBAL_ZONEID)
 			continue;
-		zone_print(&zents[i], verbose, parsable);
+		zone_print(&zents[i], format);
 	}
 	if (min_state >= ZONE_STATE_RUNNING)
-		return (Z_OK);
+		goto out;
 	/*
 	 * Next, get the full list of zones from the configuration, skipping
 	 * any we have already printed.
@@ -770,9 +832,11 @@ zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable,
 		}
 		free(name);
 		if (zent.zstate_num >= min_state)
-			zone_print(&zent, verbose, parsable);
+			zone_print(&zent, format);
 	}
 	endzoneent(cookie);
+out:
+	zone_print_end(format);
 	return (Z_OK);
 }
 
@@ -1387,94 +1451,89 @@ list_func(int argc, char *argv[])
 {
 	zone_entry_t *zentp, zent;
 	int arg, retv;
-	boolean_t output = B_FALSE, verbose = B_FALSE, parsable = B_FALSE,
-	    exclude_global = B_FALSE;
+	boolean_t output = B_FALSE, exclude_global = B_FALSE, ferr = B_FALSE;
 	zone_state_t min_state = ZONE_STATE_RUNNING;
 	zoneid_t zone_id = getzoneid();
+	list_format_t format = LF_DEFAULT;
+	char *optstr;
 
-	if (target_zone == NULL) {
-		/* all zones: default view to running but allow override */
-		optind = 0;
-		while ((arg = getopt(argc, argv, "?cinpv")) != EOF) {
-			switch (arg) {
-			case '?':
-				sub_usage(SHELP_LIST, CMD_LIST);
-				return (optopt == '?' ? Z_OK : Z_USAGE);
-				/*
-				 * The 'i' and 'c' options are not mutually
-				 * exclusive so if 'c' is given, then min_state
-				 * is set to 0 (ZONE_STATE_CONFIGURED) which is
-				 * the lowest possible state.  If 'i' is given,
-				 * then min_state is set to be the lowest state
-				 * so far.
-				 */
-			case 'c':
-				min_state = ZONE_STATE_CONFIGURED;
-				break;
-			case 'i':
-				min_state = min(ZONE_STATE_INSTALLED,
-				    min_state);
+	if (target_zone == NULL)
+		optstr = "?cijnpv";
+	else
+		optstr = "?jpv";
 
-				break;
-			case 'n':
-				exclude_global = B_TRUE;
-				break;
-			case 'p':
-				parsable = B_TRUE;
-				break;
-			case 'v':
-				verbose = B_TRUE;
-				break;
-			default:
-				sub_usage(SHELP_LIST, CMD_LIST);
-				return (Z_USAGE);
-			}
-		}
-		if (parsable && verbose) {
-			zerror(gettext("%s -p and -v are mutually exclusive."),
-			    cmd_to_str(CMD_LIST));
-			return (Z_ERR);
-		}
-		if (zone_id == GLOBAL_ZONEID || is_system_labeled()) {
-			retv = zone_print_list(min_state, verbose, parsable,
-			    exclude_global);
-		} else {
-			fake_up_local_zone(zone_id, &zent);
-			retv = Z_OK;
-			zone_print(&zent, verbose, parsable);
-		}
-		return (retv);
-	}
-
-	/*
-	 * Specific target zone: disallow -i/-c/-n suboptions.
-	 */
 	optind = 0;
-	while ((arg = getopt(argc, argv, "?pv")) != EOF) {
+	while ((arg = getopt(argc, argv, optstr)) != EOF) {
 		switch (arg) {
 		case '?':
 			sub_usage(SHELP_LIST, CMD_LIST);
 			return (optopt == '?' ? Z_OK : Z_USAGE);
+			/*
+			 * The 'i' and 'c' options are not mutually
+			 * exclusive so if 'c' is given, then min_state
+			 * is set to 0 (ZONE_STATE_CONFIGURED) which is
+			 * the lowest possible state.  If 'i' is given,
+			 * then min_state is set to be the lowest state
+			 * so far.
+			 */
+		case 'c':
+			min_state = ZONE_STATE_CONFIGURED;
+			break;
+		case 'i':
+			min_state = min(ZONE_STATE_INSTALLED, min_state);
+			break;
+		case 'j':
+			if (format != LF_DEFAULT)
+				ferr = B_TRUE;
+			else
+				format = LF_JSON;
+			break;
+		case 'n':
+			exclude_global = B_TRUE;
+			break;
 		case 'p':
-			parsable = B_TRUE;
+			if (format != LF_DEFAULT)
+				ferr = B_TRUE;
+			else
+				format = LF_PARSABLE;
 			break;
 		case 'v':
-			verbose = B_TRUE;
+			if (format != LF_DEFAULT)
+				ferr = B_TRUE;
+			else
+				format = LF_VERBOSE;
 			break;
 		default:
 			sub_usage(SHELP_LIST, CMD_LIST);
 			return (Z_USAGE);
 		}
 	}
-	if (parsable && verbose) {
-		zerror(gettext("%s -p and -v are mutually exclusive."),
-		    cmd_to_str(CMD_LIST));
-		return (Z_ERR);
-	}
+
 	if (argc > optind) {
 		sub_usage(SHELP_LIST, CMD_LIST);
 		return (Z_USAGE);
 	}
+
+	if (ferr) {
+		zerror(gettext("%s -j, -p and -v are mutually exclusive."),
+		    cmd_to_str(CMD_LIST));
+		return (Z_ERR);
+	}
+
+	if (target_zone == NULL) {
+		if (zone_id == GLOBAL_ZONEID || is_system_labeled()) {
+			retv = zone_print_list(min_state, format,
+			    exclude_global);
+		} else {
+			fake_up_local_zone(zone_id, &zent);
+			retv = Z_OK;
+			zone_print_start(format);
+			zone_print(&zent, format);
+			zone_print_end(format);
+		}
+		return (retv);
+	}
+
 	if (zone_id != GLOBAL_ZONEID && !is_system_labeled()) {
 		fake_up_local_zone(zone_id, &zent);
 		/*
@@ -1484,14 +1543,20 @@ list_func(int argc, char *argv[])
 		 * assert() that here but don't otherwise check.
 		 */
 		assert(strcmp(zent.zname, target_zone) == 0);
-		zone_print(&zent, verbose, parsable);
+		zone_print_start(format);
+		zone_print(&zent, format);
+		zone_print_end(format);
 		output = B_TRUE;
 	} else if ((zentp = lookup_running_zone(target_zone)) != NULL) {
-		zone_print(zentp, verbose, parsable);
+		zone_print_start(format);
+		zone_print(zentp, format);
+		zone_print_end(format);
 		output = B_TRUE;
 	} else if (lookup_zone_info(target_zone, ZONE_ID_UNDEFINED,
 	    &zent) == Z_OK) {
-		zone_print(&zent, verbose, parsable);
+		zone_print_start(format);
+		zone_print(&zent, format);
+		zone_print_end(format);
 		output = B_TRUE;
 	}
 
