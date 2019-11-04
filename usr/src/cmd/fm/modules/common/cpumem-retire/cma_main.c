@@ -76,7 +76,7 @@ typedef struct cma_subscriber {
 } cma_subscriber_t;
 
 static const cma_subscriber_t cma_subrs[] = {
-#if defined(i386)
+#if defined(i386) || defined(__amd64__)
 	/*
 	 * On x86, the ASRUs are expected to be in hc scheme.  When
 	 * cpumem-retire wants to retire a cpu or mem page, it calls the
