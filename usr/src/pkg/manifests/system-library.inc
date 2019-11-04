@@ -1040,45 +1040,45 @@ link path=usr/lib/scsi/$(ARCH32)/libsmp.so target=./libsmp.so.1
 link path=usr/lib/scsi/libscsi.so target=./libscsi.so.1
 link path=usr/lib/scsi/libses.so target=./libses.so.1
 link path=usr/lib/scsi/libsmp.so target=./libsmp.so.1
-link path=usr/lib/security/$(ARCH32)/crypt_bsdbf.so target=./crypt_bsdbf.so.1
-link path=usr/lib/security/$(ARCH32)/crypt_bsdmd5.so \
+link path=usr/lib/security/$(ARCH64)/crypt_bsdbf.so target=./crypt_bsdbf.so.1
+link path=usr/lib/security/$(ARCH64)/crypt_bsdmd5.so \
     target=./crypt_bsdmd5.so.1
-link path=usr/lib/security/$(ARCH32)/crypt_sha256.so \
+link path=usr/lib/security/$(ARCH64)/crypt_sha256.so \
     target=./crypt_sha256.so.1
-link path=usr/lib/security/$(ARCH32)/crypt_sha512.so \
+link path=usr/lib/security/$(ARCH64)/crypt_sha512.so \
     target=./crypt_sha512.so.1
-link path=usr/lib/security/$(ARCH32)/crypt_sunmd5.so \
+link path=usr/lib/security/$(ARCH64)/crypt_sunmd5.so \
     target=./crypt_sunmd5.so.1
-link path=usr/lib/security/$(ARCH32)/pam_allow.so target=./pam_allow.so.1
-link path=usr/lib/security/$(ARCH32)/pam_authtok_check.so \
+link path=usr/lib/security/$(ARCH64)/pam_allow.so target=./pam_allow.so.1
+link path=usr/lib/security/$(ARCH64)/pam_authtok_check.so \
     target=./pam_authtok_check.so.1
-link path=usr/lib/security/$(ARCH32)/pam_authtok_get.so \
+link path=usr/lib/security/$(ARCH64)/pam_authtok_get.so \
     target=./pam_authtok_get.so.1
-link path=usr/lib/security/$(ARCH32)/pam_authtok_store.so \
+link path=usr/lib/security/$(ARCH64)/pam_authtok_store.so \
     target=./pam_authtok_store.so.1
-link path=usr/lib/security/$(ARCH32)/pam_deny.so target=./pam_deny.so.1
-link path=usr/lib/security/$(ARCH32)/pam_dhkeys.so target=./pam_dhkeys.so.1
-link path=usr/lib/security/$(ARCH32)/pam_dial_auth.so \
+link path=usr/lib/security/$(ARCH64)/pam_deny.so target=./pam_deny.so.1
+link path=usr/lib/security/$(ARCH64)/pam_dhkeys.so target=./pam_dhkeys.so.1
+link path=usr/lib/security/$(ARCH64)/pam_dial_auth.so \
     target=./pam_dial_auth.so.1
-link path=usr/lib/security/$(ARCH32)/pam_ldap.so target=./pam_ldap.so.1
-link path=usr/lib/security/$(ARCH32)/pam_list.so target=./pam_list.so.1
-link path=usr/lib/security/$(ARCH32)/pam_passwd_auth.so \
+link path=usr/lib/security/$(ARCH64)/pam_ldap.so target=./pam_ldap.so.1
+link path=usr/lib/security/$(ARCH64)/pam_list.so target=./pam_list.so.1
+link path=usr/lib/security/$(ARCH64)/pam_passwd_auth.so \
     target=./pam_passwd_auth.so.1
-link path=usr/lib/security/$(ARCH32)/pam_roles.so target=./pam_roles.so.1
-link path=usr/lib/security/$(ARCH32)/pam_sample.so target=./pam_sample.so.1
-link path=usr/lib/security/$(ARCH32)/pam_timestamp.so \
+link path=usr/lib/security/$(ARCH64)/pam_roles.so target=./pam_roles.so.1
+link path=usr/lib/security/$(ARCH64)/pam_sample.so target=./pam_sample.so.1
+link path=usr/lib/security/$(ARCH64)/pam_timestamp.so \
     target=./pam_timestamp.so.1
-link path=usr/lib/security/$(ARCH32)/pam_unix_account.so \
+link path=usr/lib/security/$(ARCH64)/pam_unix_account.so \
     target=./pam_unix_account.so.1
-link path=usr/lib/security/$(ARCH32)/pam_unix_auth.so \
+link path=usr/lib/security/$(ARCH64)/pam_unix_auth.so \
     target=./pam_unix_auth.so.1
-link path=usr/lib/security/$(ARCH32)/pam_unix_cred.so \
+link path=usr/lib/security/$(ARCH64)/pam_unix_cred.so \
     target=./pam_unix_cred.so.1
-link path=usr/lib/security/$(ARCH32)/pam_unix_session.so \
+link path=usr/lib/security/$(ARCH64)/pam_unix_session.so \
     target=./pam_unix_session.so.1
-link path=usr/lib/security/$(ARCH32)/pkcs11_kernel.so \
+link path=usr/lib/security/$(ARCH64)/pkcs11_kernel.so \
     target=./pkcs11_kernel.so.1
-link path=usr/lib/security/$(ARCH32)/pkcs11_softtoken.so \
+link path=usr/lib/security/$(ARCH64)/pkcs11_softtoken.so \
     target=./pkcs11_softtoken.so.1
 link path=usr/lib/security/64 target=$(ARCH64)
 link path=usr/lib/security/crypt_bsdbf.so target=./crypt_bsdbf.so.1
