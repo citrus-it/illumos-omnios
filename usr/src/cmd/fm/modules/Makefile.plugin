@@ -78,12 +78,12 @@ CFLAGS64 += $(CTF_FLAGS) $(CC_PICFLAGS)
 CFLAGS64 += $(GSHARED) $(XREGSFLAG) 
 
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS
-LDFLAGS64 += $(ZDEFS) $(ZTEXT) $(ZIGNORE)
+LDFLAGS += $(ZDEFS) $(ZTEXT) $(ZIGNORE)
 
 MAPFILE-DMOD = $(SRC)/cmd/mdb/common/modules/conf/mapfile-extern
 
 
-$(PROG) := LDFLAGS64 += -Wl,-M$(APIMAP) -Wl,-M$(FMRIMAP)
+$(PROG) := LDFLAGS += -Wl,-M$(APIMAP) -Wl,-M$(FMRIMAP)
 $(PROG) := LDLIBS64 += -lnvpair -lc
 
 all: $(PROG) $(DMODPROG)

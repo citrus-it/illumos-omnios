@@ -43,7 +43,7 @@ CPPFLAGS += -I. -I../common
 CFLAGS64 += $(CTF_FLAGS)
 LDLIBS64 += -L$(ROOT)/usr/lib/fm -lfmd_adm -lfmd_msg
 LDLIBS64 += -lnvpair -ltopo
-LDFLAGS64 += -R/usr/lib/fm
+LDFLAGS += -R/usr/lib/fm
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS)

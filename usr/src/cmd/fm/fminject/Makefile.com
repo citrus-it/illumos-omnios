@@ -54,7 +54,7 @@ CERRWARN += -Wno-type-limits
 CERRWARN += -Wno-unused-label
 CERRWARN += -Wno-unused-variable
 LDLIBS64 += -L$(ROOT)/usr/lib/fm -lfmd_log -lsysevent -lnvpair -lumem
-LDFLAGS64 += -R/usr/lib/fm
+LDFLAGS += -R/usr/lib/fm
 STRIPFLAG =
 
 LFLAGS += -t

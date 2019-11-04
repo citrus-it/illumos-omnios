@@ -35,7 +35,7 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I. -I../common -I../../include
 CFLAGS64 += $(CTF_FLAGS)
 LDLIBS64 += -L$(ROOT)/usr/lib/fm -lfmd_log -lnvpair -ltopo -lfmd_msg
-LDFLAGS64 += -R/usr/lib/fm
+LDFLAGS += -R/usr/lib/fm
 CERRWARN += -Wno-parentheses
 CERRWARN += -Wno-uninitialized
 
