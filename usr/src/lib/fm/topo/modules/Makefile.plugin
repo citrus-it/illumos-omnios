@@ -30,6 +30,7 @@ MODCLASS = plugins
 
 include ../../../../Makefile.lib
 include ../../../../../Makefile.lib
+include ../../../../../Makefile.lib.64
 
 #
 # Set PROG and OBJS based on the values of MODULE and SRCS.  We expect that
@@ -62,14 +63,14 @@ APIMAP = ../../../libtopo/common/topo_mod.map
 MAPFILES =		# use APIMAP instead
 
 CSTD  = $(CSTD_GNU99)
-CFLAGS += $(CTF_FLAGS) $(CC_PICFLAGS)
-CFLAGS += $(GSHARED) $(XREGSFLAG)
+CFLAGS64 += $(CTF_FLAGS) $(CC_PICFLAGS)
+CFLAGS64 += $(GSHARED) $(XREGSFLAG)
 
 CPPFLAGS += -I.
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS
 LDFLAGS += $(ZIGNORE) -Wl,-M$(APIMAP)
-LDLIBS += -L$(ROOT)/usr/lib/fm/$(MACH32) -ltopo -lnvpair -lc
-DYNFLAGS += -R/usr/lib/fm/$(MACH32)
+LDLIBS += -L$(ROOT)/usr/lib/fm -ltopo -lnvpair -lc
+DYNFLAGS += -R/usr/lib/fm
 
 all: $(PROG)
 
