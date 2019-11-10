@@ -29,6 +29,10 @@ was changed.
  - /etc/[uw]tmpx symlink
  - /usr/adm symlink
  - legacy accounting and reporting
+ * 32-bit libraries moved to i386 subdir of /lib and /usr/lib, and 64-bit
+   libraries moved from the amd64 subdir to the top level of /lib and /usr/lib.
+   in subdirectories not directly handled by the default ld.so configuration,
+   the old style of amd64 subdir is still (mostly) used.
  * moved all /var/adm files to /var/log
  * moved /var/svc/log to /var/log/svc
  * ntp has been replaced with openntpd 6.2p3
