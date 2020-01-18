@@ -397,7 +397,9 @@ dhcp_ipc_make_request(dhcp_ipc_request_t *request, dhcp_ipc_reply_t **reply,
 	sinv.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	retval = connect(fd, (struct sockaddr *)&sinv, sizeof (sinv));
 	if (retval == -1) {
+		int saverr = errno;
 		(void) dhcp_ipc_close(fd);
+		errno = saverr;
 		return (DHCP_IPC_E_CONNECT);
 	}
 

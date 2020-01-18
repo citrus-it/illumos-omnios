@@ -74,6 +74,7 @@ typedef enum {
 	IPADM_INVALID_ARG,	/* Invalid argument */
 	IPADM_INVALID_NAME,	/* Invalid name */
 	IPADM_DLPI_FAILURE,	/* Could not open DLPI link */
+	IPADM_DLPI_EACCESS,	/* Permission denied opening DLPI link */
 	IPADM_DLADM_FAILURE,	/* DLADM error encountered */
 	IPADM_PROP_UNKNOWN,	/* Unknown property */
 	IPADM_ERANGE,		/* Value is outside the allowed range */
@@ -89,6 +90,7 @@ typedef enum {
 	IPADM_DHCP_START_ERROR,	/* Cannot start dhcpagent */
 	IPADM_DHCP_IPC_ERROR,	/* Cannot communicate with dhcpagent */
 	IPADM_DHCP_IPC_TIMEOUT,	/* Communication with dhcpagent timed out */
+	IPADM_DHCP_IPC_EACCESS,	/* Permission denied opening IPC socket */
 	IPADM_TEMPORARY_OBJ,	/* Permanent operation on temporary object */
 	IPADM_IPC_ERROR,	/* Cannot communicate with ipmgmtd */
 	IPADM_OP_DISABLE_OBJ,	/* Operation on disable object */

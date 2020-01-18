@@ -81,6 +81,7 @@ static struct ipadm_error_info {
 	{ IPADM_INVALID_ARG,	"Invalid argument provided" },
 	{ IPADM_INVALID_NAME,	"Invalid name" },
 	{ IPADM_DLPI_FAILURE,	"Could not open DLPI link" },
+	{ IPADM_DLPI_EACCESS,	"Cannot open DLPI link: Permission denied" },
 	{ IPADM_DLADM_FAILURE,	"Datalink does not exist" },
 	{ IPADM_PROP_UNKNOWN,   "Unknown property" },
 	{ IPADM_ERANGE,		"Value is outside the allowed range" },
@@ -96,6 +97,8 @@ static struct ipadm_error_info {
 	{ IPADM_DHCP_START_ERROR, "Could not start dhcpagent" },
 	{ IPADM_DHCP_IPC_ERROR,	"Could not communicate with dhcpagent" },
 	{ IPADM_DHCP_IPC_TIMEOUT, "Communication with dhcpagent timed out" },
+	{ IPADM_DHCP_IPC_EACCESS, "Could not communicate with dhcpagent: "
+	    "Permission denied" },
 	{ IPADM_TEMPORARY_OBJ,	"Persistent operation on temporary object" },
 	{ IPADM_IPC_ERROR,	"Could not communicate with ipmgmtd" },
 	{ IPADM_NOTSUP,		"Operation not supported" },

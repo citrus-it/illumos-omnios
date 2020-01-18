@@ -3181,7 +3181,7 @@ i_ipadm_op_dhcp(ipadm_addrobj_t addr, dhcp_ipc_type_t type, int *dhcperror)
 	void			*d4o = NULL;
 	uint16_t		d4olen = 0;
 	char			ifname[LIFNAMSIZ];
-	int			error;
+	int			error, saverr;
 	int			dhcp_timeout;
 
 	/* Construct a message to the dhcpagent. */
@@ -3229,6 +3229,7 @@ i_ipadm_op_dhcp(ipadm_addrobj_t addr, dhcp_ipc_type_t type, int *dhcperror)
 		dhcp_timeout = addr->ipadm_wait;
 	/* Send the message to dhcpagent. */
 	error = dhcp_ipc_make_request(request, &reply, dhcp_timeout);
+	saverr = errno;
 	free(request);
 	free(d4o);
 	if (error == 0) {
@@ -3238,9 +3239,11 @@ i_ipadm_op_dhcp(ipadm_addrobj_t addr, dhcp_ipc_type_t type, int *dhcperror)
 	if (error != 0) {
 		if (dhcperror != NULL)
 			*dhcperror = error;
+		if (error == DHCP_IPC_E_CONNECT && saverr == EACCES)
+			return (IPADM_DHCP_IPC_EACCESS);
 		if (error != DHCP_IPC_E_TIMEOUT)
 			return (IPADM_DHCP_IPC_ERROR);
-		else if (dhcp_timeout != 0)
+		if (dhcp_timeout != 0)
 			return (IPADM_DHCP_IPC_TIMEOUT);
 	}
 
@@ -3262,7 +3265,7 @@ i_ipadm_dhcp_status(ipadm_addrobj_t addr, dhcp_status_t *status,
 	dhcp_ipc_reply_t	*reply;
 	dhcp_status_t		*private_status;
 	size_t			reply_size;
-	int			error;
+	int			error, saverr;
 
 	if (addr->ipadm_af == AF_INET6)
 		type |= DHCP_V6;
@@ -3273,10 +3276,13 @@ i_ipadm_dhcp_status(ipadm_addrobj_t addr, dhcp_status_t *status,
 		return (IPADM_NO_MEMORY);
 
 	error = dhcp_ipc_make_request(request, &reply, DHCP_IPC_WAIT_DEFAULT);
+	saverr = errno;
 	free(request);
 	if (error != 0) {
 		if (dhcperror != NULL)
 			*dhcperror = error;
+		if (error == DHCP_IPC_E_CONNECT && saverr == EACCES)
+			return (IPADM_DHCP_IPC_EACCESS);
 		return (error != DHCP_IPC_E_TIMEOUT ? IPADM_DHCP_IPC_ERROR
 		    : IPADM_DHCP_IPC_TIMEOUT);
 	}
