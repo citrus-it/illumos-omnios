@@ -442,11 +442,14 @@ show_door(struct ps_prochandle *Pr, const prfdinfo_t *info)
 {
 	door_info_t door_info;
 
-	if (pr_door_info(Pr, info->pr_fd, &door_info) != 0)
+	if (info->pr_peerpid != -1) {
+		if (strlen(info->pr_peername) > 0)
+			(void) printf("  door to %s[%d]",
+			    info->pr_peername, info->pr_peerpid);
+		else
+			(void) printf(" pid %d", info->pr_peerpid);
 		return;
-
-	(void) printf("  door to");
-	show_peer_process(door_info.di_target);
+	}
 }
 
 /*

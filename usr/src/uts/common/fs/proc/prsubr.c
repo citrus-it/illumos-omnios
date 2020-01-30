@@ -39,6 +39,7 @@
 #include <sys/inline.h>
 #include <sys/kmem.h>
 #include <sys/mman.h>
+#include <sys/door.h>
 #include <sys/proc.h>
 #include <sys/brand.h>
 #include <sys/sobject.h>
@@ -2905,21 +2906,33 @@ prgetfdinfo(proc_t *p, vnode_t *vp, prfdinfo_t *fdinfo, cred_t *cred,
 		fdinfo->pr_locksysid = bf.l_sysid;
 	}
 
-	/* peer cred */
-
-	k_peercred_t kpc;
+	/* peer process */
 
 	switch (vp->v_type) {
+	case VDOOR: {
+		door_node_t *dp = VTOD(vp);
+
+		if (dp->door_target != NULL)
+			fdinfo->pr_peerpid = dp->door_target->p_pid;
+
+		break;
+	}
 	case VFIFO:
 	case VSOCK: {
+		k_peercred_t kpc;
 		int32_t rval;
 
 		error = VOP_IOCTL(vp, _I_GETPEERCRED, (intptr_t)&kpc,
 		    FKIOCTL, cred, &rval, NULL);
+		if (error == 0 && kpc.pc_cr != NULL) {
+			fdinfo->pr_peerpid = kpc.pc_cpid;
+			crfree(kpc.pc_cr);
+		}
 		break;
 	}
 	case VCHR: {
 		struct strioctl strioc;
+		k_peercred_t kpc;
 		int32_t rval;
 
 		if (vp->v_stream == NULL) {
@@ -2933,19 +2946,18 @@ prgetfdinfo(proc_t *p, vnode_t *vp, prfdinfo_t *fdinfo, cred_t *cred,
 
 		error = strdoioctl(vp->v_stream, &strioc, FNATIVE | FKIOCTL,
 		    STR_NOSIG | K_TO_K, cred, &rval);
+		if (error == 0 && kpc.pc_cr != NULL) {
+			fdinfo->pr_peerpid = kpc.pc_cpid;
+			crfree(kpc.pc_cr);
+		}
 		break;
 	}
 	default:
-		error = ENOTSUP;
 		break;
 	}
 
-	if (error == 0 && kpc.pc_cr != NULL) {
+	if (fdinfo->pr_peerpid != -1) {
 		proc_t *peerp;
-
-		fdinfo->pr_peerpid = kpc.pc_cpid;
-
-		crfree(kpc.pc_cr);
 
 		mutex_enter(&pidlock);
 		if ((peerp = prfind(fdinfo->pr_peerpid)) != NULL) {
