@@ -243,6 +243,7 @@ extern int64_t _portfs(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
  */
 extern int __xpg4;		/* global */
 extern int libc__xpg4;		/* copy of __xpg4, private to libc */
+extern int libc__xpg4open;	/* global */
 
 /*
  * defined in xpg6.c

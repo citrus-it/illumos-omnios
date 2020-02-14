@@ -119,6 +119,7 @@ typedef struct fpollinfo {
 
 #define	FCLOEXEC	0x800000	/* O_CLOEXEC = 0x800000 */
 #define	FDIRECTORY	0x1000000	/* O_DIRECTORY = 0x1000000 */
+#define	FXPG4OPEN	0x8000000	/* O_XPG4OPEN = 0x8000000 */
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 

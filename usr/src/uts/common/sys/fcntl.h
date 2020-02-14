@@ -38,6 +38,7 @@
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
 /* Copyright 2015, Joyent, Inc. */
+/* Copyright 2020 OmniOS Community Edition (OmniOSce) Association. */
 
 #ifndef	_SYS_FCNTL_H
 #define	_SYS_FCNTL_H
@@ -89,6 +90,7 @@ extern "C" {
 #if !defined(_STRICT_SYMBOLS) || defined(_XPG7)
 #define	O_DIRECTORY	0x1000000	/* fail if not a directory */
 #endif
+#define	O_XPG4OPEN	0x8000000 /* XPG4 open (adjust slave PTY behaviour) */
 
 /*
  * fcntl(2) requests

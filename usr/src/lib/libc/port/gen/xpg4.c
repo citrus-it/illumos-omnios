@@ -22,9 +22,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * __xpg4 == 0 by default. The xpg4 cc driver will add an object
@@ -36,3 +36,9 @@
 int __xpg4 = 0;
 
 int libc__xpg4;		/* copy of __xpg4, private to libc */
+
+/*
+ * libc__xpg4open == 0 by default. See the block comment in
+ * usr/src/lib/libc/port/gen/pt.c for details.
+ */
+int libc__xpg4open = 0;

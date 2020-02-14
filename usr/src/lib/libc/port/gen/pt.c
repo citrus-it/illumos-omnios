@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved	*/
 
 #pragma weak _ptsname = ptsname
 #pragma weak _grantpt = grantpt
@@ -116,6 +118,26 @@ ptsname(int fd)
 /*
  * Send an ioctl down to the master device requesting the
  * master/slave pair be unlocked.
+ *
+ * XPG4v2 requires that open of a slave pseudo terminal device
+ * provides the process with an interface that is identical to
+ * the terminal interface. For a more detailed discussion,
+ * see bugid 4025044.
+ *
+ * To satisfy this, in strict XPG4v2 mode, this routine also sets
+ * the libc__xpg4open flag which causes subsequent calls to
+ * open(2) to add O_XPG4OPEN to the mode flags, causing the
+ * kernel to perform additional actions when opening a slave PTY
+ * device. When a slave is subsequently opened, modules that are
+ * required to provide terminal semantics are pushed automatically
+ * onto the stream. Those modules are then informed that they should
+ * behave in strict XPG4v2 mode which modifies their behaviour.
+ * In particular, in strict XPG4v2 mode, empty blocks will be
+ * sent up the master side of the stream rather than being
+ * suppressed.
+ *
+ * Most applications do not expect this so it is only enabled for
+ * programs compiled in strict XPG4v2 mode (see stdlib.h)
  */
 int
 unlockpt(int fd)
@@ -131,6 +153,14 @@ unlockpt(int fd)
 		return (-1);
 
 	return (0);
+}
+
+int
+__unlockpt_xpg4(int fd)
+{
+	if (libc__xpg4 == 1)
+		libc__xpg4open = 1;
+	return (unlockpt(fd));
 }
 
 int

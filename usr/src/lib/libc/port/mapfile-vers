@@ -27,7 +27,7 @@
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -2699,6 +2699,7 @@ $endif
 	_unlink;
 	unlockpt;
 	_unlockpt;
+	__unlockpt_xpg4;
 	utime;
 	_utime;
 	vfprintf;
