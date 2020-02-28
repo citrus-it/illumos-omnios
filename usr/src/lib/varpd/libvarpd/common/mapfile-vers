@@ -36,6 +36,7 @@ SYMBOL_VERSION SUNWprivate {
 	libvarpd_c_instance_activate;
 	libvarpd_c_instance_create;
 	libvarpd_c_instance_destroy;
+	libvarpd_c_instance_reconfigure;
 	libvarpd_c_prop_nprops;
 	libvarpd_c_prop_handle_alloc;
 	libvarpd_c_prop_handle_free;
@@ -69,6 +70,7 @@ SYMBOL_VERSION SUNWprivate {
 	libvarpd_instance_create;
 	libvarpd_instance_destroy;
 	libvarpd_instance_lookup;
+	libvarpd_instance_reconfigure;
 	libvarpd_instance_id;
 
 	libvarpd_panic;

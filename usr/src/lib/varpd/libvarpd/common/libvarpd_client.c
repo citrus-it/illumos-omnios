@@ -167,6 +167,28 @@ libvarpd_c_instance_activate(varpd_client_handle_t *chp, uint64_t cid)
 }
 
 int
+libvarpd_c_instance_reconfigure(varpd_client_handle_t *chp, uint64_t cid)
+{
+	int ret;
+	varpd_client_t *client = (varpd_client_t *)chp;
+	varpd_client_arg_t carg;
+	varpd_client_instance_arg_t *vciap = &carg.vca_un.vca_instance;
+
+	carg.vca_command = VARPD_CLIENT_RECONFIGURE;
+	carg.vca_errno = 0;
+	vciap->vcia_id = cid;
+
+	ret = libvarpd_c_door_call(client, &carg, 0);
+	if (ret != 0)
+		return (ret);
+
+	if (carg.vca_errno != 0)
+		return (carg.vca_errno);
+
+	return (0);
+}
+
+int
 libvarpd_c_instance_destroy(varpd_client_handle_t *chp, uint64_t cid)
 {
 	int ret;

@@ -63,6 +63,20 @@ libvarpd_door_f_create(varpd_impl_t *vip, varpd_client_arg_t *vcap,
 
 /* ARGSUSED */
 static int
+libvarpd_door_f_reconfigure(varpd_impl_t *vip, varpd_client_arg_t *vcap,
+    ucred_t *credp)
+{
+	varpd_instance_handle_t *ihp;
+	varpd_client_instance_arg_t *vciap = &vcap->vca_un.vca_instance;
+
+	ihp = libvarpd_instance_lookup((varpd_handle_t *)vip, vciap->vcia_id);
+	if (ihp == NULL)
+		return (ENOENT);
+	return (libvarpd_instance_reconfigure(ihp));
+}
+
+/* ARGSUSED */
+static int
 libvarpd_door_f_activate(varpd_impl_t *vip, varpd_client_arg_t *vcap,
     ucred_t *credp)
 {
@@ -344,6 +358,7 @@ static libvarpd_door_f *libvarpd_door_table[] = {
 	libvarpd_door_f_create,
 	libvarpd_door_f_activate,
 	libvarpd_door_f_destroy,
+	libvarpd_door_f_reconfigure,
 	libvarpd_door_f_nprops,
 	libvarpd_door_f_propinfo,
 	libvarpd_door_f_getprop,

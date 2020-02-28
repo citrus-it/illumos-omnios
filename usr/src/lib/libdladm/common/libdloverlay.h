@@ -96,22 +96,8 @@ typedef int (*dladm_overlay_cache_f)(dladm_handle_t, datalink_id_t,
 extern dladm_status_t dladm_overlay_walk_cache(dladm_handle_t, datalink_id_t,
     dladm_overlay_cache_f, void *);
 
-/*
- * Some day we'll want to support being able to set properties after creation.
- * If we do, the following strawman API might serve us well.
- *
- * extern dladm_status_t dladm_overlay_prop_lookup(dladm_handle_t,
- *     datalink_id_t, const char *, dladm_overlay_propinfo_handle_t *);
- * extern void dladm_overlay_prop_handle_free(dladm_handle_t, datalink_id_t,
- *     dladm_overlay_propinfo_handle_t *);
- * extern dladm_status_t dladm_overlay_set_prop(dladm_handle_t, datalink_id_t,
- *     dladm_propinfo_handle_t, void *buf, size_t *bufsize);
- * extern dladm_status_t dladm_overlay_str_to_buf(dladm_handle_t, datalink_id_t,
- *     dladm_overlay_propinfo_handle_t *, const char *, void *, size_t *);
- * extern dladm_status_t dladm_overlay_buf_to_str(dladm_handle_t, datalink_id_t,
- *     dladm_overlay_propinfo_handle_t *, const void *, const size_t, char *,
- *     size_t *);
- */
+extern dladm_status_t dladm_overlay_set_properties(dladm_handle_t,
+    datalink_id_t, dladm_arg_list_t *, dladm_errlist_t *);
 
 #ifdef __cplusplus
 }

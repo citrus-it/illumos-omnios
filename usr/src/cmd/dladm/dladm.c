@@ -424,8 +424,8 @@ static cmd_t	cmds[] = {
 	{ "delete-overlay",	do_delete_overlay,
 	    "    delete-overlay   [-t] <overlay>"			},
 	{ "modify-overlay",	do_modify_overlay,
-	    "    modify-overlay   -d mac | -f | -s mac=ip:port "
-	    "<overlay>"						},
+	    "    modify-overlay   -d mac | -f | -s mac=ip:port"
+	    " | [ -p <prop>=<value>[,...]] <overlay>"			},
 	{ "show-overlay",	do_show_overlay,
 	    "    show-overlay     [-f | -t] [[-p] -o <field>,...] "
 	    "[<overlay>]\n"						},
@@ -1470,6 +1470,7 @@ static const struct option overlay_modify_lopts[] = {
 	{ "delete-entry",	required_argument,	NULL,	'd' },
 	{ "flush-table",	no_argument,		NULL,	'f' },
 	{ "set-entry",		required_argument,	NULL,	's' },
+	{ "prop",		required_argument,	NULL,	'p' },
 	{ NULL,			0,			NULL,	0 }
 };
 
@@ -1504,7 +1505,7 @@ static const ofmt_field_t overlay_fields[] = {
 { "VALUE",	11,	OVERLAY_VALUE,		print_overlay_cb },
 { "DEFAULT",	10,	OVERLAY_DEFAULT,	print_overlay_cb },
 { "POSSIBLE",	10,	OVERLAY_POSSIBLE,	print_overlay_cb },
-{ NULL,		0,	0,	NULL }
+{ NULL,		0,	0,			NULL }
 };
 
 typedef enum {
@@ -10382,7 +10383,7 @@ show_one_overlay_fma(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 	if (dladm_datalink_id2info(handle, linkid, NULL, &class, NULL, linkbuf,
 	    MAXLINKNAMELEN) != DLADM_STATUS_OK ||
 	    class != DATALINK_CLASS_OVERLAY) {
-		die("datalink %s is not an overlay device\n", linkbuf);
+		die("datalink %s is not an overlay device", linkbuf);
 	}
 
 	shof.shof_ofmt = req->sor_ofmt;
@@ -10476,14 +10477,16 @@ static void
 do_modify_overlay(int argc, char *argv[], const char *use)
 {
 	int			opt, ocnt = 0;
-	boolean_t		flush, set, delete;
+	boolean_t		flush, set, delete, prop;
 	struct ether_addr	e;
 	char			*dest;
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
+	char			propstr[DLADM_STRSIZE];
 	dladm_status_t		status;
 
-	flush = set = delete = B_FALSE;
-	while ((opt = getopt_long(argc, argv, ":fd:s:", overlay_modify_lopts,
+	flush = set = delete = prop = B_FALSE;
+	bzero(propstr, sizeof (propstr));
+	while ((opt = getopt_long(argc, argv, ":fd:p:s:", overlay_modify_lopts,
 	    NULL)) != -1) {
 		switch (opt) {
 		case 'd':
@@ -10492,13 +10495,23 @@ do_modify_overlay(int argc, char *argv[], const char *use)
 			delete = B_TRUE;
 			ocnt++;
 			if (ether_aton_r(optarg, &e) == NULL)
-				die("invalid mac address: %s\n", optarg);
+				die("invalid mac address: %s", optarg);
 			break;
 		case 'f':
 			if (flush == B_TRUE)
 				die_optdup('f');
 			flush = B_TRUE;
 			ocnt++;
+			break;
+		case 'p':
+			(void) strlcat(propstr, optarg, DLADM_STRSIZE);
+			if (strlcat(propstr, ",", DLADM_STRSIZE) >=
+			    DLADM_STRSIZE)
+				die("property list too long '%s'", propstr);
+			if (!prop) {
+				ocnt++;
+				prop = B_TRUE;
+			}
 			break;
 		case 's':
 			if (set == B_TRUE)
@@ -10512,7 +10525,7 @@ do_modify_overlay(int argc, char *argv[], const char *use)
 				die("malformed value, expected mac=dest, "
 				    "got: %s\n", optarg);
 			if (ether_aton_r(optarg, &e) == NULL)
-				die("invalid mac address: %s\n", optarg);
+				die("invalid mac address: %s", optarg);
 			break;
 		default:
 			die_opterr(optopt, opt, use);
@@ -10520,14 +10533,14 @@ do_modify_overlay(int argc, char *argv[], const char *use)
 	}
 
 	if (ocnt == 0)
-		die("need to specify one of -d, -f, or -s");
+		die("need to specify one of -d, -f, -p, or -s");
 	if (ocnt > 1)
-		die("only one of -d, -f, or -s may be used");
+		die("only one of -d, -f, -p, or -s may be used");
 
 	if (argv[optind] == NULL)
-		die("missing required overlay device\n");
+		die("missing required overlay device");
 	if (argc > optind + 1)
-		die("only one overlay device may be specified\n");
+		die("only one overlay device may be specified");
 
 	status = dladm_name2info(handle, argv[optind], &linkid, NULL, NULL,
 	    NULL);
@@ -10547,6 +10560,25 @@ do_modify_overlay(int argc, char *argv[], const char *use)
 		if (status != DLADM_STATUS_OK)
 			die_dlerr(status, "failed to flush target %s from "
 			    "overlay target cache %s", optarg, argv[optind]);
+	}
+
+	if (prop == B_TRUE) {
+		dladm_arg_list_t *proplist = NULL;
+
+		if (dladm_parse_link_props(propstr, &proplist, B_FALSE)
+		    != DLADM_STATUS_OK) {
+			die("invalid overlay property");
+		}
+
+		status = dladm_overlay_set_properties(handle, linkid, proplist,
+		    &errlist);
+
+		if (status != DLADM_STATUS_OK) {
+			die_dlerrlist(status, &errlist,
+			    "could not modify overlay properties");
+		}
+
+		dladm_free_props(proplist);
 	}
 
 	if (set == B_TRUE) {

@@ -132,7 +132,6 @@ dladm_overlay_prop_info(dladm_overlay_propinfo_handle_t phdl,
 		if (sizep != NULL)
 			*sizep = oinfop->oipi_defsize;
 		if (possp != NULL) {
-			/* LINTED: E_BAD_PTR_CAST_ALIGN */
 			*possp = (const mac_propval_range_t *)oinfop->oipi_poss;
 		}
 
@@ -231,7 +230,6 @@ done:
 	return (status);
 }
 
-/* ARGSUSED */
 static dladm_status_t
 dladm_overlay_varpd_setprop(dladm_handle_t handle,
     varpd_client_handle_t *chdl, uint64_t inst, datalink_id_t linkid,
@@ -280,8 +278,8 @@ dladm_overlay_varpd_setprop(dladm_handle_t handle,
 	return (status);
 }
 
-dladm_status_t
-dladm_overlay_setprop(dladm_handle_t handle, datalink_id_t linkid,
+static dladm_status_t
+i_dladm_overlay_setprop(dladm_handle_t handle, datalink_id_t linkid,
     const char *name, char *const *valp, uint_t cnt, uint_t flags)
 {
 	int			ret;
@@ -576,7 +574,6 @@ dladm_overlay_walk_prop(dladm_handle_t handle, datalink_id_t linkid,
 			    &bufsize) != DLADM_STATUS_OK)
 				continue;
 
-			/* LINTED: E_BAD_PTR_CAST_ALIGN */
 			vp = (uint64_t *)buf;
 			varpdid = *vp;
 		}
@@ -595,6 +592,76 @@ dladm_overlay_walk_prop(dladm_handle_t handle, datalink_id_t linkid,
 		    buf, varpdid, dladm_status2str(info_status, errmsg));
 	}
 	return (ret);
+}
+
+dladm_status_t
+dladm_overlay_set_properties(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_arg_list_t *props, dladm_errlist_t *errs)
+{
+	varpd_client_handle_t *chdl = NULL;
+	char errmsg[DLADM_STRSIZE];
+	uint32_t link_flags, flags;
+	dladm_status_t status;
+	uint64_t varpdid;
+	uint_t i;
+
+	if ((status = dladm_datalink_id2info(handle, linkid,
+	    &link_flags, NULL, NULL, NULL, 0)) != DLADM_STATUS_OK)
+		return (status);
+
+	flags = 0;
+	if ((link_flags & DLMGMT_PERSIST) != 0)
+		flags |= DLADM_OPT_PERSIST;
+
+	for (i = 0; props != NULL && i < props->al_count; i++) {
+		dladm_arg_info_t *aip = &props->al_info[i];
+
+		status = i_dladm_overlay_setprop(handle, linkid,
+		    aip->ai_name, aip->ai_val, aip->ai_count, flags);
+
+		if (status == DLADM_STATUS_OK)
+			continue;
+
+		if (status != DLADM_STATUS_NOTFOUND) {
+			(void) dladm_errlist_append(errs,
+			    "failed to set property %s; %s", aip->ai_name,
+			    dladm_status2str(status, errmsg));
+			continue;
+		}
+
+		/* This could be a varpd property */
+
+		if (chdl == NULL) {
+			int ret;
+
+			if ((ret = libvarpd_c_create(&chdl,
+			    dladm_overlay_doorpath)) != 0) {
+				return (dladm_errno2status(ret));
+			}
+
+			if ((ret = libvarpd_c_instance_lookup(chdl, linkid,
+			    &varpdid)) != 0) {
+				libvarpd_c_destroy(chdl);
+				return (dladm_errno2status(ret));
+			}
+		}
+
+		status = dladm_overlay_varpd_setprop(handle, chdl, varpdid,
+		    linkid, aip->ai_name, aip->ai_val, aip->ai_count, flags);
+
+		if (status != DLADM_STATUS_OK) {
+			(void) dladm_errlist_append(errs,
+			    "failed to set property %s; %s", aip->ai_name,
+			    dladm_status2str(status, errmsg));
+		}
+	}
+
+	if (chdl != NULL) {
+		libvarpd_c_instance_reconfigure(chdl, varpdid);
+		libvarpd_c_destroy(chdl);
+	}
+
+	return (status);
 }
 
 static dladm_status_t
@@ -679,7 +746,7 @@ i_dladm_overlay_commit_sys(dladm_handle_t handle, dladm_overlay_attr_t *attr,
 		if (strncmp(aip->ai_name, attr->oa_search, slen) == 0 &&
 		    aip->ai_name[slen] == '/')
 			continue;
-		status = dladm_overlay_setprop(handle, attr->oa_linkid,
+		status = i_dladm_overlay_setprop(handle, attr->oa_linkid,
 		    aip->ai_name, aip->ai_val, aip->ai_count, attr->oa_flags);
 		if (status != DLADM_STATUS_OK) {
 			(void) dladm_errlist_append(errs,
@@ -809,7 +876,6 @@ typedef struct overlay_walk_cb {
 	uint_t			owc_dest;
 } overlay_walk_cb_t;
 
-/* ARGSUSED */
 static int
 dladm_overlay_walk_cache_cb(varpd_client_handle_t *chdl, uint64_t varpdid,
     const struct ether_addr *key, const varpd_client_cache_entry_t *entry,
@@ -871,7 +937,6 @@ dladm_overlay_walk_cache(dladm_handle_t handle, datalink_id_t linkid,
 	return (dladm_errno2status(ret));
 }
 
-/* ARGSUSED */
 dladm_status_t
 dladm_overlay_cache_flush(dladm_handle_t handle, datalink_id_t linkid)
 {
@@ -893,7 +958,6 @@ dladm_overlay_cache_flush(dladm_handle_t handle, datalink_id_t linkid)
 	return (dladm_errno2status(ret));
 }
 
-/* ARGSUSED */
 dladm_status_t
 dladm_overlay_cache_delete(dladm_handle_t handle, datalink_id_t linkid,
     const struct ether_addr *key)
@@ -916,7 +980,6 @@ dladm_overlay_cache_delete(dladm_handle_t handle, datalink_id_t linkid,
 	return (dladm_errno2status(ret));
 }
 
-/* ARGSUSED */
 dladm_status_t
 dladm_overlay_cache_set(dladm_handle_t handle, datalink_id_t linkid,
     const struct ether_addr *key, char *val)
@@ -1030,7 +1093,6 @@ send:
 	return (dladm_errno2status(ret));
 }
 
-/* ARGSUSED */
 dladm_status_t
 dladm_overlay_cache_get(dladm_handle_t handle, datalink_id_t linkid,
     const struct ether_addr *key, dladm_overlay_point_t *point)

@@ -69,7 +69,7 @@ typedef int (*overlay_target_copyin_f)(const void *, void **, size_t *, int);
 typedef int (*overlay_target_ioctl_f)(overlay_target_hdl_t *, void *);
 typedef int (*overlay_target_copyout_f)(void *, void *, size_t, int);
 
-typedef struct overaly_target_ioctl {
+typedef struct overlay_target_ioctl {
 	int		oti_cmd;	/* ioctl id */
 	boolean_t	oti_write;	/* ioctl requires FWRITE */
 	boolean_t	oti_ncopyout;	/* copyout data? */

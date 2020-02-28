@@ -50,6 +50,7 @@ extern void libvarpd_c_destroy(varpd_client_handle_t *);
 extern int libvarpd_c_instance_create(varpd_client_handle_t *, datalink_id_t,
     const char *, uint64_t *);
 extern int libvarpd_c_instance_activate(varpd_client_handle_t *, uint64_t);
+extern int libvarpd_c_instance_reconfigure(varpd_client_handle_t *, uint64_t);
 extern int libvarpd_c_instance_destroy(varpd_client_handle_t *, uint64_t);
 
 extern int libvarpd_c_prop_nprops(varpd_client_handle_t *, uint64_t, uint_t *);

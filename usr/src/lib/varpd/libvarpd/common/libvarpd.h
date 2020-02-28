@@ -48,6 +48,7 @@ extern varpd_instance_handle_t *libvarpd_instance_lookup(varpd_handle_t *,
     uint64_t);
 extern void libvarpd_instance_destroy(varpd_instance_handle_t *);
 extern int libvarpd_instance_activate(varpd_instance_handle_t *);
+extern int libvarpd_instance_reconfigure(varpd_instance_handle_t *);
 
 extern int libvarpd_plugin_load(varpd_handle_t *, const char *);
 typedef int (*libvarpd_plugin_walk_f)(varpd_handle_t *, const char *, void *);

@@ -30,7 +30,6 @@ Overlay devices are administered through
 .Xr dladm 1M .
 Overlay devices themselves cannot be plumbed up with
 .Sy IP ,
-.Sy vnd ,
 or any other protocol.
 Instead, like an
 .Sy etherstub ,
@@ -239,7 +238,7 @@ It takes a frame that would be put on the wire, wraps it up in a VXLAN
 header and places it in a UDP packet that gets sent out on the
 underlying network.
 For more details about the specific format of the VXLAN header, see
-.Xr vxlan 7P .
+.Xr vxlan 7p .
 .Pp
 The
 .Sy vxlan
@@ -407,7 +406,7 @@ The file is a JSON file that is formatted according to
 .El
 .El
 .Ss General Properties
-Each overaly has the following properties which are used to give
+Each overlay has the following properties which are used to give
 additional information about the system.
 None of these properties may be specified as part of a
 .Sy dladm create-overlay ,
@@ -495,7 +494,7 @@ encapsulation engine.
 .El
 .Sh FMA INTEGRATION
 Overlay devices are wired into FMA, the illumos fault management
-architecture, and generates error reports depending on the
+architecture, and generate error reports depending on the
 .Sy search
 plugin in use.
 Due to limitations in FMA today, when a single overlay

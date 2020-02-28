@@ -293,6 +293,39 @@ libvarpd_instance_destroy(varpd_instance_handle_t *ihp)
 }
 
 int
+libvarpd_instance_reconfigure(varpd_instance_handle_t *ihp)
+{
+	varpd_instance_t *inst = (varpd_instance_t *)ihp;
+	int ret;
+
+	mutex_enter(&inst->vri_lock);
+
+	if (!(inst->vri_flags & VARPD_INSTANCE_F_ACTIVATED)) {
+		ret = EINVAL;
+		goto out;
+	}
+
+	inst->vri_plugin->vpp_ops->vpo_stop(inst->vri_private);
+
+	if ((ret = libvarpd_persist_instance(inst->vri_impl, inst)) != 0)
+		goto out;
+
+	if ((ret = inst->vri_plugin->vpp_ops->vpo_start(inst->vri_private)) !=
+	    0)
+		goto out;
+
+	if ((ret = libvarpd_overlay_disassociate(inst)) != 0)
+		goto out;
+
+	if ((ret = libvarpd_overlay_associate(inst)) != 0)
+		goto out;
+
+out:
+	mutex_exit(&inst->vri_lock);
+	return (ret);
+}
+
+int
 libvarpd_instance_activate(varpd_instance_handle_t *ihp)
 {
 	int ret;
