@@ -7,8 +7,8 @@ A '-' means that the support for that feature was removed, a '+' means that
 the support for that feature was added, and a '*' means that the behavior
 was changed.
 
-<next> release
---------------
+1.4 release
+-----------
  + native compiler support:
    * all provided compilers and binutils generate 64-bit output by default.
      -m32 is required for 32-bit.
