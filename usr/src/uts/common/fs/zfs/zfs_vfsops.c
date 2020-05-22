@@ -2233,6 +2233,9 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 		 * own, and any active references underneath are
 		 * reflected in the vnode count.
 		 */
+
+		zfs_unlinked_drain_stop_wait(zfsvfs);
+
 		if (zfsvfs->z_ctldir == NULL) {
 			if (vfsp->vfs_count > 1)
 				return (SET_ERROR(EBUSY));
