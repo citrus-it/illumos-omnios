@@ -157,6 +157,8 @@ const _Unwind_Action _UA_FORCE_UNWIND = 8;
 void _Unw_capture_regs(uint64_t *regs);
 void _Unw_jmp(uint64_t pc, uint64_t *regs);
 
+extern void __stack_align(void);
+
 static void
 copy_ctx(struct _Unwind_Context *ctx1, struct _Unwind_Context *ctx2)
 {
@@ -352,6 +354,15 @@ _Unwind_RaiseException(struct _Unwind_Exception *exception_object)
 {
 	struct _Unwind_Context entry_context;
 	struct _Unwind_Context *entry_ctx = &entry_context;
+
+	/*
+	 * Unfortunately, the closed source libCrun.so library calls into this
+	 * function without ensuring the stack is 16-byte aligned as required
+	 * by the amd64 ABI. Some of the downstream functions use SSE
+	 * instructions, raising GP if the stack is misaligned.
+	 * Adjust stack alignment if necessary before continuing.
+	 */
+	__stack_align();
 
 	_Unw_capture_regs(entry_ctx->current_regs);
 

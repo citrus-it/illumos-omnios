@@ -291,6 +291,7 @@ SYSOBJS=			\
 	__clock_gettime.o	\
 	__clock_gettime_sys.o	\
 	__getcontext.o		\
+	__stack_align.o		\
 	__uadmin.o		\
 	_lwp_mutex_unlock.o	\
 	_stack_grow.o		\
