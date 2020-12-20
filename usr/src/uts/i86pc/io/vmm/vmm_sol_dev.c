@@ -434,6 +434,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_SET_CAPABILITY:
 	case VM_PPTDEV_MSI:
 	case VM_PPTDEV_MSIX:
+	case VM_PPTDEV_DISABLE_MSIX:
 	case VM_SET_X2APIC_STATE:
 	case VM_GLA2GPA:
 	case VM_GLA2GPA_NOFAULT:
@@ -611,6 +612,16 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		error = ppt_setup_msix(sc->vmm_vm, pptmsix.vcpu, pptmsix.pptfd,
 		    pptmsix.idx, pptmsix.addr, pptmsix.msg,
 		    pptmsix.vector_control);
+		break;
+	}
+	case VM_PPTDEV_DISABLE_MSIX: {
+		struct vm_pptdev pptdev;
+
+		if (ddi_copyin(datap, &pptdev, sizeof (pptdev), md)) {
+			error = EFAULT;
+			break;
+		}
+		error = ppt_disable_msix(sc->vmm_vm, pptdev.pptfd);
 		break;
 	}
 	case VM_MAP_PPTDEV_MMIO: {

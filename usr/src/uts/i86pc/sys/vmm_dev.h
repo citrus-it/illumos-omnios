@@ -291,6 +291,7 @@ _Static_assert(sizeof(struct vm_readwrite_kernemu_device) == 24, "ABI");
 #define	VM_RESTART_INSTRUCTION		(VMM_CPU_IOC_BASE | 0x13)
 #define	VM_SET_KERNEMU_DEV		(VMM_CPU_IOC_BASE | 0x14)
 #define	VM_GET_KERNEMU_DEV		(VMM_CPU_IOC_BASE | 0x15)
+#define	VM_PPTDEV_DISABLE_MSIX		(VMM_CPU_IOC_BASE | 0x16)
 
 /* Operations requiring write-locking the VM */
 #define	VM_REINIT		(VMM_LOCK_IOC_BASE | 0x01)

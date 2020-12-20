@@ -52,6 +52,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_debug_cpus;
 		vm_destroy;
 		vm_destroy;
+		vm_disable_pptdev_msix;
 		vm_get_capability;
 		vm_get_desc;
 		vm_get_device_fd;

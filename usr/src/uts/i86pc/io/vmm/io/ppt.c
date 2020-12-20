@@ -1219,6 +1219,10 @@ ppt_setup_msi(struct vm *vm, int vcpu, int pptfd, uint64_t addr, uint64_t msg,
 		goto done;
 	}
 
+	/* Reject attempts to enable MSI while MSI-X is active. */
+	if (ppt->msix.num_msgs != 0 && numvec != 0)
+		return (EBUSY);
+
 	/* Free any allocated resources */
 	ppt_teardown_msi(ppt);
 
@@ -1318,6 +1322,10 @@ ppt_setup_msix(struct vm *vm, int vcpu, int pptfd, int idx, uint64_t addr,
 		err = EBUSY;
 		goto done;
 	}
+
+	/* Reject attempts to enable MSI-X while MSI is active. */
+	if (ppt->msi.num_msgs != 0)
+		return (EBUSY);
 
 	/*
 	 * First-time configuration:
@@ -1428,6 +1436,33 @@ ppt_get_limits(struct vm *vm, int pptfd, int *msilimit, int *msixlimit)
 	    msixlimit) != DDI_SUCCESS) {
 		*msixlimit = -1;
 	}
+
+done:
+	releasef(pptfd);
+	mutex_exit(&pptdev_mtx);
+	return (err);
+}
+
+int
+ppt_disable_msix(struct vm *vm, int pptfd)
+{
+	struct pptdev *ppt;
+	int err = 0;
+
+	mutex_enter(&pptdev_mtx);
+	ppt = ppt_findf(pptfd);
+	if (ppt == NULL) {
+		mutex_exit(&pptdev_mtx);
+		return (EBADF);
+	}
+	/* Make sure we own this device */
+	if (ppt->vm != vm) {
+		mutex_exit(&pptdev_mtx);
+		err = EBUSY;
+		goto done;
+	}
+
+	ppt_teardown_msix(ppt);
 
 done:
 	releasef(pptfd);
