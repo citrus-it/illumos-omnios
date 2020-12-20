@@ -375,7 +375,7 @@ struct smbios_table_type3 smbios_type3_template = {
 };
 
 const char *smbios_type3_strings[] = {
-	" ",		/* manufacturer string */
+	"illumos",	/* manufacturer string */
 	"1.0",		/* version string */
 	"None",		/* serial number string */
 	"None",		/* asset tag string */
