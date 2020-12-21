@@ -825,31 +825,43 @@ fail:
 	return (B_FALSE);
 }
 
-
-static struct pptdev *
-ppt_findf(int fd)
+static int
+ppt_findf(struct vm *vm, int fd, struct pptdev **pptp)
 {
 	struct pptdev *ppt = NULL;
 	file_t *fp;
 	vattr_t va;
+	int err = 0;
 
-	if ((fp = getf(fd)) == NULL) {
-		return (NULL);
-	}
+	assert(MUTEX_HELD(&pptdev_mtx));
+
+	if ((fp = getf(fd)) == NULL)
+		return (EBADF);
 
 	va.va_mask = AT_RDEV;
 	if (VOP_GETATTR(fp->f_vnode, &va, NO_FOLLOW, fp->f_cred, NULL) != 0 ||
-	    getmajor(va.va_rdev) != ppt_major)
+	    getmajor(va.va_rdev) != ppt_major) {
+		err = EBADF;
 		goto fail;
+	}
 
 	ppt = ddi_get_soft_state(ppt_state, getminor(va.va_rdev));
 
-	if (ppt != NULL)
-		return (ppt);
+	if (ppt == NULL) {
+		err = EBADF;
+		goto fail;
+	}
+
+	if (ppt->vm != vm) {
+		err = EBUSY;
+		goto fail;
+	}
+
+	*pptp = ppt;
 
 fail:
 	releasef(fd);
-	return (NULL);
+	return (err);
 }
 
 static void
@@ -992,16 +1004,11 @@ ppt_assign_device(struct vm *vm, int pptfd)
 	int err = 0;
 
 	mutex_enter(&pptdev_mtx);
-	ppt = ppt_findf(pptfd);
-	if (ppt == NULL) {
+	/* Passing NULL requires the device to be unowned. */
+	err = ppt_findf(NULL, pptfd, &ppt);
+	if (err != 0) {
 		mutex_exit(&pptdev_mtx);
-		return (EBADF);
-	}
-
-	/* Only one VM may own a device at any given time */
-	if (ppt->vm != NULL && ppt->vm != vm) {
-		err = EBUSY;
-		goto done;
+		return (err);
 	}
 
 	if (pci_save_config_regs(ppt->pptd_dip) != DDI_SUCCESS) {
@@ -1091,20 +1098,14 @@ ppt_unassign_device(struct vm *vm, int pptfd)
 	int err = 0;
 
 	mutex_enter(&pptdev_mtx);
-	ppt = ppt_findf(pptfd);
-	if (ppt == NULL) {
+	err = ppt_findf(vm, pptfd, &ppt);
+	if (err != 0) {
 		mutex_exit(&pptdev_mtx);
-		return (EBADF);
+		return (err);
 	}
 
-	/* If this device is not owned by this 'vm' then bail out. */
-	if (ppt->vm != vm) {
-		err = EBUSY;
-		goto done;
-	}
 	ppt_do_unassign(ppt);
 
-done:
 	releasef(pptfd);
 	mutex_exit(&pptdev_mtx);
 	return (err);
@@ -1135,14 +1136,10 @@ ppt_map_mmio(struct vm *vm, int pptfd, vm_paddr_t gpa, size_t len,
 	int err = 0;
 
 	mutex_enter(&pptdev_mtx);
-	ppt = ppt_findf(pptfd);
-	if (ppt == NULL) {
+	err = ppt_findf(vm, pptfd, &ppt);
+	if (err != 0) {
 		mutex_exit(&pptdev_mtx);
-		return (EBADF);
-	}
-	if (ppt->vm != vm) {
-		err = EBUSY;
-		goto done;
+		return (err);
 	}
 
 	/*
@@ -1208,20 +1205,17 @@ ppt_setup_msi(struct vm *vm, int vcpu, int pptfd, uint64_t addr, uint64_t msg,
 		return (EINVAL);
 
 	mutex_enter(&pptdev_mtx);
-	ppt = ppt_findf(pptfd);
-	if (ppt == NULL) {
+	err = ppt_findf(vm, pptfd, &ppt);
+	if (err != 0) {
 		mutex_exit(&pptdev_mtx);
-		return (EBADF);
-	}
-	if (ppt->vm != vm) {
-		/* Make sure we own this device */
-		err = EBUSY;
-		goto done;
+		return (err);
 	}
 
 	/* Reject attempts to enable MSI while MSI-X is active. */
-	if (ppt->msix.num_msgs != 0 && numvec != 0)
-		return (EBUSY);
+	if (ppt->msix.num_msgs != 0 && numvec != 0) {
+		err = EBUSY;
+		goto done;
+	}
 
 	/* Free any allocated resources */
 	ppt_teardown_msi(ppt);
@@ -1312,20 +1306,17 @@ ppt_setup_msix(struct vm *vm, int vcpu, int pptfd, int idx, uint64_t addr,
 	int err = 0;
 
 	mutex_enter(&pptdev_mtx);
-	ppt = ppt_findf(pptfd);
-	if (ppt == NULL) {
+	err = ppt_findf(vm, pptfd, &ppt);
+	if (err != 0) {
 		mutex_exit(&pptdev_mtx);
-		return (EBADF);
-	}
-	/* Make sure we own this device */
-	if (ppt->vm != vm) {
-		err = EBUSY;
-		goto done;
+		return (err);
 	}
 
 	/* Reject attempts to enable MSI-X while MSI is active. */
-	if (ppt->msi.num_msgs != 0)
-		return (EBUSY);
+	if (ppt->msi.num_msgs != 0) {
+		err = EBUSY;
+		goto done;
+	}
 
 	/*
 	 * First-time configuration:
@@ -1418,14 +1409,10 @@ ppt_get_limits(struct vm *vm, int pptfd, int *msilimit, int *msixlimit)
 	int err = 0;
 
 	mutex_enter(&pptdev_mtx);
-	ppt = ppt_findf(pptfd);
-	if (ppt == NULL) {
+	err = ppt_findf(vm, pptfd, &ppt);
+	if (err != 0) {
 		mutex_exit(&pptdev_mtx);
-		return (EBADF);
-	}
-	if (ppt->vm != vm) {
-		err = EBUSY;
-		goto done;
+		return (err);
 	}
 
 	if (ddi_intr_get_navail(ppt->pptd_dip, DDI_INTR_TYPE_MSI,
@@ -1437,7 +1424,6 @@ ppt_get_limits(struct vm *vm, int pptfd, int *msilimit, int *msixlimit)
 		*msixlimit = -1;
 	}
 
-done:
 	releasef(pptfd);
 	mutex_exit(&pptdev_mtx);
 	return (err);
@@ -1450,21 +1436,14 @@ ppt_disable_msix(struct vm *vm, int pptfd)
 	int err = 0;
 
 	mutex_enter(&pptdev_mtx);
-	ppt = ppt_findf(pptfd);
-	if (ppt == NULL) {
+	err = ppt_findf(vm, pptfd, &ppt);
+	if (err != 0) {
 		mutex_exit(&pptdev_mtx);
-		return (EBADF);
-	}
-	/* Make sure we own this device */
-	if (ppt->vm != vm) {
-		mutex_exit(&pptdev_mtx);
-		err = EBUSY;
-		goto done;
+		return (err);
 	}
 
 	ppt_teardown_msix(ppt);
 
-done:
 	releasef(pptfd);
 	mutex_exit(&pptdev_mtx);
 	return (err);
