@@ -1,29 +1,18 @@
 The bhyve kernel module and its associated userland consumers have been updated
 to the latest upstream FreeBSD sources as of:
 
-commit 8ade7383cafed0f7555cac16ef7f9e956e46eaeb
+commit 44a544d41c504fbe37f836eb503e4ae721daada9
 Author: grehan <grehan@FreeBSD.org>
-Date:   Mon May 25 06:25:31 2020 +0000
+Date:   Fri Dec 18 00:38:48 2020 +0000
 
-    Fix pci-passthru MSI issues with OpenBSD guests
+    Fix issues with various VNC clients.
 
-    - Return 2 x 16-bit registers in the correct byte order
-     for a 4-byte read that spans the CMD/STATUS register.
-      This reversal was hiding the capabilities-list, which prevented
-     the MSI capability from being found for XHCI passthru.
-
-    - Reorganize MSI/MSI-x config writes so that a 4-byte write at the
-     capability offset would have the read-only portion skipped.
-      This prevented MSI interrupts from being enabled.
-
-     Reported and extensively tested by Anatoli (me at anatoli dot ws)
-
-    PR:     245392
-    Reported by:    Anatoli (me at anatoli dot ws)
+    PR: 250795
+    Submitted by:   Marko Kiiskila <marko@apache.org>
     Reviewed by:    jhb (bhyve)
-    Approved by:    jhb, bz (mentor)
-    MFC after:      1 week
-    Differential Revision:  https://reviews.freebsd.org/D24951
+    MFC after:      3 weeks
+    Relnotes:       yes
+    Differential Revision:  https://reviews.freebsd.org/D27605
 
 Divergence Notes:
 A previous sync skipped commit c8edafdabc27533d9c51eddc2896e772c16d965c which
@@ -35,3 +24,10 @@ The draft Save/Restore functionality, added in FreeBSD commit
 d3e4e512238b072fb9282e024610b981ba679869, has not been synced into illumos bhyve
 yet.  It is not built by default in FreeBSD, so we're not interested in taking
 it until it successfully endures more in-depth testing.
+
+The VirtFS filesystem sharing feature, added in FreeBSD commit
+8294a283a164da94cf7c7681404c1994754565d9, has not been synced into illumos bhyve
+yet.  It depends on the userland lib9p which needs a fair amount of work to
+build and run on illumos. The integration of this feature is being tracked in
+https://www.illumos.org/issues/13380
+
