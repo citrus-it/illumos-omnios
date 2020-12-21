@@ -245,7 +245,11 @@ usage(int code)
 {
 
         fprintf(stderr,
+#ifdef	__FreeBSD__
 		"Usage: %s [-abehuwxACDHPSWY]\n"
+#else
+		"Usage: %s [-abdehuwxACDHPSWY]\n"
+#endif
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
 		"       %*s [-g <gdb port>] [-l <lpc>]\n"
 #ifdef	__FreeBSD__
