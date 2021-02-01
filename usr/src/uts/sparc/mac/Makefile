@@ -67,6 +67,11 @@ CERRWARN			+= -_gcc=-Wno-type-limits
 CERRWARN			+= -_gcc=-Wno-switch
 CERRWARN			+= -_gcc=-Wno-unused-variable
 
+# needs work
+SMOFF += all_func_returns
+$(OBJS_DIR)/mac_sched.o := SMOFF += assign_vs_compare
+$(OBJS_DIR)/mac_util.o := SMOFF += signed
+
 #
 #	Default build targets.
 #
