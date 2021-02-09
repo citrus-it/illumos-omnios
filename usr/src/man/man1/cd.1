@@ -44,345 +44,317 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH CD 1 "Apr 8, 2008"
-.SH NAME
-cd, chdir, pushd, popd, dirs \- change working directory
-.SH SYNOPSIS
-.LP
-.nf
-\fB/usr/bin/cd\fR [\fIdirectory\fR]
-.fi
-
-.SS "sh"
-.LP
-.nf
-\fBcd\fR [\fIargument\fR]
-.fi
-
-.LP
-.nf
-\fBchdir\fR [\fIargument\fR]
-.fi
-
-.SS "csh"
-.LP
-.nf
-\fBcd\fR [\fIdir\fR]
-.fi
-
-.LP
-.nf
-\fBchdir\fR [\fIdir\fR]
-.fi
-
-.LP
-.nf
-\fBpushd\fR [\fB+\fR\fIn\fR | \fIdir\fR]
-.fi
-
-.LP
-.nf
-\fBpopd\fR [\fB+\fR\fIn\fR]
-.fi
-
-.LP
-.nf
-\fBdirs\fR [\fB-l\fR]
-.fi
-
-.SS "ksh, ksh93"
-.LP
-.nf
-\fBcd\fR [\fB-L\fR] [\fB-P\fR] [\fIarg\fR]
-.fi
-
-.LP
-.nf
-\fBcd\fR \fIold\fR \fInew\fR
-.fi
-
-.SH DESCRIPTION
-.SS "/usr/bin/cd"
-.sp
-.LP
-The \fB/usr/bin/cd\fR utility changes the current directory in the context of
-the \fBcd\fR utility only. This is in contrast to the version built into the
-shell. \fB/usr/bin/cd\fR has no effect on the invoking process but can be used
-to determine whether or not a given directory can be set as the current
-directory.
-.SS "sh"
-.sp
-.LP
-The Bourne shell built-in \fBcd\fR changes the current directory to
-\fIargument\fR. The shell parameter \fBHOME\fR is the default \fIargument\fR.
-The shell parameter \fBCDPATH\fR defines the search path for the directory
-containing \fIargument\fR. Alternative directory names are separated by a colon
-(\fB:\fR). The default path is \fB<null>\fR (specifying the current directory).
+.Dd Feb 9, 2021
+.Dt CD 1
+.Os
+.Sh NAME
+.Nm cd ,
+.Nm chdir ,
+.Nm pushd ,
+.Nm popd ,
+.Nm dirs
+.Nd change working directory
+.Sh SYNOPSIS
+.Nm /usr/bin/cd
+.Op Ar directory
+.Ss ksh93
+.Nm cd
+.Op Fl L
+.Op Fl P
+.Op Ar arg
+.Nm cd Ar old new
+.Nm cd Fl
+.Ss csh
+.Nm cd Op Ar dir
+.Nm chdir Op Ar dir
+.Nm pushd Op Sy + Ns Ar n | Ar dir
+.Nm popd Op Sy + Ns Ar n
+.Nm dirs Op Fl l
+.Sh DESCRIPTION
+.Ss /usr/bin/cd
+The
+.Nm /usr/bin/cd
+utility changes the current directory in the context of
+the
+.Nm
+utility only.
+This is in contrast to the version built into the shell.
+.Nm /usr/bin/cd
+has no effect on the invoking process but can be used to determine whether or
+not a given directory can be set as the current directory.
+.Ss ksh93
+The Korn shell built-in
+.Nm
+command can be in either of two forms.
+In the first form it changes the current directory to
+.Ar arg .
+If
+.Ar arg
+is
+.Fl ,
+the directory is changed to the previous directory.
+The shell variable
+.Ev HOME
+is the default
+.Ar arg .
+The environment variable
+.Ev PWD
+is set to the current directory.
+If the
+.Ev PWD
+is changed, the
+.Ev OLDPWD
+environment variable shall also be changed to the value of the old working
+directory, that is, the current working directory immediately prior to the call
+to change directory
+.Pq Nm .
+The shell variable
+.Ev CDPATH
+defines the search path for the directory containing
+.Ar arg .
+Alternative directory names are separated by a colon
+.Po
+.Sy :
+.Pc .
+The default path is
+.Dv null
+(specifying the current directory).
 The current directory is specified by a null path name, which can appear
 immediately after the equal sign or between the colon delimiters anywhere else
-in the path list. If \fIargument\fR begins with `\fB/\fR', `\fB\&.\fR', or
-`\fB\&.\|.\fR', the search path is not used. Otherwise, each directory in the
-path is searched for \fIargument\fR. \fBcd\fR must have execute (search)
-permission in \fIargument\fR. Because a new process is created to execute each
-command, \fBcd\fR would be ineffective if it were written as a normal command;
-therefore, it is recognized by and is internal to the shell. (See \fBpwd\fR(1),
-\fBsh\fR(1), and \fBchdir\fR(2)).
-.sp
-.LP
-\fBchdir\fR is just another way to call \fBcd\fR.
-.SS "csh"
-.sp
-.LP
-If \fIdir\fR is not specified, the C shell built-in \fBcd\fR uses the value of
-shell parameter \fBHOME\fR as the new working directory. If \fIdir\fR specifies
-a complete path starting with `\fB/\fR', `\fB\&.\fR', or `\fB\&.\|.\fR',
-\fIdir\fR becomes the new working directory. If neither case applies, \fBcd\fR
-tries to find the designated directory relative to one of the paths specified
-by the \fBCDPATH\fR shell variable. \fBCDPATH\fR has the same syntax as, and
-similar semantics to, the \fBPATH\fR shell variable. \fBcd\fR must have execute
-(search) permission in \fIdir\fR. Because a new process is created to execute
-each command, \fBcd\fR would be ineffective if it were written as a normal
-command; therefore, it is recognized by and is internal to the C-shell. (See
-\fBpwd\fR(1), \fBsh\fR(1), and \fBchdir\fR(2)).
-.sp
-.LP
-\fBchdir\fR changes the shell's working directory to directory \fIdir\fR. If no
-argument is given, change to the home directory of the user. If \fIdir\fR is a
-relative pathname not found in the current directory, check for it in those
-directories listed in the \fBcdpath\fR variable. If \fIdir\fR is the name of a
-shell variable whose value starts with a \fB/\fR, change to the directory named
-by that value.
-.sp
-.LP
-\fBpushd\fR pushes a directory onto the directory stack. With no arguments,
-exchange the top two elements.
-.sp
-.ne 2
-.na
-\fB\fB+\fR\fIn\fR\fR
-.ad
-.RS 7n
-Rotate the \fIn\fR'th entry to the top of the stack and \fBcd\fR to it.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIdir\fR\fR
-.ad
-.RS 7n
-Push the current working directory onto the stack and change to \fIdir\fR.
-.RE
-
-.sp
-.LP
-\fBpopd\fR pops the directory stack and \fBcd\fR to the new top directory. The
-elements of the directory stack are numbered from 0 starting at the top.
-.sp
-.ne 2
-.na
-\fB\fB+\fR\fIn\fR\fR
-.ad
-.RS 6n
-Discard the \fIn\fR'th entry in the stack.
-.RE
-
-.sp
-.LP
-\fBdirs\fR prints the directory stack, most recent to the left; the first
-directory shown is the current directory. With the \fB-l\fR argument, produce
-an unabbreviated printout; use of the \fB~\fR notation is suppressed.
-.SS "ksh, ksh93"
-.sp
-.LP
-The Korn shell built-in \fBcd\fR command can be in either of two forms. In the
-first form it changes the current directory to \fIarg\fR. If \fIarg\fR is
-\fB\(mi\fR the directory is changed to the previous directory. The shell
-variable \fBHOME\fR is the default \fIarg\fR. The environment variable
-\fBPWD\fR is set to the current directory. If the \fBPWD\fR is changed, the
-\fBOLDPWD\fR environment variable shall also be changed to the value of the old
-working directory, that is, the current working directory immediately prior to
-the call to change directory (\fBcd\fR). The shell variable \fBCDPATH\fR
-defines the search path for the directory containing \fIarg\fR. Alternative
-directory names are separated by a colon (\fB:\fR). The default path is
-\fBnull\fR (specifying the current directory). The current directory is
-specified by a null path name, which can appear immediately after the equal
-sign or between the colon delimiters anywhere else in the path list. If
-\fIarg\fR begins with a `\fB/\fR', `\fB\&.\fR', or `\fB\&.\|.\fR', then the
-search path is not used. Otherwise, each directory in the path is searched for
-\fIarg\fR. If unsuccessful, \fBcd\fR attempts to change directories to the
-pathname formed by the concatenation of the value of PWD, a slash character,
-and arg.
-.sp
-.ne 2
-.na
-\fB\fB-L\fR\fR
-.ad
-.RS 6n
-Handles the operation dot-dot (\fB\&..\fR) logically. Symbolic link components
-are \fBnot\fR resolved before dot-dot components are processed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-P\fR\fR
-.ad
-.RS 6n
-Handles the operand dot-dot physically. Symbolic link components \fBare\fR
+in the path list.
+If
+.Ar arg
+begins with a
+.Sq Sy / ,
+.Sq Sy \&. ,
+or
+.Sq Sy \&.. ,
+then the search path is not used.
+Otherwise, each directory in the path is searched for
+.Ar arg .
+If unsuccessful,
+.Nm
+attempts to change directories to the pathname formed by the concatenation of
+the value of PWD, a slash character, and
+.Bl -tag -width Ar
+.It Fl L
+Handles the operation dot-dot
+.Pq Sy \&..
+logically.
+Symbolic link components are
+.Em not
 resolved before dot-dot components are processed.
-.RE
-
-.sp
-.LP
-If both \fB-L\fR and \fB-P\fR options are specified, the last option to be
-invoked is used and the other is ignored. If neither \fB-L\fR nor \fB-P\fR is
-specified, the operand is handled dot-dot logically.
-.sp
-.LP
-The second form of \fBcd\fR substitutes the string \fInew\fR for the string
-\fIold\fR in the current directory name, \fBPWD\fR and tries to change to this
-new directory.
-.sp
-.LP
-The \fBcd\fR command cannot be executed by \fBrksh\fR. Because a new process is
-created to execute each command, \fBcd\fR would be ineffective if it were
-written as a normal command; therefore, it is recognized by and is internal to
-the Korn shell. (See \fBpwd\fR(1), \fBsh\fR(1), and \fBchdir\fR(2)).
-.SH OPERANDS
-.sp
-.LP
+.It Fl P
+Handles the operand dot-dot physically.
+Symbolic link components
+.Em are
+resolved before dot-dot components are processed.
+.El
+.Pp
+If both
+.Fl L
+and
+.Fl P
+options are specified, the last option to be invoked is used and the other is
+ignored.
+If neither
+.Fl L
+nor
+.Fl P
+are specified, the dot-dot operand is handled logically.
+.Pp
+The second form of
+.Nm
+substitutes the string
+.Ar new
+for the string
+.Ar old
+in the current directory name,
+.Ev PWD
+and tries to change to this new directory.
+.Pp
+The
+.Nm
+command cannot be executed by
+.Sy rksh
+because a new process is created to execute each command.
+.Nm
+would be ineffective if it were written as a normal command; therefore, it is
+recognized by and is internal to the Korn shell.
+.Po See
+.Xr pwd 1 ,
+.Xr ksh93 1 ,
+and
+.Xr chdir 2
+.Pc .
+.Ss csh
+If
+.Ar dir
+is not specified, the C shell built-in
+.Nm
+uses the value of shell parameter
+.Sy HOME
+as the new working directory.
+If
+.Ar dir
+specifies a complete path starting with
+.Sq Sy / ,
+.Sq Sy \&. ,
+or
+.Sq Sy \&.. ,
+.Ar dir
+becomes the new working directory.
+If neither case applies,
+.Nm
+tries to find the designated directory relative to one of the paths specified
+by the
+.Ev CDPATH
+shell variable.
+.Ev CDPATH
+has the same syntax as, and similar semantics to, the
+.Sy PATH
+shell variable.
+.Nm
+must have execute (search) permission in
+.Ar dir .
+Since a new process is created to execute each command,
+.Nm
+would be ineffective if it were written as a normal command; therefore, it is
+recognized by and is internal to the C-shell.
+.Po See
+.Xr pwd 1 ,
+.Xr sh 1 ,
+and
+.Xr chdir 2
+.Pc .
+.Pp
+.Nm chdir
+changes the shell's working directory to directory
+.Ar dir .
+If no argument is given, change to the home directory of the user.
+If
+.Ar dir
+is a relative pathname not found in the current directory, check for it in
+those directories listed in the
+.Sy cdpath
+variable.
+If
+.Ar dir
+is the name of a shell variable whose value starts with a
+.Sy / ,
+change to the directory named by that value.
+.Pp
+.Nm pushd
+pushes a directory onto the directory stack.
+With no arguments, exchange the top two elements.
+.Bl -tag -width Ar -offset indent
+.It Sy + Ns Ar n
+Rotate the
+.Ar n Ns No 'th
+entry to the top of the stack and
+.Nm
+to it.
+.It Ar dir
+Push the current working directory onto the stack and change to
+.Ar dir .
+.El
+.Pp
+.Nm popd
+pops the directory stack and changes directory to the new top directory.
+The elements of the directory stack are numbered from 0 starting at the top.
+.Bl -tag -width Ar -offset indent
+.It Sy + Ns Ar n
+Discard the
+.Ar n Ns No 'th
+entry in the stack.
+.El
+.Pp
+.Nm dirs
+prints the directory stack, most recent to the left; the first
+directory shown is the current directory.
+With the
+.Fl l
+argument, produce
+an unabbreviated printout; use of the
+.Sy ~
+notation is suppressed.
+.Sh OPERANDS
 The following operands are supported:
-.sp
-.ne 2
-.na
-\fB\fIdirectory\fR\fR
-.ad
-.RS 13n
+.Bl -tag -width Ar
+.It Ar directory
 An absolute or relative pathname of the directory that becomes the new working
-directory. The interpretation of a relative pathname by \fBcd\fR depends on the
-\fBCDPATH\fR environment variable.
-.RE
-
-.SH OUTPUT
-.sp
-.LP
-If a non-empty directory name from \fBCDPATH\fR is used, an absolute pathname
-of the new working directory is written to the standard output as follows:
-.sp
-.LP
-\fB"%s\en"\fR, <\fInew directory\fR>
-.sp
-.LP
-Otherwise, there is no output.
-.SH ENVIRONMENT VARIABLES
-.sp
-.LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
-that affect the execution of \fBcd\fR: \fBLANG\fR, \fBLC_ALL\fR,
-\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
-.sp
-.ne 2
-.na
-\fB\fBCDPATH\fR\fR
-.ad
-.RS 10n
-A colon-separated list of pathnames that refer to directories. If the
-\fIdirectory\fR operand does not begin with a slash \fB(\fR \fB/\fR \fB)\fR
-character, and the first component is not dot or dot-dot, \fBcd\fR searches for
-\fIdirectory\fR relative to each directory named in the \fBCDPATH\fR variable,
-in the order listed. The new working directory sets to the first matching
-directory found. An empty string in place of a directory pathname represents
-the current directory. If \fBCDPATH\fR is not set, it is treated as if it were
-an empty string.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBHOME\fR\fR
-.ad
-.RS 10n
-The name of the home directory, used when no \fIdirectory\fR operand is
-specified.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBOLDPWD\fR\fR
-.ad
-.RS 10n
-A pathname of the previous working directory, used by \fBcd-\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPWD\fR\fR
-.ad
-.RS 10n
-A pathname of the current working directory, set by \fBcd\fR after it has
-changed to that directory.
-.RE
-
-.SH EXIT STATUS
-.sp
-.LP
-The following exit values are returned by \fBcd\fR:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 6n
+directory.
+The interpretation of a relative pathname by
+.Nm
+depends on the
+.Ev CDPATH
+environment variable.
+.El
+.Sh EXIT STATUS
+The following exit values are returned:
+.Bl -tag -width Ds
+.It Sy 0
 The directory was successfully changed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB>0\fR\fR
-.ad
-.RS 6n
+.It Sy >0
 An error occurred.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.SS "csh, ksh, sh"
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-Standard	See \fBstandards\fR(5).
-.TE
-
-.SS "ksh93"
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Uncommitted
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBpwd\fR(1), \fBsh\fR(1),
-\fBchdir\fR(2), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
+.El
+.Sh ENVIRONMENT VARIABLES
+See
+.Xr environ 5
+for descriptions of the following environment variables
+that affect the execution of
+.Nm :
+.Ev LANG ,
+.Ev LC_ALL ,
+.Ev LC_CTYPE ,
+.Ev LC_MESSAGES ,
+and
+.Ev NLSPATH .
+.Bl -tag -width Ds
+.It Ev CDPATH
+A colon-separated list of pathnames that refer to directories.
+If the
+.Ar directory
+operand does not begin with a slash
+.Pq Sy /
+character, and the first component is not dot or dot-dot,
+.Nm
+searches for
+.Ar directory
+relative to each directory named in the
+.Ev CDPATH
+variable,
+in the order listed.
+The new working directory is set to the first matching directory found.
+An empty string in place of a directory pathname represents the current
+directory.
+If
+.Ev CDPATH
+is not set, it is treated as if it were an empty string.
+.It Ev HOME
+The name of the home directory, used when no
+.Ar directory
+operand is specified.
+.It Ev OLDPWD
+A pathname of the previous working directory, used by ksh93's
+.Nm Fl .
+.It Ev PWD
+A pathname of the current working directory, set by
+.Nm
+after it has changed to that directory.
+.El
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Committed .
+.Sh SEE ALSO
+.Xr csh 1 ,
+.Xr ksh93 1 ,
+.Xr pwd 1 ,
+.Xr chdir 2 ,
+.Xr attributes 5 ,
+.Xr environ 5 ,
+.Xr standards 5

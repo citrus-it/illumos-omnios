@@ -43,363 +43,226 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH CUT 1 "Apr 29, 1999"
-.SH NAME
-cut \- cut out selected fields of each line of a file
-.SH SYNOPSIS
-.LP
-.nf
-\fBcut\fR \fB-b\fR \fIlist\fR [\fB-n\fR] [\fIfile\fR]...
-.fi
-
-.LP
-.nf
-\fBcut\fR \fB-c\fR \fIlist\fR [\fIfile\fR]...
-.fi
-
-.LP
-.nf
-\fBcut\fR \fB-f\fR \fIlist\fR [\fB-d\fR \fIdelim\fR] [\fB-s\fR] [\fIfile\fR]...
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-Use the \fBcut\fR utility to cut out columns from a table or fields from each
-line of a file; in data base parlance, it implements the projection of a
-relation. The fields as specified by \fIlist\fR can be fixed length, that is,
-character positions as on a punched card (\fB-c\fR option) or the length can
-vary from line to line and be marked with a field delimiter character like TAB
-(\fB-f\fR option). \fBcut\fR can be used as a filter.
-.sp
-.LP
-Either the \fB-b\fR, \fB-c\fR, or \fB-f\fR option must be specified.
-.sp
-.LP
-Use \fBgrep\fR(1) to make horizontal ``cuts'' (by context) through a file, or
-\fBpaste\fR(1) to put files together column-wise (that is, horizontally). To
-reorder columns in a table, use \fBcut\fR and \fBpaste\fR.
-.SH OPTIONS
-.sp
-.LP
+.Dd Feb 9, 2021
+.Dt CUT 1
+.Os
+.Sh NAME
+.Nm cut
+.Nd cut out selected columns or fields of each line of a file
+.Sh SYNOPSIS
+.Nm
+.Fl b Ar list
+.Op Fl nN
+.Op Fl r Ar reclen
+.Oo Ar file Oc Ns ...
+.Pp
+.Nm
+.Fl c Ar list
+.Op Fl N
+.Op Fl r Ar reclen
+.Oo Ar file Oc Ns ...
+.Pp
+.Nm
+.Fl f Ar list
+.Op Fl s
+.Op Fl d Ar delim
+.Op Fl D Ar ldelim
+.Oo Ar file Oc Ns ...
+.Sh DESCRIPTION
+Use the
+.Nm
+utility to cut out columns from a table or fields from each line of a file.
+In database parlance, it implements the projection of a relation.
+The fields as specified by
+.Ar list
+can be fixed length, that is, character positions as on a punched card
+.Pq Fl c No option
+or the length can vary from line to line and be marked with a field delimiter
+character such as TAB
+.Po Fl f No option Pc .
+.Nm
+can be used as a filter.
+.Pp
+Either the
+.Fl b ,
+.Fl c ,
+or
+.Fl f
+option must be specified.
+.Pp
+Use
+.Xr grep 1
+to make horizontal cuts (by context) through a file, or
+.Xr paste 1
+to put files together column-wise (that is, horizontally).
+To reorder columns in a table, use
+.Nm cut
+and
+.Xr paste 1 .
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fIlist\fR \fR
-.ad
-.RS 13n
-A comma-separated or blank-character-separated list of integer field numbers
-(in increasing order), with optional \fB\(mi\fR to indicate ranges (for
-instance, \fB1,4,7\fR; \fB1\(mi3,8\fR; \fB\(mi5,10\fR (short for
-\fB1\(mi5,10\fR); or \fB3\(mi\fR (short for third through last field)).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\fR\fB-b\fR \fIlist\fR \fR
-.ad
-.RS 13n
-The \fIlist\fR following \fB-b\fR specifies byte positions (for instance,
-\fB-b1\fR\fB-72\fR would pass the first 72 bytes of each line). When \fB-b\fR
-and \fB-n\fR are used together, \fIlist\fR is adjusted so that no multi-byte
-character is split.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\fR\fB-c\fR \fIlist\fR \fR
-.ad
-.RS 13n
-The \fIlist\fR following \fB-c\fR specifies character positions (for instance,
-\fB-c1\fR\fB-72\fR would pass the first 72 characters of each line).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\fR\fB-d\fR \fIdelim\fR \fR
-.ad
-.RS 13n
-The character following \fB-d\fR is the field delimiter (\fB-f\fR option only).
-Default is \fItab\fR. Space or other characters with special meaning to the
-shell must be quoted. \fIdelim\fR can be a multi-byte character.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\fR\fB-f\fR \fIlist\fR \fR
-.ad
-.RS 13n
-The \fIlist\fR following \fB-f\fR is a list of fields assumed to be separated
-in the file by a delimiter character (see \fB-d\fR ); for instance,
-\fB-f1\fR\fB,7\fR copies the first and seventh field only. Lines with no field
-delimiters will be passed through intact (useful for table subheadings), unless
-\fB-s\fR is specified.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-n\fR \fR
-.ad
-.RS 13n
-Do not split characters. When \fB-b\fR \fIlist\fR and \fB-n\fR are used
-together, \fIlist\fR is adjusted so that no multi-byte character is split.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR \fR
-.ad
-.RS 13n
-Suppresses lines with no delimiter characters in case of \fB-f\fR option.
+.Bl -tag -width Ar
+.It Fl b Ar list Ns \&, Fl \-bytes Ns = Ns Ar list
+The
+.Ar list
+following
+.Fl b
+specifies byte positions (for instance,
+.Fl b Ar 1-72
+would pass the first 72 bytes of each line).
+When
+.Fl b
+and
+.Fl n
+are used together, list is adjusted so that no multi-byte character is split.
+.It Fl c Ar list Ns \&, Fl \-characters Ns = Ns Ar list
+The
+.Ar list
+following
+.Fl c
+specifies character positions (for instance,
+.Fl c Ar 1-72
+would pass the first 72 characters of each line).
+.It Fl d Ar delim Ns \&, Fl \-delimiter Ns = Ns Ar delim
+The character following
+.Fl d
+is the field delimiter
+.Po Fl f No option only Pc ;
+the default is the TAB character.
+Space or other characters with special meaning to the shell must be quoted.
+delim can be a multi-byte character.
+.It Fl f Ar list Ns \&, Fl \-fields Ns = Ns Ar list
+The
+.Ar list
+following
+.Fl f
+is a list of fields assumed to be separated in the file by a delimiter
+character
+.Po see Fl d Pc ;
+for instance,
+.Fl f Ar 1,7
+copies the first and seventh field only.
+Lines with no field delimiters will be passed through intact (useful for table
+subheadings), unless
+.Fl s
+is specified.
+.It Fl n Ns \&, Fl \-split Ns \&, Fl \-nosplit
+Controls whether multi-byte characters are split with the
+.Fl b
+option.
+The default is to split characters and this can be disabled with the
+.Fl n
+or
+.Fl \-nosplit
+flag.
 Unless specified, lines with no delimiters will be passed through untouched.
-.RE
-
-.SH OPERANDS
-.sp
-.LP
+.It Fl r Ar reclen Ns \&, Fl R Ar reclen Ns \&, Fl \-reclen Ns = Ns Ar reclen
+If
+.Ar reclen
+is > 0, the input will be read as fixed length records of length
+.Ar reclen
+when used with the
+.Fl b
+or
+.Fl c
+options.
+.It Fl s Ns \&, Fl \-suppress Ns \&, Fl \-only-delimited
+Suppress lines which do not contain any delimiter characters
+.Po Fl f No option only Pc .
+.It Fl D Ar ldelim Ns \&, Fl \-line-delimiter Ns = Ns Ar ldelim Ns \&, Fl \-output-delimiter Ns = Ns Ar ldelim
+The line delimiter for the
+.Fl f
+option is set to
+.Ar ldelim .
+The default is the newline character.
+.It Fl N Ns \&, Fl \-newline Ns \&, Fl \-nonewline
+Controls whether to output a new-line at the end of each record when used with
+the
+.Fl b
+or
+.Fl c
+options.
+This is on by default;
+.Fl N
+turns it off and is the same as specifying
+.Fl \-nonewline .
+.El
+.Pp
+In the above options,
+.Ar list
+is a comma-separated or blank-character-separated list of integer field, byte
+or character numbers (in increasing order), with optional
+.Ar \(mi
+to indicate ranges (for instance,
+.Em 1,4,7 ;
+.Em 1\(mi3,8 ;
+.Em \(mi5,10
+.Po short for Ar 1\(mi5,10 Pc ;
+or
+.Ar 3\(mi
+.Po short for third through last field Pc .
+)
+.Sh OPERANDS
 The following operands are supported:
-.sp
-.ne 2
-.na
-\fB\fIfile\fR \fR
-.ad
-.RS 9n
-A path name of an input file. If no \fIfile\fR operands are specified, or if a
-\fIfile\fR operand is \fB\(mi\fR, the standard input will be used.
-.RE
-
-.SH USAGE
-.sp
-.LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBcut\fR when
-encountering files greater than or equal to 2 Gbyte (2^31 bytes).
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRMapping user IDs
-.sp
-.LP
-A mapping of user \fBIDs\fR to names follows:
-
-.sp
-.in +2
-.nf
-example% \fBcut -d: -f1,5 /etc/passwd\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2 \fRSetting current login name
-.sp
-.LP
-To set \fBname\fR to current login name:
-
-.sp
-.in +2
-.nf
-example$ \fBname=\(gawho am i | cut -f1 -d' '\(ga\fR
-.fi
-.in -2
-.sp
-
-.SH ENVIRONMENT VARIABLES
-.sp
-.LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
-that affect the execution of \fBcut\fR: \fBLANG\fR, \fBLC_ALL\fR,
-\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
-.SH EXIT STATUS
-.sp
-.LP
-The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR \fR
-.ad
-.RS 7n
+.Bl -tag -width Ar
+.It Ar file
+A path name of an input file.
+If no file operands are specified, or if a file operand is
+.Sy \- ,
+the standard input will be used.
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It Sy 0
 All input files were output successfully.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB>0\fR \fR
-.ad
-.RS 7n
+.It Sy >0
 An error occurred.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled
-_
-Interface Stability	Standard
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBgrep\fR(1), \fBpaste\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBlargefile\fR(5), \fBstandards\fR(5)
-.SH DIAGNOSTICS
-.sp
-.ne 2
-.na
-\fB\fBcut: \fR\fB-n\fR\fB may only be used with \fR\fB-b\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: \fR\fB-d\fR\fB may only be used with \fR\fB-f\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: \fR\fB-s\fR\fB may only be used with \fR\fB-f\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: cannot open \fR\fI<file>\fR \fR
-.ad
-.sp .6
-.RS 4n
-Either \fIfile\fR cannot be read or does not exist.  If multiple files are
-present, processing continues.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: no delimiter specified\fR \fR
-.ad
-.sp .6
-.RS 4n
-Missing \fIdelim\fR on \fB-d\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: invalid delimiter\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: no \fIlist\fR\fR\fB specified\fR \fR
-.ad
-.sp .6
-.RS 4n
-Missing \fIlist\fR on \fB-b\fR, \fB-c\fR, or \fB-f\fR option.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: invalid range specifier\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: too many ranges specified\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: range must be increasing\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: invalid character in range\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: internal error processing input\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: invalid multibyte character\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcut: unable to allocate enough memory\fR \fR
-.ad
-.sp .6
-.RS 4n
-
-.RE
-
+.El
+.Sh EXAMPLES
+.Bl -tag -width 6
+.It Sy Example 1 No Mapping user IDs
+.Pp
+A mapping of user IDs to names follows:
+.Bd -literal
+    $ cut -d: -f1,5 /etc/passwd
+.Ed
+.It Sy Example 2 No Setting current login name
+.Pp
+To set
+.Ar name
+to current login name:
+.Bd -literal
+    $ name=\(gawho am i | cut -f1 -d' '\(ga
+.Ed
+.El
+.Sh ENVIRONMENT VARIABLES
+See
+.Xr environ 5
+for descriptions of the following environment variables
+that affect the execution of
+.Nm :
+.Ev LANG ,
+.Ev LC_ALL ,
+.Ev LC_CTYPE ,
+.Ev LC_MESSAGES ,
+.Ev LC_NUMERIC ,
+and
+.Ev NLSPATH .
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Committed .
+The output of
+.Nm
+is
+.Sy Committed .
+.Sh SEE ALSO
+.Xr grep 1 ,
+.Xr paste 1 ,
+.Xr attributes 5 ,
+.Xr environ 5 ,
+.Xr largefile 5 ,
+.Xr standards 5

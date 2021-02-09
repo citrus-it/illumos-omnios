@@ -55,11 +55,26 @@ Description of what oper2 is.
 .\" In general, do not use the '.Ex' macro and instead call out the
 .\" different error values. One would expect at least a difference
 .\" between an error during execution and an error in the usage.
+.\" The following exit values are returned:
+.\" .Bl -tag -width Ds
+.\" .It Sy 0
+.\" All input files were successfully processed.
+.\" .It Sy >0
+.\" An error occurred.
+.\" .El
 .Sh EXAMPLES
 .\" There should be multiple examples present that describe how to use
 .\" different parts of the command. This section should not be skipped
 .\" and it's good to have a number of them.
-.\" .Sh ENVIRONMENT
+.\" .Bl -tag -width 6
+.\" .It Sy Example 1 No description of example
+.\" .Pp
+.\" Introduction
+.\" .Bd -literal
+.\"     $ command
+.\" .Ed
+.\" .El
+.\" .Sh ENVIRONMENT VARIABLES
 .\" If the program reacts to environment variables, most often locale
 .\" related ones, document those here. If they are just the standard
 .\" locale ones, use the following text, adjusting it for the exact set
