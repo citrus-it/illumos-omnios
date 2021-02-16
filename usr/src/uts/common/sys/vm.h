@@ -57,6 +57,8 @@ int	queue_io_request(struct vnode *, u_offset_t);
 extern	kmutex_t	memavail_lock;
 extern	kcondvar_t	memavail_cv;
 
+#define	WAKE_PAGEOUT_SCANNER()	cv_broadcast(&proc_pageout->p_cv);
+
 #endif	/* defined(_KERNEL) */
 
 #ifdef	__cplusplus
