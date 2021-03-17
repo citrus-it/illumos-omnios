@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -69,9 +70,9 @@ print_array()
 	typeset -n pa_array=$1
 
 	(( pa_i = 0 ))
-	while (( $pa_i < ${#pa_array[@]} )); do
+	while (( pa_i < ${#pa_array[@]} )); do
 		printf "\t${pa_array[$pa_i]}\n"
-		(( pa_i = $pa_i + 1 ))
+		(( pa_i = pa_i + 1 ))
 	done
 }
 
@@ -205,11 +206,11 @@ zfs_set_array()
 	zsa_ignore_errors=$4
 
 	(( zsa_i = 0 ))
-	while (( $zsa_i < ${#zsa_array[@]} )); do
+	while (( zsa_i < ${#zsa_array[@]} )); do
 		zfs_set "$zsa_prop" "$zsa_value" "${zsa_array[$zsa_i]}"
 		[[ $? != 0 ]] && [[ -z "$zsa_ignore_errors" ]] &&
 			return 1
-		(( zsa_i = $zsa_i + 1 ))
+		(( zsa_i = zsa_i + 1 ))
 	done
 	return 0
 }
@@ -230,11 +231,11 @@ snap_rename()
 
 	if [[ "$sr_snap" == ~(Elr)(zbe-[0-9][0-9]*) ]]; then
 		sr_snap="zbe-$snap_rename_zbe_i"
-		(( snap_rename_zbe_i = $snap_rename_zbe_i + 1 ))
+		(( snap_rename_zbe_i = snap_rename_zbe_i + 1 ))
 	elif [[ "$sr_snap" == ~(Er)(_snap[0-9]*) ]]; then
 		sr_snap=${sr_snap##~(Er)([0-9]*)}
 		sr_snap="${sr_snap}${snap_rename_snap_i}"
-		(( snap_rename_snap_i = $snap_rename_snap_i + 1 ))
+		(( snap_rename_snap_i = snap_rename_snap_i + 1 ))
 	else
 		printf "$f_user_snap\n" >&2
 		printf "\t$sr_fs@$sr_snap\n" >&2
@@ -288,7 +289,7 @@ destroy_zone_dataset()
 	# Fastpath.  if there are no snapshots of $fs then just delete it.
 	c=`/sbin/zfs list -H -t snapshot -o name -r $fs | grep "^$fs@" |
 	    LC_ALL=C LANG=C wc -l`
-	if (( $c == 0 )) ; then
+	if (( c == 0 )) ; then
 		zfs_destroy "$fs"
 		return
 	fi
@@ -337,13 +338,13 @@ destroy_zone_dataset()
 			continue
 
 		# skip desendents of the origin we plan to destroy
-		[[ "$name" == ~()(${fs}/*) ]] &&
+		[[ "$name" == ~()${fs}/* ]] &&
 			continue
 
 		# record this clone and it's origin
 		clones[$clones_c]="$name"
 		clones_origin[$clones_c]="$origin"
-		(( clones_c = $clones_c + 1 ))
+		(( clones_c = clones_c + 1 ))
 	done
 
 	#
@@ -357,16 +358,16 @@ destroy_zone_dataset()
 	unset stray_clones
 	(( stray_clones_c = 0 ))
 	(( j = 0 ))
-	while (( $j < $clones_c )); do
+	while (( j < clones_c )); do
 		# is the clone origin a descendant of $fs?
-		if [[ "${clones_origin[$j]}" != ~()(${fs}/*) ]]; then
+		if [[ "${clones_origin[$j]}" != ~()${fs}/* ]]; then
 			# we don't care.
-			(( j = $j + 1 ))
+			(( j = j + 1 ))
 			continue
 		fi
 		stray_clones[$stray_clones_c]=${clones[$j]}
-		(( stray_clones_c = $stray_clones_c + 1 ))
-		(( j = $j + 1 ))
+		(( stray_clones_c = stray_clones_c + 1 ))
+		(( j = j + 1 ))
 	done
 	if (( stray_clones_c > 0 )); then
 		#
@@ -385,7 +386,7 @@ destroy_zone_dataset()
 	/sbin/zfs list -H -t snapshot -s creation -o name -r $fs |
 	    grep "^$fs@" | while read name; do
 		s_origin[$s_origin_c]=$name
-		(( s_origin_c = $s_origin_c + 1 ))
+		(( s_origin_c = s_origin_c + 1 ))
 	done
 
 	#
@@ -396,30 +397,30 @@ destroy_zone_dataset()
 	unset s_delete
 	(( s_delete_c = 0 ))
 	(( j = 0 ))
-	while (( $j < $s_origin_c )); do
+	while (( j < s_origin_c )); do
 		(( k = 0 ))
-		while (( $k < $clones_c )); do
+		while (( k < clones_c )); do
 			# if we have a match then break out of this loop
 			[[ "${s_origin[$j]}" == "${clones_origin[$k]}" ]] &&
 				break
-			(( k = $k + 1 ))
+			(( k = k + 1 ))
 		done
-		if (( $k != $clones_c )); then
+		if (( k != clones_c )); then
 			# this snapshot has a clone, move on to the next one
-			(( j = $j + 1 ))
+			(( j = j + 1 ))
 			continue
 		fi
 
 		# snapshot has no clones so add it to our delete list
 		s_delete[$s_delete_c]=${s_origin[$j]}
-		(( s_delete_c = $s_delete_c + 1 ))
+		(( s_delete_c = s_delete_c + 1 ))
 		# remove it from the origin snapshot list
-		(( k = $j + 1 ))
-		while (( $k < $s_origin_c )); do
-			s_origin[(( $k - 1 ))]=${s_origin[$k]}
-			(( k = $k + 1 ))
+		(( k = j + 1 ))
+		while (( k < s_origin_c )); do
+			s_origin[(( k - 1 ))]=${s_origin[$k]}
+			(( k = k + 1 ))
 		done
-		(( s_origin_c = $s_origin_c - 1 ))
+		(( s_origin_c = s_origin_c - 1 ))
 	done
 
 	#
@@ -427,23 +428,23 @@ destroy_zone_dataset()
 	# delete the origin filesystem (and all it's descendents) and
 	# move onto the next zone BE.
 	#
-	if (( $s_origin_c == 0 )); then
+	if (( s_origin_c == 0 )); then
 		zfs_destroy "$fs"
 		return
 	fi
 
 	# find the youngest snapshot of $fs
-	s_youngest=${s_origin[(( $s_origin_c - 1 ))]}
+	s_youngest=${s_origin[(( s_origin_c - 1 ))]}
 
 	# Find the oldest clone of the youngest snapshot of $fs
 	unset s_clone
-	(( j = $clones_c - 1 ))
-	while (( $j >= 0 )); do
+	(( j = clones_c - 1 ))
+	while (( j >= 0 )); do
 		if [[ "$s_youngest" == "${clones_origin[$j]}" ]]; then
 			s_clone=${clones[$j]}
 			break
 		fi
-		(( j = $j - 1 ))
+		(( j = j - 1 ))
 	done
 	if [[ -z "$s_clone" ]]; then
 		# uh oh.  something has gone wrong.  bail.
@@ -459,17 +460,17 @@ destroy_zone_dataset()
 	/sbin/zfs list -H -t snapshot -s creation -o name -r $s_clone |
 	    grep "^$s_clone@" | while read name; do
 		s_clone_s[$s_clone_s_c]=${name##*@}
-		(( s_clone_s_c = $s_clone_s_c + 1 ))
+		(( s_clone_s_c = s_clone_s_c + 1 ))
 	done
 
 	# create an arrays of possible origin snapshot renames
 	unset s_origin_snap
 	unset s_rename
 	(( j = 0 ))
-	while (( $j < $s_origin_c )); do
+	while (( j < s_origin_c )); do
 		s_origin_snap[$j]=${s_origin[$j]##*@}
 		s_rename[$j]=${s_origin[$j]##*@}
-		(( j = $j + 1 ))
+		(( j = j + 1 ))
 	done
 
 	#
@@ -479,13 +480,13 @@ destroy_zone_dataset()
 	#
 	snap_rename_init
 	(( j = 0 ))
-	while (( $j < $s_origin_c )); do
+	while (( j < s_origin_c )); do
 		(( k = 0 ))
-		while (( $k < $s_clone_s_c )); do
+		while (( k < s_clone_s_c )); do
 
 			# if there's no naming conflict continue
 			if [[ "${s_rename[$j]}" != "${s_clone_s[$k]}" ]]; then
-				(( k = $k + 1 ))
+				(( k = k + 1 ))
 				continue
 			fi
 
@@ -501,7 +502,7 @@ destroy_zone_dataset()
 
 		# if we didn't rename this snapshot then continue
 		if [[ "${s_rename[$j]}" == "${s_origin_snap[$j]}" ]]; then
-			(( j = $j + 1 ))
+			(( j = j + 1 ))
 			continue
 		fi
 
@@ -514,17 +515,17 @@ destroy_zone_dataset()
 		# check for that now.
 		#
 		(( k = 0 ))
-		while (( $k < $s_origin_c )); do
+		while (( k < s_origin_c )); do
 
 			# don't compare against ourself
-			if (( $j == $k )); then
-				(( k = $k + 1 ))
+			if (( j == k )); then
+				(( k = k + 1 ))
 				continue
 			fi
 
 			# if there's no naming conflict continue
 			if [[ "${s_rename[$j]}" != "${s_rename[$k]}" ]]; then
-				(( k = $k + 1 ))
+				(( k = k + 1 ))
 				continue
 			fi
 
@@ -543,7 +544,7 @@ destroy_zone_dataset()
 		# A new unique name has been chosen.  Move on to the
 		# next origin snapshot.
 		#
-		(( j = $j + 1 ))
+		(( j = j + 1 ))
 		snap_rename_init
 	done
 
@@ -580,10 +581,10 @@ destroy_zone_dataset()
 	(( zoned_iu_clones_c = 0 ))
 	(( j = 0 ))
 	# walk through all the clones
-	while (( $j < $clones_c )); do
+	while (( j < clones_c )); do
 		# walk through all the origin snapshots
 		(( k = 0 ))
-		while (( $k < $s_origin_c )); do
+		while (( k < s_origin_c )); do
 			#
 			# check if this clone originated from a snapshot that
 			# we need to rename.
@@ -591,12 +592,12 @@ destroy_zone_dataset()
 			[[ "${clones_origin[$j]}" == "${s_origin[$k]}" ]] &&
 			    [[ "${s_origin_snap[$k]}" != "${s_rename[$k]}" ]] &&
 				break
-			(( k = $k + 1 ))
+			(( k = k + 1 ))
 			continue
 		done
-		if (( $k == $s_origin_c )); then
+		if (( k == s_origin_c )); then
 			# This isn't a clone of a snapshot we want to rename.
-			(( j = $j + 1 ))
+			(( j = j + 1 ))
 			continue;
 		fi
 
@@ -605,29 +606,29 @@ destroy_zone_dataset()
 		    /sbin/zfs get -H -o value zoned ${clones[$j]}`
 		if [[ "$zoned" != on ]]; then
 			# This clone isn't zoned so ignore it.
-			(( j = $j + 1 ))
+			(( j = j + 1 ))
 			continue
 		fi
 
 		# remember this clone so we can muck with it's zoned attr.
 		zoned_clones[$zoned_clones_c]=${clones[$j]}
-		(( zoned_clones_c = $zoned_clones_c + 1 ))
+		(( zoned_clones_c = zoned_clones_c + 1 ))
 
 		# check if it's in use
 		mounted=`LC_ALL=C LANG=C \
 		    /sbin/zfs get -H -o value mounted ${clones[$j]}`
 		if [[ "$mounted" != yes ]]; then
 			# Good news.  This clone isn't in use.
-			(( j = $j + 1 ))
+			(( j = j + 1 ))
 			continue
 		fi
 
 		# Sigh.  This clone is in use so we're destined to fail.
 		zoned_iu_clones[$zoned_iu_clones_c]=${clones[$j]}
-		(( zoned_iu_clones_c = $zoned_iu_clones_c + 1 ))
+		(( zoned_iu_clones_c = zoned_iu_clones_c + 1 ))
 
 		# keep looking for errors so we can report them all at once.
-		(( j = $j + 1 ))
+		(( j = j + 1 ))
 	done
 	if (( zoned_iu_clones_c > 0 )); then
 		#
@@ -652,9 +653,9 @@ destroy_zone_dataset()
 
 	# delete any unsed snapshot
 	(( j = 0 ))
-	while (( $j < $s_delete_c )); do
+	while (( j < s_delete_c )); do
 		zfs_destroy "${s_delete[$j]}"
-		(( j = $j + 1 ))
+		(( j = j + 1 ))
 	done
 
 	# unzone clones
@@ -663,7 +664,7 @@ destroy_zone_dataset()
 
 	# rename conflicting snapshots
 	(( j = 0 ))
-	while (( $j < $s_origin_c )); do
+	while (( j < s_origin_c )); do
 		if [[ "${s_origin_snap[$j]}" != "${s_rename[$j]}" ]]; then
 			zfs_rename "${s_origin[$j]}" "$fs@${s_rename[$j]}"
 			if [[ $? != 0 ]]; then
@@ -672,7 +673,7 @@ destroy_zone_dataset()
 				exit $ZONE_SUBPROC_FATAL
 			fi
 		fi
-		(( j = $j + 1 ))
+		(( j = j + 1 ))
 	done
 
 	# re-zone the clones
@@ -695,11 +696,11 @@ destroy_zone_datasets()
 {
 	# Destroy the zone BEs datasets one by one.
 	(( i = 0 ))
-	while (( $i < $fs_all_c )); do
+	while (( i < fs_all_c )); do
 		fs=${fs_all[$i]}
 
 		destroy_zone_dataset "$fs"
-		(( i = $i + 1 ))
+		(( i = i + 1 ))
 	done
 
 	#

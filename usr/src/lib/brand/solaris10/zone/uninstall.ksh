@@ -23,6 +23,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+#
 
 #
 # common shell script functions
@@ -118,10 +120,10 @@ unset fs_all
 (( fs_all_c = 0 ))
 /sbin/zfs list -H -t filesystem -o name -r $ZONEPATH_RDS | while read fs; do
 	# only look at filesystems directly below $ZONEPATH_RDS
-	[[ "$fs" != ~()($ZONEPATH_RDS/+([^/])) ]] && continue
+	[[ "$fs" != ~()$ZONEPATH_RDS/+([^/]) ]] && continue
 
 	fs_all[$fs_all_c]=$fs
-	(( fs_all_c = $fs_all_c + 1 ))
+	(( fs_all_c = fs_all_c + 1 ))
 done
 
 destroy_zone_datasets
