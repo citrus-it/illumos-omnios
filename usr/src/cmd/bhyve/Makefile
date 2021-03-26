@@ -35,8 +35,6 @@ SRCS =	acpi.c			\
 	block_if.c		\
 	bootrom.c		\
 	console.c		\
-	consport.c		\
-	dbgport.c		\
 	fwctl.c			\
 	gdb.c			\
 	inout.c			\

@@ -91,7 +91,6 @@ __FBSDID("$FreeBSD$");
 #include "console.h"
 #include "bootrom.h"
 #include "inout.h"
-#include "dbgport.h"
 #include "debug.h"
 #include "fwctl.h"
 #include "gdb.h"
@@ -246,12 +245,12 @@ usage(int code)
 
         fprintf(stderr,
 #ifdef	__FreeBSD__
-		"Usage: %s [-abehuwxACDHPSWY]\n"
+		"Usage: %s [-aehuwxACDHPSWY]\n"
 #else
-		"Usage: %s [-abdehuwxACDHPSWY]\n"
+		"Usage: %s [-adehuwxACDHPSWY]\n"
 #endif
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
-		"       %*s [-g <gdb port>] [-l <lpc>]\n"
+		"       %*s [-l <lpc>]\n"
 #ifdef	__FreeBSD__
 		"       %*s [-m mem] [-p vcpu:hostcpu] [-s <pci>] [-U uuid] <vm>\n"
 #else
@@ -266,7 +265,6 @@ usage(int code)
 #endif
 		"       -D: destroy on power-off\n"
 		"       -e: exit on unhandled I/O access\n"
-		"       -g: gdb port\n"
 		"       -h: help\n"
 		"       -H: vmexit from the guest on hlt\n"
 		"       -l: LPC device configuration\n"
@@ -1251,7 +1249,7 @@ do_open(const char *vmname)
 int
 main(int argc, char *argv[])
 {
-	int c, error, dbg_port, err, bvmcons;
+	int c, error, err;
 	int max_vcpus, mptgen, memflags;
 	int rtc_localtime;
 	bool gdb_stop;
@@ -1263,9 +1261,7 @@ main(int argc, char *argv[])
 	size_t memsize;
 	char *optstr;
 
-	bvmcons = 0;
 	progname = basename(argv[0]);
-	dbg_port = 0;
 	gdb_stop = false;
 	guest_ncpus = 1;
 	sockets = cores = threads = 1;
@@ -1276,9 +1272,10 @@ main(int argc, char *argv[])
 	memflags = 0;
 
 #ifdef	__FreeBSD__
-	optstr = "abehuwxACDHIPSWYp:g:G:c:s:m:l:B:U:";
+	optstr = "aehuwxACDHIPSWYp:G:c:s:m:l:U:";
 #else
-	optstr = "abdehuwxACDHIPSWYg:G:c:s:m:l:B:U:";
+	/* +d, +B, -p */
+	optstr = "adehuwxACDHIPSWY:G:c:s:m:l:B:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
@@ -1288,23 +1285,21 @@ main(int argc, char *argv[])
 		case 'A':
 			acpi = 1;
 			break;
-		case 'b':
-			bvmcons = 1;
-			break;
 		case 'D':
 			destroy_on_poweroff = 1;
 			break;
+#ifndef	__FreeBSD__
 		case 'B':
 			if (smbios_parse(optarg) != 0) {
 				errx(EX_USAGE, "invalid SMBIOS "
 				    "configuration '%s'", optarg);
 			}
 			break;
-#ifndef	__FreeBSD__
 		case 'd':
 			suspend = true;
 			break;
-#else
+#endif
+#ifdef	__FreeBSD__
 		case 'p':
 			if (pincpu_parse(optarg) != 0) {
 				errx(EX_USAGE, "invalid vcpu pinning "
@@ -1320,9 +1315,6 @@ main(int argc, char *argv[])
 			break;
 		case 'C':
 			memflags |= VM_MEM_F_INCORE;
-			break;
-		case 'g':
-			dbg_port = atoi(optarg);
 			break;
 		case 'G':
 			if (optarg[0] == 'w') {
@@ -1473,9 +1465,6 @@ main(int argc, char *argv[])
 	if (acpi)
 		vmgenc_init(ctx);
 
-	if (dbg_port != 0)
-		init_dbgport(dbg_port);
-
 #ifdef __FreeBSD__
 	if (gdb_port != 0)
 		init_gdb(ctx, gdb_port, gdb_stop);
@@ -1490,9 +1479,6 @@ main(int argc, char *argv[])
 		init_gdb(ctx, gdb_port, gdb_stop);
 	}
 #endif
-
-	if (bvmcons)
-		init_bvmcons();
 
 	vga_init(1);
 
