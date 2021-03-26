@@ -135,10 +135,12 @@ struct pci_viona_softc {
 static uint64_t
 pci_viona_iosize(struct pci_devinst *pi)
 {
-	if (pci_msix_enabled(pi))
+	if (pci_msix_enabled(pi)) {
 		return (VIONA_REGSZ);
-	else
-		return (VIONA_REGSZ - (VTCFG_R_CFG1 - VTCFG_R_MSIX));
+	} else {
+		return (VIONA_REGSZ -
+		    (VIRTIO_PCI_CONFIG_OFF(1) - VIRTIO_PCI_CONFIG_OFF(0)));
+	}
 }
 
 static uint16_t
@@ -454,7 +456,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	pci_set_cfgdata16(pi, PCIR_DEVICE, VIRTIO_DEV_NET);
 	pci_set_cfgdata16(pi, PCIR_VENDOR, VIRTIO_VENDOR);
 	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_NETWORK);
-	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_TYPE_NET);
+	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_ID_NETWORK);
 	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, VIRTIO_VENDOR);
 
 	/* MSI-X support */
@@ -476,7 +478,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	}
 
 	/* Install ioport hook for virtqueue notification */
-	ioport = pi->pi_bar[0].addr + VTCFG_R_QNOTIFY;
+	ioport = pi->pi_bar[0].addr + VIRTIO_PCI_QUEUE_NOTIFY;
 	error = ioctl(sc->vsc_vnafd, VNA_IOC_SET_NOTIFY_IOP, ioport);
 	if (error != 0) {
 		WPRINTF(("could not install ioport hook at %x\n", ioport));
@@ -501,8 +503,10 @@ viona_adjust_offset(struct pci_devinst *pi, uint64_t offset)
 	 * whether MSI-X capability is enabled or not
 	 */
 	if (!pci_msix_enabled(pi)) {
-		if (offset >= VTCFG_R_MSIX)
-			return (offset + (VTCFG_R_CFG1 - VTCFG_R_MSIX));
+		if (offset >= VIRTIO_PCI_CONFIG_OFF(0)) {
+			return (offset + (VIRTIO_PCI_CONFIG_OFF(1) -
+			    VIRTIO_PCI_CONFIG_OFF(0)));
+		}
 	}
 
 	return (offset);
@@ -640,7 +644,7 @@ pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 	offset = viona_adjust_offset(pi, offset);
 
 	switch (offset) {
-	case VTCFG_R_GUESTCAP:
+	case VIRTIO_PCI_GUEST_FEATURES:
 		assert(size == 4);
 		value &= ~(sc->vsc_feature_mask);
 		err = ioctl(sc->vsc_vnafd, VNA_IOC_SET_FEATURES, &value);
@@ -651,29 +655,29 @@ pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 			sc->vsc_features = value;
 		}
 		break;
-	case VTCFG_R_PFN:
+	case VIRTIO_PCI_QUEUE_PFN:
 		assert(size == 4);
 		pci_viona_ring_init(sc, value);
 		break;
-	case VTCFG_R_QSEL:
+	case VIRTIO_PCI_QUEUE_SEL:
 		assert(size == 2);
 		assert(value < VIONA_MAXQ);
 		sc->vsc_curq = value;
 		break;
-	case VTCFG_R_QNOTIFY:
+	case VIRTIO_PCI_QUEUE_NOTIFY:
 		assert(size == 2);
 		assert(value < VIONA_MAXQ);
 		pci_viona_qnotify(sc, value);
 		break;
-	case VTCFG_R_STATUS:
+	case VIRTIO_PCI_STATUS:
 		assert(size == 1);
 		pci_viona_update_status(sc, value);
 		break;
-	case VTCFG_R_CFGVEC:
+	case VIRTIO_MSI_CONFIG_VECTOR:
 		assert(size == 2);
 		sc->vsc_msix_table_idx[VIONA_CTLQ] = value;
 		break;
-	case VTCFG_R_QVEC:
+	case VIRTIO_MSI_QUEUE_VECTOR:
 		assert(size == 2);
 		assert(sc->vsc_curq != VIONA_CTLQ);
 		sc->vsc_msix_table_idx[sc->vsc_curq] = value;
@@ -699,9 +703,9 @@ pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 			*(uint32_t *)ptr = value;
 		}
 		break;
-	case VTCFG_R_HOSTCAP:
-	case VTCFG_R_QNUM:
-	case VTCFG_R_ISR:
+	case VIRTIO_PCI_HOST_FEATURES:
+	case VIRTIO_PCI_QUEUE_NUM:
+	case VIRTIO_PCI_ISR:
 	case VIONA_R_CFG6:
 	case VIONA_R_CFG7:
 		DPRINTF(("viona: write to readonly reg %ld\n\r", offset));
@@ -742,7 +746,7 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 	offset = viona_adjust_offset(pi, offset);
 
 	switch (offset) {
-	case VTCFG_R_HOSTCAP:
+	case VIRTIO_PCI_HOST_FEATURES:
 		assert(size == 4);
 		err = ioctl(sc->vsc_vnafd, VNA_IOC_GET_FEATURES, &value);
 		if (err != 0) {
@@ -751,31 +755,31 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		}
 		value &= ~sc->vsc_feature_mask;
 		break;
-	case VTCFG_R_GUESTCAP:
+	case VIRTIO_PCI_GUEST_FEATURES:
 		assert(size == 4);
 		value = sc->vsc_features; /* XXX never read ? */
 		break;
-	case VTCFG_R_PFN:
+	case VIRTIO_PCI_QUEUE_PFN:
 		assert(size == 4);
 		value = sc->vsc_pfn[sc->vsc_curq] >> VRING_PFN;
 		break;
-	case VTCFG_R_QNUM:
+	case VIRTIO_PCI_QUEUE_NUM:
 		assert(size == 2);
 		value = pci_viona_qsize(sc, sc->vsc_curq);
 		break;
-	case VTCFG_R_QSEL:
+	case VIRTIO_PCI_QUEUE_SEL:
 		assert(size == 2);
 		value = sc->vsc_curq;  /* XXX never read ? */
 		break;
-	case VTCFG_R_QNOTIFY:
+	case VIRTIO_PCI_QUEUE_NOTIFY:
 		assert(size == 2);
 		value = sc->vsc_curq;  /* XXX never read ? */
 		break;
-	case VTCFG_R_STATUS:
+	case VIRTIO_PCI_STATUS:
 		assert(size == 1);
 		value = sc->vsc_status;
 		break;
-	case VTCFG_R_ISR:
+	case VIRTIO_PCI_ISR:
 		assert(size == 1);
 		value = sc->vsc_isr;
 		sc->vsc_isr = 0;	/* a read clears this flag */
@@ -783,11 +787,11 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 			pci_lintr_deassert(pi);
 		}
 		break;
-	case VTCFG_R_CFGVEC:
+	case VIRTIO_MSI_CONFIG_VECTOR:
 		assert(size == 2);
 		value = sc->vsc_msix_table_idx[VIONA_CTLQ];
 		break;
-	case VTCFG_R_QVEC:
+	case VIRTIO_MSI_QUEUE_VECTOR:
 		assert(size == 2);
 		assert(sc->vsc_curq != VIONA_CTLQ);
 		value = sc->vsc_msix_table_idx[sc->vsc_curq];
