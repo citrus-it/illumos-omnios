@@ -185,16 +185,7 @@ vm_open(const char *name)
 
 	return (vm);
 err:
-#ifdef __FreeBSD__
-	vm_destroy(vm);
-#else
-	/*
-	 * As libvmmapi is used by other programs to query and control bhyve
-	 * VMs, destroying a VM just because the open failed isn't useful. We
-	 * have to free what we have allocated, though.
-	 */
 	free(vm);
-#endif
 	return (NULL);
 }
 
