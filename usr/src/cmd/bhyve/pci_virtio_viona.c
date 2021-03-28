@@ -64,6 +64,7 @@
 #include <vmmapi.h>
 
 #include "bhyverun.h"
+#include "config.h"
 #include "pci_emul.h"
 #include "virtio.h"
 
@@ -303,82 +304,80 @@ pci_viona_viona_init(struct vmctx *ctx, struct pci_viona_softc *sc)
 }
 
 static int
-pci_viona_parse_opts(struct pci_viona_softc *sc, char *opts)
+pci_viona_legacy_config(nvlist_t *nvl, const char *opt)
 {
-	char *next, *cp, *vnic = NULL;
+	char *config, *name, *tofree, *value;
+
+	if (opt == NULL)
+		return (0);
+
+	config = tofree = strdup(opt);
+	while ((name = strsep(&config, ",")) != NULL) {
+		value = strchr(name, '=');
+		if (value != NULL) {
+			*value++ = '\0';
+			set_config_value_node(nvl, name, value);
+		} else {
+			set_config_value_node(nvl, "vnic", name);
+		}
+	}
+	free(tofree);
+	return (0);
+}
+
+static int
+pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
+{
+	const char *value;
 	int err = 0;
 
 	sc->vsc_vq_size = VIONA_RINGSZ;
 	sc->vsc_feature_mask = 0;
+	sc->vsc_linkname[0] = '\0';
 
-	for (; opts != NULL && *opts != '\0'; opts = next) {
-		char *val;
+	value = get_config_value_node(nvl, "feature_mask");
+	if (value != NULL) {
+		long num;
 
-		if ((cp = strchr(opts, ',')) != NULL) {
-			*cp = '\0';
-			next = cp + 1;
-		} else {
-			next = NULL;
-		}
-
-		if ((cp = strchr(opts, '=')) == NULL) {
-			/* vnic chosen with bare name */
-			if (vnic != NULL) {
-				fprintf(stderr,
-				    "viona: unexpected vnic name '%s'", opts);
-				err = -1;
-			} else {
-				vnic = opts;
-			}
-			continue;
-		}
-
-		/* <param>=<value> handling */
-		val = cp + 1;
-		*cp = '\0';
-		if (strcmp(opts, "feature_mask") == 0) {
-			long num;
-
-			errno = 0;
-			num = strtol(val, NULL, 0);
-			if (errno != 0 || num < 0) {
-				fprintf(stderr,
-				    "viona: invalid mask '%s'", val);
-			} else {
-				sc->vsc_feature_mask = num;
-			}
-		} else if (strcmp(opts, "vqsize") == 0) {
-			long num;
-
-			errno = 0;
-			num = strtol(val, NULL, 0);
-			if (errno != 0) {
-				fprintf(stderr,
-				    "viona: invalid vsqize '%s'", val);
-				err = -1;
-			} else if (num <= 2 || num > 32768) {
-				fprintf(stderr,
-				    "viona: vqsize out of range", num);
-				err = -1;
-			} else if ((1 << (ffs(num) - 1)) != num) {
-				fprintf(stderr,
-				    "viona: vqsize must be power of 2", num);
-				err = -1;
-			} else {
-				sc->vsc_vq_size = num;
-			}
-		} else {
+		errno = 0;
+		num = strtol(value, NULL, 0);
+		if (errno != 0 || num < 0) {
 			fprintf(stderr,
-			    "viona: unrecognized option '%s'", opts);
-			err = -1;
+			    "viona: invalid mask '%s'", value);
+		} else {
+			sc->vsc_feature_mask = num;
 		}
 	}
-	if (vnic == NULL) {
+
+	value = get_config_value_node(nvl, "vqsize");
+	if (value != NULL) {
+		long num;
+
+		errno = 0;
+		num = strtol(value, NULL, 0);
+		if (errno != 0) {
+			fprintf(stderr,
+			    "viona: invalid vsqize '%s'", value);
+			err = -1;
+		} else if (num <= 2 || num > 32768) {
+			fprintf(stderr,
+			    "viona: vqsize out of range", num);
+			err = -1;
+		} else if ((1 << (ffs(num) - 1)) != num) {
+			fprintf(stderr,
+			    "viona: vqsize must be power of 2", num);
+			err = -1;
+		} else {
+			sc->vsc_vq_size = num;
+		}
+	}
+
+	value = get_config_value_node(nvl, "vnic");
+	if (value == NULL) {
 		fprintf(stderr, "viona: vnic name required");
-		sc->vsc_linkname[0] = '\0';
 		err = -1;
 	} else {
-		(void) strlcpy(sc->vsc_linkname, vnic, MAXLINKNAMELEN);
+		(void) strlcpy(sc->vsc_linkname, value, MAXLINKNAMELEN);
 	}
 
 	DPRINTF(("viona=%p dev=%s vqsize=%x feature_mask=%x\n", sc,
@@ -387,7 +386,7 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, char *opts)
 }
 
 static int
-pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
+pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
 	dladm_handle_t		handle;
 	dladm_status_t		status;
@@ -396,8 +395,10 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	int error, i;
 	struct pci_viona_softc *sc;
 	uint64_t ioport;
+	const char *vnic;
 
-	if (opts == NULL) {
+	vnic = get_config_value_node(nvl, "vnic");
+	if (vnic == NULL) {
 		printf("virtio-viona: vnic required\n");
 		return (1);
 	}
@@ -410,7 +411,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 
 	pthread_mutex_init(&sc->vsc_mtx, NULL);
 
-	if (pci_viona_parse_opts(sc, opts) != 0) {
+	if (pci_viona_parse_opts(sc, nvl) != 0) {
 		free(sc);
 		return (1);
 	}
@@ -423,7 +424,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 
 	if (dladm_name2info(handle, sc->vsc_linkname, &sc->vsc_linkid,
 	    NULL, NULL, NULL) != DLADM_STATUS_OK) {
-		WPRINTF(("dladm_name2info() for %s failed: %s\n", opts,
+		WPRINTF(("dladm_name2info() for %s failed: %s\n", vnic,
 		    dladm_status2str(status, errmsg)));
 		dladm_close(handle);
 		free(sc);
@@ -432,7 +433,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 
 	if (dladm_vnic_info(handle, sc->vsc_linkid, &attr,
 	    DLADM_OPT_ACTIVE) != DLADM_STATUS_OK) {
-		WPRINTF(("dladm_vnic_info() for %s failed: %s\n", opts,
+		WPRINTF(("dladm_vnic_info() for %s failed: %s\n", vnic,
 		    dladm_status2str(status, errmsg)));
 		dladm_close(handle);
 		free(sc);
@@ -834,6 +835,7 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 struct pci_devemu pci_de_viona = {
 	.pe_emu =	"virtio-net-viona",
 	.pe_init =	pci_viona_init,
+	.pe_legacy_config = pci_viona_legacy_config,
 	.pe_barwrite =	pci_viona_write,
 	.pe_barread =	pci_viona_read,
 	.pe_lintrupdate = pci_viona_lintrupdate

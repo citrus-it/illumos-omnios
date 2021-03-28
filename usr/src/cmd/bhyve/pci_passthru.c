@@ -62,6 +62,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm.h>
 #include <vmmapi.h>
 #include <sys/ppt_dev.h>
+
+#include "config.h"
+#include "debug.h"
 #include "pci_emul.h"
 #include "mem.h"
 
@@ -672,10 +675,23 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 }
 
 static int
-passthru_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
+passthru_legacy_config(nvlist_t *nvl, const char *opts)
+{
+	if (opts == NULL)
+		return (0);
+
+	if (strncmp(opts, "/dev/ppt", 8) == 0)
+		set_config_value_node(nvl, "path", opts);
+
+	return (0);
+}
+
+static int
+passthru_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
 	int error, memflags, pptfd;
 	struct passthru_softc *sc;
+	const char *path;
 
 	sc = NULL;
 	error = 1;
@@ -686,7 +702,8 @@ passthru_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 		goto done;
 	}
 
-	if (opts == NULL || passthru_dev_open(opts, &pptfd) != 0) {
+	path = get_config_value_node(nvl, "path");
+	if (path == NULL || passthru_dev_open(path, &pptfd) != 0) {
 		warnx("invalid passthru options");
 		goto done;
 	}
@@ -933,6 +950,7 @@ passthru_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 struct pci_devemu passthru = {
 	.pe_emu		= "passthru",
 	.pe_init	= passthru_init,
+	.pe_legacy_config = passthru_legacy_config,
 	.pe_cfgwrite	= passthru_cfgwrite,
 	.pe_cfgread	= passthru_cfgread,
 	.pe_barwrite 	= passthru_write,
