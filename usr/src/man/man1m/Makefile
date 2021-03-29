@@ -546,6 +546,7 @@ _MANFILES=	6to4relay.1m		\
 i386_MANFILES=				\
 		acpidump.1m		\
 		acpixtract.1m		\
+		bhyve.1m		\
 		nvmeadm.1m		\
 		pptadm.1m		\
 		rdmsr.1m
