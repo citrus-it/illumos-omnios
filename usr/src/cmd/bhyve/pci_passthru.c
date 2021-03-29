@@ -506,8 +506,8 @@ passthru_msix_table_write(struct vmctx *ctx, int vcpu,
 static int
 init_msix_table(struct vmctx *ctx, struct passthru_softc *sc, uint64_t base)
 {
-	int error, idx;
-	size_t len, remaining;
+	int idx;
+	size_t remaining __unused;
 	uint32_t table_size, table_offset;
 	uint32_t pba_size, pba_offset;
 	vm_paddr_t start;
@@ -554,7 +554,7 @@ init_msix_table(struct vmctx *ctx, struct passthru_softc *sc, uint64_t base)
 				pi->pi_msix.pba_page_offset = table_offset +
 				    table_size - 4096;
 			pi->pi_msix.pba_page = mmap(NULL, 4096, PROT_READ |
-			    PROT_WRITE, MAP_SHARED, sc->pptfd,
+			    PROT_WRITE, MAP_SHARED, sc->pptfd, start +
 			    pi->pi_msix.pba_page_offset);
 			if (pi->pi_msix.pba_page == MAP_FAILED) {
 				warn("Failed to map PBA page for MSI-X on %d",
@@ -562,31 +562,6 @@ init_msix_table(struct vmctx *ctx, struct passthru_softc *sc, uint64_t base)
 				return (-1);
 			}
 		}
-	}
-
-	/* Map everything before the MSI-X table */
-	if (table_offset > 0) {
-		len = table_offset;
-		error = vm_map_pptdev_mmio(ctx, sc->pptfd, start, len, base);
-		if (error)
-			return (error);
-
-		base += len;
-		start += len;
-		remaining -= len;
-	}
-
-	/* Skip the MSI-X table */
-	base += table_size;
-	start += table_size;
-	remaining -= table_size;
-
-	/* Map everything beyond the end of the MSI-X table */
-	if (remaining > 0) {
-		len = remaining;
-		error = vm_map_pptdev_mmio(ctx, sc->pptfd, start, len, base);
-		if (error)
-			return (error);
 	}
 
 	return (0);
@@ -632,12 +607,6 @@ cfginitbar(struct vmctx *ctx, struct passthru_softc *sc)
 		/* The MSI-X table needs special handling */
 		if (i == pci_msix_table_bar(pi)) {
 			error = init_msix_table(ctx, sc, base);
-			if (error)
-				return (-1);
-		} else if (bartype != PCIBAR_IO) {
-			/* Map the physical BAR in the guest MMIO space */
-			error = vm_map_pptdev_mmio(ctx, sc->pptfd,
-			    pi->pi_bar[i].addr, pi->pi_bar[i].size, base);
 			if (error)
 				return (-1);
 		}
@@ -947,6 +916,77 @@ passthru_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 	return (val);
 }
 
+static void
+passthru_msix_addr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
+    int enabled, uint64_t address)
+{
+	struct passthru_softc *sc;
+	size_t remaining;
+	uint32_t table_size, table_offset;
+
+	sc = pi->pi_arg;
+	table_offset = rounddown2(pi->pi_msix.table_offset, 4096);
+	if (table_offset > 0) {
+		if (!enabled) {
+			if (vm_unmap_pptdev_mmio(ctx, sc->pptfd, address,
+			    table_offset) != 0)
+				warnx("pci_passthru: unmap_pptdev_mmio failed");
+		} else {
+			if (vm_map_pptdev_mmio(ctx, sc->pptfd, address,
+			    table_offset, sc->psc_bar[baridx].addr) != 0)
+				warnx("pci_passthru: map_pptdev_mmio failed");
+		}
+	}
+	table_size = pi->pi_msix.table_offset - table_offset;
+	table_size += pi->pi_msix.table_count * MSIX_TABLE_ENTRY_SIZE;
+	table_size = roundup2(table_size, 4096);
+	remaining = pi->pi_bar[baridx].size - table_offset - table_size;
+	if (remaining > 0) {
+		address += table_offset + table_size;
+		if (!enabled) {
+			if (vm_unmap_pptdev_mmio(ctx, sc->pptfd, address,
+			    remaining) != 0)
+				warnx("pci_passthru: unmap_pptdev_mmio failed");
+		} else {
+			if (vm_map_pptdev_mmio(ctx, sc->pptfd, address,
+			    remaining, sc->psc_bar[baridx].addr +
+			    table_offset + table_size) != 0)
+				warnx("pci_passthru: map_pptdev_mmio failed");
+		}
+	}
+}
+
+static void
+passthru_mmio_addr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
+    int enabled, uint64_t address)
+{
+	struct passthru_softc *sc;
+
+	sc = pi->pi_arg;
+	if (!enabled) {
+		if (vm_unmap_pptdev_mmio(ctx, sc->pptfd, address,
+		    sc->psc_bar[baridx].size) != 0)
+			warnx("pci_passthru: unmap_pptdev_mmio failed");
+	} else {
+		if (vm_map_pptdev_mmio(ctx, sc->pptfd, address,
+		    sc->psc_bar[baridx].size, sc->psc_bar[baridx].addr) != 0)
+			warnx("pci_passthru: map_pptdev_mmio failed");
+	}
+}
+
+static void
+passthru_addr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
+	      int enabled, uint64_t address)
+{
+
+	if (pi->pi_bar[baridx].type == PCIBAR_IO)
+		return;
+	if (baridx == pci_msix_table_bar(pi))
+		passthru_msix_addr(ctx, pi, baridx, enabled, address);
+	else
+		passthru_mmio_addr(ctx, pi, baridx, enabled, address);
+}
+
 struct pci_devemu passthru = {
 	.pe_emu		= "passthru",
 	.pe_init	= passthru_init,
@@ -955,5 +995,6 @@ struct pci_devemu passthru = {
 	.pe_cfgread	= passthru_cfgread,
 	.pe_barwrite 	= passthru_write,
 	.pe_barread    	= passthru_read,
+	.pe_baraddr	= passthru_addr,
 };
 PCI_EMUL_SET(passthru);
