@@ -1602,7 +1602,7 @@ main(int argc, char *argv[])
 	} while (error == ENOMEM);
 #endif
 	if (err) {
-		fprintf(stderr, "Unable to setup memory (%d)\n", errno);
+		fprintf(stderr, "Unable to set up memory (%d)\n", errno);
 		exit(4);
 	}
 

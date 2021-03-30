@@ -422,8 +422,8 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		return (1);
 	}
 
-	if (dladm_name2info(handle, sc->vsc_linkname, &sc->vsc_linkid,
-	    NULL, NULL, NULL) != DLADM_STATUS_OK) {
+	if ((status = dladm_name2info(handle, sc->vsc_linkname, &sc->vsc_linkid,
+	    NULL, NULL, NULL)) != DLADM_STATUS_OK) {
 		WPRINTF(("dladm_name2info() for %s failed: %s\n", vnic,
 		    dladm_status2str(status, errmsg)));
 		dladm_close(handle);
@@ -431,8 +431,8 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		return (1);
 	}
 
-	if (dladm_vnic_info(handle, sc->vsc_linkid, &attr,
-	    DLADM_OPT_ACTIVE) != DLADM_STATUS_OK) {
+	if ((status = dladm_vnic_info(handle, sc->vsc_linkid, &attr,
+	    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
 		WPRINTF(("dladm_vnic_info() for %s failed: %s\n", vnic,
 		    dladm_status2str(status, errmsg)));
 		dladm_close(handle);
