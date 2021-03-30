@@ -18,7 +18,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 # Copyright 2020 Peter Tribble
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master

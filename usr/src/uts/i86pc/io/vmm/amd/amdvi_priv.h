@@ -375,7 +375,7 @@ enum IvrsType
 struct amdvi_softc {
 	struct amdvi_ctrl *ctrl;	/* Control area. */
 	device_t	dev;		/* IOMMU device. */
-	device_t 	pci_dev;	/* IOMMU PCI function device. */
+	device_t	pci_dev;	/* IOMMU PCI function device. */
 	enum IvrsType   ivhd_type;	/* IOMMU IVHD type. */
 	bool		iotlb;		/* IOTLB supported by IOMMU */
 	struct amdvi_cmd *cmd;		/* Command descriptor area. */

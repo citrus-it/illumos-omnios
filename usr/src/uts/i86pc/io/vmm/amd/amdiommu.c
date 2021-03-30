@@ -45,7 +45,7 @@ __FBSDID("$FreeBSD$");
 
 struct amdiommu_softc {
 	struct resource *event_res;	/* Event interrupt resource. */
-	void   		*event_tag;	/* Event interrupt tag. */
+	void		*event_tag;	/* Event interrupt tag. */
 	int		event_rid;
 };
 
@@ -68,7 +68,7 @@ static device_method_t amdiommu_methods[] = {
 static driver_t amdiommu_driver = {
 	"amdiommu",
 	amdiommu_methods,
-	sizeof(struct amdiommu_softc),
+	sizeof (struct amdiommu_softc),
 };
 
 static int

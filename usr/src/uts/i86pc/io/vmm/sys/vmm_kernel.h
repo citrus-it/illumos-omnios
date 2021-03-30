@@ -40,6 +40,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 Oxide Computer Company
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _VMM_KERNEL_H_

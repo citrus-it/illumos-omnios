@@ -19,7 +19,7 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	4
+MANSECT=	4
 
 _MANFILES=	Intro.4				\
 		NISLDAPmapping.4		\
