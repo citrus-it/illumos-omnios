@@ -32,13 +32,13 @@
 #ifndef _USB_EMUL_H_
 #define _USB_EMUL_H_
 
-#include <sys/nv.h>
 #include <stdlib.h>
 #include <sys/linker_set.h>
 #include <pthread.h>
 #ifndef __FreeBSD__
 #include <synch.h>
 #endif
+#include "config.h"
 
 #define	USB_MAX_XFER_BLOCKS	8
 
@@ -58,7 +58,7 @@ struct usb_devemu {
 	int	ue_usbspeed;	/* usb device speed */
 
 	/* instance creation */
-	void	*(*ue_init)(struct usb_hci *hci, nvlist_t *nvl);
+	void	*(*ue_init)(struct usb_hci *hci, config_node_t *node);
 
 	/* handlers */
 	int	(*ue_request)(void *sc, struct usb_data_xfer *xfer);

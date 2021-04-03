@@ -933,7 +933,7 @@ pci_vtnet_netmap_setup(struct pci_vtnet_softc *sc, char *ifname)
 #endif /* __FreeBSD__ */
 
 static int
-pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	struct pci_vtnet_softc *sc;
 	const char *value;
@@ -964,7 +964,7 @@ pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
         sc->vsc_queues[VTNET_CTLQ].vq_notify = pci_vtnet_ping_ctlq;
 #endif
 
-	value = get_config_value_node(nvl, "mac");
+	value = get_config_value_node(node, "mac");
 	if (value != NULL) {
 		err = net_parsemac(value, sc->vsc_config.mac);
 		if (err) {
@@ -975,7 +975,7 @@ pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		net_genmac(pi, sc->vsc_config.mac);
 
 #ifdef __FreeBSD__
-	value = get_config_value_node(nvl, "mtu");
+	value = get_config_value_node(node, "mtu");
 	if (value != NULL) {
 		err = net_parsemtu(value, &mtu);
 		if (err) {
@@ -993,15 +993,15 @@ pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 #endif
 
 	/* Permit interfaces without a configured backend. */
-	if (get_config_value_node(nvl, "backend") != NULL) {
+	if (get_config_value_node(node, "backend") != NULL) {
 #ifdef __FreeBSD__
-		err = netbe_init(&sc->vsc_be, nvl, pci_vtnet_rx_callback, sc);
+		err = netbe_init(&sc->vsc_be, node, pci_vtnet_rx_callback, sc);
 		if (err) {
 			free(sc);
 			return (err);
 		}
 #else
-		pci_vtnet_tap_setup(sc, get_config_value_node(nvl, "backend"));
+		pci_vtnet_tap_setup(sc, get_config_value_node(node, "backend"));
 #endif
 	}
 
@@ -1108,7 +1108,7 @@ pci_vtnet_neg_features(void *vsc, uint64_t negotiated_features)
 
 #ifndef __FreeBSD__
 static int
-pci_vtnet_legacy_config(nvlist_t *nvl, const char *opt)
+pci_vtnet_legacy_config(config_node_t *node, const char *opt)
 {
 	char *config, *name, *tofree, *value;
 
@@ -1120,9 +1120,9 @@ pci_vtnet_legacy_config(nvlist_t *nvl, const char *opt)
 		value = strchr(name, '=');
 		if (value != NULL) {
 			*value++ = '\0';
-			set_config_value_node(nvl, name, value);
+			set_config_value_node(node, name, value);
 		} else {
-			set_config_value_node(nvl, "backend", name);
+			set_config_value_node(node, "backend", name);
 		}
 	}
 	free(tofree);

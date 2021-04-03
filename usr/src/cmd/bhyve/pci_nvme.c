@@ -2655,7 +2655,7 @@ pci_nvme_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 }
 
 static int
-pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
+pci_nvme_parse_config(struct pci_nvme_softc *sc, config_node_t *node)
 {
 	char bident[sizeof("XX:X:X")];
 	const char *value;
@@ -2671,10 +2671,10 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 	snprintf(sc->ctrldata.sn, sizeof(sc->ctrldata.sn),
 	         "NVME-%d-%d", sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
 
-	value = get_config_value_node(nvl, "maxq");
+	value = get_config_value_node(node, "maxq");
 	if (value != NULL)
 		sc->max_queues = atoi(value);
-	value = get_config_value_node(nvl, "qsz");
+	value = get_config_value_node(node, "qsz");
 	if (value != NULL) {
 		sc->max_qentries = atoi(value);
 		if (sc->max_qentries <= 0) {
@@ -2683,7 +2683,7 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 			return (-1);
 		}
 	}
-	value = get_config_value_node(nvl, "ioslots");
+	value = get_config_value_node(node, "ioslots");
 	if (value != NULL) {
 		sc->ioslots = atoi(value);
 		if (sc->ioslots <= 0) {
@@ -2691,10 +2691,10 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 			return (-1);
 		}
 	}
-	value = get_config_value_node(nvl, "sectsz");
+	value = get_config_value_node(node, "sectsz");
 	if (value != NULL)
 		sectsz = atoi(value);
-	value = get_config_value_node(nvl, "ser");
+	value = get_config_value_node(node, "ser");
 	if (value != NULL) {
 		/*
 		 * This field indicates the Product Serial Number in
@@ -2704,10 +2704,10 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 		cpywithpad((char *)sc->ctrldata.sn,
 		    sizeof(sc->ctrldata.sn), value, ' ');
 	}
-	value = get_config_value_node(nvl, "eui64");
+	value = get_config_value_node(node, "eui64");
 	if (value != NULL)
 		sc->nvstore.eui64 = htobe64(strtoull(value, NULL, 0));
-	value = get_config_value_node(nvl, "dsm");
+	value = get_config_value_node(node, "dsm");
 	if (value != NULL) {
 		if (strcmp(value, "auto") == 0)
 			sc->dataset_management = NVME_DATASET_MANAGEMENT_AUTO;
@@ -2717,7 +2717,7 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 			sc->dataset_management = NVME_DATASET_MANAGEMENT_DISABLE;
 	}
 
-	value = get_config_value_node(nvl, "ram");
+	value = get_config_value_node(node, "ram");
 	if (value != NULL) {
 		uint64_t sz = strtoull(value, NULL, 10);
 
@@ -2733,7 +2733,7 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 	} else {
 		snprintf(bident, sizeof(bident), "%d:%d",
 		    sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
-		sc->nvstore.ctx = blockif_open(nvl, bident);
+		sc->nvstore.ctx = blockif_open(node, bident);
 		if (sc->nvstore.ctx == NULL) {
 			EPRINTLN("nvme: Could not open backing file: %s",
 			    strerror(errno));
@@ -2758,7 +2758,7 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 }
 
 static int
-pci_nvme_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_nvme_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	struct pci_nvme_softc *sc;
 	uint32_t pci_membar_sz;
@@ -2770,7 +2770,7 @@ pci_nvme_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	pi->pi_arg = sc;
 	sc->nsc_pi = pi;
 
-	error = pci_nvme_parse_config(sc, nvl);
+	error = pci_nvme_parse_config(sc, node);
 	if (error < 0)
 		goto done;
 	else

@@ -417,7 +417,7 @@ pci_vtblk_notify(void *vsc, struct vqueue_info *vq)
 }
 
 static int
-pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	char bident[sizeof("XX:X:X")];
 	struct blockif_ctxt *bctxt;
@@ -432,7 +432,7 @@ pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	 * The supplied backing file has to exist
 	 */
 	snprintf(bident, sizeof(bident), "%d:%d", pi->pi_slot, pi->pi_func);
-	bctxt = blockif_open(nvl, bident);
+	bctxt = blockif_open(node, bident);
 	if (bctxt == NULL) {
 		perror("Could not open backing file");
 		return (1);
@@ -475,7 +475,7 @@ pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	 * Create an identifier for the backing file. Use parts of the
 	 * md5 sum of the filename
 	 */
-	path = get_config_value_node(nvl, "path");
+	path = get_config_value_node(node, "path");
 	MD5Init(&mdctx);
 	MD5Update(&mdctx, path, strlen(path));
 	MD5Final(digest, &mdctx);

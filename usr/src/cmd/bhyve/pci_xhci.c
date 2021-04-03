@@ -2672,17 +2672,17 @@ pci_xhci_dev_event(struct usb_hci *hci, enum hci_usbev evid, void *param)
  *                 .device="tablet"
  */
 static int
-pci_xhci_legacy_config(nvlist_t *nvl, const char *opts)
+pci_xhci_legacy_config(config_node_t *node, const char *opts)
 {
 	char node_name[16];
-	nvlist_t *slots_nvl, *slot_nvl;
+	config_node_t *slots_node, *slot_node;
 	char *cp, *opt, *str, *tofree;
 	int slot;
 
 	if (opts == NULL)
 		return (0);
 
-	slots_nvl = create_relative_config_node(nvl, "slot");
+	slots_node = create_relative_config_node(node, "slot");
 	slot = 1;
 	tofree = str = strdup(opts);
 	while ((opt = strsep(&str, ",")) != NULL) {
@@ -2695,26 +2695,26 @@ pci_xhci_legacy_config(nvlist_t *nvl, const char *opts)
 
 		snprintf(node_name, sizeof(node_name), "%d", slot);
 		slot++;
-		slot_nvl = create_relative_config_node(slots_nvl, node_name);
-		set_config_value_node(slot_nvl, "device", opt);
+		slot_node = create_relative_config_node(slots_node, node_name);
+		set_config_value_node(slot_node, "device", opt);
 
 		/*
 		 * NB: Given that we split on commas above, the legacy
 		 * format only supports a single option.
 		 */
 		if (cp != NULL && *cp != '\0')
-			pci_parse_legacy_config(slot_nvl, cp);
+			pci_parse_legacy_config(slot_node, cp);
 	}
 	free(tofree);
 	return (0);
 }
 
 static int
-pci_xhci_parse_devices(struct pci_xhci_softc *sc, nvlist_t *nvl)
+pci_xhci_parse_devices(struct pci_xhci_softc *sc, config_node_t *node)
 {
 	struct pci_xhci_dev_emu	*dev;
 	struct usb_devemu	*ue;
-	const nvlist_t *slots_nvl, *slot_nvl;
+	const config_node_t *slots_node, *slot_node;
 	const char *name, *device;
 	char	*cp;
 	void	*devsc, *cookie;
@@ -2733,12 +2733,12 @@ pci_xhci_parse_devices(struct pci_xhci_softc *sc, nvlist_t *nvl)
 
 	ndevices = 0;
 
-	slots_nvl = find_relative_config_node(nvl, "slots");
-	if (slots_nvl == NULL)
+	slots_node = find_relative_config_node(node, "slots");
+	if (slots_node == NULL)
 		goto portsfinal;
 
 	cookie = NULL;
-	while ((name = nvlist_next(slots_nvl, &type, &cookie)) != NULL) {
+	while ((name = config_node_next(slots_node, &type, &cookie)) != NULL) {
 		if (usb2_port == ((sc->usb2_port_start) + XHCI_MAX_DEVS/2) ||
 		    usb3_port == ((sc->usb3_port_start) + XHCI_MAX_DEVS/2)) {
 			WPRINTF(("pci_xhci max number of USB 2 or 3 "
@@ -2746,7 +2746,7 @@ pci_xhci_parse_devices(struct pci_xhci_softc *sc, nvlist_t *nvl)
 			goto bad;
 		}
 
-		if (type != NV_TYPE_NVLIST) {
+		if (type != NODE_TYPE_NODE) {
 			EPRINTLN(
 			    "pci_xhci: config variable '%s' under slot node",
 			     name);
@@ -2764,8 +2764,8 @@ pci_xhci_parse_devices(struct pci_xhci_softc *sc, nvlist_t *nvl)
 			goto bad;
 		}
 
-		slot_nvl = nvlist_get_nvlist(slots_nvl, name);
-		device = get_config_value_node(slot_nvl, "device");
+		slot_node = find_relative_config_node(slots_node, name);
+		device = get_config_value_node(slot_node, "device");
 		if (device == NULL) {
 			EPRINTLN(
 			    "pci_xhci: missing \"device\" value for slot '%s'",
@@ -2810,7 +2810,7 @@ pci_xhci_parse_devices(struct pci_xhci_softc *sc, nvlist_t *nvl)
 		XHCI_DEVINST_PTR(sc, dev->hci.hci_port) = dev;
 
 		dev->hci.hci_address = 0;
-		devsc = ue->ue_init(&dev->hci, nvl);
+		devsc = ue->ue_init(&dev->hci, node);
 		if (devsc == NULL) {
 			goto bad;
 		}
@@ -2846,7 +2846,7 @@ bad:
 }
 
 static int
-pci_xhci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_xhci_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	struct pci_xhci_softc *sc;
 	int	error;
@@ -2865,7 +2865,7 @@ pci_xhci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	sc->usb3_port_start = 1;
 
 	/* discover devices */
-	error = pci_xhci_parse_devices(sc, nvl);
+	error = pci_xhci_parse_devices(sc, node);
 	if (error < 0)
 		goto done;
 	else

@@ -2324,22 +2324,22 @@ pci_ahci_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
  *                 .path="/path/to/image"
  */
 static int
-pci_ahci_legacy_config_port(nvlist_t *nvl, int port, const char *type,
+pci_ahci_legacy_config_port(config_node_t *node, int port, const char *type,
     const char *opts)
 {
 	char node_name[sizeof("XX")];
-	nvlist_t *port_nvl;
+	config_node_t *port_node;
 
 	snprintf(node_name, sizeof(node_name), "%d", port);
-	port_nvl = create_relative_config_node(nvl, node_name);
-	set_config_value_node(port_nvl, "type", type);
-	return (blockif_legacy_config(port_nvl, opts));
+	port_node = create_relative_config_node(node, node_name);
+	set_config_value_node(port_node, "type", type);
+	return (blockif_legacy_config(port_node, opts));
 }
 
 static int
-pci_ahci_legacy_config(nvlist_t *nvl, const char *opts)
+pci_ahci_legacy_config(config_node_t *node, const char *opts)
 {
-	nvlist_t *ports_nvl;
+	config_node_t *ports_node;
 	const char *type;
 	char *next, *next2, *str, *tofree;
 	int p, ret;
@@ -2347,7 +2347,7 @@ pci_ahci_legacy_config(nvlist_t *nvl, const char *opts)
 	if (opts == NULL)
 		return (0);
 
-	ports_nvl = create_relative_config_node(nvl, "port");
+	ports_node = create_relative_config_node(node, "port");
 	ret = 1;
 	tofree = str = strdup(opts);
 	for (p = 0; p < MAX_PORTS && str != NULL; p++, str = next) {
@@ -2380,7 +2380,7 @@ pci_ahci_legacy_config(nvlist_t *nvl, const char *opts)
 			goto out;
 		}
 
-		if (pci_ahci_legacy_config_port(ports_nvl, p, type, str) != 0)
+		if (pci_ahci_legacy_config_port(ports_node, p, type, str) != 0)
 			goto out;
 	}
 	ret = 0;
@@ -2390,25 +2390,25 @@ out:
 }
 
 static int
-pci_ahci_cd_legacy_config(nvlist_t *nvl, const char *opts)
+pci_ahci_cd_legacy_config(config_node_t *node, const char *opts)
 {
-	nvlist_t *ports_nvl;
+	config_node_t *ports_node;
 
-	ports_nvl = create_relative_config_node(nvl, "port");
-	return (pci_ahci_legacy_config_port(ports_nvl, 0, "cd", opts));
+	ports_node = create_relative_config_node(node, "port");
+	return (pci_ahci_legacy_config_port(ports_node, 0, "cd", opts));
 }
 
 static int
-pci_ahci_hd_legacy_config(nvlist_t *nvl, const char *opts)
+pci_ahci_hd_legacy_config(config_node_t *node, const char *opts)
 {
-	nvlist_t *ports_nvl;
+	config_node_t *ports_node;
 
-	ports_nvl = create_relative_config_node(nvl, "port");
-	return (pci_ahci_legacy_config_port(ports_nvl, 0, "hd", opts));
+	ports_node = create_relative_config_node(node, "port");
+	return (pci_ahci_legacy_config_port(ports_node, 0, "hd", opts));
 }
 
 static int
-pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	char bident[sizeof("XX:XX:XX")];
 	char node_name[sizeof("XX")];
@@ -2418,7 +2418,7 @@ pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	MD5_CTX mdctx;
 	u_char digest[16];
 	const char *path, *type, *value;
-	nvlist_t *ports_nvl, *port_nvl;
+	config_node_t *ports_node, *port_node;
 
 	ret = 0;
 
@@ -2434,17 +2434,17 @@ pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	sc->pi = 0;
 	slots = 32;
 
-	ports_nvl = find_relative_config_node(nvl, "port");
+	ports_node = find_relative_config_node(node, "port");
 	for (p = 0; p < MAX_PORTS; p++) {
 		struct ata_params *ata_ident = &sc->port[p].ata_ident;
 		char ident[AHCI_PORT_IDENT];
 
 		snprintf(node_name, sizeof(node_name), "%d", p);
-		port_nvl = find_relative_config_node(ports_nvl, node_name);
-		if (port_nvl == NULL)
+		port_node = find_relative_config_node(ports_node, node_name);
+		if (port_node == NULL)
 			continue;
 
-		type = get_config_value_node(port_nvl, "type");
+		type = get_config_value_node(port_node, "type");
 		if (type == NULL)
 			continue;
 
@@ -2460,7 +2460,7 @@ pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		snprintf(bident, sizeof(bident), "%d:%d:%d", pi->pi_slot,
 		    pi->pi_func, p);
 
-		bctxt = blockif_open(port_nvl, bident);
+		bctxt = blockif_open(port_node, bident);
 		if (bctxt == NULL) {
 			sc->ports = p;
 			ret = 1;
@@ -2475,7 +2475,7 @@ pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		 * Create an identifier for the backing file.
 		 * Use parts of the md5 sum of the filename
 		 */
-		path = get_config_value_node(port_nvl, "path");
+		path = get_config_value_node(port_node, "path");
 		MD5Init(&mdctx);
 		MD5Update(&mdctx, path, strlen(path));
 		MD5Final(digest, &mdctx);
@@ -2491,16 +2491,16 @@ pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 			ata_string((uint8_t*)&ata_ident->model, "BHYVE SATA DVD ROM", 40);
 		else
 			ata_string((uint8_t*)&ata_ident->model, "BHYVE SATA DISK", 40);
-		value = get_config_value_node(port_nvl, "nmrr");
+		value = get_config_value_node(port_node, "nmrr");
 		if (value != NULL)
 			ata_ident->media_rotation_rate = atoi(value);
-		value = get_config_value_node(port_nvl, "ser");
+		value = get_config_value_node(port_node, "ser");
 		if (value != NULL)
 			ata_string((uint8_t*)(&ata_ident->serial), value, 20);
-		value = get_config_value_node(port_nvl, "rev");
+		value = get_config_value_node(port_node, "rev");
 		if (value != NULL)
 			ata_string((uint8_t*)(&ata_ident->revision), value, 8);
-		value = get_config_value_node(port_nvl, "model");
+		value = get_config_value_node(port_node, "model");
 		if (value != NULL)
 			ata_string((uint8_t*)(&ata_ident->model), value, 40);
 		ata_identify_init(&sc->port[p], atapi);

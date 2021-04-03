@@ -304,7 +304,7 @@ pci_viona_viona_init(struct vmctx *ctx, struct pci_viona_softc *sc)
 }
 
 static int
-pci_viona_legacy_config(nvlist_t *nvl, const char *opt)
+pci_viona_legacy_config(config_node_t *node, const char *opt)
 {
 	char *config, *name, *tofree, *value;
 
@@ -316,9 +316,9 @@ pci_viona_legacy_config(nvlist_t *nvl, const char *opt)
 		value = strchr(name, '=');
 		if (value != NULL) {
 			*value++ = '\0';
-			set_config_value_node(nvl, name, value);
+			set_config_value_node(node, name, value);
 		} else {
-			set_config_value_node(nvl, "vnic", name);
+			set_config_value_node(node, "vnic", name);
 		}
 	}
 	free(tofree);
@@ -326,7 +326,7 @@ pci_viona_legacy_config(nvlist_t *nvl, const char *opt)
 }
 
 static int
-pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
+pci_viona_parse_opts(struct pci_viona_softc *sc, config_node_t *node)
 {
 	const char *value;
 	int err = 0;
@@ -335,7 +335,7 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 	sc->vsc_feature_mask = 0;
 	sc->vsc_linkname[0] = '\0';
 
-	value = get_config_value_node(nvl, "feature_mask");
+	value = get_config_value_node(node, "feature_mask");
 	if (value != NULL) {
 		long num;
 
@@ -349,7 +349,7 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 		}
 	}
 
-	value = get_config_value_node(nvl, "vqsize");
+	value = get_config_value_node(node, "vqsize");
 	if (value != NULL) {
 		long num;
 
@@ -372,7 +372,7 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 		}
 	}
 
-	value = get_config_value_node(nvl, "vnic");
+	value = get_config_value_node(node, "vnic");
 	if (value == NULL) {
 		fprintf(stderr, "viona: vnic name required");
 		err = -1;
@@ -386,7 +386,7 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 }
 
 static int
-pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	dladm_handle_t		handle;
 	dladm_status_t		status;
@@ -397,7 +397,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	uint64_t ioport;
 	const char *vnic;
 
-	vnic = get_config_value_node(nvl, "vnic");
+	vnic = get_config_value_node(node, "vnic");
 	if (vnic == NULL) {
 		printf("virtio-viona: vnic required\n");
 		return (1);
@@ -411,7 +411,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 
 	pthread_mutex_init(&sc->vsc_mtx, NULL);
 
-	if (pci_viona_parse_opts(sc, nvl) != 0) {
+	if (pci_viona_parse_opts(sc, node) != 0) {
 		free(sc);
 		return (1);
 	}

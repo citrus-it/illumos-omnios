@@ -277,7 +277,7 @@ pci_vtcon_port_add(struct pci_vtcon_softc *sc, int port_id, const char *name,
 
 static int
 pci_vtcon_sock_add(struct pci_vtcon_softc *sc, const char *port_name,
-    const nvlist_t *nvl)
+    const config_node_t *node)
 {
 #ifdef __FreeBSD__
 	struct pci_vtcon_sock *sock;
@@ -302,7 +302,7 @@ pci_vtcon_sock_add(struct pci_vtcon_softc *sc, const char *port_name,
 		goto out;
 	}
 
-	path = get_config_value_node(nvl, "path");
+	path = get_config_value_node(node, "path");
 	if (path == NULL) {
 		EPRINTLN("vtcon: required path missing for port %ld", port);
 		error = -1;
@@ -372,7 +372,7 @@ pci_vtcon_sock_add(struct pci_vtcon_softc *sc, const char *port_name,
 		errx(EX_OSERR, "Unable to apply rights for sandbox");
 #endif
 
-	name = get_config_value_node(nvl, "name");
+	name = get_config_value_node(node, "name");
 	if (name == NULL) {
 		EPRINTLN("vtcon: required name missing for port %ld", port);
 		error = -1;
@@ -667,11 +667,11 @@ pci_vtcon_notify_rx(void *vsc, struct vqueue_info *vq)
  * each port.  Ports are numbered starting at 0.
  */
 static int
-pci_vtcon_legacy_config_port(nvlist_t *nvl, int port, char *opt)
+pci_vtcon_legacy_config_port(config_node_t *node, int port, char *opt)
 {
 	char *name, *path;
 	char node_name[sizeof("XX")];
-	nvlist_t *port_nvl;
+	config_node_t *port_node;
 
 	name = strsep(&opt, "=");
 	path = opt;
@@ -684,25 +684,25 @@ pci_vtcon_legacy_config_port(nvlist_t *nvl, int port, char *opt)
 		return (-1);
 	}
 	snprintf(node_name, sizeof(node_name), "%d", port);
-	port_nvl = create_relative_config_node(nvl, node_name);
-	set_config_value_node(port_nvl, "name", name);
-	set_config_value_node(port_nvl, "path", path);
+	port_node = create_relative_config_node(node, node_name);
+	set_config_value_node(port_node, "name", name);
+	set_config_value_node(port_node, "path", path);
 	return (0);
 }
 
 static int
-pci_vtcon_legacy_config(nvlist_t *nvl, const char *opts)
+pci_vtcon_legacy_config(config_node_t *node, const char *opts)
 {
 	char *opt, *str, *tofree;
-	nvlist_t *ports_nvl;
+	config_node_t *ports_node;
 	int error, port;
 
-	ports_nvl = create_relative_config_node(nvl, "port");
+	ports_node = create_relative_config_node(node, "port");
 	tofree = str = strdup(opts);
 	error = 0;
 	port = 0;
 	while ((opt = strsep(&str, ",")) != NULL) {
-		error = pci_vtcon_legacy_config_port(ports_nvl, port, opt);
+		error = pci_vtcon_legacy_config_port(ports_node, port, opt);
 		if (error)
 			break;
 		port++;
@@ -713,10 +713,10 @@ pci_vtcon_legacy_config(nvlist_t *nvl, const char *opts)
 #endif
 
 static int
-pci_vtcon_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_vtcon_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	struct pci_vtcon_softc *sc;
-	nvlist_t *ports_nvl;
+	config_node_t *ports_node;
 	int i;
 
 	sc = calloc(1, sizeof(struct pci_vtcon_softc));
@@ -753,20 +753,20 @@ pci_vtcon_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	sc->vsc_control_port.vsp_cb = pci_vtcon_control_tx;
 	sc->vsc_control_port.vsp_enabled = true;
 
-	ports_nvl = find_relative_config_node(nvl, "port");
-	if (ports_nvl != NULL) {
+	ports_node = find_relative_config_node(node, "port");
+	if (ports_node != NULL) {
 		const char *name;
 		void *cookie;
 		int type;
 
 		cookie = NULL;
-		while ((name = nvlist_next(ports_nvl, &type, &cookie)) !=
+		while ((name = config_node_next(ports_node, &type, &cookie)) !=
 		    NULL) {
-			if (type != NV_TYPE_NVLIST)
+			if (type != NODE_TYPE_NODE)
 				continue;
 
 			if (pci_vtcon_sock_add(sc, name,
-			    nvlist_get_nvlist(ports_nvl, name)) < 0) {
+			    find_relative_config_node(ports_node, name)) < 0) {
 				EPRINTLN("cannot create port %s: %s",
 				    name, strerror(errno));
 				return (1);

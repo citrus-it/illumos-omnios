@@ -36,18 +36,19 @@ __FBSDID("$FreeBSD$");
 
 #include "config.h"
 
-static nvlist_t *config_root;
+static config_node_t *config_root;
 
 void
 init_config(void)
 {
-	config_root = nvlist_create(0);
+	nvlist_t *nvl = nvlist_create(0);
 	if (config_root == NULL)
 		err(4, "Failed to create configuration root nvlist");
+	config_root = (config_node_t *)nvl;
 }
 
-static nvlist_t *
-_lookup_config_node(nvlist_t *parent, const char *path, bool create)
+static config_node_t *
+_lookup_config_node(const config_node_t *parent, const char *path, bool create)
 {
 	char *copy, *name, *tofree;
 	nvlist_t *nvl, *new_nvl;
@@ -56,7 +57,7 @@ _lookup_config_node(nvlist_t *parent, const char *path, bool create)
 	if (copy == NULL)
 		errx(4, "Failed to allocate memory");
 	tofree = copy;
-	nvl = parent;
+	nvl = (nvlist_t *)parent;
 	while ((name = strsep(&copy, ".")) != NULL) {
 		if (*name == '\0') {
 			warnx("Invalid configuration node: %s", path);
@@ -94,45 +95,47 @@ _lookup_config_node(nvlist_t *parent, const char *path, bool create)
 		}
 	}
 	free(tofree);
-	return (nvl);
+	return ((config_node_t *)nvl);
 }
 
-nvlist_t *
+config_node_t *
 create_config_node(const char *path)
 {
 
 	return (_lookup_config_node(config_root, path, true));
 }
 
-nvlist_t *
+config_node_t *
 find_config_node(const char *path)
 {
 
 	return (_lookup_config_node(config_root, path, false));
 }
 
-nvlist_t *
-create_relative_config_node(nvlist_t *parent, const char *path)
+config_node_t *
+create_relative_config_node(const config_node_t *parent, const char *path)
 {
 
 	return (_lookup_config_node(parent, path, true));
 }
 
-nvlist_t *
-find_relative_config_node(nvlist_t *parent, const char *path)
+config_node_t *
+find_relative_config_node(const config_node_t *parent, const char *path)
 {
 
 	return (_lookup_config_node(parent, path, false));
 }
 
 void
-set_config_value_node(nvlist_t *parent, const char *name, const char *value)
+set_config_value_node(const config_node_t *node, const char *name,
+    const char *value)
 {
+	nvlist_t *parent = (nvlist_t *)node;
 
 	if (strchr(name, '.') != NULL)
 		errx(4, "Invalid config node name %s", name);
 	if (parent == NULL)
-		parent = config_root;
+		parent = (nvlist_t *)config_root;
 	if (nvlist_exists_string(parent, name))
 		nvlist_free_string(parent, name);
 	else if (nvlist_exists(parent, name))
@@ -152,13 +155,13 @@ set_config_value(const char *path, const char *value)
 	/* Look for last separator. */
 	name = strrchr(path, '.');
 	if (name == NULL) {
-		nvl = config_root;
+		nvl = (nvlist_t *)config_root;
 		name = path;
 	} else {
 		node_name = strndup(path, name - path);
 		if (node_name == NULL)
 			errx(4, "Failed to allocate memory");
-		nvl = create_config_node(node_name);
+		nvl = (nvlist_t *)create_config_node(node_name);
 		if (nvl == NULL)
 			errx(4, "Failed to create configuration node %s",
 			    node_name);
@@ -171,7 +174,7 @@ set_config_value(const char *path, const char *value)
 	if (nvlist_exists_nvlist(nvl, name))
 		errx(4, "Attempting to add value %s to existing node %s",
 		    value, path);
-	set_config_value_node(nvl, name, value);
+	set_config_value_node((config_node_t *)nvl, name, value);
 }
 
 static const char *
@@ -184,13 +187,13 @@ get_raw_config_value(const char *path)
 	/* Look for last separator. */
 	name = strrchr(path, '.');
 	if (name == NULL) {
-		nvl = config_root;
+		nvl = (nvlist_t *)config_root;
 		name = path;
 	} else {
 		node_name = strndup(path, name - path);
 		if (node_name == NULL)
 			errx(4, "Failed to allocate memory");
-		nvl = find_config_node(node_name);
+		nvl = (nvlist_t *)find_config_node(node_name);
 		free(node_name);
 		if (nvl == NULL)
 			return (NULL);
@@ -228,7 +231,7 @@ _expand_config_value(const char *value, int depth)
 				fputc('%', valfp);
 				vp++;
 				break;
-			}				
+			}
 			if (vp[1] != '(' || vp[2] == '\0')
 				cp = NULL;
 			else
@@ -316,21 +319,22 @@ get_config_value(const char *path)
 }
 
 const char *
-get_config_value_node(const nvlist_t *parent, const char *name)
+get_config_value_node(const config_node_t *parent, const char *name)
 {
+	nvlist_t *nvl = (nvlist_t *)parent;
 
 	if (strchr(name, '.') != NULL)
 		errx(4, "Invalid config node name %s", name);
-	if (parent == NULL)
-		parent = config_root;
+	if (nvl == NULL)
+		nvl = (nvlist_t *)config_root;
 
-	if (nvlist_exists_nvlist(parent, name))
+	if (nvlist_exists_nvlist(nvl, name))
 		warnx("Attempt to fetch value of node %s of list %p", name,
 		    parent);
-	if (!nvlist_exists_string(parent, name))
+	if (!nvlist_exists_string(nvl, name))
 		return (NULL);
 
-	return (expand_config_value(nvlist_get_string(parent, name)));
+	return (expand_config_value(nvlist_get_string(nvl, name)));
 }
 
 bool
@@ -373,7 +377,7 @@ get_config_bool_default(const char *path, bool def)
 }
 
 bool
-get_config_bool_node(const nvlist_t *parent, const char *name)
+get_config_bool_node(const config_node_t *parent, const char *name)
 {
 	const char *value;
 
@@ -384,7 +388,7 @@ get_config_bool_node(const nvlist_t *parent, const char *name)
 }
 
 bool
-get_config_bool_node_default(const nvlist_t *parent, const char *name,
+get_config_bool_node_default(const config_node_t *parent, const char *name,
     bool def)
 {
 	const char *value;
@@ -403,10 +407,18 @@ set_config_bool(const char *path, bool value)
 }
 
 void
-set_config_bool_node(nvlist_t *parent, const char *name, bool value)
+set_config_bool_node(config_node_t *parent, const char *name, bool value)
 {
 
 	set_config_value_node(parent, name, value ? "true" : "false");
+}
+
+const char *
+config_node_next(const config_node_t *node, int *type, void **cookie)
+{
+	nvlist_t *nvl = (nvlist_t *)node;
+
+	return nvlist_next(nvl, type, cookie);
 }
 
 static void
@@ -435,5 +447,5 @@ dump_tree(const char *prefix, const nvlist_t *nvl)
 void
 dump_config(void)
 {
-	dump_tree("", config_root);
+	dump_tree("", (nvlist_t *)config_root);
 }

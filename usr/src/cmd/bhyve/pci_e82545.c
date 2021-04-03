@@ -2289,7 +2289,7 @@ e82545_open_tap(struct e82545_softc *sc, const char *path)
 }
 
 static int
-e82545_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+e82545_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	char nstr[80];
 	struct e82545_softc *sc;
@@ -2332,7 +2332,7 @@ e82545_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	pci_emul_alloc_bar(pi, E82545_BAR_IO, PCIBAR_IO,
 		E82545_BAR_IO_LEN);
 
-	mac = get_config_value_node(nvl, "mac");
+	mac = get_config_value_node(node, "mac");
 	if (mac != NULL) {
 		err = net_parsemac(mac, sc->esc_mac.octet);
 		if (err) {
@@ -2342,7 +2342,7 @@ e82545_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	} else
 		net_genmac(pi, sc->esc_mac.octet);
 
-	const char *tap = get_config_value_node(nvl, "tap");
+	const char *tap = get_config_value_node(node, "tap");
 	if (tap != NULL && (strncmp(tap, "tap", 3) == 0 ||
 	    strncmp(tap, "vmnet", 5) == 0))
 		e82545_open_tap(sc, tap);
@@ -2355,7 +2355,7 @@ e82545_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 
 #ifndef __FreeBSD__
 static int
-e82545_legacy_config(nvlist_t *nvl, const char *opt)
+e82545_legacy_config(config_node_t *node, const char *opt)
 {
 	char *config, *name, *tofree, *value;
 
@@ -2367,9 +2367,9 @@ e82545_legacy_config(nvlist_t *nvl, const char *opt)
 		value = strchr(name, '=');
 		if (value != NULL) {
 			*value++ = '\0';
-			set_config_value_node(nvl, name, value);
+			set_config_value_node(node, name, value);
 		} else {
-			set_config_value_node(nvl, "tap", name);
+			set_config_value_node(node, "tap", name);
 		}
 	}
 	free(tofree);

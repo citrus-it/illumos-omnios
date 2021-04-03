@@ -59,7 +59,7 @@ static struct pci_hostbridge_model {
 #endif
 
 static int
-pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	const char *value;
 	u_int vendor, device;
@@ -71,15 +71,15 @@ pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	vendor = device = 0;
 #endif
 
-	value = get_config_value_node(nvl, "vendor");
+	value = get_config_value_node(node, "vendor");
 	if (value != NULL)
 		vendor = strtol(value, NULL, 0);
-	value = get_config_value_node(nvl, "devid");
+	value = get_config_value_node(node, "devid");
 	if (value != NULL)
 		device = strtol(value, NULL, 0);
 
 #ifndef __FreeBSD__
-	const char *model = get_config_value_node(nvl, "model");
+	const char *model = get_config_value_node(node, "model");
 
 	if (model != NULL && (vendor != 0 || device != 0)) {
 		fprintf(stderr, "pci_hostbridge: cannot specify model "
@@ -125,11 +125,11 @@ pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 }
 
 static int
-pci_amd_hostbridge_legacy_config(nvlist_t *nvl, const char *opts)
+pci_amd_hostbridge_legacy_config(config_node_t *node, const char *opts)
 {
 
-	set_config_value_node(nvl, "vendor", "0x1022");	/* AMD */
-	set_config_value_node(nvl, "devid", "0x7432");	/* made up */
+	set_config_value_node(node, "vendor", "0x1022");	/* AMD */
+	set_config_value_node(node, "devid", "0x7432");	/* made up */
 
 	return (0);
 }

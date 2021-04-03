@@ -148,7 +148,7 @@ static inline uint32_t hda_get_reg_by_offset(struct hda_softc *sc,
 static inline void hda_set_field_by_offset(struct hda_softc *sc,
     uint32_t offset, uint32_t mask, uint32_t value);
 
-static struct hda_softc *hda_init(nvlist_t *nvl);
+static struct hda_softc *hda_init(config_node_t *node);
 static void hda_update_intr(struct hda_softc *sc);
 static void hda_response_interrupt(struct hda_softc *sc);
 static int hda_codec_constructor(struct hda_softc *sc,
@@ -209,7 +209,7 @@ static uint64_t hda_get_clock_ns(void);
 /*
  * PCI HDA function declarations
  */
-static int pci_hda_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl);
+static int pci_hda_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node);
 static void pci_hda_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
     int baridx, uint64_t offset, int size, uint64_t value);
 static uint64_t pci_hda_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
@@ -318,7 +318,7 @@ hda_set_field_by_offset(struct hda_softc *sc, uint32_t offset,
 }
 
 static struct hda_softc *
-hda_init(nvlist_t *nvl)
+hda_init(config_node_t *node)
 {
 	struct hda_softc *sc = NULL;
 	struct hda_codec_class *codec = NULL;
@@ -343,12 +343,12 @@ hda_init(nvlist_t *nvl)
 	 */
 	codec = hda_find_codec_class("hda_codec");
 	if (codec) {
-		value = get_config_value_node(nvl, "play");
+		value = get_config_value_node(node, "play");
 		if (value == NULL)
 			play = NULL;
 		else
 			play = strdup(value);
-		value = get_config_value_node(nvl, "rec");
+		value = get_config_value_node(node, "rec");
 		if (value == NULL)
 			rec = NULL;
 		else
@@ -1224,7 +1224,7 @@ static uint64_t hda_get_clock_ns(void)
  * PCI HDA function definitions
  */
 static int
-pci_hda_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_hda_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	struct hda_softc *sc = NULL;
 
@@ -1246,7 +1246,7 @@ pci_hda_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	/* allocate an IRQ pin for our slot */
 	pci_lintr_request(pi);
 
-	sc = hda_init(nvl);
+	sc = hda_init(node);
 	if (!sc)
 		return (-1);
 

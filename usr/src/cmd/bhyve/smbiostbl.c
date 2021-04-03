@@ -885,16 +885,16 @@ struct {
 void
 smbios_apply(void)
 {
-	nvlist_t *nvl;
+	config_node_t *node;
 
-	nvl = find_config_node("smbios");
-	if (nvl == NULL)
+	node = find_config_node("smbios");
+	if (node == NULL)
 		return;
 
 	for (uint_t i = 0; type1_map[i].key != NULL; i++) {
 		const char *value;
 
-		value = get_config_value_node(nvl, type1_map[i].key);
+		value = get_config_value_node(node, type1_map[i].key);
 		if (value != NULL)
 			*type1_map[i].targetp = value;
 	}
@@ -904,7 +904,7 @@ int
 smbios_parse(const char *opts)
 {
 	char *buf, *lasts, *token, *end;
-	nvlist_t *nvl;
+	config_node_t *node;
 	long type;
 
 	if ((buf = strdup(opts)) == NULL) {
@@ -931,8 +931,8 @@ smbios_parse(const char *opts)
 		goto fail;
 	}
 
-	nvl = create_config_node("smbios");
-	if (nvl == NULL) {
+	node = create_config_node("smbios");
+	if (node == NULL) {
 		(void) fprintf(stderr, "out of memory\n");
 		return (-1);
 	}
@@ -950,7 +950,7 @@ smbios_parse(const char *opts)
 		val++;
 
 		if (strcmp(token, "uuid") == 0) {
-			set_config_value_node(nvl, token, val);
+			set_config_value_node(node, token, val);
 			continue;
 		}
 
@@ -963,7 +963,7 @@ smbios_parse(const char *opts)
 			(void) fprintf(stderr, "invalid key '%s'\n", token);
 			goto fail;
 		}
-		set_config_value_node(nvl, token, val);
+		set_config_value_node(node, token, val);
 	}
 
 	return (0);

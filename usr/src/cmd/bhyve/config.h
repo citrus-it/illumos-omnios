@@ -45,7 +45,11 @@
  * Configuration variables are stored in a tree.  The full path of a
  * variable is specified as a dot-separated name similar to sysctl(8)
  * OIDs.
- */ 
+ */
+
+typedef nvlist_t config_node_t;
+#define	NODE_TYPE_NODE		NV_TYPE_NVLIST
+#define	NODE_TYPE_STRING	NV_TYPE_STRING
 
 /*
  * Fetches the value of a configuration variable.  If the "raw" value
@@ -58,7 +62,8 @@
  *
  * If 'parent' is NULL, 'name' is assumed to be a top-level variable.
  */
-const char *get_config_value_node(const nvlist_t *parent, const char *name);
+const char *get_config_value_node(const config_node_t *parent,
+    const char *name);
 
 /*
  * Similar to get_config_value_node but expects a full path to the
@@ -75,28 +80,30 @@ void	init_config(void);
  * variable.  If the node already exists, this returns a pointer to
  * the existing node.
  */
-nvlist_t *create_config_node(const char *path);
+config_node_t *create_config_node(const char *path);
 
 /*
  * Looks for an existing configuration node via a dot-separated OID
  * path.  Will fail if the path names an existing leaf configuration
  * variable.
  */
-nvlist_t *find_config_node(const char *path);
+config_node_t *find_config_node(const char *path);
 
 /*
  * Similar to the above, but treats the path relative to an existing
  * 'parent' node rather than as an absolute path.
  */
-nvlist_t *create_relative_config_node(nvlist_t *parent, const char *path);
-nvlist_t *find_relative_config_node(nvlist_t *parent, const char *path);
+config_node_t *create_relative_config_node(const config_node_t *parent,
+    const char *path);
+config_node_t *find_relative_config_node(const config_node_t *parent,
+    const char *path);
 
 /*
  * Adds or replaces the value of the specified variable.
  *
  * If 'parent' is NULL, 'name' is assumed to be a top-level variable.
  */
-void	set_config_value_node(nvlist_t *parent, const char *name,
+void	set_config_value_node(const config_node_t *parent, const char *name,
     const char *value);
 
 /*
@@ -107,12 +114,17 @@ void	set_config_value(const char *path, const char *value);
 
 /* Convenience wrappers for boolean variables. */
 bool	get_config_bool(const char *path);
-bool	get_config_bool_node(const nvlist_t *parent, const char *name);
+bool	get_config_bool_node(const config_node_t *parent, const char *name);
 bool	get_config_bool_default(const char *path, bool def);
-bool	get_config_bool_node_default(const nvlist_t *parent, const char *name,
-    bool def);
+bool	get_config_bool_node_default(const config_node_t *parent,
+    const char *name, bool def);
 void	set_config_bool(const char *path, bool value);
-void	set_config_bool_node(nvlist_t *parent, const char *name, bool value);
+void	set_config_bool_node(config_node_t *parent, const char *name,
+    bool value);
+
+/* Node iterator. */
+const char *config_node_next(const config_node_t *node, int *type,
+    void **cookie);
 
 void	dump_config(void);
 

@@ -644,19 +644,19 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 }
 
 static int
-passthru_legacy_config(nvlist_t *nvl, const char *opts)
+passthru_legacy_config(config_node_t *node, const char *opts)
 {
 	if (opts == NULL)
 		return (0);
 
 	if (strncmp(opts, "/dev/ppt", 8) == 0)
-		set_config_value_node(nvl, "path", opts);
+		set_config_value_node(node, "path", opts);
 
 	return (0);
 }
 
 static int
-passthru_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+passthru_init(struct vmctx *ctx, struct pci_devinst *pi, config_node_t *node)
 {
 	int error, memflags, pptfd;
 	struct passthru_softc *sc;
@@ -671,7 +671,7 @@ passthru_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		goto done;
 	}
 
-	path = get_config_value_node(nvl, "path");
+	path = get_config_value_node(node, "path");
 	if (path == NULL || passthru_dev_open(path, &pptfd) != 0) {
 		warnx("invalid passthru options");
 		goto done;

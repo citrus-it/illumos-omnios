@@ -295,7 +295,7 @@ umouse_event(uint8_t button, int x, int y, void *arg)
 }
 
 static void *
-umouse_init(struct usb_hci *hci, nvlist_t *nvl)
+umouse_init(struct usb_hci *hci, config_node_t *node)
 {
 	struct umouse_softc *sc;
 

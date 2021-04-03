@@ -491,7 +491,7 @@ blockif_init(void)
 }
 
 int
-blockif_legacy_config(nvlist_t *nvl, const char *opts)
+blockif_legacy_config(config_node_t *node, const char *opts)
 {
 	char *cp, *path;
 
@@ -500,17 +500,17 @@ blockif_legacy_config(nvlist_t *nvl, const char *opts)
 
 	cp = strchr(opts, ',');
 	if (cp == NULL) {
-		set_config_value_node(nvl, "path", opts);
+		set_config_value_node(node, "path", opts);
 		return (0);
 	}
 	path = strndup(opts, cp - opts);
-	set_config_value_node(nvl, "path", path);
+	set_config_value_node(node, "path", path);
 	free(path);
-	return (pci_parse_legacy_config(nvl, cp + 1));
+	return (pci_parse_legacy_config(node, cp + 1));
 }
 
 struct blockif_ctxt *
-blockif_open(nvlist_t *nvl, const char *ident)
+blockif_open(config_node_t *node, const char *ident)
 {
 	char tname[MAXCOMLEN + 1];
 #ifdef	__FreeBSD__
@@ -546,16 +546,16 @@ blockif_open(nvlist_t *nvl, const char *ident)
 	ro = 0;
 	nodelete = 0;
 
-	if (get_config_bool_node_default(nvl, "nocache", false))
+	if (get_config_bool_node_default(node, "nocache", false))
 		extra |= O_DIRECT;
-	if (get_config_bool_node_default(nvl, "nodelete", false))
+	if (get_config_bool_node_default(node, "nodelete", false))
 		nodelete = 1;
-	if (get_config_bool_node_default(nvl, "sync", false) ||
-	    get_config_bool_node_default(nvl, "direct", false))
+	if (get_config_bool_node_default(node, "sync", false) ||
+	    get_config_bool_node_default(node, "direct", false))
 		extra |= O_SYNC;
-	if (get_config_bool_node_default(nvl, "ro", false))
+	if (get_config_bool_node_default(node, "ro", false))
 		ro = 1;
-	ssval = get_config_value_node(nvl, "sectorsize");
+	ssval = get_config_value_node(node, "sectorsize");
 	if (ssval != NULL) {
 		ssopt = strtol(ssval, &cp, 10);
 		if (cp == ssval) {
@@ -577,7 +577,7 @@ blockif_open(nvlist_t *nvl, const char *ident)
 		}
 	}
 
-	path = get_config_value_node(nvl, "path");
+	path = get_config_value_node(node, "path");
 	if (path == NULL) {
 		EPRINTLN("Missing \"path\" for block device.");
 		goto err;

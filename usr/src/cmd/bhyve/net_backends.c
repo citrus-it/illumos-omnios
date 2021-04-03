@@ -98,7 +98,7 @@ struct net_backend {
 	 * and should not be called by the frontend.
 	 */
 	int (*init)(struct net_backend *be, const char *devname,
-	    nvlist_t *nvl, net_be_rxeof_t cb, void *param);
+	    config_node_t *node, net_be_rxeof_t cb, void *param);
 	void (*cleanup)(struct net_backend *be);
 
 	/*
@@ -206,7 +206,7 @@ tap_cleanup(struct net_backend *be)
 
 static int
 tap_init(struct net_backend *be, const char *devname,
-	 nvlist_t *nvl, net_be_rxeof_t cb, void *param)
+	 config_node_t *node, net_be_rxeof_t cb, void *param)
 {
 	struct tap_priv *priv = (struct tap_priv *)be->opaque;
 	char tbuf[80];
@@ -400,7 +400,7 @@ DATA_SET(net_backend_set, vmnet_backend);
 
 static int
 ng_init(struct net_backend *be, const char *devname,
-	 nvlist_t *nvl, net_be_rxeof_t cb, void *param)
+	 config_node_t *node, net_be_rxeof_t cb, void *param)
 {
 	struct tap_priv *p = (struct tap_priv *)be->opaque;
 	struct ngm_connect ngc;
@@ -423,26 +423,26 @@ ng_init(struct net_backend *be, const char *devname,
 
 	memset(&ngc, 0, sizeof(ngc));
 
-	value = get_config_value_node(nvl, "path");
+	value = get_config_value_node(node, "path");
 	if (value == NULL) {
 		WPRINTF(("path must be provided"));
 		return (-1);
 	}
 	strncpy(ngc.path, value, NG_PATHSIZ - 1);
 
-	value = get_config_value_node(nvl, "hook");
+	value = get_config_value_node(node, "hook");
 	if (value == NULL)
 		value = "vmlink";
 	strncpy(ngc.ourhook, value, NG_HOOKSIZ - 1);
 
-	value = get_config_value_node(nvl, "peerhook");
+	value = get_config_value_node(node, "peerhook");
 	if (value == NULL) {
 		WPRINTF(("peer hook must be provided"));
 		return (-1);
 	}
 	strncpy(ngc.peerhook, value, NG_HOOKSIZ - 1);
 
-	nodename = get_config_value_node(nvl, "socket");
+	nodename = get_config_value_node(node, "socket");
 	if (NgMkSockNode(nodename,
 		&ctrl_sock, &be->fd) < 0) {
 		WPRINTF(("can't get Netgraph sockets"));
@@ -633,7 +633,7 @@ netmap_set_cap(struct net_backend *be, uint64_t features,
 
 static int
 netmap_init(struct net_backend *be, const char *devname,
-	    nvlist_t *nvl, net_be_rxeof_t cb, void *param)
+	    config_node_t *node, net_be_rxeof_t cb, void *param)
 {
 	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
 
@@ -894,7 +894,7 @@ DATA_SET(net_backend_set, netmap_backend);
 DATA_SET(net_backend_set, vale_backend);
 
 int
-netbe_legacy_config(nvlist_t *nvl, const char *opts)
+netbe_legacy_config(config_node_t *node, const char *opts)
 {
 	char *backend, *cp;
 
@@ -903,13 +903,13 @@ netbe_legacy_config(nvlist_t *nvl, const char *opts)
 
 	cp = strchr(opts, ',');
 	if (cp == NULL) {
-		set_config_value_node(nvl, "backend", opts);
+		set_config_value_node(node, "backend", opts);
 		return (0);
 	}
 	backend = strndup(opts, cp - opts);
-	set_config_value_node(nvl, "backend", backend);
+	set_config_value_node(node, "backend", backend);
 	free(backend);
-	return (pci_parse_legacy_config(nvl, cp + 1));
+	return (pci_parse_legacy_config(node, cp + 1));
 }
 
 /*
@@ -925,7 +925,7 @@ netbe_legacy_config(nvlist_t *nvl, const char *opts)
  *	the argument for the callback.
  */
 int
-netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
+netbe_init(struct net_backend **ret, config_node_t *node, net_be_rxeof_t cb,
     void *param)
 {
 	struct net_backend **pbe, *nbe, *tbe = NULL;
@@ -933,7 +933,7 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
 	char *devname;
 	int err;
 
-	value = get_config_value_node(nvl, "backend");
+	value = get_config_value_node(node, "backend");
 	if (value == NULL) {
 		return (-1);
 	}
@@ -971,7 +971,7 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
 	nbe->fe_vnet_hdr_len = 0;
 
 	/* Initialize the backend. */
-	err = nbe->init(nbe, devname, nvl, cb, param);
+	err = nbe->init(nbe, devname, node, cb, param);
 	if (err) {
 		free(devname);
 		free(nbe);
