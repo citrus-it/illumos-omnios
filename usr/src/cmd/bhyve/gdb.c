@@ -754,8 +754,6 @@ static void
 _gdb_cpu_suspend(int vcpu, bool report_stop)
 {
 
-	if (!gdb_active)
-		return;
 	debug("$vCPU %d suspending\n", vcpu);
 	CPU_SET(vcpu, &vcpus_waiting);
 	if (report_stop && CPU_CMP(&vcpus_waiting, &vcpus_suspended) == 0)
@@ -830,6 +828,8 @@ void
 gdb_cpu_suspend(int vcpu)
 {
 
+	if (!gdb_active)
+		return;
 	pthread_mutex_lock(&gdb_lock);
 	_gdb_cpu_suspend(vcpu, true);
 	gdb_cpu_resume(vcpu);
