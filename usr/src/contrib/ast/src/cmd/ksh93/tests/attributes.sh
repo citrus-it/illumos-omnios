@@ -518,5 +518,27 @@ do	unset foo
 done
 unset expect
 
+# Bug introduced in 0e4c4d61: could not alter the size of an existing justified string attribute
+# https://github.com/ksh93/ksh/issues/142#issuecomment-780931533
+got=$(unset s; typeset -L 100 s=h; typeset +p s; typeset -L 5 s; typeset +p s)
+exp=$'typeset -L 100 s\ntypeset -L 5 s'
+[[ $got == "$exp" ]] || err_exit 'cannot alter size of existing justified string attribute' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(unset s; typeset -L 100 s=h; typeset +p s; typeset -R 5 s; typeset +p s)
+exp=$'typeset -L 100 s\ntypeset -R 5 s'
+[[ $got == "$exp" ]] || err_exit 'cannot set -R after setting -L' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+got=$(unset s; typeset -L 100 s=h; typeset +p s; typeset -Z 5 s; typeset +p s)
+exp=$'typeset -L 100 s\ntypeset -Z 5 -R 5 s'
+[[ $got == "$exp" ]] || err_exit 'cannot set -Z after setting -L' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
+# Old bug: zero-filling zero would cause the zero number to disappear
+# https://github.com/ksh93/ksh/issues/142#issuecomment-782013674
+got=$(typeset -i x=0; typeset -Z5 x; echo $x; typeset -Z3 x; echo $x; typeset -Z7 x; echo $x)
+exp=$'00000\n000\n0000000'
+[[ $got == "$exp" ]] || err_exit 'failed to zero-fill zero' \
+	"(expected $(printf %q "$exp"), got $(printf %q "$got"))"
+
 # ======
 exit $((Errors<125?Errors:125))
