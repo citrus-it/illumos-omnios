@@ -1046,6 +1046,7 @@ ZVERBOSE=	-Wl,-zverbose
 ZASSERTDEFLIB=	-Wl,-zassert-deflib
 ZGUIDANCE=	-Wl,-zguidance
 ZFATALWARNINGS=	-Wl,-zfatal-warnings
+ZASLR=		-Wl,-zaslr
 
 GSHARED=	-shared
 CCMT=		-mt
