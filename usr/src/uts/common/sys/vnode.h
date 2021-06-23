@@ -283,6 +283,22 @@ struct vsd_node {
 
 struct fem_head;	/* from fem.h */
 
+#ifdef DEBUG
+typedef struct vnode_reference {
+	list_node_t	vr_link;
+	void		*vr_holder;
+	//uint64_t	vr_number;
+	uint8_t		*vr_removed;
+} vnode_reference_t;
+
+typedef struct vnode_refcount {
+	list_t		vrc_list;
+	list_t		vrc_removed;
+	//uint64_t	vrc_count;
+	uint64_t	vrc_removed_count;
+} vnode_refcount_t;
+#endif
+
 typedef struct vnode {
 	kmutex_t	v_lock;		/* protects vnode fields */
 	uint_t		v_flag;		/* vnode flags (see below) */
@@ -318,6 +334,9 @@ typedef struct vnode {
 	struct vsd_node *v_vsd;		/* vnode specific data */
 	struct vnode	*v_xattrdir;	/* unnamed extended attr dir (GFS) */
 	uint_t		v_count_dnlc;	/* dnlc reference count */
+#ifdef DEBUG
+	vnode_refcount_t v_ref;
+#endif
 } vnode_t;
 
 #define	IS_DEVVP(vp)	\
@@ -1460,6 +1479,7 @@ extern uint_t pvn_vmodsort_supported;
  *
  * A phantom hold must be released by VN_PHANTOM_RELE().
  */
+
 #define	VN_HOLD_LOCKED(vp) {			\
 	ASSERT(mutex_owned(&(vp)->v_lock));	\
 	(vp)->v_count++;			\
@@ -1508,6 +1528,16 @@ extern uint_t pvn_vmodsort_supported;
 	(vp)->v_type = (type); \
 	(vp)->v_rdev = (dev); \
 }
+
+#ifdef DEBUG
+
+#undef VN_HOLD
+#define	VN_HOLD(vp) {			\
+	vn_hold(vp, (char *)(uintptr_t)__func__); \
+}
+
+#endif /* DEBUG */
+
 
 /*
  * Compare two vnodes for equality.  In general this macro should be used

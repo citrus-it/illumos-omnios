@@ -233,6 +233,11 @@ ushort_t vttoif_tab[] = {
 
 kmem_cache_t *vn_cache;
 
+#ifdef DEBUG
+kmem_cache_t *vn_ref_cache;
+kmem_cache_t *vn_ref_history_cache;
+#endif
+
 
 /*
  * Vnode operations vector.
@@ -827,6 +832,24 @@ done:
 		nbl_end_crit(vp);
 	return (error);
 }
+
+#ifdef DEBUG
+void
+vn_hold(vnode_t *vp, void *holder)
+{
+	vnode_reference_t *ref;
+
+	ref = kmem_cache_alloc(vn_ref_cache, KM_SLEEP);
+	ref->vr_holder = holder;
+
+	mutex_enter(&vp->v_lock);
+	list_insert_head(&vp->v_ref.vrc_list, ref);
+	vp->v_count++;
+	mutex_exit(&vp->v_lock);
+
+	DTRACE_PROBE1(vn__hold, vnode_t *, vp);
+}
+#endif
 
 /*
  * Release a vnode.  Call VOP_INACTIVE on last reference or
@@ -2377,7 +2400,43 @@ vn_freevnodeops(vnodeops_t *vnops)
  * Vnode cache.
  */
 
-/* ARGSUSED */
+#ifdef DEBUG
+static
+vn_ref_init(struct vnode *vp)
+{
+	list_create(&vp->v_ref.vrc_list, sizeof (vnode_reference_t),
+	    offsetof(vnode_reference_t, vr_link));
+	list_create(&vp->v_ref.vrc_removed, sizeof (vnode_reference_t),
+	    offsetof(vnode_reference_t, vr_link));
+}
+
+static void
+vn_ref_clear(struct vnode *vp)
+{
+	vnode_reference_t *ref;
+
+	while (ref = list_head(&vp->v_ref.vrc_list)) {
+		list_remove(&vp->v_ref.vrc_list, ref);
+		kmem_cache_free(vn_ref_cache, ref);
+	}
+
+	while (ref = list_head(&vp->v_ref.vrc_removed)) {
+		list_remove(&vp->v_ref.vrc_removed, ref);
+		kmem_cache_free(vn_ref_history_cache, ref->ref_removed);
+		kmem_cache_free(vn_ref_cache, ref);
+	}
+}
+
+static void
+vn_ref_fini(struct vnode *vp)
+{
+	vn_ref_clear(vp);
+	list_destroy(&vp->v_ref.vrc_list);
+	list_destroy(&vp->v_ref.vrc_removed);
+}
+#endif
+
+
 static int
 vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 {
@@ -2396,10 +2455,13 @@ vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	vp->v_vsd = NULL;
 	vp->v_fopdata = NULL;
 
+#ifdef DEBUG
+	vn_ref_init(vp);
+#endif
+
 	return (0);
 }
 
-/* ARGSUSED */
 static void
 vn_cache_destructor(void *buf, void *cdrarg)
 {
@@ -2411,6 +2473,10 @@ vn_cache_destructor(void *buf, void *cdrarg)
 	cv_destroy(&vp->v_cv);
 	mutex_destroy(&vp->v_vsd_lock);
 	mutex_destroy(&vp->v_lock);
+
+#ifdef DEBUG
+	vn_ref_fini(vp);
+#endif
 }
 
 void
@@ -2422,12 +2488,22 @@ vn_create_cache(void)
 	vn_cache = kmem_cache_create("vn_cache", sizeof (struct vnode),
 	    VNODE_ALIGN, vn_cache_constructor, vn_cache_destructor, NULL, NULL,
 	    NULL, 0);
+#ifdef DEBUG
+	vn_ref_cache = kmem_cache_create("vn_ref_cache",
+	    sizeof (vnode_reference_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+	vn_ref_history_cache = kmem_cache_create("vn_ref_history_cache",
+	    sizeof (uint64_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+#endif
 }
 
 void
 vn_destroy_cache(void)
 {
 	kmem_cache_destroy(vn_cache);
+#ifdef DEBUG
+	kmem_cache_destroy(vn_ref_cache);
+	kmem_cache_destroy(vn_ref_history_cache);
+#endif
 }
 
 /*
@@ -2515,6 +2591,10 @@ vn_reinit(vnode_t *vp)
 
 	/* Handles v_femhead, v_path, and the r/w/map counts */
 	vn_recycle(vp);
+
+#ifdef DEBUG
+	vn_ref_clear(vp);
+#endif
 }
 
 vnode_t *
@@ -3307,7 +3387,6 @@ vn_updatepath(vnode_t *pvp, vnode_t *vp, const char *name)
  * a safe manner.  If the vnode already has path information embedded, then the
  * cached path is left untouched.
  */
-/* ARGSUSED */
 void
 vn_setpath(vnode_t *rootvp, vnode_t *pvp, vnode_t *vp, const char *name,
     size_t len)
@@ -4604,7 +4683,6 @@ fop_retzcbuf(vnode_t *vp, xuio_t *uiop, cred_t *cr, caller_context_t *ct)
  * Default destructor
  *	Needed because NULL destructor means that the key is unused
  */
-/* ARGSUSED */
 void
 vsd_defaultdestructor(void *value)
 {}
