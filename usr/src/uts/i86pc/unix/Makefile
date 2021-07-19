@@ -112,6 +112,15 @@ CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN)
 # instr_size needs a special header
 $(OBJS_DIR)/instr_size.o :=	EXTRA_OPTIONS	= -I$(SRC)/common/dis/i386
 
+# As of GNU binutils 2.37, the assembler has split the 'sysexit' instruction
+# into 'sysexitl' and 'sysexitq'. Using a plain 'sysexit' as kpti_trampolines.s
+# does is interpreted as 'sysexitl' but comes with a warning about the
+# assumption being made. By default, 'aw' tells the assembler to treat all
+# warnings as fatal; the -n option disables this.
+# The plain 'sysexit' in this file cannot be changed to 'sysexitl' since older
+# versions of GNU binutils do not understand that.
+$(OBJS_DIR)/kpti_trampolines.o :=	ASFLAGS += -n
+
 #
 # When performing shadow studio builds, the pre-processed comm page
 # output from gcc can end up confusing studio.
