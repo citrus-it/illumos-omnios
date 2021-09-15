@@ -194,9 +194,7 @@ Print a list of supported LPC devices.
 .It Fl l Ar lpcdev Ns Op \&, Ns Ar conf
 Allow devices behind the LPC PCI-ISA bridge to be configured.
 The only supported devices are the TTY-class devices
-.Cm com1 ,
-.Cm com2 ,
-.Cm com3
+.Cm com1 , com2 , com3
 and
 .Cm com4 ,
 the boot ROM device
@@ -209,15 +207,23 @@ The possible values for the
 argument are listed in the
 .Fl s
 flag description.
-.It Fl m Ar memsize Ns Op Ar K|k|M|m|G|g|T|t
-Guest physical memory size.
-The size argument may be suffixed with one of K, M, G or T (either upper
-or lower case) to indicate a multiple of kibibytes, mebibytes, gibibytes,
-or tebibytes.
+.It Xo
+.Fl m Ar memsize Ns Oo
+.Sm off
+.Cm K | k | M | m | G | g | T | t
+.Sm on
+.Oc
+.Xc
+Set the guest physical memory size.
+The size argument may be suffixed with one of
+.Cm K , M , G
+or
+.Cm T
+.Pq either upper or lower case
+to indicate a multiple of kibibytes, mebibytes, gibibytes, or tebibytes.
 If no suffix is given, the value is assumed to be in mebibytes.
 .Pp
-.Ar memsize
-defaults to 256MiB.
+The default is 256MiB.
 .It Fl o Ar var Ns Cm = Ns Ar value
 Set the configuration variable
 .Ar var
