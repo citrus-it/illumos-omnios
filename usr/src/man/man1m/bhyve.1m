@@ -448,7 +448,7 @@ are:
 Expose the share in read-only mode.
 .El
 .Pp
-.Sy TTY devices :
+.Sy TTY device backends :
 .Bl -tag -width 10n
 .It Cm stdio
 Connect the serial port to the standard input and output of
@@ -459,7 +459,7 @@ process.
 Use the host TTY device for serial port I/O.
 .El
 .Pp
-.Sy Boot ROM device :
+.Sy Boot ROM device backends :
 .Bl -tag -width 10n
 .It Pa romfile
 Map
@@ -467,10 +467,10 @@ Map
 in the guest address space reserved for boot firmware.
 .El
 .Pp
-.Sy Pass-through devices :
+.Sy Pass-through device backends :
 .Bl -tag -width 10n
 .It Pa /dev/ppt Ns Ar N
-Connect to a PCI device on the host identified by the specificed path.
+Connect to a PCI device on the host identified by the specified path.
 .El
 .Pp
 Guest memory must be wired using the
