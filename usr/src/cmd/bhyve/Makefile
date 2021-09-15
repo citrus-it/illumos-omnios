@@ -150,12 +150,13 @@ $(PROG) := LDLIBS += \
 	-ldladm \
 	-lmd \
 	-lnvpair \
+	-lproc \
 	-lcrypto \
 	-luuid \
 	-lvmmapi \
 	-lz
 NATIVE_LIBS += libz.so libcrypto.so
-$(MEVENT_TEST_PROG) := LDLIBS += -lsocket
+$(MEVENT_TEST_PROG) := LDLIBS += -lsocket -lproc
 $(PROG) := LDFLAGS += $(ZASLR)
 
 .KEEP_STATE:

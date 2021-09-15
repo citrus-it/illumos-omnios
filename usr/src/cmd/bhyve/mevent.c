@@ -66,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/siginfo.h>
 #include <sys/queue.h>
 #include <sys/debug.h>
+#include <libproc.h>
 #endif
 #include <sys/time.h>
 
@@ -104,10 +105,13 @@ struct mevent {
 	int	me_cq;
 	int	me_state; /* Desired kevent flags. */
 	int	me_closefd;
+	int	me_fflags;
 #ifndef __FreeBSD__
 	port_notify_t	me_notify;
 	struct sigevent	me_sigev;
 	boolean_t	me_auto_requeue;
+	struct file_obj	me_fobj;
+	char		*me_fname;
 #endif
 	LIST_ENTRY(mevent) me_list;
 };
@@ -200,6 +204,9 @@ mevent_kq_filter(struct mevent *mevp)
 	if (mevp->me_type == EVF_SIGNAL)
 		retval = EVFILT_SIGNAL;
 
+	if (mevp->me_type == EVF_VNODE)
+		retval = EVFILT_VNODE;
+
 	return (retval);
 }
 
@@ -212,8 +219,18 @@ mevent_kq_flags(struct mevent *mevp)
 static int
 mevent_kq_fflags(struct mevent *mevp)
 {
-	/* XXX nothing yet, perhaps EV_EOF for reads ? */
-	return (0);
+	int retval;
+
+	retval = 0;
+
+	switch (mevp->me_type) {
+	case EVF_VNODE:
+		if ((mevp->me_fflags & EVFF_ATTRIB) != 0)
+			retval |= NOTE_ATTRIB;
+		break;
+	}
+
+	return (retval);
 }
 
 static void
@@ -317,6 +334,41 @@ mevent_clarify_state(struct mevent *mevp)
 	return (B_TRUE);
 }
 
+static char *
+mevent_fdpath(int fd)
+{
+	prfdinfo_t *fdinfo;
+	char *path;
+	size_t len;
+
+	fdinfo = proc_get_fdinfo(getpid(), fd);
+	if (fdinfo == NULL) {
+		(void) fprintf(stderr, "%s: proc_get_fdinfo(%d) failed: %s\n",
+		    __func__, fd, strerror(errno));
+		path = NULL;
+	} else {
+		path = (char *)proc_fdinfo_misc(fdinfo, PR_PATHNAME, &len);
+	}
+
+	if (path == NULL) {
+		(void) fprintf(stderr, "%s: Fall back to /proc/self/fd/%d\n",
+		    __func__, fd);
+		(void) asprintf(&path, "/proc/self/fd/%d", fd);
+	} else {
+		path = strdup(path);
+	}
+
+	proc_fdinfo_free(fdinfo);
+
+	if (path == NULL) {
+		(void) fprintf(stderr,
+		    "%s: Error building path for fd %d: %s\n", __func__,
+		    fd, strerror(errno));
+	}
+
+	return (path);
+}
+
 static void
 mevent_update_one(struct mevent *mevp)
 {
@@ -400,6 +452,58 @@ mevent_update_one(struct mevent *mevp)
 		default:
 			goto abort;
 		}
+
+	case EVF_VNODE:
+		mevp->me_auto_requeue = B_FALSE;
+
+		switch (mevp->me_state) {
+		case EV_ENABLE:
+		{
+			int events = 0;
+
+			if ((mevp->me_fflags & EVFF_ATTRIB) != 0)
+				events |= FILE_ATTRIB;
+
+			assert(events != 0);
+
+			if (mevp->me_fname == NULL) {
+				mevp->me_fname = mevent_fdpath(mevp->me_fd);
+				if (mevp->me_fname == NULL)
+					return;
+			}
+
+			bzero(&mevp->me_fobj, sizeof (mevp->me_fobj));
+			mevp->me_fobj.fo_name = mevp->me_fname;
+
+			if (port_associate(portfd, PORT_SOURCE_FILE,
+			    (uintptr_t)&mevp->me_fobj, events, mevp) != 0) {
+				(void) fprintf(stderr,
+				    "port_associate fd %d (%s) %p failed: %s\n",
+				    mevp->me_fd, mevp->me_fname, mevp,
+				    strerror(errno));
+			}
+			return;
+		}
+		case EV_DISABLE:
+		case EV_DELETE:
+			/*
+			 * A disable that comes in while an event is being
+			 * handled will result in an ENOENT.
+			 */
+			if (port_dissociate(portfd, PORT_SOURCE_FILE,
+			    (uintptr_t)&mevp->me_fobj) != 0 &&
+			    errno != ENOENT) {
+				(void) fprintf(stderr, "port_dissociate "
+				    "portfd %d fd %d mevp %p failed: %s\n",
+				    portfd, mevp->me_fd, mevp, strerror(errno));
+			}
+			free(mevp->me_fname);
+			mevp->me_fname = NULL;
+			return;
+		default:
+			goto abort;
+		}
+
 	default:
 		/* EVF_SIGNAL not yet implemented. */
 		goto abort;
@@ -444,6 +548,7 @@ mevent_update_pending()
 		LIST_REMOVE(mevp, me_list);
 
 		if (mevp->me_state & EV_DELETE) {
+			free(mevp->me_fname);
 			free(mevp);
 		} else {
 			LIST_INSERT_HEAD(&global_head, mevp, me_list);
@@ -473,7 +578,7 @@ mevent_handle_pe(port_event_t *pe)
 static struct mevent *
 mevent_add_state(int tfd, enum ev_type type,
 	   void (*func)(int, enum ev_type, void *), void *param,
-	   int state)
+	   int state, int fflags)
 {
 #ifdef __FreeBSD__
 	struct kevent kev;
@@ -528,6 +633,7 @@ mevent_add_state(int tfd, enum ev_type type,
 	mevp->me_param = param;
 
 	mevp->me_state = state;
+	mevp->me_fflags = fflags;
 
 	/*
 	 * Try to add the event.  If this fails, report the failure to
@@ -561,7 +667,15 @@ mevent_add(int tfd, enum ev_type type,
 	   void (*func)(int, enum ev_type, void *), void *param)
 {
 
-	return (mevent_add_state(tfd, type, func, param, EV_ADD));
+	return (mevent_add_state(tfd, type, func, param, EV_ADD, 0));
+}
+
+struct mevent *
+mevent_add_flags(int tfd, enum ev_type type, int fflags,
+		 void (*func)(int, enum ev_type, void *), void *param)
+{
+
+	return (mevent_add_state(tfd, type, func, param, EV_ADD, fflags));
 }
 
 struct mevent *
@@ -569,7 +683,7 @@ mevent_add_disabled(int tfd, enum ev_type type,
 		    void (*func)(int, enum ev_type, void *), void *param)
 {
 
-	return (mevent_add_state(tfd, type, func, param, EV_ADD | EV_DISABLE));
+	return (mevent_add_state(tfd, type, func, param, EV_ADD | EV_DISABLE, 0));
 }
 
 static int
