@@ -234,16 +234,18 @@ usage(int code)
 
         fprintf(stderr,
 #ifdef	__FreeBSD__
-		"Usage: %s [-aehuwxACDHPSWY]\n"
+		"Usage: %s [-AaCDeHhPSuWwxY]\n"
 #else
-		"Usage: %s [-adehuwxACDHPSWY]\n"
+		"Usage: %s [-AaCDdeHhPSuWwxY]\n"
 #endif
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
-		"       %*s [-k <file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
 #ifdef	__FreeBSD__
-		"       %*s [-p vcpu:hostcpu] [-s <pci>] [-U uuid] [<vm>]\n"
+		"       %*s [-G port] [-k file] [-l lpc] [-m mem] [-o var=value]\n"
+		"       %*s [-p vcpu:hostcpu] [-r file] [-s pci] [-U uuid] vmname\n"
+
 #else
-		"       %*s [-s <pci>] [-U uuid] [<vm>]\n"
+		"       %*s [-k <file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
+		"       %*s [-s <pci>] [-U uuid] vmname\n"
 #endif
 		"       -a: local apic is in xAPIC mode (deprecated)\n"
 		"       -A: create ACPI tables\n"
