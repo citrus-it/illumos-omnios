@@ -24,7 +24,7 @@
 .\"
 .\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd April 20, 2021
+.Dd September 15, 2021
 .Dt BHYVE 1M
 .Os
 .Sh NAME
@@ -56,7 +56,7 @@
 .Op Fl k Ar file
 .Oo Fl l
 .Sm off
-.Cm help \&| Ar lpcdev Op Cm \&, Ar conf
+.Ar lpcdev Op Cm \&, Ar conf
 .Sm on
 .Oc
 .Oo Fl m
@@ -69,13 +69,17 @@
 .Oc
 .Op Fl o Ar var Ns Cm = Ns Ar value
 .Op Fl r Ar file
-.Oo Fl s
 .Sm off
-.Cm help \&| Ar slot Cm \&, Ar emulation Op Cm \&, Ar conf
+.Oo Fl s\~
+.Ar slot Cm \&, Ar emulation Op Cm \&, Ar conf
 .Sm on
 .Oc
 .Op Fl U Ar uuid
 .Ar vmname
+.Nm
+.Fl l Cm help
+.Nm
+.Fl s Cm help
 .Sh DESCRIPTION
 .Nm
 is a hypervisor that runs guest operating systems inside a
