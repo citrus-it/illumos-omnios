@@ -145,11 +145,12 @@ the host's hostname and the VM name.
 Use MSI-X interrupts for PCI VirtIO devices.
 If set to false, MSI interrupts are used instead.
 .It Va config.dump Ta bool Ta false Ta
-If this value is set to true, then
+If this value is set to true then, after parsing command line options,
 .Xr bhyve 1M
 will write all of its configuration variables to
 .Dv stdout
-and exit after it has finished parsing command line options.
+and exit.
+No VM will be started.
 .It Va privileges.debug Ta bool Ta false Ta
 Enable debug messages relating to privilege management.
 These messages are sent to
