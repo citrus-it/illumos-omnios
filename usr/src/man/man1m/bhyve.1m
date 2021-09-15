@@ -432,15 +432,13 @@ Disable emulation of guest trim requests via
 requests.
 .El
 .Pp
-9P devices:
-.Bl -tag -width 10n
-.It Xo
+.Sy 9P device backends :
 .Sm off
-.Cm sharename Sy = Pa /path/to/share
-.Op Cm \&, Ar 9p-device-options
-.Sm on
-.Xc
+.Bl -bullet
+.It
+.Ar sharename Cm = Ar /path/to/share Op Cm \&, Ar 9p-device-options
 .El
+.Sm on
 .Pp
 The
 .Ar 9p-device-options
@@ -450,7 +448,7 @@ are:
 Expose the share in read-only mode.
 .El
 .Pp
-TTY devices:
+.Sy TTY devices :
 .Bl -tag -width 10n
 .It Cm stdio
 Connect the serial port to the standard input and output of
