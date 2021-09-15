@@ -247,31 +247,31 @@ usage(int code)
 		"       %*s [-k <file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
 		"       %*s [-s <pci>] [-U uuid] vmname\n"
 #endif
-		"       -a: local apic is in xAPIC mode (deprecated)\n"
 		"       -A: create ACPI tables\n"
-		"       -c: number of cpus and/or topology specification\n"
+		"       -a: local apic is in xAPIC mode (deprecated)\n"
 		"       -C: include guest memory in core file\n"
+		"       -c: number of cpus and/or topology specification\n"
+		"       -D: destroy on power-off\n"
 #ifndef __FreeBSD__
 	        "       -d: suspend cpu at boot\n"
 #endif
-		"       -D: destroy on power-off\n"
 		"       -e: exit on unhandled I/O access\n"
-		"       -h: help\n"
 		"       -H: vmexit from the guest on hlt\n"
+		"       -h: help\n"
 		"       -k: key=value flat config file\n"
 		"       -l: LPC device configuration\n"
 		"       -m: memory size\n"
 		"       -o: set config 'var' to 'value'\n"
+		"       -P: vmexit from the guest on pause\n"
 #ifdef	__FreeBSD__
 		"       -p: pin 'vcpu' to 'hostcpu'\n"
 #endif
-		"       -P: vmexit from the guest on pause\n"
-		"       -s: <slot,driver,configinfo> PCI slot config\n"
 		"       -S: guest memory cannot be swapped\n"
-		"       -u: RTC keeps UTC time\n"
+		"       -s: <slot,driver,configinfo> PCI slot config\n"
 		"       -U: uuid\n"
-		"       -w: ignore unimplemented MSRs\n"
+		"       -u: RTC keeps UTC time\n"
 		"       -W: force virtio to use single-vector MSI\n"
+		"       -w: ignore unimplemented MSRs\n"
 		"       -x: local apic is in x2APIC mode\n"
 		"       -Y: disable MPtable generation\n",
 		progname, (int)strlen(progname), "", (int)strlen(progname), "",
