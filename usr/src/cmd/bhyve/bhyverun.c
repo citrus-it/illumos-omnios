@@ -1366,6 +1366,30 @@ parse_simple_config_file(const char *path)
 }
 
 static void
+parse_gdb_options(char *optarg)
+{
+	const char *sport;
+	char *colon;
+
+	if (optarg[0] == 'w') {
+		set_config_bool("gdb.wait", true);
+		optarg++;
+	}
+
+	colon = strrchr(optarg, ':');
+	if (colon == NULL) {
+		sport = optarg;
+	} else {
+		*colon = '\0';
+		colon++;
+		sport = colon;
+		set_config_value("gdb.address", optarg);
+	}
+
+	set_config_value("gdb.port", sport);
+}
+
+static void
 set_defaults(void)
 {
 
@@ -1435,11 +1459,7 @@ main(int argc, char *argv[])
 			set_config_bool("memory.guest_in_core", true);
 			break;
 		case 'G':
-			if (optarg[0] == 'w') {
-				set_config_bool("gdb.wait", true);
-				optarg++;
-			}
-			set_config_value("gdb.port", optarg);
+			parse_gdb_options(optarg);
 			break;
 		case 'k':
 			parse_simple_config_file(optarg);
@@ -1618,22 +1638,16 @@ main(int argc, char *argv[])
 	if (get_config_bool("acpi_tables"))
 		vmgenc_init(ctx);
 
-	value = get_config_value("gdb.port");
 #ifdef __FreeBSD__
-	if (value != NULL)
-		init_gdb(ctx, atoi(value), get_config_bool_default("gdb.wait",
-		    false));
+	init_gdb(ctx);
 #else
 	if (value != NULL) {
 		int port = atoi(value);
 
-		if (port < 0) {
-			init_mdb(ctx,
-			    get_config_bool_default("gdb.wait", false));
-		} else {
-			init_gdb(ctx, port,
-			    get_config_bool_default("gdb.wait", false));
-		}
+		if (port < 0)
+			init_mdb(ctx);
+		else
+			init_gdb(ctx);
 	}
 #endif
 
