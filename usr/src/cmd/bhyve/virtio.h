@@ -386,11 +386,7 @@ static inline void
 vq_interrupt(struct virtio_softc *vs, struct vqueue_info *vq)
 {
 
-#ifdef __FreeBSD__
 	vi_interrupt(vs, VIRTIO_PCI_ISR_INTR, vq->vq_msix_idx);
-#else
-	vi_interrupt(vs, VTCFG_ISR_QUEUES, vq->vq_msix_idx);
-#endif
 }
 
 static inline void
