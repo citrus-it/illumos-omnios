@@ -142,16 +142,16 @@ dbmerge() {
 #
 # Handle line continuations (trailing \)
 #
- 	$sed_cmd \
- 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
- 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
- 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
- 	    $2 > $4.old
- 	$sed_cmd \
- 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
- 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
- 	    -e '/\\$/{N;s/\\\n//;}'  -e '/\\$/{N;s/\\\n//;}' \
- 	    $3 > $4.new
+	$sed_cmd \
+	    -e '/\\$/{N;s/\\\n[	 ]*//;}' -e '/\\$/{N;s/\\\n[ 	]*//;}' \
+	    -e '/\\$/{N;s/\\\n[	 ]*//;}' -e '/\\$/{N;s/\\\n[ 	]*//;}' \
+	    -e '/\\$/{N;s/\\\n[	 ]*//;}' -e '/\\$/{N;s/\\\n[ 	]*//;}' \
+	    $2 > $4.old
+	$sed_cmd \
+	    -e '/\\$/{N;s/\\\n[	 ]*//;}' -e '/\\$/{N;s/\\\n[ 	]*//;}' \
+	    -e '/\\$/{N;s/\\\n[	 ]*//;}' -e '/\\$/{N;s/\\\n[ 	]*//;}' \
+	    -e '/\\$/{N;s/\\\n[	 ]*//;}' -e '/\\$/{N;s/\\\n[ 	]*//;}' \
+	    $3 > $4.new
 #
 # The nawk script below processes the old and new files using up to
 # three passes.  If the old file is empty, only the final pass over

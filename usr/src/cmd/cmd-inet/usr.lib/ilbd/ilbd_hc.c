@@ -211,7 +211,7 @@ ilbd_create_hc(const ilb_hc_info_t *hc_info, int ev_port,
 	 * ps != NULL is from client.
 	 */
 	if (ps != NULL) {
-		ret = ilbd_check_client_config_auth(ps);
+		ret = ilbd_check_client_config_auth(ps, ucredp);
 		if (ret != ILB_STATUS_OK) {
 			ilbd_audit_hc_event(NULL, hc_info, ILBD_CREATE_HC,
 			    ret, ucredp);
@@ -311,7 +311,7 @@ ilbd_destroy_hc(const char *hc_name, const struct passwd *ps,
 	 * No need to check ps == NULL, daemon won't call any destroy func
 	 * at start up.
 	 */
-	ret = ilbd_check_client_config_auth(ps);
+	ret = ilbd_check_client_config_auth(ps, ucredp);
 	if (ret != ILB_STATUS_OK) {
 		ilbd_audit_hc_event(hc_name, NULL, ILBD_DESTROY_HC,
 		    ret, ucredp);

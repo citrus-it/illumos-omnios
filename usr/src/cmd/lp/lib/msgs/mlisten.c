@@ -39,6 +39,7 @@
 #include <user_attr.h>
 #include <secdb.h>
 #include <pwd.h>
+#include <ucred.h>
 
 # include	"lp.h"
 # include	"msgs.h"
@@ -336,14 +337,24 @@ mlisten()
 		 * privilege are print administrators
 		 */
 		md->admin = (md->uid == 0 || md->uid == Lp_Uid);
-		if (md->admin == 0) { 
+		if (md->admin == 0) {
 			struct passwd *pw = NULL;
 
-			if ((pw = getpwuid(md->uid)) != NULL)
-				md->admin = chkauthattr("solaris.print.admin",
-							pw->pw_name);
+			if ((pw = getpwuid(md->uid)) != NULL) {
+				ucred_t *ucred = NULL;
+
+				if (getpeerucred(mdp->readfd, &ucred) == 0) {
+					md->admin = chkauthattr_ucred(
+					    "solaris.print.admin", pw->pw_name,
+					    ucred);
+					ucred_free(ucred);
+				} else {
+					md->admin = chkauthattr(
+					    "solaris.print.admin", pw->pw_name);
+				}
+			}
 		}
-	
+
 		get_peer_label(md->readfd, &md->slabel);
 
 		if (mlistenadd(md, POLLIN) != 0)

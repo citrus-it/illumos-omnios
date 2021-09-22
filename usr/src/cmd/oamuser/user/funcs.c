@@ -83,6 +83,7 @@ static ua_key_t keys[] = {
 	{ USERATTR_TYPE_KW,	check_type,	type },
 	{ USERATTR_AUTHS_KW,	check_auth,	auth },
 	{ USERATTR_PROFILES_KW,	check_prof,	prof },
+	{ USERATTR_AUTHPROFILES_KW,	check_prof,	prof },
 	{ USERATTR_ROLES_KW,	check_role,	role },
 	{ USERATTR_DEFAULTPROJ_KW,	check_proj,	proj },
 	{ USERATTR_LIMPRIV_KW,	check_privset,	priv },

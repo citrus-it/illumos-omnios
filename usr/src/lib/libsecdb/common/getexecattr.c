@@ -125,9 +125,8 @@ getexecuser(const char *username, const char *type, const char *id,
 	execattr_t	*prev =  NULL;
 	execattr_t	*new = NULL;
 
-	if (!IS_GET_ONE(search_flag) && !IS_GET_ALL(search_flag)) {
+	if (!IS_GET_ONE(search_flag) && !IS_GET_ALL(search_flag))
 		return (NULL);
-	}
 
 	if (username == NULL) {
 		setuserattr();
@@ -265,6 +264,7 @@ userprof(const char *username, const char *type, const char *id,
 	struct passwd	pwd;
 	call		call;
 	result		result;
+	uint_t		epflag = 0;
 
 	/*
 	 * Check if specified username is valid user
@@ -278,7 +278,12 @@ userprof(const char *username, const char *type, const char *id,
 	call.id = id;
 	call.sflag = search_flag;
 
-	(void) _enum_profs(username, findexecattr, &call, &result);
+	if (IS_GET_PROF(search_flag))
+		epflag |= _ENUM_PROFS_PROFILES;
+	if (IS_GET_AUTHPROF(search_flag))
+		epflag |= _ENUM_PROFS_AUTHPROFILES;
+
+	(void) _enum_profs(username, findexecattr, &call, &result, epflag);
 
 	return (result.head);
 }

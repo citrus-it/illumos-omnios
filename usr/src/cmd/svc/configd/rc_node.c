@@ -1560,7 +1560,7 @@ perm_granted(permcheck_t *pcp)
 	 * Enumerate all the auths defined for the user and return the
 	 * result in ret.
 	 */
-	if (_enum_auths(pw.pw_name, auth_cb, pcp, &ret) < 0)
+	if (_enum_auths(pw.pw_name, uc, auth_cb, pcp, &ret) < 0)
 		return (PERM_FAIL);
 
 	return (ret);

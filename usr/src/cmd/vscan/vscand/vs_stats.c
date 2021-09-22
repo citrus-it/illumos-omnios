@@ -127,7 +127,7 @@ vs_stats_check_auth()
 
 	if (((uid = ucred_getsuid(uc)) == (uid_t)-1) ||
 	    ((pw = getpwuid(uid)) == NULL) ||
-	    (chkauthattr(VS_VALUE_AUTH, pw->pw_name) != 1)) {
+	    (chkauthattr_ucred(VS_VALUE_AUTH, pw->pw_name, uc) != 1)) {
 		ucred_free(uc);
 		return (-1);
 	}

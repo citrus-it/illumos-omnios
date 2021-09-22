@@ -296,7 +296,7 @@ ilbd_destroy_sg(const char *sg_name, const struct passwd *ps,
 	(void) memset(&audit_sg_data, 0, sizeof (audit_sg_event_data_t));
 	audit_sg_data.ed_sgroup = (char *)sg_name;
 
-	rc = ilbd_check_client_config_auth(ps);
+	rc = ilbd_check_client_config_auth(ps, ucredp);
 	if (rc != ILB_STATUS_OK) {
 		ilbd_audit_server_event(&audit_sg_data,
 		    ILBD_DESTROY_SERVERGROUP, rc, ucredp);
@@ -357,7 +357,7 @@ ilbd_create_sg(ilb_sg_info_t *sg, int ev_port, const struct passwd *ps,
 	audit_sg_data.ed_sgroup = sg->sg_name;
 
 	if (ps != NULL) {
-		rc = ilbd_check_client_config_auth(ps);
+		rc = ilbd_check_client_config_auth(ps, ucredp);
 		if (rc != ILB_STATUS_OK) {
 			ilbd_audit_server_event(&audit_sg_data,
 			    ILBD_CREATE_SERVERGROUP, rc, ucredp);
@@ -602,7 +602,7 @@ ilbd_add_server_to_group(ilb_sg_info_t *sg_info, int ev_port,
 	audit_sg_event_data_t   audit_sg_data;
 
 	if (ps != NULL) {
-		rc = ilbd_check_client_config_auth(ps);
+		rc = ilbd_check_client_config_auth(ps, ucredp);
 		if (rc != ILB_STATUS_OK) {
 			fill_audit_record(sg_info, &audit_sg_data,
 			    ILBD_ADD_SERVER_TO_GROUP, rc, ucredp);
@@ -962,7 +962,7 @@ ilbd_rem_server_from_group(ilb_sg_info_t *sg_info, int ev_port,
 	ilb_sg_srv_t    *tsrv;
 	audit_sg_event_data_t   audit_sg_data;
 
-	rc = ilbd_check_client_config_auth(ps);
+	rc = ilbd_check_client_config_auth(ps, ucredp);
 	if (rc != ILB_STATUS_OK) {
 		fill_audit_record(sg_info, &audit_sg_data,
 		    ILBD_REM_SERVER_FROM_GROUP, rc, ucredp);
@@ -1220,7 +1220,7 @@ ilbd_Xable_server(ilb_sg_info_t *sg, const struct passwd *ps,
 	srv = &sg->sg_servers[0];
 	audit_sg_data.ed_serverid = srv->sgs_srvID;
 
-	rc = ilbd_check_client_enable_auth(ps);
+	rc = ilbd_check_client_enable_auth(ps, ucredp);
 	if (rc != ILB_STATUS_OK) {
 		ilbd_audit_server_event(&audit_sg_data,
 		    ILBD_ENABLE_SERVER, rc, ucredp);

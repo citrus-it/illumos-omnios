@@ -166,7 +166,7 @@ char *argv[];
 	change_key(USERATTR_TYPE_KW, usertype);
 
 	while ((ch = getopt(argc, argv,
-		    "b:c:Dd:e:f:G:g:k:mzZop:s:u:A:P:R:K:")) != EOF)
+		    "b:c:Dd:e:f:G:g:k:mzZop:s:u:A:P:R:K:X:")) != EOF)
 		switch (ch) {
 		case 'b':
 			base_dir = optarg;
@@ -238,6 +238,10 @@ char *argv[];
 
 		case 'P':
 			change_key(USERATTR_PROFILES_KW, optarg);
+			break;
+
+		case 'X':
+			change_key(USERATTR_AUTHPROFILES_KW, optarg);
 			break;
 
 		case 'R':

@@ -307,8 +307,8 @@ typedef struct {
 void		ilbd_reply_ok(uint32_t *, size_t *);
 void		ilbd_reply_err(uint32_t *, size_t *, ilb_status_t);
 
-ilb_status_t	ilbd_check_client_config_auth(const struct passwd *);
-ilb_status_t	ilbd_check_client_enable_auth(const struct passwd *);
+ilb_status_t	ilbd_check_client_config_auth(const struct passwd *, ucred_t *);
+ilb_status_t	ilbd_check_client_enable_auth(const struct passwd *, ucred_t *);
 ilb_status_t	ilbd_retrieve_names(ilbd_cmd_t, uint32_t *, size_t *);
 void		i_setup_sg_hlist(void);
 void		i_setup_rule_hlist(void);

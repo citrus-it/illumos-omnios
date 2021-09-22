@@ -54,10 +54,11 @@ extern "C" {
 #define	D_DPRIV		0x1000
 #define	D_LOCK		0x2000
 #define	D_ROLEAUTH	0x4000
+#define	D_AUTHPROF	0x8000
 
 #define	D_ALL	(D_GROUP | D_BASEDIR | D_RID | D_SKEL | D_SHELL \
 	| D_INACT | D_EXPIRE | D_AUTH | D_PROF | D_ROLE | D_PROJ | \
-	D_LPRIV | D_DPRIV | D_LOCK | D_ROLEAUTH)
+	D_LPRIV | D_DPRIV | D_LOCK | D_ROLEAUTH | D_AUTHPROF)
 
 #ifdef	__cplusplus
 }

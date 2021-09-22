@@ -56,6 +56,7 @@
  *		| -f inactive | -e expire ]
  *		[ -A authorization [, authorization ...]]
  *		[ -P profile [, profile ...]]
+ *		[ -X profile [, profile ...]]
  *		[ -R role [, role ...]]
  *		[ -K key=value ]
  *		[ -p project [, project]] login
@@ -177,7 +178,7 @@ char **argv;
 	usertype = getusertype(argv[0]);
 
 	while ((ch = getopt(argc, argv,
-				"c:d:e:f:G:g:l:mzZop:s:u:A:P:R:K:")) != EOF)
+				"c:d:e:f:G:g:l:mzZop:s:u:A:P:R:K:X:")) != EOF)
 		switch (ch) {
 		case 'c':
 			comment = optarg;
@@ -245,6 +246,10 @@ char **argv;
 			break;
 		case 'P':
 			change_key(USERATTR_PROFILES_KW, optarg);
+			flag++;
+			break;
+		case 'X':
+			change_key(USERATTR_AUTHPROFILES_KW, optarg);
 			flag++;
 			break;
 		case 'R':
