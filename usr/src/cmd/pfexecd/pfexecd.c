@@ -51,6 +51,8 @@
 #include <prof_attr.h>
 #include <user_attr.h>
 
+#include "isapath.h"
+
 static int doorfd = -1;
 
 static size_t repsz, setsz;
@@ -58,112 +60,6 @@ static size_t repsz, setsz;
 static uid_t get_uid(const char *, boolean_t *, char *);
 static gid_t get_gid(const char *, boolean_t *, char *);
 static priv_set_t *get_privset(const char *, boolean_t *, char *);
-static priv_set_t *get_granted_privs(uid_t);
-
-/*
- * Remove the isaexec path of an executable if we can't find the
- * executable at the first attempt.
- */
-
-static regex_t regc;
-static boolean_t cansplice = B_TRUE;
-
-static void
-init_isa_regex(void)
-{
-	char *isalist;
-	size_t isalen = 255;		/* wild guess */
-	size_t len;
-	long ret;
-	char *regexpr;
-	char *p;
-
-	/*
-	 * Extract the isalist(5) for userland from the kernel.
-	 */
-	isalist = malloc(isalen);
-	do {
-		ret = sysinfo(SI_ISALIST, isalist, isalen);
-		if (ret == -1l) {
-			free(isalist);
-			return;
-		}
-		if (ret > isalen) {
-			isalen = ret;
-			isalist = realloc(isalist, isalen);
-		} else
-			break;
-	} while (isalist != NULL);
-
-
-	if (isalist == NULL)
-		return;
-
-	/* allocate room for the regex + (/())/[^/]*$ + needed \\. */
-#define	LEFT	"(/("
-#define	RIGHT	"))/[^/]*$"
-
-	regexpr = alloca(ret * 2 + sizeof (LEFT RIGHT));
-	(void) strcpy(regexpr, LEFT);
-	len = strlen(regexpr);
-
-	for (p = isalist; *p; p++) {
-		switch (*p) {
-		case '+':
-		case '|':
-		case '*':
-		case '[':
-		case ']':
-		case '{':
-		case '}':
-		case '\\':
-			regexpr[len++] = '\\';
-			/* FALLTHROUGH */
-		default:
-			regexpr[len++] = *p;
-			break;
-		case ' ':
-		case '\t':
-			regexpr[len++] = '|';
-			break;
-		}
-	}
-
-	free(isalist);
-	regexpr[len] = '\0';
-	(void) strcat(regexpr, RIGHT);
-
-	if (regcomp(&regc, regexpr, REG_EXTENDED) != 0)
-		return;
-
-	cansplice = B_TRUE;
-}
-
-#define	NMATCH	2
-
-static boolean_t
-removeisapath(char *path)
-{
-	regmatch_t match[NMATCH];
-
-	if (!cansplice || regexec(&regc, path, NMATCH, match, 0) != 0)
-		return (B_FALSE);
-
-	/*
-	 * The first match includes the whole matched expression including the
-	 * end of the string.  The second match includes the "/" + "isa" and
-	 * that is the part we need to remove.
-	 */
-
-	if (match[1].rm_so == -1)
-		return (B_FALSE);
-
-	/* match[0].rm_eo == strlen(path) */
-	(void) memmove(path + match[1].rm_so, path + match[1].rm_eo,
-	    match[0].rm_eo - match[1].rm_eo + 1);
-
-	return (B_TRUE);
-}
 
 static int
 register_pfexec(int fd)
@@ -274,7 +170,7 @@ ggp_callback(const char *prof, kva_t *attr, void *ctxt, void *vres)
  * are set.
  */
 static priv_set_t *
-get_granted_privs(uid_t uid)
+get_granted_privs(uid_t uid, int flags)
 {
 	priv_set_t *res;
 	struct passwd *pwd, pwdm;
@@ -289,7 +185,7 @@ get_granted_privs(uid_t uid)
 
 	priv_emptyset(res);
 
-	(void) _enum_profs(pwd->pw_name, ggp_callback, NULL, res);
+	(void) _enum_profs(pwd->pw_name, ggp_callback, NULL, res, flags);
 
 	return (res);
 }
@@ -337,9 +233,15 @@ callback_user_privs(pfexec_arg_t *pap)
 {
 	priv_set_t *gset, *wset;
 	uint32_t res;
+	int flags;
+
+	flags = _ENUM_PROFS_PROFILES;
+
+	if (pap->pfa_authd)
+		flags = _ENUM_PROFS_AUTHPROFILES;
 
 	wset = (priv_set_t *)&pap->pfa_buf;
-	gset = get_granted_privs(pap->pfa_uid);
+	gset = get_granted_privs(pap->pfa_uid, flags);
 
 	res = priv_issubset(wset, gset);
 	priv_freeset(gset);
@@ -360,6 +262,13 @@ callback_pfexec(pfexec_arg_t *pap)
 	priv_set_t *lset, *iset;
 	size_t mysz = repsz - 2 * setsz;
 	char *path = pap->pfa_path;
+	char *noisapath;
+
+	noisapath = strdup(path);
+	if (noisapath != NULL && !removeisapath(noisapath)) {
+		free(noisapath);
+		noisapath = NULL;
+	}
 
 	/*
 	 * Initialize the pfexec_reply_t to a sane state.
@@ -373,6 +282,7 @@ callback_pfexec(pfexec_arg_t *pap)
 	res->pfr_setcred = B_FALSE;
 	res->pfr_scrubenv = B_TRUE;
 	res->pfr_allowed = B_FALSE;
+	res->pfr_authreq = B_FALSE;
 	res->pfr_ioff = 0;
 	res->pfr_loff = 0;
 
@@ -381,12 +291,58 @@ callback_pfexec(pfexec_arg_t *pap)
 	if (getpwuid_r(uuid, &pw, buf, sizeof (buf), &pwd) != 0 || pwd == NULL)
 		goto stdexec;
 
-	exec = getexecuser(pwd->pw_name, KV_COMMAND, path, GET_ONE);
-
-	if ((exec == NULL || exec->attr == NULL) && removeisapath(path)) {
+	/* XXX - caching? */
+	if (!pap->pfa_authd) {
+		/*
+		 * If not already authenticated, check to see if the command
+		 * matches a profile in the user's authenticated set. If so,
+		 * let the kernel know that authentication is required to
+		 * proceed.
+		 */
+		exec = getexecuser(pwd->pw_name, KV_COMMAND, path,
+		    GET_ONE | GET_AUTHPROF);
+		if (exec == NULL && noisapath != NULL) {
+			free_execattr(exec);
+			exec = getexecuser(pwd->pw_name, KV_COMMAND, noisapath,
+			    GET_ONE | GET_AUTHPROF);
+		}
+		if (exec != NULL) {
+			/*
+			 * For now, set the effective UID to root and return.
+			 *
+			 * XXX
+			 * An alternative approach could be to set
+			 *	path = "/usr/lib/pfauth";
+			 * and fall-through to normal processing. That would
+			 * require a profile in every user's unauthenticated
+			 * set to grant the required privileges to pfauth
+			 * (PROC_SETID and FILE_READ_DAC as a minimum, pam
+			 * could require more depending on the configuration)
+			 *
+			 * I don't really like that but it would allow for
+			 * more easily granting granular privileges. A down
+			 * side is that PROFS_GRANTED could need an update
+			 * in policy.conf, which is troublesome if anyone
+			 * has made local edits.
+			 */
+			free(noisapath);
+			free_execattr(exec);
+			res->pfr_authreq = B_TRUE;
+			res->pfr_allowed = B_TRUE;
+			res->pfr_setcred = B_TRUE;
+			res->pfr_euid = 0;
+			goto ret;
+		}
 		free_execattr(exec);
-		exec = getexecuser(pwd->pw_name, KV_COMMAND, path, GET_ONE);
 	}
+
+	exec = getexecuser(pwd->pw_name, KV_COMMAND, path, GET_ONE);
+	if (exec == NULL  && noisapath != NULL) {
+		free_execattr(exec);
+		exec = getexecuser(pwd->pw_name, KV_COMMAND, noisapath,
+		    GET_ONE);
+	}
+	free(noisapath);
 
 	if (exec == NULL) {
 		res->pfr_allowed = B_FALSE;
@@ -399,8 +355,8 @@ callback_pfexec(pfexec_arg_t *pap)
 	/* Found in execattr, so clearly we can use it */
 	res->pfr_allowed = B_TRUE;
 
-	uid = euid = (uid_t)-1;
-	gid = egid = (gid_t)-1;
+	uid = euid = PFEXEC_NOTSET;
+	gid = egid = PFEXEC_NOTSET;
 	lset = iset = NULL;
 
 	/*
@@ -429,8 +385,8 @@ callback_pfexec(pfexec_arg_t *pap)
 	 * Remove LD_* variables in the kernel when the runtime linker might
 	 * use them later on because the uids are equal.
 	 */
-	res->pfr_scrubenv = (uid != (uid_t)-1 && euid == uid) ||
-	    (gid != (gid_t)-1 && egid == gid) || iset != NULL;
+	res->pfr_scrubenv = (uid != PFEXEC_NOTSET && euid == uid) ||
+	    (gid != PFEXEC_NOTSET && egid == gid) || iset != NULL;
 
 	res->pfr_euid = euid;
 	res->pfr_ruid = uid;
@@ -452,12 +408,12 @@ callback_pfexec(pfexec_arg_t *pap)
 		priv_freeset(lset);
 	}
 
-	res->pfr_setcred = uid != (uid_t)-1 || euid != (uid_t)-1 ||
-	    egid != (gid_t)-1 || gid != (gid_t)-1 || iset != NULL ||
+	res->pfr_setcred = uid != PFEXEC_NOTSET || euid != PFEXEC_NOTSET ||
+	    egid != PFEXEC_NOTSET || gid != PFEXEC_NOTSET || iset != NULL ||
 	    lset != NULL;
 
 	/* If the real uid changes, we stop running under a profile shell */
-	res->pfr_clearflag = uid != (uid_t)-1 && uid != uuid;
+	res->pfr_clearflag = uid != PFEXEC_NOTSET && uid != uuid;
 	free_execattr(exec);
 ret:
 	(void) door_return((char *)res, mysz, NULL, 0);
@@ -468,6 +424,7 @@ stdexec:
 
 	res->pfr_scrubenv = B_FALSE;
 	res->pfr_setcred = B_FALSE;
+	res->pfr_authreq = B_FALSE;
 	res->pfr_allowed = B_TRUE;
 
 	(void) door_return((char *)res, mysz, NULL, 0);

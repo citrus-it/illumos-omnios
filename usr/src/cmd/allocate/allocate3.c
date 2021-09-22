@@ -158,6 +158,7 @@ _is_authorized(char *auths, uid_t uid)
 	if (getpwuid_r(uid, &pw_ent, pw_buf, sizeof (pw_buf)) == NULL)
 		return (0);
 	if (strpbrk(auths, DEVICE_AUTH_SEPARATOR) == NULL)
+		/* XXX */
 		return (chkauthattr(auths, pw_ent.pw_name));
 	authlist = strdup(auths);
 	if (authlist == NULL)

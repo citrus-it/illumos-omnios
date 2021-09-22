@@ -92,7 +92,8 @@ File System Management:solaris:cmd:::/usr/sbin/mpathadm:privs=sys_devices
 File System Management:solaris:cmd:::/usr/sbin/quotacheck:uid=0;gid=sys
 File System Management:solaris:cmd:::/usr/sbin/quotaoff:uid=0;gid=sys
 File System Management:solaris:cmd:::/usr/sbin/quotaon:uid=0;gid=sys
-File System Management:solaris:cmd:::/usr/sbin/raidctl:privs=sys_config,sys_devices;euid=0
+File System Management:solaris:cmd:::/usr/sbin/raidctl:\
+	privs=sys_config,sys_devices;euid=0
 File System Management:suser:cmd:::/usr/sbin/ramdiskadm:euid=0
 File System Management:solaris:cmd:::/usr/sbin/sasinfo:privs=sys_devices
 File System Management:solaris:cmd:::/usr/sbin/sbdadm:privs=sys_devices
@@ -106,38 +107,43 @@ File System Management:suser:cmd:::/usr/sbin/umountall:uid=0
 File System Management:suser:cmd:::/usr/sbin/unshare:uid=0;gid=root
 File System Management:suser:cmd:::/usr/sbin/unshareall:uid=0;gid=root
 Forced Privilege:solaris:cmd:::/usr/bin/newtask:\
-    privs=proc_taskid,sys_resource,sys_res_config,proc_priocntl
+	privs=proc_taskid,sys_resource,sys_res_config,proc_priocntl
 Forced Privilege:solaris:cmd:::/usr/bin/rcp:privs=net_privaddr
 Forced Privilege:solaris:cmd:::/usr/bin/rdist:privs=net_privaddr
 Forced Privilege:solaris:cmd:::/usr/bin/rlogin:privs=net_privaddr
 Forced Privilege:solaris:cmd:::/usr/bin/rmformat:\
-    privs=file_dac_read,file_dac_write,proc_fork,proc_exec,sys_mount,sys_devices
+	privs=file_dac_read,file_dac_write,proc_fork,proc_exec,sys_mount,sys_devices
 Forced Privilege:solaris:cmd:::/usr/bin/rsh:privs=net_privaddr
 Forced Privilege:solaris:cmd:::/usr/bin/w:privs=proc_owner
 Forced Privilege:solaris:cmd:::/usr/lib/fs/ufs/quota:privs=file_dac_read
 Forced Privilege:solaris:cmd:::/usr/lib/fs/ufs/ufsdump:privs=net_privaddr
 Forced Privilege:solaris:cmd:::/usr/lib/fs/ufs/ufsrestore:privs=net_privaddr
 Forced Privilege:solaris:cmd:::/usr/sbin/ping:\
-    privs=net_icmpaccess,sys_ip_config
+	privs=net_icmpaccess,sys_ip_config
 Forced Privilege:solaris:cmd:::/usr/sbin/traceroute:\
-    privs=net_icmpaccess,net_rawaccess
+	privs=net_icmpaccess,net_rawaccess
 Forced Privilege:solaris:cmd:::/usr/sbin/whodo:privs=proc_owner
 Forced Privilege:solaris:cmd:::/usr/lib/fs/smbfs/mount:privs=sys_mount
 Forced Privilege:solaris:cmd:::/usr/lib/fs/smbfs/umount:privs=sys_mount
 IP Filter Management:solaris:cmd:::/usr/sbin/ipf:privs=sys_ip_config
 IP Filter Management:solaris:cmd:::/usr/sbin/ipfs:privs=sys_ip_config
 IP Filter Management:solaris:cmd:::/usr/sbin/ipmon:privs=sys_ip_config
-IP Filter Management:solaris:cmd:::/usr/sbin/ipfstat:privs=sys_ip_config;gid=sys
+IP Filter Management:solaris:cmd:::/usr/sbin/i\
+	pfstat:privs=sys_ip_config;gid=sys
 IP Filter Management:solaris:cmd:::/usr/sbin/ipnat:privs=sys_ip_config;gid=sys
 IP Filter Management:solaris:cmd:::/usr/sbin/ippool:privs=sys_ip_config;gid=sys
 Kerberos Server Management:solaris:cmd:::/usr/lib/krb5/krb5kdc:uid=0
 Kerberos Server Management:solaris:cmd:::/usr/lib/krb5/kadmind:uid=0
-Kerberos Server Management:solaris:cmd:::/usr/lib/krb5/kprop:euid=0;privs=none
-Kerberos Server Management:solaris:cmd:::/usr/sbin/kadmin.local:euid=0;privs=none
+Kerberos Server Management:solaris:cmd:::/usr/lib/krb5/kprop:\
+	euid=0;privs=none
+Kerberos Server Management:solaris:cmd:::/usr/sbin/kadmin.local:\
+	euid=0;privs=none
 Kerberos Server Management:solaris:cmd:::/usr/sbin/kdb5_util:euid=0;privs=none
-Kerberos Server Management:solaris:cmd:::/usr/sbin/kdb5_ldap_util:euid=0;privs=none
+Kerberos Server Management:solaris:cmd:::/usr/sbin/kdb5_ldap_util:\
+	euid=0;privs=none
 Kerberos Server Management:solaris:cmd:::/usr/sbin/kdcmgr:euid=0;privs=none
-Kerberos Client Management:solaris:cmd:::/usr/bin/klist:euid=0;privs=file_dac_read
+Kerberos Client Management:solaris:cmd:::/usr/bin/klist:\
+	euid=0;privs=file_dac_read
 Kerberos Client Management:solaris:cmd:::/usr/sbin/kadmin:euid=0;privs=none
 Kerberos Client Management:solaris:cmd:::/usr/sbin/kclient:euid=0;privs=none
 Log Management:suser:cmd:::/usr/sbin/logadm:euid=0
@@ -206,14 +212,20 @@ Network Observability:solaris:cmd:::/usr/sbin/snoop:privs=net_observability
 Network Link Security:solaris:cmd:::/sbin/dladm:euid=dladm;egid=sys;\
 	privs=sys_dl_config,net_rawaccess,proc_audit
 Network Link Security:solaris:cmd:::/sbin/dlstat:euid=dladm;egid=sys;
-Network IPsec Management:solaris:cmd:::/usr/lib/inet/certdb:euid=0;privs=none
-Network IPsec Management:solaris:cmd:::/usr/lib/inet/certlocal:euid=0;privs=none
-Network IPsec Management:solaris:cmd:::/usr/lib/inet/certrldb:euid=0;privs=none
+Network IPsec Management:solaris:cmd:::/usr/lib/inet/certdb:euid=0;\
+	privs=none
+Network IPsec Management:solaris:cmd:::/usr/lib/inet/certlocal:euid=0;\
+	privs=none
+Network IPsec Management:solaris:cmd:::/usr/lib/inet/certrldb:euid=0;\
+	privs=none
 Network IPsec Management:solaris:cmd:::/usr/lib/inet/in.iked:euid=0
-Network IPsec Management:solaris:cmd:::/usr/sbin/ikeadm:euid=0;privs=file_dac_write
+Network IPsec Management:solaris:cmd:::/usr/sbin/ikeadm:euid=0;\
+	privs=file_dac_write
 Network IPsec Management:solaris:cmd:::/usr/sbin/ikecert:euid=0;privs=none
-Network IPsec Management:solaris:cmd:::/usr/sbin/ipsecconf:euid=0;privs=sys_ip_config
-Network IPsec Management:solaris:cmd:::/usr/sbin/ipseckey:uid=0;privs=sys_ip_config
+Network IPsec Management:solaris:cmd:::/usr/sbin/i\
+	psecconf:euid=0;privs=sys_ip_config
+Network IPsec Management:solaris:cmd:::/usr/sbin/i\
+	pseckey:uid=0;privs=sys_ip_config
 Network IPsec Management:solaris:cmd:::/usr/sbin/ipsecalgs:privs=sys_ip_config
 Network IPsec Management:suser:cmd:::/usr/lib/inet/certdb:euid=0
 Network IPsec Management:suser:cmd:::/usr/lib/inet/certlocal:euid=0
@@ -236,7 +248,7 @@ Object Access Management:suser:cmd:::/usr/bin/chown:euid=0
 Object Access Management:suser:cmd:::/usr/bin/getfacl:euid=0
 Object Access Management:suser:cmd:::/usr/bin/setfacl:euid=0
 Primary Administrator:solaris:cmd:::*:uid=0;gid=0
-Printer Management:suser:cmd:::/usr/lib/lp/local/lpadmin:uid=lp;gid=lp 
+Printer Management:suser:cmd:::/usr/lib/lp/local/lpadmin:uid=lp;gid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpfilter:euid=lp;uid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpforms:euid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpusers:euid=lp
@@ -272,6 +284,8 @@ Process Management:solaris:cmd:::/usr/sbin/rcapadm:uid=0
 Project Management:solaris:cmd:::/usr/sbin/projadd:euid=0
 Project Management:solaris:cmd:::/usr/sbin/projmod:euid=0
 Project Management:solaris:cmd:::/usr/sbin/projdel:euid=0
+Service Management:solaris:cmd:::/usr/sbin/svcadm:
+Service Management:solaris:cmd:::/usr/sbin/svccfg:
 Software Installation:suser:cmd:::/sbin/beadm:uid=0;gid=bin
 Software Installation:suser:cmd:::/usr/bin/ln:euid=0
 Software Installation:suser:cmd:::/usr/bin/pkginfo:uid=0
@@ -308,4 +322,5 @@ Zone Security:solaris:cmd:::/usr/sbin/txzonemgr:uid=0
 Zone Security:solaris:cmd:::/usr/sbin/zonecfg:uid=0
 Zone Management:solaris:cmd:::/usr/sbin/zoneadm:euid=0
 Zone Management:solaris:cmd:::/usr/sbin/zlogin:euid=0
-acctadm:solaris:cmd:::/usr/sbin/acctadm:euid=0;egid=0;privs=sys_acct,file_dac_write
+acctadm:solaris:cmd:::/usr/sbin/acctadm:euid=0;egid=0;\
+	privs=sys_acct,file_dac_write

@@ -137,10 +137,12 @@ typedef struct priv_impl_info {
 #define	PRIV_AWARE_RESET		0x0040		/* Reset on setuid() */
 #define	PRIV_XPOLICY			0x0080		/* Extended policy */
 #define	PRIV_PFEXEC			0x0100		/* As if pfexec'ed */
+#define	PRIV_PFEXEC_AUTH		0x0200		/* pfexec authed */
 
 /* user-settable flags: */
-#define	PRIV_USER	(PRIV_DEBUG | NET_MAC_AWARE | NET_MAC_AWARE_INHERIT |\
-			    PRIV_XPOLICY | PRIV_AWARE_RESET | PRIV_PFEXEC)
+#define	PRIV_USER	(PRIV_DEBUG | NET_MAC_AWARE | NET_MAC_AWARE_INHERIT | \
+			    PRIV_XPOLICY | PRIV_AWARE_RESET | PRIV_PFEXEC | \
+			    PRIV_PFEXEC_AUTH)
 
 /*
  * Header of the privilege info data structure; multiple structures can
@@ -195,6 +197,8 @@ typedef struct priv_info_names {
 #define	PRIV_GLOBAL			(-5)	/* Must be in global zone */
 
 #ifdef _KERNEL
+
+#define	PRIV_AUTH_HELPER		"/usr/lib/pfauth"
 
 #define	PRIV_ALLOC			0x1
 

@@ -61,6 +61,7 @@
 #include <sys/stermio.h>
 #include <fcntl.h>
 #include <termio.h>
+#include <priv.h>
 #include <pwd.h>
 #include <shadow.h>
 #include <stdlib.h>
@@ -561,6 +562,7 @@ checkauth:
 		 * to the case of root not existing in /etc/passwd.
 		 */
 
+		setpflags(PRIV_PFEXEC_AUTH, 1);
 		if ((getusernam("root") != NULL) &&
 		    (chkauthattr(MAINTENANCE_AUTH, user) != 1)) {
 			goto sorry;

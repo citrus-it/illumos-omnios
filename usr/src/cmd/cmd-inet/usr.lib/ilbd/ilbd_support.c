@@ -115,6 +115,7 @@ logperror(const char *str)
 ilb_status_t
 ilbd_check_client_config_auth(const struct passwd *pwd)
 {
+	/* XXX */
 	if (chkauthattr(NET_ILB_CONFIG_AUTH, pwd->pw_name) == 0) {
 		logdebug("user %s is not authorized for"
 		    " configuration operation", pwd->pw_name);
@@ -127,6 +128,7 @@ ilbd_check_client_config_auth(const struct passwd *pwd)
 ilb_status_t
 ilbd_check_client_enable_auth(const struct passwd *pwd)
 {
+	/* XXX */
 	if (chkauthattr(NET_ILB_ENABLE_AUTH, pwd->pw_name) == 0) {
 		logdebug("user %s is not authorized for"
 		    " enable/disable operation", pwd->pw_name);

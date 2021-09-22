@@ -270,7 +270,8 @@ nwamd_door_req_action(nwamd_door_arg_t *req, ucred_t *ucr, struct passwd *pwd)
 	 * - REFRESH on other objects requires either WRITE or SELECT auth
 	 */
 	if (action == NWAM_ACTION_ENABLE || action == NWAM_ACTION_DISABLE) {
-		if (chkauthattr(AUTOCONF_SELECT_AUTH, pwd->pw_name) == 0) {
+		if (chkauthattr_ucred(AUTOCONF_SELECT_AUTH, pwd->pw_name,
+		    ucr) == 0) {
 			nwam_record_audit_event(ucr,
 			    action == NWAM_ACTION_ENABLE ?
 			    ADT_nwam_enable : ADT_nwam_disable, name,
@@ -281,22 +282,26 @@ nwamd_door_req_action(nwamd_door_arg_t *req, ucred_t *ucr, struct passwd *pwd)
 			return (NWAM_PERMISSION_DENIED);
 		}
 	} else if (object_type == NWAM_OBJECT_TYPE_KNOWN_WLAN) {
-		if (chkauthattr(AUTOCONF_WLAN_AUTH, pwd->pw_name) == 0) {
+		if (chkauthattr_ucred(AUTOCONF_WLAN_AUTH, pwd->pw_name,
+		    ucr) == 0) {
 			nlog(LOG_ERR, "nwamd_door_req_action: "
 			    "need %s for %s action on Known WLAN",
 			    AUTOCONF_WLAN_AUTH, nwam_action_to_string(action));
 			return (NWAM_PERMISSION_DENIED);
 		}
 	} else if (action == NWAM_ACTION_ADD || action == NWAM_ACTION_DESTROY) {
-		if (chkauthattr(AUTOCONF_WRITE_AUTH, pwd->pw_name) == 0) {
+		if (chkauthattr_ucred(AUTOCONF_WRITE_AUTH, pwd->pw_name,
+		    ucr) == 0) {
 			nlog(LOG_ERR, "nwamd_door_req_action: "
 			    "need %s for %s action", AUTOCONF_WRITE_AUTH,
 			    nwam_action_to_string(action));
 			return (NWAM_PERMISSION_DENIED);
 		}
 	} else if (action == NWAM_ACTION_REFRESH) {
-		if (chkauthattr(AUTOCONF_WRITE_AUTH, pwd->pw_name) == 0 &&
-		    chkauthattr(AUTOCONF_SELECT_AUTH, pwd->pw_name) == 0) {
+		if (chkauthattr_ucred(AUTOCONF_WRITE_AUTH, pwd->pw_name,
+		    ucr) == 0 &&
+		    chkauthattr_ucred(AUTOCONF_SELECT_AUTH, pwd->pw_name,
+		     ucr) == 0) {
 			nlog(LOG_ERR, "nwamd_door_req_action: "
 			    "need either %s or %s for %s action",
 			    AUTOCONF_WRITE_AUTH, AUTOCONF_SELECT_AUTH,
@@ -577,8 +582,8 @@ nwamd_door_switch(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 		found = B_TRUE;
 
 		if (door_req_table[i].ndre_auth != NULL &&
-		    chkauthattr(door_req_table[i].ndre_auth,
-		    pwd->pw_name) == 0) {
+		    chkauthattr_ucred(door_req_table[i].ndre_auth,
+		    pwd->pw_name, ucr) == 0) {
 			nlog(LOG_ERR,
 			    "nwamd_door_switch: need %s for request type %d",
 			    door_req_table[i].ndre_auth, req->nwda_type);

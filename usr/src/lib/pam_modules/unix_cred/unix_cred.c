@@ -578,7 +578,7 @@ adt_done:
 	tset = def = lim = NULL;
 	deflim.def = deflim.lim = NULL;
 
-	(void) _enum_attrs(user, finddeflim, NULL, &deflim);
+	(void) _enum_attrs(user, NULL, finddeflim, NULL, &deflim);
 
 	if (getset(deflim.lim, &lim) != 0 || getset(deflim.def, &def) != 0) {
 		ret = PAM_SYSTEM_ERR;

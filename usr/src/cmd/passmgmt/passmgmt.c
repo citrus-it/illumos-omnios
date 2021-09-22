@@ -88,6 +88,7 @@ typedef struct kvopts {
 kvopts_t ua_opts[] =  {
 { 'A',	USERATTR_AUTHS_KW },
 { 'P',	USERATTR_PROFILES_KW },
+{ 'X',	USERATTR_AUTHPROFILES_KW },
 { 'R',	USERATTR_ROLES_KW },
 { 'T',	USERATTR_TYPE_KW },
 { '\0', USERATTR_DEFAULTPROJ_KW },

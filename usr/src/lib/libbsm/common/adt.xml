@@ -73,20 +73,20 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 			auditrecord -p passwd
 			passwd		<-   <title>
 			  program     various              See passwd(1)
-			  		^-   <program>		^-   <see>
+					^-   <program>		^-   <see>
 			  event ID    6163                 AUE_passwd
 			  class       lo                   (0x00001000)
 			      header
 			      subject
 			      [text]                       username...
-			      					^-   <comment>
+								^-   <comment>
 			      return
 
 			If the length of string in any of the given
 			elements is longer than defined, the string is
 			silently truncated to the defined length in the
-			auditrecord(1M) runtime: 
-				
+			auditrecord(1M) runtime:
+
 				element	<= max (non-truncated) string length
 				title	<= 46
 				program	<= 20
@@ -175,7 +175,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 			If the type is an array, its length must be given
 			explicitly.
 
-	comment		Used by auditrecord(1M) build to generate 
+	comment		Used by auditrecord(1M) build to generate
 			audit_record_attr. Comment is explanation note
 			printed with token type. Colon (':') may not be
 			used in a comment. See example above for other
@@ -188,7 +188,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 			- usage is an optional value.  At present, only
 			  "TSOL" is defined; it means that this data is
 			  to be used only in Trusted Solaris implementations.
-			See also example above for "token" tag relation to 
+			See also example above for "token" tag relation to
 			the auditrecord(1M) output.
 
 	msg_list	Define a set of text strings.
@@ -528,7 +528,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
 <!-- This is SMC; should this also be used elsewhere? -->
     <event id="AUE_uauth" header="0" idNo="20">
-    	<title>SMC: Use of Authorization</title>
+	<title>SMC: Use of Authorization</title>
 	<program>SMC server</program>
 	<entry id="subject">
 	    <internal token="subject"/>
@@ -569,15 +569,15 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 <!--
     while not used by SMC logout is used by Lockhart
 -->
-    <event id="AUE_logout" header="0" idNo="1"> 
-    	<title>login: logout</title>
+    <event id="AUE_logout" header="0" idNo="1">
+	<title>login: logout</title>
 	<program>various</program>
 	<see>login(1)</see>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
 	</entry>
-<!-- 
+<!--
     not used by C code, used by Lockhart,
     get them to change and remove
     event.user_name("logout " + session.getUserName());
@@ -598,7 +598,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
 <!-- C Only events -->
     <event id="AUE_init_solaris" header="0" idNo="32" omit="JNI">
-    	<title>init</title>
+	<title>init</title>
 	<program>/sbin/init</program>
 	<program>/usr/sbin/init</program>
 	<program>/usr/sbin/shutdown</program>
@@ -643,7 +643,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
 
     <event id="AUE_zlogin" header="0" idNo="38" omit="JNI">
-    	<title>zone login</title>
+	<title>zone login</title>
 	<program>/usr/sbin/login</program>
 	<see>zlogin(1)</see>
 	<entry id="subject">
@@ -662,7 +662,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
 
     <event id="AUE_su" header="0" idNo="30" omit="JNI">
-    	<title>su</title>
+	<title>su</title>
 	<program>/usr/bin/su</program>
 	<see>su(1M)</see>
 	<entry id="subject">
@@ -685,7 +685,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
 
     <event id="AUE_passwd" header="0" idNo="27" omit="JNI">
-    	<title>passwd</title>
+	<title>passwd</title>
 	<program>various</program>
 	<see>passwd(1)</see>
 	<entry id="subject">
@@ -720,7 +720,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     -->
 
     <event id="AUE_prof_cmd" header="0" idNo="24" omit="JNI">
-    	<title>pfexec</title>
+	<title>pfexec</title>
 	<program>/usr/bin/pfexec</program>
 	<see>pfexec(1)</see>
 	<entry id="subject">
@@ -749,7 +749,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 	<entry id="limit_set">
 	    <internal token="priv_limit"/>
 	    <external opt="optional" type="priv_set_t*"/>
- 	</entry>
+	</entry>
 	<entry id="inherit_set">
 	    <internal token="priv_inherit"/>
 	    <external opt="optional" type="priv_set_t*"/>
@@ -761,7 +761,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
 
     <event id="AUE_inetd_connect" header="0" idNo="34" omit="JNI">
-    	<title>inetd</title>
+	<title>inetd</title>
 	<program>/usr/sbin/inetd</program>
 	<entry id="subject">
 	    <internal token="subject"/>
@@ -794,7 +794,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
 
     <event id="AUE_inetd_ratelimit" header="0" idNo="35" omit="JNI">
-    	<title>inetd</title>
+	<title>inetd</title>
 	<program>/usr/sbin/inetd</program>
 	<entry id="subject">
 	    <internal token="subject"/>
@@ -817,7 +817,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
 
     <event id="AUE_inetd_copylimit" header="0" idNo="36" omit="JNI">
-    	<title>inetd</title>
+	<title>inetd</title>
 	<program>/usr/sbin/inetd</program>
 	<entry id="subject">
 	    <internal token="subject"/>
@@ -840,7 +840,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
 
     <event id="AUE_inetd_failrate" header="0" idNo="37" omit="JNI">
-    	<title>inetd</title>
+	<title>inetd</title>
 	<program>/usr/sbin/inetd</program>
 	<entry id="subject">
 	    <internal token="subject"/>
@@ -898,7 +898,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
 
     <event id="AUE_newgrp_login" header="0" idNo="41" omit="JNI">
-    	<program>newgrp</program>
+	<program>newgrp</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -984,9 +984,9 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 	    <external opt="none"/>
 	</entry>
     </event>
-    
+
     <event id="AUE_pool_import" header="0" idNo="45" omit="JNI">
-    	<program>hald</program>
+	<program>hald</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -1012,7 +1012,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 	</entry>
     </event>
     <event id="AUE_pool_export" header="0" idNo="46" omit="JNI">
-    	<program>hald</program>
+	<program>hald</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -1082,7 +1082,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
     <!-- labeld events -->
     <event id="AUE_file_relabel" header="0" idNo="49" omit="JNI">
-    	<title>relabel file from one zone to another</title>
+	<title>relabel file from one zone to another</title>
 	<program>setlabel(1)</program>
 	<see>setflabel(3TSOL)</see>
 	<entry id="subject">
@@ -1116,7 +1116,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
 
     <event id="AUE_file_copy" header="0" idNo="50" omit="JNI">
-    	<title>copy file to another zone</title>
+	<title>copy file to another zone</title>
 	<program>dtfile(1X)</program>
 	<entry id="subject">
 	    <internal token="subject"/>
@@ -1191,34 +1191,34 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     </event>
     <event id="AUE_uadmin_shutdown" instance_of="AUE_uadmin_generic"
         header="0" idNo="51" omit="JNI">
-    	<title>uadmin shutdown</title>
+	<title>uadmin shutdown</title>
 	<program>/sbin/uadmin</program>
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
     </event>
     <event id="AUE_uadmin_reboot" instance_of="AUE_uadmin_generic"
         header="0" idNo="52" omit="JNI">
-    	<title>uadmin reboot</title>
+	<title>uadmin reboot</title>
 	<program>/sbin/uadmin</program>
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
     </event>
     <event id="AUE_uadmin_dump" instance_of="AUE_uadmin_generic"
         header="0" idNo="53" omit="JNI">
-    	<title>uadmin dump</title>
+	<title>uadmin dump</title>
 	<program>/sbin/uadmin</program>
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
     </event>
     <event id="AUE_uadmin_freeze" instance_of="AUE_uadmin_generic"
         header="0" idNo="54" omit="JNI">
-    	<title>uadmin freeze</title>
+	<title>uadmin freeze</title>
 	<program>/sbin/uadmin</program>
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
     </event>
     <event id="AUE_uadmin_remount" header="0" idNo="55" omit="JNI">
-    	<title>uadmin remount</title>
+	<title>uadmin remount</title>
 	<program>/sbin/uadmin</program>
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
@@ -1234,20 +1234,20 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     <!-- uadmin ftrace and swapctl are not documented in uadmin(2) -->
     <event id="AUE_uadmin_ftrace" instance_of="AUE_uadmin_generic"
         header="0" idNo="56" omit="JNI">
-    	<title>uadmin ftrace</title>
+	<title>uadmin ftrace</title>
 	<program>/sbin/uadmin</program>
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
     </event>
     <event id="AUE_uadmin_swapctl" instance_of="AUE_uadmin_generic_fcn"
         header="0" idNo="57" omit="JNI">
-    	<title>uadmin swapctl</title>
+	<title>uadmin swapctl</title>
 	<program>/sbin/uadmin</program>
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
     </event>
     <event id="AUE_uadmin_thaw" header="0" idNo="96" omit="JNI">
-    	<title>thaw after freeze</title>
+	<title>thaw after freeze</title>
 	<program>/sbin/uadmin</program>
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
@@ -1268,7 +1268,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     <!-- uadmin config is not documented in uadmin(2) -->
     <event id="AUE_uadmin_config" instance_of="AUE_uadmin_generic"
         header="0" idNo="119" omit="JNI">
-    	<title>uadmin config</title>
+	<title>uadmin config</title>
 	<program>/sbin/uadmin</program>
 	<program>/usr/sbin/uadmin</program>
 	<see>uadmin(1M)</see>
@@ -1329,7 +1329,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
 <!-- vscan service event; infected file detected -->
     <event id="AUE_vscan_quarantine" header="0" idNo="60" omit="JNI">
-    	<title>VSCAN: quarantine infected file</title>
+	<title>VSCAN: quarantine infected file</title>
 	<program>/usr/lib/vscan/vscand</program>
 	<see>vscand(1M), ICAP RFC 3507 (Extensions)</see>
 	<entry id="subject">
@@ -2111,7 +2111,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
             <internal token="return"/>
 	    <external opt="none"/>
         </entry>
-    </event> 
+    </event>
 
     <event id="AUE_ilb_delete_healthcheck" header="0" idNo="121" omit="JNI">
         <title>Delete Integrated Loadbalancer healthcheck object</title>
@@ -2313,7 +2313,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 		if authorization fails, user specified IP address
 		is invalid or server cannot be added because
 		server group is full
-	    </comment>  
+	    </comment>
         </entry>
         <entry id="server_group">
             <internal token="text"/>
@@ -2330,7 +2330,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 	<entry id="server_maxport">
 	    <internal token="iport"/>
 	    <external opt="optional" type="uint16_t" />
-	    <comment>server's maximum value in port range - empty 
+	    <comment>server's maximum value in port range - empty
 		means default value(see man page)
 	    </comment>
 	</entry>
@@ -2338,7 +2338,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
             <internal token="return"/>
 	    <external opt="none"/>
         </entry>
-    </event> 
+    </event>
 
     <event id="AUE_ilb_disable_server" header="0" idNo="127" omit="JNI">
         <title>Disable server to Integrated Loadbalancer</title>
@@ -2361,7 +2361,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
         <entry id="server_ipaddress_type,server_ipaddress">
             <internal token="in_remote"/>
             <external opt="optional" type="int32_t,uint32_t[4]"/>
-            <comment>IPaddr corresponding to the serverid - empty 
+            <comment>IPaddr corresponding to the serverid - empty
 		if authorization fails, or user specified serverid
 		is nonexistent
 	    </comment>
@@ -2370,7 +2370,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
             <internal token="return"/>
 	    <external opt="none"/>
         </entry>
-    </event> 
+    </event>
 
     <event id="AUE_ilb_enable_server" header="0" idNo="128" omit="JNI">
         <title>Enable server to Integrated Loadbalancer</title>
@@ -2393,7 +2393,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
         <entry id="server_ipaddress_type,server_ipaddress">
             <internal token="in_remote"/>
             <external opt="optional" type="int32_t,uint32_t[4]"/>
-            <comment>IPaddr corresponding to the serverid - empty 
+            <comment>IPaddr corresponding to the serverid - empty
 		if authorization fails, or user specified serverid
 		is nonexistent
 	    </comment>
@@ -2402,7 +2402,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
             <internal token="return"/>
 	    <external opt="none"/>
         </entry>
-    </event> 
+    </event>
 
     <event id="AUE_ilb_remove_server" header="0" idNo="129" omit="JNI">
         <title>Remove server from Integrated Loadbalancer</title>
@@ -2430,7 +2430,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
         <entry id="server_ipaddress_type,server_ipaddress">
             <internal token="in_remote"/>
             <external opt="optional" type="int32_t,uint32_t[4]"/>
-            <comment>IPaddr corresponding to serverid - empty 
+            <comment>IPaddr corresponding to serverid - empty
 		if authorization fails or user specified serverid
 		serverid is nonexistent
 	    </comment>
@@ -2439,7 +2439,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
             <internal token="return"/>
 	    <external opt="none"/>
         </entry>
-    </event> 
+    </event>
 
     <event id="AUE_ilb_create_servergroup" header="0" idNo="130" omit="JNI">
         <title>Create server group for Integrated Loadbalancer</title>
@@ -2463,7 +2463,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 	    <internal token="return"/>
 	    <external opt="none"/>
 	</entry>
-    </event> 
+    </event>
 
     <event id="AUE_ilb_delete_servergroup" header="0" idNo="131" omit="JNI">
         <title>Delete server group from Integrated Loadbalancer</title>
@@ -2487,7 +2487,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
             <internal token="return"/>
             <external opt="none"/>
         </entry>
-    </event> 
+    </event>
 
     <event id="AUE_nwam_enable" header="0" idNo="132" omit="JNI">
 	<entry id="subject">
@@ -2573,8 +2573,29 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 	</entry>
     </event>
 
+    <event id="AUE_pfauth" header="0" idNo="136" omit="JNI">
+	<title>pfauth</title>
+	<program>/usr/lib/pfauth</program>
+	<see>pfexec(1)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+<!--
+	<entry id="message">
+	    <internal token="text"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>TBD</comment>
+	</entry>
+-->
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 135, so next is 136, then fix this comment -->
+<!-- Highest idNo is 136, so next is 137, then fix this comment -->
 <!-- end of C Only events -->
 
 <!--
@@ -2583,7 +2604,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
      become a way of describing token structure.
 -->
 
-    <token id="acl">	
+    <token id="acl">
     </token>
     <token id="arbitrary">
     </token>
@@ -2612,7 +2633,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
     <token id="secflags">
     </token>
     <!--
-    	the iport token take a single argument of type uint16_t
+	the iport token take a single argument of type uint16_t
 	if there are any other tokens following it that have arguments
 	the last of the iport tokens in the event description must
 	be followed by a dummy iport token that is optional.
@@ -2763,7 +2784,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 
 <!-- msg list for uadmin(1m) fcn argument (next action, see uadmin(2)) -->
     <msg_list id="uadmin_fcn" header="0" start="3000" public="true">
-    	<msg id="AD_HALT">Halt the processor(s)</msg>
+	<msg id="AD_HALT">Halt the processor(s)</msg>
 	<msg id="AD_POWEROFF">Halt the processor(s) and turn off the power</msg>
 	<msg id="AD_BOOT">Reboot the system using the kernel file</msg>
 	<msg id="AD_IBOOT">Interactive reboot</msg>
@@ -2810,7 +2831,7 @@ Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 	<msg id="INVALID_PCR_INFO">PCR information could not be interpreted</msg>
 	<msg id="NOSPACE">No room to load key.</msg>
 	<msg id="NOSRK">There is no SRK set</msg>
-	<msg id="NOTSEALED_BLOB">An encrypted blob is invalid or was 
+	<msg id="NOTSEALED_BLOB">An encrypted blob is invalid or was
 	not created by this TPM</msg>
 	<msg id="OWNER_SET">There is already an Owner </msg>
 	<msg id="RESOURCES">The TPM has insufficient internal resources</msg>

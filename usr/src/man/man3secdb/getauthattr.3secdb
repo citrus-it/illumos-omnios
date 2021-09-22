@@ -7,6 +7,7 @@
 .SH NAME
 getauthattr, getauthnam, free_authattr, setauthattr, endauthattr, chkauthattr
 \- get authorization entry
+.\" XXX
 .SH SYNOPSIS
 .LP
 .nf

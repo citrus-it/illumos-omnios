@@ -152,6 +152,8 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	struct pathname resolvepn;
 	struct uarg args;
 	struct execa ua;
+	struct intpdata idata, *idatap = NULL;
+	size_t idatasz;
 	k_sigset_t savedmask;
 	lwpdir_t *lwpdir = NULL;
 	tidhash_t *tidhash;
@@ -292,7 +294,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	 */
 	if ((CR_FLAGS(p->p_cred) & PRIV_PFEXEC) != 0) {
 		error = pfexec_call(p->p_cred, &resolvepn, &args.pfcred,
-		    &args.scrubenv);
+		    &args.scrubenv, &args.auth);
 
 		/* Returning errno in case we're not allowed to execute. */
 		if (error > 0) {
@@ -300,7 +302,51 @@ exec_common(const char *fname, const char **argp, const char **envp,
 				VN_RELE(dir);
 			pn_free(&resolvepn);
 			VN_RELE(vp);
-			goto out;
+			goto fail;
+		}
+
+		if (args.auth) {
+			size_t l;
+
+			/*
+			 * pfexecd requests authentication for this action.
+			 * Substitute 'pfauth' for the file to be executed
+			 * and continue. pfexecd will have granted the extra
+			 * necessary privileges.
+			 */
+			if (dir != NULL)
+				VN_RELE(dir);
+			dir = NULL;
+			VN_RELE(vp);
+
+			error = pn_get(PRIV_AUTH_HELPER, UIO_SYSSPACE, &pn);
+			if (error != 0) {
+				pn_free(&resolvepn);
+				goto out;
+			}
+			error = lookuppn(&pn, &resolvepn, NO_FOLLOW, NULLVPP,
+			    &vp);
+			if (error != 0 || vp == NULL) {
+				pn_free(&resolvepn);
+				pn_free(&pn);
+				if (vp == NULL)
+					error = ENOENT;
+				else
+					VN_RELE(vp);
+				goto out;
+			}
+
+			idatap = &idata;
+			bzero(idatap, sizeof (idata));
+			idatasz = strlen(pn.pn_path) + 1;
+			idata.intp = kmem_alloc(idatasz, KM_SLEEP);
+			idata.intp_name[0] = idata.intp;
+			strlcpy(idata.intp_name[0], pn.pn_path, idatasz);
+
+			(void) strncpy(exec_file, pn.pn_path, MAXCOMLEN);
+			args.pathname = resolvepn.pn_path;
+			/* don't free resolvepn until we are done with args */
+			pn_free(&pn);
 		}
 
 		/* Don't change the credentials when using old ptrace. */
@@ -357,7 +403,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 		}
 	}
 
-	if ((error = gexec(&vp, &ua, &args, NULL, 0, &execsz,
+	if ((error = gexec(&vp, &ua, &args, idatap, 0, &execsz,
 	    exec_file, p->p_cred, &brand_action)) != 0) {
 		if (brandme) {
 			BROP(p)->b_freelwp(lwp);
@@ -576,6 +622,9 @@ exec_common(const char *fname, const char **argp, const char **envp,
 		ret_tidhash = next;
 	}
 
+	if (idatap != NULL)
+		kmem_free(idatap->intp, idatasz);
+
 	ASSERT(error == 0);
 	DTRACE_PROC(exec__success);
 	return (0);
@@ -583,6 +632,8 @@ exec_common(const char *fname, const char **argp, const char **envp,
 fail:
 	DTRACE_PROC1(exec__failure, int, error);
 out:		/* error return */
+	if (idatap != NULL)
+		kmem_free(idatap->intp, idatasz);
 	mutex_enter(&p->p_lock);
 	curthread->t_hold = savedmask;
 	prexecend();

@@ -51,6 +51,7 @@ extern "C" {
 #define	PROFILE_STOP			"Stop"
 
 #define	DEF_PROF			"PROFS_GRANTED="
+#define	DEF_AUTHPROF			"AUTHPROFS_GRANTED="
 #define	DEF_CONSUSER			"CONSOLE_USER="
 
 #define	MAXPROFS			4096

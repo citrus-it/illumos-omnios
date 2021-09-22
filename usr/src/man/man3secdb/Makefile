@@ -25,6 +25,7 @@ MANFILES= 	getauthattr.3secdb	\
 		kva_match.3secdb
 
 MANLINKS=	chkauthattr.3secdb	\
+		chkauthattr_ucred.3secdb	\
 		endauthattr.3secdb	\
 		endexecattr.3secdb	\
 		endprofattr.3secdb	\
@@ -49,6 +50,7 @@ MANLINKS=	chkauthattr.3secdb	\
 		setuserattr.3secdb
 
 chkauthattr.3secdb	:= LINKSRC = getauthattr.3secdb
+chkauthattr_ucred.3secdb	:= LINKSRC = getauthattr.3secdb
 endauthattr.3secdb	:= LINKSRC = getauthattr.3secdb
 free_authattr.3secdb	:= LINKSRC = getauthattr.3secdb
 getauthnam.3secdb	:= LINKSRC = getauthattr.3secdb

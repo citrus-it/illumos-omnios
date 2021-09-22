@@ -340,6 +340,7 @@ mlisten()
 			struct passwd *pw = NULL;
 
 			if ((pw = getpwuid(md->uid)) != NULL)
+				/* XXX */
 				md->admin = chkauthattr("solaris.print.admin",
 							pw->pw_name);
 		}

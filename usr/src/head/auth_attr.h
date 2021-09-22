@@ -33,6 +33,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <secdb.h>
+#include <ucred.h>
 
 /*
  * Some macros used internally by the nsswitch code
@@ -95,6 +96,7 @@ extern void setauthattr(void);
 extern void endauthattr(void);
 extern void free_authattr(authattr_t *);
 extern int chkauthattr(const char *, const char *);
+extern int chkauthattr_ucred(const char *, const char *, const ucred_t *);
 
 #ifdef	__cplusplus
 }

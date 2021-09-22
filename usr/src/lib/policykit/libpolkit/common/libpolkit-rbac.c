@@ -174,6 +174,7 @@ libpolkit_is_uid_allowed_for_privilege (LibPolKitContext   *ctx,
 		}
 	}
 
+	/* XXX */
 	*out_is_allowed = (chkauthattr(authname, pw->pw_name) != 0);
 	*out_is_temporary = FALSE;
 

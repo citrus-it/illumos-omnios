@@ -899,7 +899,7 @@ verify_rules_auth(struct svc_req *rqstp)
 		return (-1);
 	}
 
-	if (chkauthattr(IDMAP_RULES_AUTH, pwd.pw_name) != 1) {
+	if (chkauthattr_ucred(IDMAP_RULES_AUTH, pwd.pw_name, uc) != 1) {
 		idmapdlog(LOG_INFO, "%s is not authorized (%s)",
 		    pwd.pw_name, IDMAP_RULES_AUTH);
 		ucred_free(uc);

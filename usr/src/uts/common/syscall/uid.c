@@ -23,7 +23,7 @@
  */
 
 /*
- * 	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
+ *	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
  */
 
 #include <sys/param.h>
@@ -135,7 +135,7 @@ retry_locked:
 
 		/* Remove the PRIV_PFEXEC, we changed the real uid. */
 		if (uidchge)
-			CR_FLAGS(newcr) &= ~PRIV_PFEXEC;
+			CR_FLAGS(newcr) &= ~(PRIV_PFEXEC|PRIV_PFEXEC_AUTH);
 
 		crsetsid(newcr, ksp, KSID_USER);
 
@@ -350,8 +350,10 @@ retry_locked:
 		}
 		if (ruid != -1) {
 			/* Remove the PRIV_PFEXEC, we changed the real uid. */
-			if (uidchge)
-				CR_FLAGS(newcr) &= ~PRIV_PFEXEC;
+			if (uidchge) {
+				CR_FLAGS(newcr) &=
+				    ~(PRIV_PFEXEC|PRIV_PFEXEC_AUTH);
+			}
 
 			oldruid = newcr->cr_ruid;
 			newcr->cr_ruid = ruid;

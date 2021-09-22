@@ -1038,6 +1038,7 @@ tsol_lpauth(char *auth, char *in_name)
 	if ((cp = strchr(in_name, '@')) != NULL) {
 		/* user@system */
 		*cp = '\0';
+		/* XXX */
 		res = chkauthattr(auth, in_name);
 		*cp = '@';
 	} else if ((cp = strchr(in_name, '!')) != NULL)

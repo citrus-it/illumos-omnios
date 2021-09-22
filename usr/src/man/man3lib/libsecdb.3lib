@@ -48,6 +48,7 @@ l l .
 \fBkva_match\fR	\fBmatch_execattr\fR
 \fBsetauthattr\fR	\fBsetexecattr\fR
 \fBsetprofattr\fR	\fBsetuserattr\fR
+chkauthattr_ucred XXX
 .TE
 
 .SH FILES
