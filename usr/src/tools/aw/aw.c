@@ -1,3 +1,4 @@
+
 /*
  * CDDL HEADER START
  *
@@ -160,7 +161,6 @@ static void
 copyuntil_path(FILE *in, FILE *out, int termchar,
     const char *wspace, size_t wspace_len)
 {
-#define	PROTO_INC "/proto/root_i386/usr/include/"
 #define	SYS_INC "/usr/include/"
 
 	static const size_t proto_inc_len = sizeof (PROTO_INC) - 1;
@@ -505,19 +505,31 @@ main(int argc, char *argv[])
 	/*
 	 * Helpful when debugging, or when changing tool versions..
 	 */
-	if ((cmd = getenv("AW_AS")) != NULL)
-		strlcpy(as_pgm, cmd, sizeof (as_pgm));
-	else {
-		if ((dir = getenv("AW_AS_DIR")) == NULL)
-			dir = DEFAULT_AS_DIR;	/* /usr/sfw/bin */
+	cmd = dir = NULL;
+	if ((cmd = getenv("AW_" AW_TARGET "_AS")) == NULL)
+		cmd = getenv("AW_AS");
+	if ((dir = getenv("AW_" AW_TARGET "_AS_DIR")) == NULL)
+		dir = getenv("AW_AS_DIR");
+
+	if (cmd != NULL) {
+		(void) strlcpy(as_pgm, cmd, sizeof (as_pgm));
+	} else {
+		if (dir == NULL)
+			dir = DEFAULT_AS_DIR;
 		(void) snprintf(as_pgm, sizeof (as_pgm), "%s/gas", dir);
 	}
 
-	if ((cmd = getenv("AW_AS64")) != NULL)
-		strlcpy(as64_pgm, cmd, sizeof (as64_pgm));
-	else {
-		if ((dir = getenv("AW_AS64_DIR")) == NULL)
-			dir = DEFAULT_AS64_DIR;	/* /usr/sfw/bin */
+	cmd = dir = NULL;
+	if ((cmd = getenv("AW_" AW_TARGET "_AS64")) == NULL)
+		cmd = getenv("AW_AS64");
+	if ((dir = getenv("AW_" AW_TARGET "_AS64_DIR")) == NULL)
+		dir = getenv("AW_AS64_DIR");
+
+	if (cmd != NULL) {
+		(void) strlcpy(as64_pgm, cmd, sizeof (as64_pgm));
+	} else {
+		if (dir == NULL)
+			dir = DEFAULT_AS64_DIR;
 		(void) snprintf(as64_pgm, sizeof (as_pgm), "%s/gas", dir);
 	}
 
@@ -732,7 +744,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-#if defined(__i386)
+#if defined(AW_TARGET_i386)
 	if (as64)
 		newae(as, "--64");
 	else
@@ -748,14 +760,14 @@ main(int argc, char *argv[])
 
 	asargv = aeltoargv(as);
 	if (cpp) {
-#if defined(__sparc)
+#if defined(AW_TARGET_sparc)
 		newae(cpp, "-Dsparc");
 		newae(cpp, "-D__sparc");
 		if (as64)
 			newae(cpp, "-D__sparcv9");
 		else
 			newae(cpp, "-D__sparcv8");
-#elif defined(__i386) || defined(__x86)
+#elif defined(AW_TARGET_i386)
 		if (as64) {
 			newae(cpp, "-D__x86_64");
 			newae(cpp, "-D__amd64");
@@ -763,6 +775,9 @@ main(int argc, char *argv[])
 			newae(cpp, "-Di386");
 			newae(cpp, "-D__i386");
 		}
+#elif defined(AW_TARGET_aarch64)
+		newae(cpp, "-Daarch64");
+		newae(cpp, "-D__aarch64");
 #else
 #error	"need isa-dependent defines"
 #endif

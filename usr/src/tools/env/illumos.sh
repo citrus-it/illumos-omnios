@@ -301,6 +301,7 @@ export SPRO_VROOT="$SPRO_ROOT"
 #CHECK_PATHS='y'
 
 if [[ "$ENABLE_SMATCH" == "1" ]]; then
-	SMATCHBIN=$CODEMGR_WS/usr/src/tools/proto/root_$MACH-nd/opt/onbld/bin/$MACH/smatch
+	SMATCHBIN=$CODEMGR_WS/usr/src/tools/proto/root_$MACH-nd
+	SMATCHBIN+=/opt/onbld/bin/$NATIVE_MACH/smatch
 	export SHADOW_CCS="$SHADOW_CCS smatch,$SMATCHBIN,smatch"
 fi

@@ -53,8 +53,6 @@ install: all .WAIT $(ROOTONBLDMACHPROG)
 	$(RM) $(ROOTONBLDBINMACH)/install
 	$(LN) $(ROOTONBLDMACHPROG) $(ROOTONBLDBINMACH)/install
 
-lint:	lint_SRCS
-
 clean:
 	$(RM) $(CLEANFILES)
 

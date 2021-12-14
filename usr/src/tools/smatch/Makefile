@@ -25,8 +25,10 @@ SPARSE_VERSION = 0.6.1-rc1-il-7
 include ../Makefile.tools
 
 # We have to build smatch before we can use cw
-i386_CC = $(GNUC_ROOT)/bin/gcc
-sparc_CC = $(GNUC_ROOT)/bin/gcc
+i386_CC = $(i386_GNUC_ROOT)/bin/gcc
+sparc_CC = $(sparc_GNUC_ROOT)/bin/gcc
+aarch64_CC = $(aarch64_GNUC_ROOT)/bin/gcc
+
 # sparc doesn't recognise -msave-args
 i386_SMATCHFLAGS = -msave-args
 sparc_SMATCHFLAGS =

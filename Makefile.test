@@ -1,0 +1,28 @@
+
+include usr/src/tools/Makefile.tools
+
+all:
+	@echo MACH               = $(MACH) $(MACH64)
+	@echo NATIVE_MACH        = $(NATIVE_MACH) $(NATIVE_MACH64)
+	@echo
+	@echo aarch64_GNUC_ROOT  = $(aarch64_GNUC_ROOT)
+	@echo GNUC_ROOT          = $(GNUC_ROOT)
+	@echo NATIVE_GNUC_ROOT   = $(NATIVE_GNUC_ROOT)
+	@echo
+	@echo PRIMACY_CC         = $(PRIMARY_CC)
+	@echo i386_PRIMACY_CC    = $(i386_PRIMARY_CC)
+	@echo aarch64_PRIMACY_CC = $(aarch64_PRIMARY_CC)
+	@echo
+	@echo aarch64_CW_CC...   = $(aarch64_CW_CC_COMPILERS)
+	@echo
+	@echo i386_CC            = $(i386_CC)
+	@echo
+	@echo aarch64_CC         = $(aarch64_CC)
+	@echo
+	@echo NATIVECC           = $(NATIVECC)
+	@echo
+	@echo CC                 = $(CC)
+	@echo CC64               = $(CC64)
+
+include usr/src/tools/Makefile.targ
+

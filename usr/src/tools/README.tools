@@ -225,6 +225,11 @@ wsdiff
 	source change. This information is needed for patch construction.
 
 
+Tools which are relevant to a cross-compiled build exist in two forms, with
+the bare name as listed above (this version is always the one native to the
+current host), and as a version with an architecture suffix, indicating that
+it targets the given architecture.
+
 How to do a full build
 ----------------------
 
