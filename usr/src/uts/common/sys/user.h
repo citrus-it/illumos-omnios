@@ -26,6 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 /*
+ * Copyright 2017 Hayashi Naoyuki
  * Copyright (c) 2018, Joyent, Inc.
  */
 
@@ -111,7 +112,7 @@ typedef struct uf_entry {
 	short		uf_busy;	/* file is allocated [grow, fork] */
 	kcondvar_t	uf_wanted_cv;	/* waiting for setf() [never copied] */
 	kcondvar_t	uf_closing_cv;	/* waiting for close() [never copied] */
-	struct portfd 	*uf_portfd;	/* associated with port [grow] */
+	struct portfd	*uf_portfd;	/* associated with port [grow] */
 	uf_entry_gen_t	uf_gen;		/* assigned fd generation [grow,fork] */
 	/* Avoid false sharing - pad to coherency granularity (64 bytes) */
 	char		uf_pad[64 - sizeof (kmutex_t) - 2 * sizeof (void*) -
@@ -201,7 +202,7 @@ typedef struct {		/* kernel syscall set type */
  *
  * This value should not be changed in a patch.
  */
-#if defined(__sparc)
+#if defined(__sparc) || defined(__aarch64)
 #define	__KERN_NAUXV_IMPL 20
 #elif defined(__i386) || defined(__amd64)
 #define	__KERN_NAUXV_IMPL 25

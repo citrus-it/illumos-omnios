@@ -23,8 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2017 RackTop Systems.
- */
-/*
+ * Copyright 2017 Hayashi Naoyuki
  * Copyright (c) 2017 Joyent, Inc.
  */
 
@@ -79,6 +78,13 @@ struct module {
 	char *text;
 	char *data;
 
+#if 0	/* XXXARCH64 */
+	size_t dso_size;
+	char *dso;
+	uintptr_t dso_text;
+	uintptr_t dso_data;
+#endif
+
 	unsigned int symtbl_section;
 	/* pointers into symspace, or NULL */
 	char *symtbl;
@@ -132,7 +138,7 @@ struct _buf {
 	intptr_t	 _fd;
 	char		*_ptr;
 	char		*_base;
-	char 		*_name;
+	char		*_name;
 	char		*_dbuf;
 	int		 _size;
 	int		_cnt;
@@ -202,7 +208,8 @@ extern void do_hotinlines(struct module *);
 
 extern int kobj_filbuf(struct _buf *);
 extern void kobj_sync(void);
-#if defined(__i386) || defined(__sparc) || defined(__amd64)
+#if defined(__i386) || defined(__sparc) || defined(__amd64) || \
+	defined(__aarch64)
 extern void kobj_vmem_init(vmem_t **, vmem_t **);
 #else
 #error "ISA not supported"

@@ -24,6 +24,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2017 Hayashi Naoyuki
  */
 
 #ifndef	_SYS_ISA_DEFS_H
@@ -74,14 +75,14 @@
  * _POINTER_ALIGNMENT / _FLOAT_ALIGNMENT:
  *	The ABI defines alignment requirements of each of the primitive
  *	object types.  Some, if not all, may be hardware requirements as
- * 	well.  The values are expressed in "byte-alignment" units.
+ *	well.  The values are expressed in "byte-alignment" units.
  *
  * _MAX_ALIGNMENT:
  *	The most stringent alignment requirement as specified by the ABI.
  *	Equal to the maximum of all the above _XXX_ALIGNMENT values.
  *
  * _MAX_ALIGNMENT_TYPE:
- * 	The name of the C type that has the value descried in _MAX_ALIGNMENT.
+ *	The name of the C type that has the value descried in _MAX_ALIGNMENT.
  *
  * _ALIGNMENT_REQUIRED:
  *	True or false (1 or 0) whether or not the hardware requires the ABI
@@ -480,6 +481,52 @@ extern "C" {
 #else
 #error	"unknown SPARC version"
 #endif
+
+
+
+#elif defined(__aarch64)
+
+/*
+ * Define the appropriate "processor characteristics"
+ */
+#define	_LITTLE_ENDIAN
+#define	_STACK_GROWS_DOWNWARD
+#define	_LONG_LONG_LTOH
+#define	_BIT_FIELDS_LTOH
+#define	_IEEE_754
+#define	_CHAR_IS_SIGNED
+#define	_BOOL_ALIGNMENT			1
+#define	_CHAR_ALIGNMENT			1
+#define	_SHORT_ALIGNMENT		2
+#define	_INT_ALIGNMENT			4
+#define	_FLOAT_ALIGNMENT		4
+#define	_FLOAT_COMPLEX_ALIGNMENT	4
+#define	_LONG_ALIGNMENT			8
+#define	_LONG_LONG_ALIGNMENT		8
+#define	_DOUBLE_ALIGNMENT		8
+#define	_DOUBLE_COMPLEX_ALIGNMENT	8
+#define	_LONG_DOUBLE_ALIGNMENT		__SIZEOF_LONG_DOUBLE__
+#define	_LONG_DOUBLE_COMPLEX_ALIGNMENT	__SIZEOF_LONG_DOUBLE__
+#define	_POINTER_ALIGNMENT		8
+#define	_MAX_ALIGNMENT			__BIGGEST_ALIGNMENT__
+#define	_ALIGNMENT_REQUIRED		1
+#define	_MAX_ALIGNMENT_TYPE		long double
+
+#define	_LONG_LONG_ALIGNMENT_32		_LONG_LONG_ALIGNMENT
+
+#if !defined(_LP64)
+#define	_LP64
+#endif
+#if !defined(_I32LPx)
+#define	_I32LPx
+#endif
+
+#define	_SUNOS_VTOC_16
+#define	_DMA_USES_PHYSADDR
+#define	_FIRMWARE_NEEDS_FDISK
+#define	_RTC_CONFIG
+#define	_SOFT_HOSTID
+#define	_DONT_USE_1275_GENERIC_NAMES
 
 /*
  * #error is strictly ansi-C, but works as well as anything for K&R systems.

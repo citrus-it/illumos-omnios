@@ -22,9 +22,11 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Hayashi Naoyuki
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef _SYS_DKTP_FDISK_H
@@ -152,7 +154,7 @@ struct mboot {	/* master boot block */
 	ushort_t signature;
 };
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__i386) || defined(__amd64) || defined(__aarch64)
 
 /* Byte offset of the start of the partition table within the sector */
 #define	FDISK_PART_TABLE_START	446
