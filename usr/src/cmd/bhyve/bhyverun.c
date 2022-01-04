@@ -240,11 +240,11 @@ usage(int code)
 #endif
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
 #ifdef	__FreeBSD__
-		"       %*s [-G port] [-k file] [-l lpc] [-m mem] [-o var=value]\n"
+		"       %*s [-G port] [-k config_file] [-l lpc] [-m mem] [-o var=value]\n"
 		"       %*s [-p vcpu:hostcpu] [-r file] [-s pci] [-U uuid] vmname\n"
 
 #else
-		"       %*s [-k <file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
+		"       %*s [-k <config_file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
 		"       %*s [-s <pci>] [-U uuid] vmname\n"
 #endif
 		"       -A: create ACPI tables\n"
