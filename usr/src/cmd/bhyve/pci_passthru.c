@@ -641,7 +641,7 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 		return (-1);
 	}
 
-	pci_set_cfgdata16(pi, PCIR_COMMAND, read_config(sc, PCIR_COMMAND, 2));
+	write_config(sc, PCIR_COMMAND, 2, pci_get_cfgdata16(pi, PCIR_COMMAND));
 
 	return (0);
 }
