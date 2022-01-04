@@ -24,7 +24,7 @@
 .\"
 .\" Portions Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd October 13, 2021
+.Dd November 18, 2021
 .Dt BHYVE 1M
 .Os
 .Sh NAME
@@ -477,10 +477,15 @@ Use the host TTY device for serial port I/O.
 .Pp
 .Sy Boot ROM device backends :
 .Bl -tag -width 10n
-.It Pa romfile
+.It Pa romfile Ns Op Cm \&, Ns Ar varfile
 Map
 .Ar romfile
 in the guest address space reserved for boot firmware.
+If
+.Ar varfile
+is provided, that file is also mapped in the boot firmware guest
+address space, and any modifications the guest makes will be saved
+to that file.
 .El
 .Pp
 .Sy Pass-through device backends :
@@ -805,6 +810,20 @@ bhyve -c 2 -m 4G -w -H \e
   -s 30,xhci,tablet \e
   -s 31,lpc -l com1,stdio \e
   -l bootrom,/usr/share/bhyve/firmware/BHYVE_UEFI.fd \e
+   uefivm
+.Ed
+.Pp
+Run a UEFI virtual machine with a VARS file to save EFI variables.
+Note that
+.Nm
+will write guest modifications to the given VARS file.
+Be sure to create a per-guest copy of the template VARS file from
+.Pa /usr/share/bhyve/firmware .
+.Bd -literal -offset indent
+bhyve -c 2 -m 4g -w -H \e
+  -s 0,hostbridge \e
+  -s 31,lpc -p com1,stdio \e
+  -l bootrom,/usr/share/bhyve/firmware/BHYVE_UEFI.fd,BHYVE_UEFI_VARS.fd \e
    uefivm
 .Ed
 .Sh SEE ALSO
