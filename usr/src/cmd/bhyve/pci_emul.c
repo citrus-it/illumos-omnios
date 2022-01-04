@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/linker_set.h>
 
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -56,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <strings.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <sysexits.h>
 
 #include <machine/vmm.h>
 #include <vmmapi.h>
@@ -113,6 +115,7 @@ SET_DECLARE(pci_devemu_set, struct pci_devemu);
 static uint64_t pci_emul_iobase;
 static uint64_t pci_emul_membase32;
 static uint64_t pci_emul_membase64;
+static uint64_t pci_emul_memlim64;
 
 #define	PCI_EMUL_IOBASE		0x2000
 #define	PCI_EMUL_IOLIMIT	0x10000
@@ -121,6 +124,11 @@ static uint64_t pci_emul_membase64;
 #define	PCI_EMUL_ECFG_SIZE	(MAXBUSES * 1024 * 1024)    /* 1MB per bus */
 SYSRES_MEM(PCI_EMUL_ECFG_BASE, PCI_EMUL_ECFG_SIZE);
 
+/*
+ * OVMF always uses 0xC0000000 as base address for 32 bit PCI MMIO. Don't
+ * change this address without changing it in OVMF.
+ */
+#define PCI_EMUL_MEMBASE32 0xC0000000
 #define	PCI_EMUL_MEMLIMIT32	PCI_EMUL_ECFG_BASE
 #define	PCI_EMUL_MEMSIZE64	(32*GB)
 
@@ -1173,8 +1181,11 @@ init_pci(struct vmctx *ctx)
 	int bus, slot, func;
 	int error;
 
+	if (vm_get_lowmem_limit(ctx) > PCI_EMUL_MEMBASE32)
+		errx(EX_OSERR, "Invalid lowmem limit");
+
 	pci_emul_iobase = PCI_EMUL_IOBASE;
-	pci_emul_membase32 = vm_get_lowmem_limit(ctx);
+	pci_emul_membase32 = PCI_EMUL_MEMBASE32;
 
 	pci_emul_membase64 = 4*GB + vm_get_highmem_size(ctx);
 	pci_emul_membase64 = roundup2(pci_emul_membase64, PCI_EMUL_MEMSIZE64);
@@ -1279,8 +1290,8 @@ init_pci(struct vmctx *ctx)
 	/*
 	 * The guest physical memory map looks like the following:
 	 * [0,		    lowmem)		guest system memory
-	 * [lowmem,	    lowmem_limit)	memory hole (may be absent)
-	 * [lowmem_limit,   0xE0000000)		PCI hole (32-bit BAR allocation)
+	 * [lowmem,	    0xC0000000)		memory hole (may be absent)
+	 * [0xC0000000,     0xE0000000)		PCI hole (32-bit BAR allocation)
 	 * [0xE0000000,	    0xF0000000)		PCI extended config window
 	 * [0xF0000000,	    4GB)		LAPIC, IOAPIC, HPET, firmware
 	 * [4GB,	    4GB + highmem)
