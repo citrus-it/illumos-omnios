@@ -643,12 +643,16 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 	* We need to do this after PCIR_COMMAND got possibly updated, e.g.,
 	* a BAR was enabled.
 	*/
-	error = init_msix_table(ctx, sc);
-	if (error != 0) {
-		warnx("failed to initialize MSI-X table for PCI %d", sc->pptfd);
-		goto done;
+	if (pci_msix_table_bar(pi) >= 0) {
+		error = init_msix_table(ctx, sc);
+		if (error != 0) {
+			warnx("failed to initialize MSI-X table for PCI %d",
+			    sc->pptfd);
+			goto done;
+		}
 	}
 
+	error = 0;				/* success */
 done:
 	return (error);
 }
