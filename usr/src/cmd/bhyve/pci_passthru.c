@@ -492,11 +492,13 @@ msix_table_write(struct vmctx *ctx, int vcpu, struct passthru_softc *sc,
 }
 
 static int
-init_msix_table(struct vmctx *ctx, struct passthru_softc *sc, uint64_t size)
+init_msix_table(struct vmctx *ctx, struct passthru_softc *sc)
 {
 	struct pci_devinst *pi = sc->psc_pi;
+	int i;
 
-	assert(pci_msix_table_bar(pi) >= 0);
+	i = pci_msix_table_bar(pi);
+	assert(i >= 0);
 
         /*
          * Map the region of the BAR containing the MSI-X table.  This is
@@ -518,8 +520,8 @@ init_msix_table(struct vmctx *ctx, struct passthru_softc *sc, uint64_t size)
 	 * pi->pi_msix.mapped_addr points to the start of the BAR. For now,
 	 * keep closer to upstream.
 	 */
-	pi->pi_msix.mapped_size = size;
-	pi->pi_msix.mapped_addr = (uint8_t *)mmap(NULL, size,
+	pi->pi_msix.mapped_size = sc->psc_bar[i].size;
+	pi->pi_msix.mapped_addr = (uint8_t *)mmap(NULL, pi->pi_msix.mapped_size,
 	    PROT_READ | PROT_WRITE, MAP_SHARED, sc->pptfd, 0);
 	if (pi->pi_msix.mapped_addr == MAP_FAILED) {
 		warn("Failed to map MSI-X table BAR on %d", sc->pptfd);
@@ -607,13 +609,6 @@ cfginitbar(struct vmctx *ctx, struct passthru_softc *sc)
 		sc->psc_bar[i].lobits = lobits;
 		pi->pi_bar[i].lobits = lobits;
 
-		/* The MSI-X table needs special handling */
-		if (i == pci_msix_table_bar(pi)) {
-			error = init_msix_table(ctx, sc, size);
-			if (error)
-				return (-1);
-		}
-
 		/*
 		 * 64-bit BAR takes up two slots so skip the next one.
 		 */
@@ -630,6 +625,7 @@ static int
 cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 {
 	struct pci_devinst *pi = sc->psc_pi;
+	int error;
 
 	if (cfginitmsi(sc) != 0) {
 		warnx("failed to initialize MSI for PCI %d", sc->pptfd);
@@ -643,7 +639,18 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 
 	write_config(sc, PCIR_COMMAND, 2, pci_get_cfgdata16(pi, PCIR_COMMAND));
 
-	return (0);
+	/*
+	* We need to do this after PCIR_COMMAND got possibly updated, e.g.,
+	* a BAR was enabled.
+	*/
+	error = init_msix_table(ctx, sc);
+	if (error != 0) {
+		warnx("failed to initialize MSI-X table for PCI %d", sc->pptfd);
+		goto done;
+	}
+
+done:
+	return (error);
 }
 
 static int
