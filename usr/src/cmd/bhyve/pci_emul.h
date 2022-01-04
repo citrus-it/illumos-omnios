@@ -159,6 +159,8 @@ struct pci_devinst {
 		struct msix_table_entry *table;	/* allocated at runtime */
 		void	*pba_page;
 		int	pba_page_offset;
+		uint8_t *mapped_addr;
+		size_t	mapped_size;
 	} pi_msix;
 
 	void      *pi_arg;		/* devemu-private data */
