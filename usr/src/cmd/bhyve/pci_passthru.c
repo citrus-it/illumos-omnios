@@ -495,6 +495,7 @@ static int
 init_msix_table(struct vmctx *ctx, struct passthru_softc *sc)
 {
 	struct pci_devinst *pi = sc->psc_pi;
+	uint32_t table_size, table_offset;
 	int i;
 
 	i = pci_msix_table_bar(pi);
@@ -528,9 +529,6 @@ init_msix_table(struct vmctx *ctx, struct passthru_softc *sc)
 		return (-1);
 	}
 
-#ifdef __FreeBSD__
-	uint32_t table_size, table_offset;
-
 	table_offset = rounddown2(pi->pi_msix.table_offset, 4096);
 
 	table_size = pi->pi_msix.table_offset - table_offset;
@@ -538,25 +536,20 @@ init_msix_table(struct vmctx *ctx, struct passthru_softc *sc)
 	table_size = roundup2(table_size, 4096);
 
 	/*
-	 * XXX - come back to this, not making a lot of sense to me yet, and
-	 *       the second part seems wrong regardless.
-	 */
-
-	/*
-	 * Unmap any pages not covered by the table, we do not need to emulate
+	 * Unmap any pages not containing the table, we do not need to emulate
 	 * accesses to them.  Avoid releasing address space to help ensure that
 	 * a buggy out-of-bounds access causes a crash.
 	 */
 	if (table_offset != 0)
-		if (mprotect(pi->pi_msix.mapped_addr, table_offset,
+		if (mprotect((caddr_t)pi->pi_msix.mapped_addr, table_offset,
 		    PROT_NONE) != 0)
 			warn("Failed to unmap MSI-X table BAR region");
 	if (table_offset + table_size != pi->pi_msix.mapped_size)
-		if (mprotect(pi->pi_msix.mapped_addr,
+		if (mprotect((caddr_t)
+		    pi->pi_msix.mapped_addr + table_offset + table_size,
 		    pi->pi_msix.mapped_size - (table_offset + table_size),
 		    PROT_NONE) != 0)
 			warn("Failed to unmap MSI-X table BAR region");
-#endif
 
 	return (0);
 }
