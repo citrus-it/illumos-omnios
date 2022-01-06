@@ -30,7 +30,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
- * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -112,6 +112,12 @@ struct mevent {
 	boolean_t	me_auto_requeue;
 	struct file_obj	me_fobj;
 	char		*me_fname;
+	struct {
+		int	mp_fd;
+		off_t	mp_size;
+		void	(*mp_func)(int, enum ev_type, void *);
+		void    *mp_param;
+	} me_poll;
 #endif
 	LIST_ENTRY(mevent) me_list;
 };
@@ -382,149 +388,226 @@ mevent_fdpath(int fd)
 }
 
 static void
-mevent_update_one(struct mevent *mevp)
+mevent_poll_file_attrib(int fd, enum ev_type type, void *param)
+{
+	struct mevent *mevp = param;
+	struct stat st;
+
+	if (fstat(mevp->me_poll.mp_fd, &st) != 0) {
+		(void) fprintf(stderr, "%s: fstat(%d) \"%s\" failed: %s\n",
+		    __func__, fd, mevp->me_fname, strerror(errno));
+		return;
+	}
+
+	if (mevp->me_poll.mp_size != st.st_size ||
+	    mevp->me_fobj.fo_ctime.tv_sec != st.st_ctim.tv_sec ||
+	    mevp->me_fobj.fo_ctime.tv_nsec != st.st_ctim.tv_nsec) {
+		(void) fprintf(stderr, "File '%s' attributes changed.\n",
+		    mevp->me_fname);
+		mevp->me_poll.mp_size = st.st_size;
+		mevp->me_fobj.fo_atime = st.st_atim;
+		mevp->me_fobj.fo_mtime = st.st_mtim;
+		mevp->me_fobj.fo_ctime = st.st_ctim;
+		(*mevp->me_poll.mp_func)(mevp->me_poll.mp_fd, type,
+		    mevp->me_poll.mp_param);
+	}
+}
+
+static void
+mevent_update_one_readwrite(struct mevent *mevp)
 {
 	int portfd = mevp->me_notify.portnfy_port;
 
-	switch (mevp->me_type) {
-	case EVF_READ:
-	case EVF_WRITE:
-		mevp->me_auto_requeue = B_FALSE;
+	mevp->me_auto_requeue = B_FALSE;
 
-		switch (mevp->me_state) {
-		case EV_ENABLE:
-		{
-			int events;
+	switch (mevp->me_state) {
+	case EV_ENABLE:
+	{
+		int events;
 
-			events = (mevp->me_type == EVF_READ) ? POLLIN : POLLOUT;
+		events = (mevp->me_type == EVF_READ) ? POLLIN : POLLOUT;
 
-			if (port_associate(portfd, PORT_SOURCE_FD, mevp->me_fd,
-			    events, mevp) != 0) {
-				(void) fprintf(stderr,
-				    "port_associate fd %d %p failed: %s\n",
-				    mevp->me_fd, mevp, strerror(errno));
-			}
+		if (port_associate(portfd, PORT_SOURCE_FD, mevp->me_fd,
+		    events, mevp) != 0) {
+			(void) fprintf(stderr,
+			    "port_associate fd %d %p failed: %s\n",
+			    mevp->me_fd, mevp, strerror(errno));
+		}
+		return;
+	}
+	case EV_DISABLE:
+	case EV_DELETE:
+		/*
+		 * A disable that comes in while an event is being
+		 * handled will result in an ENOENT.
+		 */
+		if (port_dissociate(portfd, PORT_SOURCE_FD,
+		    mevp->me_fd) != 0 && errno != ENOENT) {
+			(void) fprintf(stderr, "port_dissociate "
+			    "portfd %d fd %d mevp %p failed: %s\n",
+			    portfd, mevp->me_fd, mevp, strerror(errno));
+		}
+		return;
+	default:
+		(void) fprintf(stderr, "%s: unhandled state %d\n", __func__,
+		    mevp->me_state);
+		abort();
+	}
+}
+
+static void
+mevent_update_one_timer(struct mevent *mevp)
+{
+	mevp->me_auto_requeue = B_TRUE;
+
+	switch (mevp->me_state) {
+	case EV_ENABLE:
+	{
+		struct itimerspec it = { 0 };
+
+		mevp->me_sigev.sigev_notify = SIGEV_PORT;
+		mevp->me_sigev.sigev_value.sival_ptr = &mevp->me_notify;
+
+		if (timer_create(CLOCK_REALTIME, &mevp->me_sigev,
+		    &mevp->me_timid) != 0) {
+			(void) fprintf(stderr,
+			    "timer_create failed: %s", strerror(errno));
 			return;
 		}
-		case EV_DISABLE:
-		case EV_DELETE:
+
+		/* The first timeout */
+		it.it_value.tv_sec = mevp->me_msecs / MILLISEC;
+		it.it_value.tv_nsec =
+			MSEC2NSEC(mevp->me_msecs % MILLISEC);
+		/* Repeat at the same interval */
+		it.it_interval = it.it_value;
+
+		if (timer_settime(mevp->me_timid, 0, &it, NULL) != 0) {
+			(void) fprintf(stderr, "timer_settime failed: "
+			    "%s", strerror(errno));
+		}
+		return;
+	}
+	case EV_DISABLE:
+	case EV_DELETE:
+		if (timer_delete(mevp->me_timid) != 0) {
+			(void) fprintf(stderr, "timer_delete failed: "
+			    "%s", strerror(errno));
+		}
+		return;
+	default:
+		(void) fprintf(stderr, "%s: unhandled state %d\n", __func__,
+		    mevp->me_state);
+		abort();
+	}
+}
+
+static void
+mevent_update_one_signal(struct mevent *mevp)
+{
+	(void) fprintf(stderr, "%s: unhandled event type EVF_SIGNAL\n",
+	    __func__);
+	abort();
+}
+
+static void
+mevent_update_one_vnode(struct mevent *mevp)
+{
+	int portfd = mevp->me_notify.portnfy_port;
+
+	mevp->me_auto_requeue = B_FALSE;
+
+	switch (mevp->me_state) {
+	case EV_ENABLE:
+	{
+		int events = 0;
+
+		if ((mevp->me_fflags & EVFF_ATTRIB) != 0)
+			events |= FILE_ATTRIB;
+
+		assert(events != 0);
+
+		if (mevp->me_fname == NULL) {
+			mevp->me_fname = mevent_fdpath(mevp->me_fd);
+			if (mevp->me_fname == NULL)
+				return;
+		}
+
+		bzero(&mevp->me_fobj, sizeof (mevp->me_fobj));
+		mevp->me_fobj.fo_name = mevp->me_fname;
+
+		if (port_associate(portfd, PORT_SOURCE_FILE,
+		    (uintptr_t)&mevp->me_fobj, events, mevp) != 0) {
 			/*
-			 * A disable that comes in while an event is being
-			 * handled will result in an ENOENT.
+			 * If this file does not support event ports
+			 * (ZVOLs do not yet have support)
+			 * then convert this to a timer event and poll for
+			 * file attribute changes.
 			 */
-			if (port_dissociate(portfd, PORT_SOURCE_FD,
-			    mevp->me_fd) != 0 && errno != ENOENT) {
-				(void) fprintf(stderr, "port_dissociate "
-				    "portfd %d fd %d mevp %p failed: %s\n",
-				    portfd, mevp->me_fd, mevp, strerror(errno));
-			}
-			return;
-		default:
-			goto abort;
-		}
+			struct stat st;
 
-	case EVF_TIMER:
-		mevp->me_auto_requeue = B_TRUE;
-
-		switch (mevp->me_state) {
-		case EV_ENABLE:
-		{
-			struct itimerspec it = { 0 };
-
-			mevp->me_sigev.sigev_notify = SIGEV_PORT;
-			mevp->me_sigev.sigev_value.sival_ptr = &mevp->me_notify;
-
-			if (timer_create(CLOCK_REALTIME, &mevp->me_sigev,
-			    &mevp->me_timid) != 0) {
+			if (fstat(mevp->me_fd, &st) != 0) {
 				(void) fprintf(stderr,
-				    "timer_create failed: %s", strerror(errno));
+				    "fstat(%d) \"%s\" failed: %s\n",
+				    mevp->me_fd, mevp->me_fname,
+				    strerror(errno));
 				return;
 			}
 
-			/* The first timeout */
-			it.it_value.tv_sec = mevp->me_msecs / MILLISEC;
-			it.it_value.tv_nsec =
-				MSEC2NSEC(mevp->me_msecs % MILLISEC);
-			/* Repeat at the same interval */
-			it.it_interval = it.it_value;
+			mevp->me_fobj.fo_atime = st.st_atim;
+			mevp->me_fobj.fo_mtime = st.st_mtim;
+			mevp->me_fobj.fo_ctime = st.st_ctim;
 
-			if (timer_settime(mevp->me_timid, 0, &it, NULL) != 0) {
-				(void) fprintf(stderr, "timer_settime failed: "
-				    "%s", strerror(errno));
-			}
-			return;
+			mevp->me_poll.mp_fd = mevp->me_fd;
+			mevp->me_poll.mp_size = st.st_size;
+
+			mevp->me_poll.mp_func = mevp->me_func;
+			mevp->me_poll.mp_param = mevp->me_param;
+			mevp->me_func = mevent_poll_file_attrib;
+			mevp->me_param = mevp;
+
+			mevp->me_type = EVF_TIMER;
+			mevp->me_timid = mevent_timid++;
+			mevp->me_msecs = 5000;
+			mevent_update_one_timer(mevp);
 		}
-		case EV_DISABLE:
-		case EV_DELETE:
-			if (timer_delete(mevp->me_timid) != 0) {
-				(void) fprintf(stderr, "timer_delete failed: "
-				    "%s", strerror(errno));
-			}
-			return;
-		default:
-			goto abort;
-		}
-
-	case EVF_VNODE:
-		mevp->me_auto_requeue = B_FALSE;
-
-		switch (mevp->me_state) {
-		case EV_ENABLE:
-		{
-			int events = 0;
-
-			if ((mevp->me_fflags & EVFF_ATTRIB) != 0)
-				events |= FILE_ATTRIB;
-
-			assert(events != 0);
-
-			if (mevp->me_fname == NULL) {
-				mevp->me_fname = mevent_fdpath(mevp->me_fd);
-				if (mevp->me_fname == NULL)
-					return;
-			}
-
-			bzero(&mevp->me_fobj, sizeof (mevp->me_fobj));
-			mevp->me_fobj.fo_name = mevp->me_fname;
-
-			if (port_associate(portfd, PORT_SOURCE_FILE,
-			    (uintptr_t)&mevp->me_fobj, events, mevp) != 0) {
-				(void) fprintf(stderr,
-				    "port_associate fd %d (%s) %p failed: %s\n",
-				    mevp->me_fd, mevp->me_fname, mevp,
-				    strerror(errno));
-			}
-			return;
-		}
-		case EV_DISABLE:
-		case EV_DELETE:
-			/*
-			 * A disable that comes in while an event is being
-			 * handled will result in an ENOENT.
-			 */
-			if (port_dissociate(portfd, PORT_SOURCE_FILE,
-			    (uintptr_t)&mevp->me_fobj) != 0 &&
-			    errno != ENOENT) {
-				(void) fprintf(stderr, "port_dissociate "
-				    "portfd %d fd %d mevp %p failed: %s\n",
-				    portfd, mevp->me_fd, mevp, strerror(errno));
-			}
-			free(mevp->me_fname);
-			mevp->me_fname = NULL;
-			return;
-		default:
-			goto abort;
-		}
-
-	default:
-		/* EVF_SIGNAL not yet implemented. */
-		goto abort;
+		return;
 	}
+	case EV_DISABLE:
+	case EV_DELETE:
+		/*
+		 * A disable that comes in while an event is being
+		 * handled will result in an ENOENT.
+		 */
+		if (port_dissociate(portfd, PORT_SOURCE_FILE,
+		    (uintptr_t)&mevp->me_fobj) != 0 &&
+		    errno != ENOENT) {
+			(void) fprintf(stderr, "port_dissociate "
+			    "portfd %d fd %d mevp %p failed: %s\n",
+			    portfd, mevp->me_fd, mevp, strerror(errno));
+		}
+		free(mevp->me_fname);
+		mevp->me_fname = NULL;
+		return;
+	default:
+		(void) fprintf(stderr, "%s: unhandled state %d\n", __func__,
+		    mevp->me_state);
+		abort();
+	}
+}
 
-abort:
-	(void) fprintf(stderr, "%s: unhandled type %d state %d\n", __func__,
-	    mevp->me_type, mevp->me_state);
-	abort();
+static void (*mevent_update_backends[])(struct mevent *) = {
+	mevent_update_one_readwrite,
+	mevent_update_one_readwrite,
+	mevent_update_one_timer,
+	mevent_update_one_signal,
+	mevent_update_one_vnode,
+};
+
+static void
+mevent_update_one(struct mevent *mevp)
+{
+	mevent_update_backends[mevp->me_type](mevp);
 }
 
 static void
