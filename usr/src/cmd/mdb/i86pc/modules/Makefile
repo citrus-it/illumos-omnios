@@ -25,6 +25,7 @@ SUBDIRS = \
 	apix \
 	pcplusmp \
 	uppc \
-	unix
+	unix \
+	vmm
 
 include ../../Makefile.subdirs
