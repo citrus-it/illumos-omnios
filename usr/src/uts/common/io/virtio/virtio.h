@@ -281,6 +281,9 @@ int virtio_init_complete(virtio_t *, int);
 int virtio_quiesce(virtio_t *);
 void virtio_shutdown(virtio_t *);
 
+void virtio_register_cfgchange_handler(virtio_t *, ddi_intr_handler_t *,
+    void *);
+
 void *virtio_intr_pri(virtio_t *);
 
 void virtio_device_reset(virtio_t *);
