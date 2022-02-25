@@ -290,6 +290,12 @@ struct pci_nvme_aen {
 	bool		posted;
 };
 
+typedef enum {
+	NVME_CNTRLTYPE_IO = 1,
+	NVME_CNTRLTYPE_DISCOVERY = 2,
+	NVME_CNTRLTYPE_ADMIN = 3,
+} pci_nvme_cntrl_type;
+
 struct pci_nvme_softc {
 	struct pci_devinst *nsc_pi;
 
@@ -530,6 +536,7 @@ pci_nvme_init_ctrldata(struct pci_nvme_softc *sc)
 
 	cd->ver = NVME_REV(1,4);
 
+	cd->cntrltype = NVME_CNTRLTYPE_IO;
 	cd->oacs = 1 << NVME_CTRLR_DATA_OACS_FORMAT_SHIFT;
 #ifndef __FreeBSD__
 	/*
@@ -576,7 +583,8 @@ pci_nvme_init_ctrldata(struct pci_nvme_softc *sc)
 		break;
 	}
 
-	cd->fna = 0x03;
+	cd->fna = NVME_CTRLR_DATA_FNA_FORMAT_ALL_MASK <<
+	    NVME_CTRLR_DATA_FNA_FORMAT_ALL_SHIFT;
 
 	cd->power_state[0].mp = 10;
 }
