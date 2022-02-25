@@ -260,6 +260,7 @@ usage(int code)
 		"       -H: vmexit from the guest on hlt\n"
 		"       -h: help\n"
 		"       -k: key=value flat config file\n"
+		"       -K: PS2 keyboard layout\n"
 		"       -l: LPC device configuration\n"
 		"       -m: memory size\n"
 		"       -o: set config 'var' to 'value'\n"
@@ -1442,10 +1443,10 @@ main(int argc, char *argv[])
 	progname = basename(argv[0]);
 
 #ifdef	__FreeBSD__
-	optstr = "aehuwxACDHIPSWYk:o:p:G:c:s:m:l:U:";
+	optstr = "aehuwxACDHIPSWYk:o:p:G:c:s:m:l:K:U:";
 #else
 	/* +d, +B, -p */
-	optstr = "adehuwxACDHIPSWYk:o:G:c:s:m:l:B:U:";
+	optstr = "adehuwxACDHIPSWYk:o:G:c:s:m:l:B:K:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
@@ -1501,6 +1502,9 @@ main(int argc, char *argv[])
 			break;
 		case 'k':
 			parse_simple_config_file(optarg);
+			break;
+		case 'K':
+			set_config_value("keyboard.layout", optarg);
 			break;
 		case 'l':
 			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
