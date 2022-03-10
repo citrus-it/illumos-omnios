@@ -1201,23 +1201,28 @@ persist:
 static int
 num_vcpus_allowed(struct vmctx *ctx)
 {
+	uint16_t sockets, cores, threads, maxcpus;
 #ifdef __FreeBSD__
 	int tmp, error;
-
-	error = vm_get_capability(ctx, BSP, VM_CAP_UNRESTRICTED_GUEST, &tmp);
 
 	/*
 	 * The guest is allowed to spinup more than one processor only if the
 	 * UNRESTRICTED_GUEST capability is available.
 	 */
-	if (error == 0)
-		return (VM_MAXCPU);
-	else
+	error = vm_get_capability(ctx, BSP, VM_CAP_UNRESTRICTED_GUEST, &tmp);
+	if (error != 0)
 		return (1);
 #else
+	int error;
 	/* Unrestricted Guest is always enabled on illumos */
-	return (VM_MAXCPU);
+
 #endif /* __FreeBSD__ */
+
+	error = vm_get_topology(ctx, &sockets, &cores, &threads, &maxcpus);
+	if (error == 0)
+		return (maxcpus);
+	else
+		return (1);
 }
 
 void
