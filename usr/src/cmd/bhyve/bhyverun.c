@@ -202,8 +202,10 @@ static cpuset_t cpumask;
 
 static void vm_loop(struct vmctx *ctx, int vcpu, uint64_t rip);
 
-static struct vm_exit vmexit[VM_MAXCPU];
-static struct vm_entry vmentry[VM_MAXCPU];
+static struct vm_exit *vmexit;
+#ifndef __FreeBSD__
+static struct vm_entry *vmentry;
+#endif
 
 struct bhyvestats {
 	uint64_t	vmexit_bogus;
@@ -223,10 +225,10 @@ struct mt_vmm_info {
 	struct vmctx	*mt_ctx;
 	int		mt_vcpu;
 	uint64_t	mt_startrip;
-} mt_vmm_info[VM_MAXCPU];
+} *mt_vmm_info;
 
 #ifdef	__FreeBSD__
-static cpuset_t *vcpumap[VM_MAXCPU] = { NULL };
+static cpuset_t **vcpumap;
 #endif
 
 static void
@@ -530,6 +532,7 @@ build_vcpumaps(void)
 	const char *value;
 	int vcpu;
 
+	vcpumap = calloc(guest_ncpus, sizeof(*vcpumap));
 	for (vcpu = 0; vcpu < guest_ncpus; vcpu++) {
 		snprintf(key, sizeof(key), "vcpu.%d.cpuset", vcpu);
 		value = get_config_value(key);
@@ -1663,6 +1666,13 @@ main(int argc, char *argv[])
 	sci_init(ctx);
 #ifndef	__FreeBSD__
 	pmtmr_init(ctx);
+#endif
+
+	/* Allocate per-VCPU resources. */
+	vmexit = calloc(guest_ncpus, sizeof(*vmexit));
+	mt_vmm_info = calloc(guest_ncpus, sizeof(*mt_vmm_info));
+#ifndef	__FreeBSD__
+	vmentry = calloc(guest_ncpus, sizeof(*vmentry));
 #endif
 
 	/*
