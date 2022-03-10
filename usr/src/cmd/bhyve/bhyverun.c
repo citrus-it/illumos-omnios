@@ -1649,7 +1649,7 @@ main(int argc, char *argv[])
 		exit(4);
 	}
 
-	init_mem();
+	init_mem(guest_ncpus);
 	init_inout();
 #ifdef	__FreeBSD__
 	kernemu_dev_init();
