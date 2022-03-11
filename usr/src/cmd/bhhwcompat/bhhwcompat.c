@@ -245,9 +245,15 @@ main(int argc, char **argv)
 
 	while ((c = getopt(argc, argv, "cs")) != EOF) {
 		switch (c) {
-		case 'c':
-			(void) printf("%d\n", VM_MAXCPU);
+		case 'c': {
+			uint16_t sockets, cores, threads, maxcpus;
+
+			error = vm_get_topology(ctx, &sockets, &cores,
+			    &threads, &maxcpus);
+			(void) printf("%u\n", error == 0 ? maxcpus : 1);
+
 			return (EXIT_SUCCESS);
+		}
 		case 's':
 			g_status = B_TRUE;
 			break;
