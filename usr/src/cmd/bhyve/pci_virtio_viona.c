@@ -43,6 +43,7 @@
 #include <sys/param.h>
 #include <sys/linker_set.h>
 #include <sys/ioctl.h>
+#include <sys/uio.h>
 #include <sys/viona_io.h>
 
 #include <errno.h>
@@ -56,6 +57,7 @@
 #include <assert.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <poll.h>
 #include <libdladm.h>
 #include <libdllink.h>
@@ -66,10 +68,15 @@
 
 #include "bhyverun.h"
 #include "config.h"
+#include "debug.h"
 #include "pci_emul.h"
 #include "virtio.h"
+#include "iov.h"
+#include "virtio_net.h"
 
-#define	VIONA_RINGSZ	1024
+#define	VIONA_RINGSZ		1024
+#define	VIONA_CTLQ_SIZE		64
+#define	VIONA_CTLQ_MAXSEGS	32
 
 /*
  * PCI config-space register offsets
@@ -84,7 +91,7 @@
 #define	VIONA_R_CFG7	31
 #define	VIONA_R_MAX	31
 
-#define	VIONA_REGSZ	VIONA_R_MAX+1
+#define	VIONA_REGSZ	(VIONA_R_MAX + 1)
 
 /*
  * Queue definitions.
@@ -96,22 +103,39 @@
 #define	VIONA_MAXQ	3
 
 /*
+ * Supplementary host capabilities provided in the userspace component.
+ */
+#define	VIONA_S_HOSTCAPS_USERSPACE	(	\
+	VIRTIO_NET_F_CTRL_VQ |			\
+	VIRTIO_NET_F_CTRL_RX)
+
+/*
  * Debug printf
  */
 static volatile int pci_viona_debug;
-#define	DPRINTF(params) if (pci_viona_debug) printf params
-#define	WPRINTF(params) printf params
+#define	DPRINTF(fmt, arg...) \
+	do { \
+		if (pci_viona_debug) { \
+			FPRINTLN(stdout, fmt, ##arg); \
+			fflush(stdout); \
+		} \
+	} while (0)
+#define	WPRINTF(fmt, arg...) FPRINTLN(stderr, fmt, ##arg)
 
 /*
  * Per-device softc
  */
 struct pci_viona_softc {
-	struct pci_devinst *vsc_pi;
-	pthread_mutex_t vsc_mtx;
+	struct virtio_softc	vsc_vs;
+	struct virtio_consts	vsc_consts;
+	struct vqueue_info	vsc_queues[VIONA_MAXQ];
+	pthread_mutex_t		vsc_mtx;
 
-	int		vsc_curq;
-	int		vsc_status;
-	int		vsc_isr;
+#define	vsc_pi		vsc_vs.vs_pi
+#define	vsc_curq	vsc_vs.vs_curq
+#define	vsc_status	vsc_vs.vs_status
+#define	vsc_isr		vsc_vs.vs_isr
+#define	vsc_features	vsc_vs.vs_negotiated_caps
 
 	datalink_id_t	vsc_linkid;
 	int		vsc_vnafd;
@@ -121,12 +145,48 @@ struct pci_viona_softc {
 	uint32_t	vsc_feature_mask;
 	uint16_t	vsc_vq_size;
 
-	uint32_t	vsc_features;
 	uint8_t		vsc_macaddr[6];
 
-	uint64_t	vsc_pfn[VIONA_MAXQ];
-	uint16_t	vsc_msix_table_idx[VIONA_MAXQ];
-	boolean_t	vsc_msix_active;
+	bool		vsc_resetting;
+	bool		vsc_msix_active;
+
+	/* Control queue */
+	pthread_t		vsc_ctrlq_tid;
+	struct vqueue_info	vsc_ctrlq;
+	pthread_mutex_t		vsc_ctrlq_mtx;
+	pthread_cond_t		vsc_ctrlq_cond;
+	bool			vsc_ctrlq_running;
+
+	viona_promisc_t		vsc_promisc;	/* Current promisc mode */
+	struct {				/* Guest has enabled... */
+		uint32_t	promisc:1;	/* PROMISC */
+		uint32_t	allmulti:1;	/* ALLMULTI */
+		uint32_t	umac:1;		/* Additional MAC addresses */
+		uint32_t	mmac:1;		/* .. multicast MAC addresses */
+	} vsc_promiscflags;
+};
+
+static struct virtio_consts viona_vi_consts = {
+	.vc_name		= "viona",
+	.vc_nvq			= VIONA_MAXQ,
+	/*
+	 * We use the common bhyve virtio framework so that we can call
+	 * the utility functions to work with the queues handled in userspace.
+	 * The framework PCI read/write functions are not used so these
+	 * callbacks will not be invoked.
+	 */
+	.vc_cfgsize		= 0,
+	.vc_reset		= NULL,
+	.vc_qnotify		= NULL,
+	.vc_cfgread		= NULL,
+	.vc_cfgwrite		= NULL,
+	.vc_apply_features	= NULL,
+	/*
+	 * The following field is populated using the response from the
+	 * viona driver during initialisation, augmented with the additional
+	 * capabilities emulated in userspace.
+	 */
+	.vc_hv_caps		= 0,
 };
 
 /*
@@ -148,10 +208,8 @@ pci_viona_iosize(struct pci_devinst *pi)
 static uint16_t
 pci_viona_qsize(struct pci_viona_softc *sc, int qnum)
 {
-	/* XXX no ctl queue currently */
-	if (qnum == VIONA_CTLQ) {
-		return (0);
-	}
+	if (qnum == VIONA_CTLQ)
+		return (VIONA_CTLQ_SIZE);
 
 	return (sc->vsc_vq_size);
 }
@@ -177,13 +235,13 @@ pci_viona_ring_reset(struct pci_viona_softc *sc, int ring)
 		if (res == 0) {
 			break;
 		} else if (errno != EINTR) {
-			WPRINTF(("ioctl viona ring %d reset failed %d\n",
-			    ring, errno));
+			WPRINTF("ioctl viona ring %d reset failed %d",
+			    ring, errno);
 			return;
 		}
 	}
 
-	sc->vsc_pfn[ring] = 0;
+	sc->vsc_queues[ring].vq_pfn = 0;
 }
 
 static void
@@ -191,12 +249,278 @@ pci_viona_update_status(struct pci_viona_softc *sc, uint32_t value)
 {
 
 	if (value == 0) {
-		DPRINTF(("viona: device reset requested !\n"));
+		DPRINTF("viona: device reset requested !");
+
+		pthread_mutex_lock(&sc->vsc_ctrlq_mtx);
+		sc->vsc_resetting = true;
+		while (sc->vsc_ctrlq_running) {
+			pthread_mutex_unlock(&sc->vsc_ctrlq_mtx);
+			usleep(10000);
+			pthread_mutex_lock(&sc->vsc_ctrlq_mtx);
+		}
+
+		vi_reset_dev(&sc->vsc_vs);
 		pci_viona_ring_reset(sc, VIONA_RXQ);
 		pci_viona_ring_reset(sc, VIONA_TXQ);
+
+		sc->vsc_resetting = false;
+		pthread_mutex_unlock(&sc->vsc_ctrlq_mtx);
 	}
 
 	sc->vsc_status = value;
+}
+
+static const char *
+pci_viona_promisc_descr(viona_promisc_t mode)
+{
+	switch (mode) {
+	case VIONA_PROMISC_NONE:
+		return ("none");
+	case VIONA_PROMISC_MULTI:
+		return ("multicast");
+	case VIONA_PROMISC_ALL:
+		return ("all");
+	default:
+		break;
+	}
+	return ("???");
+}
+
+static int
+pci_viona_eval_promisc(struct pci_viona_softc *sc)
+{
+	viona_promisc_t mode = VIONA_PROMISC_NONE;
+	int err = 0;
+
+	if (sc->vsc_promiscflags.promisc || sc->vsc_promiscflags.umac)
+		mode = VIONA_PROMISC_ALL;
+	else if (sc->vsc_promiscflags.allmulti || sc->vsc_promiscflags.mmac)
+		mode = VIONA_PROMISC_MULTI;
+
+	if (mode != sc->vsc_promisc) {
+		DPRINTF("viona: setting promiscuous mode to %d (%s)",
+		    mode, pci_viona_promisc_descr(mode));
+		DPRINTF("       promisc=%u, umac=%u, allmulti=%u, mmac=%u",
+		    sc->vsc_promiscflags.promisc, sc->vsc_promiscflags.umac,
+		    sc->vsc_promiscflags.allmulti, sc->vsc_promiscflags.mmac);
+
+		err = ioctl(sc->vsc_vnafd, VNA_IOC_SET_PROMISC, mode);
+		if (err == 0)
+			sc->vsc_promisc = mode;
+		else
+			WPRINTF("ioctl viona set promisc failed %d", errno);
+	}
+
+	return (err);
+}
+
+static uint8_t
+pci_viona_control_rx(struct vqueue_info *vq, const virtio_net_ctrl_hdr_t *hdr,
+    struct iovec *iov, size_t niov)
+{
+	struct pci_viona_softc *sc = (struct pci_viona_softc *)vq->vq_vs;
+	uint8_t v;
+
+	if (iov[0].iov_len != sizeof (uint8_t) || niov != 1) {
+		EPRINTLN("viona: bad control RX data");
+		return (VIRTIO_NET_CQ_ERR);
+	}
+
+	v = *(uint8_t *)iov[0].iov_base;
+
+	switch (hdr->vnch_command) {
+	case VIRTIO_NET_CTRL_RX_PROMISC:
+		DPRINTF("viona: ctrl RX promisc %d", v);
+		sc->vsc_promiscflags.promisc = (v == 0) ? 0 : 1;
+		break;
+	case VIRTIO_NET_CTRL_RX_ALLMULTI:
+		DPRINTF("viona: ctrl RX allmulti %d", v);
+		sc->vsc_promiscflags.allmulti = (v == 0) ? 0 : 1;
+		break;
+	default:
+		/*
+		 * VIRTIO_NET_F_CTRL_RX_EXTRA was not offered so no other
+		 * commands are expected.
+		 */
+		EPRINTLN("viona: unrecognised RX control cmd %u",
+		    hdr->vnch_command);
+		return (VIRTIO_NET_CQ_ERR);
+	}
+
+	if (pci_viona_eval_promisc(sc) == 0)
+		return (VIRTIO_NET_CQ_OK);
+	return (VIRTIO_NET_CQ_ERR);
+}
+
+static void
+pci_viona_control_mac_dump(const char *tag, struct iovec *iov)
+{
+	virtio_net_ctrl_mac_t *table = (virtio_net_ctrl_mac_t *)iov->iov_base;
+	ether_addr_t *mac = &table->vncm_mac;
+
+	DPRINTF("-- %s MAC TABLE (entries: %u)", tag, table->vncm_entries);
+
+	if (table->vncm_entries * ETHERADDRL !=
+	    iov->iov_len - sizeof (table->vncm_entries)) {
+		DPRINTF("   Bad table size %u", iov->iov_len);
+		return;
+	}
+
+	for (uint32_t i = 0; i < table->vncm_entries; i++) {
+		DPRINTF("   [%2d] %s", i, ether_ntoa((struct ether_addr *)mac));
+		mac++;
+	}
+}
+
+static uint8_t
+pci_viona_control_mac(struct vqueue_info *vq, const virtio_net_ctrl_hdr_t *hdr,
+    struct iovec *iov, size_t niov)
+{
+	struct pci_viona_softc *sc = (struct pci_viona_softc *)vq->vq_vs;
+
+	switch (hdr->vnch_command) {
+	case VIRTIO_NET_CTRL_MAC_TABLE_SET: {
+		virtio_net_ctrl_mac_t *table;
+
+		DPRINTF("viona: ctrl MAC table set");
+
+		if (niov != 2) {
+			EPRINTLN("viona: bad control MAC data");
+			return (VIRTIO_NET_CQ_ERR);
+		}
+
+		/* Unicast MAC table */
+		table = (virtio_net_ctrl_mac_t *)iov[0].iov_base;
+		sc->vsc_promiscflags.umac = (table->vncm_entries == 0) ? 0 : 1;
+		if (pci_viona_debug)
+			pci_viona_control_mac_dump("UNICAST", &iov[0]);
+
+		/* Multicast MAC table */
+		table = (virtio_net_ctrl_mac_t *)iov[1].iov_base;
+		sc->vsc_promiscflags.mmac = (table->vncm_entries == 0) ? 0 : 1;
+		if (pci_viona_debug)
+			pci_viona_control_mac_dump("MULTICAST", &iov[1]);
+
+		break;
+	}
+	case VIRTIO_NET_CTRL_MAC_ADDR_SET:
+		/* disallow setting the primary filter MAC address */
+		DPRINTF("viona: ctrl MAC addr set %d", niov);
+		return (VIRTIO_NET_CQ_ERR);
+		break;
+	default:
+		EPRINTLN("viona: unrecognised MAC control cmd %u",
+		    hdr->vnch_command);
+		return (VIRTIO_NET_CQ_ERR);
+	}
+
+	if (pci_viona_eval_promisc(sc) == 0)
+		return (VIRTIO_NET_CQ_OK);
+	return (VIRTIO_NET_CQ_ERR);
+}
+
+static void
+pci_viona_control(struct vqueue_info *vq)
+{
+	struct iovec iov[VIONA_CTLQ_MAXSEGS + 1];
+	const virtio_net_ctrl_hdr_t *hdr;
+	struct iovec *siov = iov;
+	struct vi_req req = { 0 };
+	uint8_t *ackp;
+	size_t nsiov;
+	uint32_t len;
+	int n;
+
+	n = vq_getchain(vq, iov, VIONA_CTLQ_MAXSEGS, &req);
+
+	assert(n >= 1 && n <= VIONA_CTLQ_MAXSEGS);
+
+	/*
+	 * Since we have not negotiated VIRTIO_F_ANY_LAYOUT, we expect the
+	 * control message to be laid out in at least three descriptors as
+	 * follows:
+	 *	header		- sizeof (virtio_net_ctrl_hdr_t)
+	 *	data[]		- at least one descriptor, varying size
+	 *	ack		- uint8_t, flagged as writable
+	 * Check the incoming message to make sure it matches this layout and
+	 * drop the entire chain if not.
+	 */
+	if (n < 3 || req.writable != 1 || req.readable + 1 != n ||
+	    iov[req.readable].iov_len != sizeof (uint8_t)) {
+		EPRINTLN("viona: bad control chain, len=%d, w=%d, r=%d",
+		    n, req.writable, req.readable);
+		goto drop;
+	}
+
+	hdr = (const virtio_net_ctrl_hdr_t *)iov[0].iov_base;
+	if (iov[0].iov_len < sizeof (virtio_net_ctrl_hdr_t)) {
+		EPRINTLN("viona: control header too short: %u", iov[0].iov_len);
+		goto drop;
+	}
+
+	ackp = (uint8_t *)iov[req.readable].iov_base;
+	*ackp = VIRTIO_NET_CQ_OK;
+
+	siov = &iov[1];
+	nsiov = n - 2;
+
+	switch (hdr->vnch_class) {
+	case VIRTIO_NET_CTRL_RX:
+		*ackp = pci_viona_control_rx(vq, hdr, siov, nsiov);
+		break;
+	case VIRTIO_NET_CTRL_MAC:
+		*ackp = pci_viona_control_mac(vq, hdr, siov, nsiov);
+		break;
+	default:
+		EPRINTLN("viona: unrecognised control class %u, cmd %u",
+		    hdr->vnch_class, hdr->vnch_command);
+		*ackp = VIRTIO_NET_CQ_ERR;
+		break;
+	}
+
+drop:
+	len = 0;
+	for (uint_t i = 0; i < n; i++)
+		len += iov[i].iov_len;
+
+	vq_relchain(vq, req.idx, len);
+}
+
+static void *
+pci_viona_ctrlq_thread(void *param)
+{
+	struct pci_viona_softc *sc = param;
+	struct vqueue_info *vq = &sc->vsc_queues[VIONA_CTLQ];
+	int error;
+
+	pthread_mutex_lock(&sc->vsc_ctrlq_mtx);
+	error = pthread_cond_wait(&sc->vsc_ctrlq_cond, &sc->vsc_ctrlq_mtx);
+	assert(error == 0);
+
+	for (;;) {
+		while (sc->vsc_resetting || !vq_has_descs(vq)) {
+			vq_kick_enable(vq);
+			if (!sc->vsc_resetting && vq_has_descs(vq))
+				break;
+			sc->vsc_ctrlq_running = false;
+			error = pthread_cond_wait(&sc->vsc_ctrlq_cond,
+			    &sc->vsc_ctrlq_mtx);
+			assert(error == 0);
+		}
+		vq_kick_disable(vq);
+		sc->vsc_ctrlq_running = true;
+		pthread_mutex_unlock(&sc->vsc_ctrlq_mtx);
+
+		do {
+			pci_viona_control(vq);
+		} while (vq_has_descs(vq));
+
+		vq_endchains(vq, /* used_all_avail= */1);
+
+		pthread_mutex_lock(&sc->vsc_ctrlq_mtx);
+	}
+
+	return (NULL);
 }
 
 static void *
@@ -214,8 +538,8 @@ pci_viona_poll_thread(void *param)
 			if (errno == EINTR || errno == EAGAIN) {
 				continue;
 			} else {
-				WPRINTF(("pci_viona_poll_thread poll()"
-				    "error %d\n", errno));
+				WPRINTF("pci_viona_poll_thread poll() error %d",
+				    errno);
 				break;
 			}
 		}
@@ -223,8 +547,8 @@ pci_viona_poll_thread(void *param)
 			vioc_intr_poll_t vip;
 			uint_t i;
 			int res;
-			boolean_t assert_lintr = B_FALSE;
-			const boolean_t do_msix = pci_msix_enabled(sc->vsc_pi);
+			bool assert_lintr = false;
+			const bool do_msix = pci_msix_enabled(sc->vsc_pi);
 
 			res = ioctl(fd, VNA_IOC_INTR_POLL, &vip);
 			for (i = 0; res > 0 && i < VIONA_VQ_MAX; i++) {
@@ -233,14 +557,14 @@ pci_viona_poll_thread(void *param)
 				}
 				if (do_msix) {
 					pci_generate_msix(sc->vsc_pi,
-					    sc->vsc_msix_table_idx[i]);
+					    sc->vsc_queues[i].vq_msix_idx);
 				} else {
-					assert_lintr = B_TRUE;
+					assert_lintr = true;
 				}
 				res = ioctl(fd, VNA_IOC_RING_INTR_CLR, i);
 				if (res != 0) {
-					WPRINTF(("ioctl viona vq %d intr "
-					    "clear failed %d\n", i, errno));
+					WPRINTF("ioctl viona vq %d intr "
+					    "clear failed %d", i, errno);
 				}
 			}
 			if (assert_lintr) {
@@ -265,18 +589,18 @@ pci_viona_ring_init(struct pci_viona_softc *sc, uint64_t pfn)
 	assert(qnum < VIONA_MAXQ);
 
 	if (qnum == VIONA_CTLQ) {
+		vi_vq_init(&sc->vsc_vs, pfn);
 		return;
 	}
 
-	sc->vsc_pfn[qnum] = (pfn << VRING_PFN);
-
+	sc->vsc_queues[qnum].vq_pfn = (pfn << VRING_PFN);
 	vna_ri.ri_index = qnum;
 	vna_ri.ri_qsize = pci_viona_qsize(sc, qnum);
 	vna_ri.ri_qaddr = (pfn << VRING_PFN);
 	error = ioctl(sc->vsc_vnafd, VNA_IOC_RING_INIT, &vna_ri);
 
 	if (error != 0) {
-		WPRINTF(("ioctl viona ring %u init failed %d\n", qnum, errno));
+		WPRINTF("ioctl viona ring %u init failed %d", qnum, errno);
 	}
 }
 
@@ -288,7 +612,7 @@ pci_viona_viona_init(struct vmctx *ctx, struct pci_viona_softc *sc)
 
 	sc->vsc_vnafd = open("/dev/viona", O_RDWR | O_EXCL);
 	if (sc->vsc_vnafd == -1) {
-		WPRINTF(("open viona ctl failed: %d\n", errno));
+		WPRINTF("open viona ctl failed: %d", errno);
 		return (-1);
 	}
 
@@ -297,7 +621,7 @@ pci_viona_viona_init(struct vmctx *ctx, struct pci_viona_softc *sc)
 	error = ioctl(sc->vsc_vnafd, VNA_IOC_CREATE, &vna_create);
 	if (error != 0) {
 		(void) close(sc->vsc_vnafd);
-		WPRINTF(("ioctl viona create failed %d\n", errno));
+		WPRINTF("ioctl viona create failed %d", errno);
 		return (-1);
 	}
 
@@ -381,8 +705,8 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 		(void) strlcpy(sc->vsc_linkname, value, MAXLINKNAMELEN);
 	}
 
-	DPRINTF(("viona=%p dev=%s vqsize=%x feature_mask=%x\n", sc,
-	    sc->vsc_linkname, sc->vsc_vq_size, sc->vsc_feature_mask));
+	DPRINTF("viona=%p dev=%s vqsize=%x feature_mask=%x", sc,
+	    sc->vsc_linkname, sc->vsc_vq_size, sc->vsc_feature_mask);
 	return (err);
 }
 
@@ -399,19 +723,17 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	const char *vnic;
 	pthread_t tid;
 
+	if (get_config_bool_default("viona.debug", false))
+		pci_viona_debug = 1;
+
 	vnic = get_config_value_node(nvl, "vnic");
 	if (vnic == NULL) {
-		printf("virtio-viona: vnic required\n");
+		WPRINTF("virtio-viona: vnic required");
 		return (1);
 	}
 
 	sc = malloc(sizeof (struct pci_viona_softc));
 	memset(sc, 0, sizeof (struct pci_viona_softc));
-
-	pi->pi_arg = sc;
-	sc->vsc_pi = pi;
-
-	pthread_mutex_init(&sc->vsc_mtx, NULL);
 
 	if (pci_viona_parse_opts(sc, nvl) != 0) {
 		free(sc);
@@ -419,15 +741,15 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	}
 
 	if ((status = dladm_open(&handle)) != DLADM_STATUS_OK) {
-		WPRINTF(("could not open /dev/dld"));
+		WPRINTF("could not open /dev/dld");
 		free(sc);
 		return (1);
 	}
 
 	if ((status = dladm_name2info(handle, sc->vsc_linkname, &sc->vsc_linkid,
 	    NULL, NULL, NULL)) != DLADM_STATUS_OK) {
-		WPRINTF(("dladm_name2info() for %s failed: %s\n", vnic,
-		    dladm_status2str(status, errmsg)));
+		WPRINTF("dladm_name2info() for %s failed: %s", vnic,
+		    dladm_status2str(status, errmsg));
 		dladm_close(handle);
 		free(sc);
 		return (1);
@@ -435,8 +757,8 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 
 	if ((status = dladm_vnic_info(handle, sc->vsc_linkid, &attr,
 	    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
-		WPRINTF(("dladm_vnic_info() for %s failed: %s\n", vnic,
-		    dladm_status2str(status, errmsg)));
+		WPRINTF("dladm_vnic_info() for %s failed: %s", vnic,
+		    dladm_status2str(status, errmsg));
 		dladm_close(handle);
 		free(sc);
 		return (1);
@@ -464,9 +786,31 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, VIRTIO_ID_NETWORK);
 	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, VIRTIO_VENDOR);
 
+	sc->vsc_consts = viona_vi_consts;
+	pthread_mutex_init(&sc->vsc_mtx, NULL);
+
+	/*
+	 * The RX and TX queues are handled in the kernel component of
+	 * viona; however The control queue is emulated in userspace.
+	 */
+	sc->vsc_queues[VIONA_CTLQ].vq_qsize = pci_viona_qsize(sc, VIONA_CTLQ);
+
+	vi_softc_linkup(&sc->vsc_vs, &sc->vsc_consts, sc, pi, sc->vsc_queues);
+	sc->vsc_vs.vs_mtx = &sc->vsc_mtx;
+
+	/*
+	 * Guests that do not support CTRL_RX_MAC still generally need to
+	 * receive multicast packets. Guests that do support this feature will
+	 * end up setting this flag indirectly via messages on the control
+	 * queue but it does not hurt to default to multicast promiscuity here
+	 * and it is what older version of viona did.
+	 */
+	sc->vsc_promiscflags.mmac = 1;
+	pci_viona_eval_promisc(sc);
+
 	/* MSI-X support */
 	for (i = 0; i < VIONA_MAXQ; i++)
-		sc->vsc_msix_table_idx[i] = VIRTIO_MSI_NO_VECTOR;
+		sc->vsc_queues[i].vq_msix_idx = VIRTIO_MSI_NO_VECTOR;
 
 	/* BAR 1 used to map MSI-X table and PBA */
 	if (pci_emul_add_msixcap(pi, VIONA_MAXQ, 1)) {
@@ -477,7 +821,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	/* BAR 0 for legacy-style virtio register access. */
 	error = pci_emul_alloc_bar(pi, 0, PCIBAR_IO, VIONA_REGSZ);
 	if (error != 0) {
-		WPRINTF(("could not allocate virtio BAR\n"));
+		WPRINTF("could not allocate virtio BAR");
 		free(sc);
 		return (1);
 	}
@@ -487,6 +831,17 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	 * operation is _strongly_ suggested for adequate performance.
 	 */
 	pci_lintr_request(pi);
+
+	sc->vsc_ctrlq_running = false;
+	pthread_mutex_init(&sc->vsc_ctrlq_mtx, NULL);
+	pthread_cond_init(&sc->vsc_ctrlq_cond, NULL);
+
+	error = pthread_create(&sc->vsc_ctrlq_tid, NULL,
+	    pci_viona_ctrlq_thread, sc);
+	assert(error == 0);
+	snprintf(tname, sizeof (tname), "vionactrlq:%s", vnic);
+	pthread_set_name_np(tid, tname);
+
 
 	return (0);
 }
@@ -522,7 +877,7 @@ pci_viona_ring_set_msix(struct pci_devinst *pi, uint_t ring)
 	vrm.rm_index = ring;
 	vrm.rm_addr = 0;
 	vrm.rm_msg = 0;
-	tab_index = sc->vsc_msix_table_idx[ring];
+	tab_index = sc->vsc_queues[ring].vq_msix_idx;
 
 	if (tab_index != VIRTIO_MSI_NO_VECTOR && sc->vsc_msix_active) {
 		mte = pi->pi_msix.table[tab_index];
@@ -534,7 +889,7 @@ pci_viona_ring_set_msix(struct pci_devinst *pi, uint_t ring)
 
 	res = ioctl(sc->vsc_vnafd, VNA_IOC_RING_SET_MSI, &vrm);
 	if (res != 0) {
-		WPRINTF(("ioctl viona set_msi %d failed %d\n", ring, errno));
+		WPRINTF("ioctl viona set_msi %d failed %d", ring, errno);
 	}
 }
 
@@ -542,7 +897,7 @@ static void
 pci_viona_lintrupdate(struct pci_devinst *pi)
 {
 	struct pci_viona_softc *sc = pi->pi_arg;
-	boolean_t msix_on = B_FALSE;
+	bool msix_on = false;
 
 	pthread_mutex_lock(&sc->vsc_mtx);
 	msix_on = pci_msix_enabled(pi) && (pi->pi_msix.function_mask == 0);
@@ -580,7 +935,7 @@ pci_viona_msix_update(struct pci_devinst *pi, uint64_t offset)
 	tab_index = offset / MSIX_TABLE_ENTRY_SIZE;
 
 	for (i = 0; i <= VIONA_VQ_TX; i++) {
-		if (sc->vsc_msix_table_idx[i] != tab_index) {
+		if (sc->vsc_queues[i].vq_msix_idx != tab_index) {
 			continue;
 		}
 		pci_viona_ring_set_msix(pi, i);
@@ -599,13 +954,22 @@ pci_viona_qnotify(struct pci_viona_softc *sc, int ring)
 	case VIONA_RXQ:
 		error = ioctl(sc->vsc_vnafd, VNA_IOC_RING_KICK, ring);
 		if (error != 0) {
-			WPRINTF(("ioctl viona ring %d kick failed %d\n",
-			    ring, errno));
+			WPRINTF("ioctl viona ring %d kick failed %d",
+			    ring, errno);
 		}
 		break;
-	case VIONA_CTLQ:
-		DPRINTF(("viona: control qnotify!\n"));
+	case VIONA_CTLQ: {
+		struct vqueue_info *vq = &sc->vsc_queues[ring];
+
+		if (vq_has_descs(vq)) {
+			pthread_mutex_lock(&sc->vsc_ctrlq_mtx);
+			vq_kick_disable(vq);
+			if (!sc->vsc_ctrlq_running)
+				pthread_cond_signal(&sc->vsc_ctrlq_cond);
+			pthread_mutex_unlock(&sc->vsc_ctrlq_mtx);
+		}
 		break;
+	}
 	default:
 		break;
 	}
@@ -625,7 +989,7 @@ pci_viona_baraddr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
 	if (enabled == 0) {
 		error = ioctl(sc->vsc_vnafd, VNA_IOC_SET_NOTIFY_IOP, 0);
 		if (error != 0)
-			WPRINTF(("uninstall ioport hook failed %d\n", errno));
+			WPRINTF("uninstall ioport hook failed %d", errno);
 		return;
 	}
 
@@ -637,8 +1001,8 @@ pci_viona_baraddr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
 	ioport = address + VIRTIO_PCI_QUEUE_NOTIFY;
 	error = ioctl(sc->vsc_vnafd, VNA_IOC_SET_NOTIFY_IOP, ioport);
 	if (error != 0) {
-		WPRINTF(("install ioport hook at %x failed %d\n",
-		    ioport, errno));
+		WPRINTF("install ioport hook at %x failed %d",
+		    ioport, errno);
 	}
 }
 
@@ -661,8 +1025,8 @@ pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 	assert(baridx == 0);
 
 	if (offset + size > pci_viona_iosize(pi)) {
-		DPRINTF(("viona_write: 2big, offset %ld size %d\n",
-		    offset, size));
+		DPRINTF("viona_write: 2big, offset %ld size %d",
+		    offset, size);
 		return;
 	}
 
@@ -676,8 +1040,8 @@ pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		value &= ~(sc->vsc_feature_mask);
 		err = ioctl(sc->vsc_vnafd, VNA_IOC_SET_FEATURES, &value);
 		if (err != 0) {
-			WPRINTF(("ioctl feature negotiation returned"
-			    " err = %d\n", errno));
+			WPRINTF("ioctl feature negotiation returned err = %d",
+			    errno);
 		} else {
 			sc->vsc_features = value;
 		}
@@ -702,12 +1066,12 @@ pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		break;
 	case VIRTIO_MSI_CONFIG_VECTOR:
 		assert(size == 2);
-		sc->vsc_msix_table_idx[VIONA_CTLQ] = value;
+		sc->vsc_queues[VIONA_CTLQ].vq_msix_idx = value;
 		break;
 	case VIRTIO_MSI_QUEUE_VECTOR:
 		assert(size == 2);
 		assert(sc->vsc_curq != VIONA_CTLQ);
-		sc->vsc_msix_table_idx[sc->vsc_curq] = value;
+		sc->vsc_queues[sc->vsc_curq].vq_msix_idx = value;
 		pci_viona_ring_set_msix(pi, sc->vsc_curq);
 		break;
 	case VIONA_R_CFG0:
@@ -735,10 +1099,10 @@ pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 	case VIRTIO_PCI_ISR:
 	case VIONA_R_CFG6:
 	case VIONA_R_CFG7:
-		DPRINTF(("viona: write to readonly reg %ld\n\r", offset));
+		DPRINTF("viona: write to readonly reg %ld", offset);
 		break;
 	default:
-		DPRINTF(("viona: unknown i/o write offset %ld\n\r", offset));
+		DPRINTF("viona: unknown i/o write offset %ld", offset);
 		value = 0;
 		break;
 	}
@@ -763,8 +1127,8 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 	assert(baridx == 0);
 
 	if (offset + size > pci_viona_iosize(pi)) {
-		DPRINTF(("viona_read: 2big, offset %ld size %d\n",
-		    offset, size));
+		DPRINTF("viona_read: 2big, offset %ld size %d",
+		    offset, size);
 		return (0);
 	}
 
@@ -777,10 +1141,12 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		assert(size == 4);
 		err = ioctl(sc->vsc_vnafd, VNA_IOC_GET_FEATURES, &value);
 		if (err != 0) {
-			WPRINTF(("ioctl get host features returned"
-			    " err = %d\n", errno));
+			WPRINTF("ioctl get host features returned err = %d",
+			    errno);
 		}
+		value |= VIONA_S_HOSTCAPS_USERSPACE;
 		value &= ~sc->vsc_feature_mask;
+		sc->vsc_consts.vc_hv_caps = value;
 		break;
 	case VIRTIO_PCI_GUEST_FEATURES:
 		assert(size == 4);
@@ -788,7 +1154,7 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		break;
 	case VIRTIO_PCI_QUEUE_PFN:
 		assert(size == 4);
-		value = sc->vsc_pfn[sc->vsc_curq] >> VRING_PFN;
+		value = sc->vsc_queues[sc->vsc_curq].vq_pfn >> VRING_PFN;
 		break;
 	case VIRTIO_PCI_QUEUE_NUM:
 		assert(size == 2);
@@ -816,12 +1182,12 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		break;
 	case VIRTIO_MSI_CONFIG_VECTOR:
 		assert(size == 2);
-		value = sc->vsc_msix_table_idx[VIONA_CTLQ];
+		value = sc->vsc_queues[VIONA_CTLQ].vq_msix_idx;
 		break;
 	case VIRTIO_MSI_QUEUE_VECTOR:
 		assert(size == 2);
 		assert(sc->vsc_curq != VIONA_CTLQ);
-		value = sc->vsc_msix_table_idx[sc->vsc_curq];
+		value = sc->vsc_queues[sc->vsc_curq].vq_msix_idx;
 		break;
 	case VIONA_R_CFG0:
 	case VIONA_R_CFG1:
@@ -848,7 +1214,7 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		value = 0;	/* XXX link status in LSB */
 		break;
 	default:
-		DPRINTF(("viona: unknown i/o read offset %ld\n\r", offset));
+		DPRINTF("viona: unknown i/o read offset %ld", offset);
 		value = 0;
 		break;
 	}

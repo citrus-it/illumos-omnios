@@ -765,17 +765,7 @@ vioif_m_setpromisc(void *arg, boolean_t on)
 	uint8_t val = on ? 1 : 0;
 
 	if (!vif->vif_has_ctrlq_rx) {
-		/*
-		 * While most hypervisors support the control queue, bhyve
-		 * (or more specifically viona) on illumos currently does not.
-		 *
-		 * Until that support is added to viona, we pretend
-		 * the request always succeeds to match the historic behavior
-		 * of the illumos vioif driver. Once that support has been
-		 * added to viona, we should do the correct thing and return
-		 * ENOTSUP
-		 */
-		return (0);
+		return (ENOTSUP);
 	}
 
 	return (vioif_ctrlq_req(vif, VIRTIO_NET_CTRL_RX,
