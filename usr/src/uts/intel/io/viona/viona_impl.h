@@ -36,6 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_VIONA_IMPL_H
@@ -132,9 +133,11 @@ typedef struct viona_vring {
 		uint64_t	rs_rx_merge_overrun;
 		uint64_t	rs_rx_merge_underrun;
 		uint64_t	rs_rx_pad_short;
-		uint64_t	rs_rx_mcast_check;
+		uint64_t	rs_rx_promisc_check;
 		uint64_t	rs_too_short;
 		uint64_t	rs_tx_absent;
+		uint64_t	rs_ctrl_absent;
+		uint64_t	rs_ctrl_short;
 
 		uint64_t	rs_rx_hookdrop;
 		uint64_t	rs_tx_hookdrop;
@@ -158,6 +161,7 @@ struct viona_link {
 	mac_handle_t		l_mh;
 	mac_client_handle_t	l_mch;
 	mac_promisc_handle_t	l_mph;
+	mac_client_promisc_type_t	l_mcpt;
 
 	pollhead_t		l_pollhead;
 
@@ -230,6 +234,11 @@ struct virtio_net_hdr {
 	uint16_t	vrh_csum_start;
 	uint16_t	vrh_csum_offset;
 };
+
+struct virtio_net_ctrl_hdr {
+	uint8_t		vnc_class;
+	uint8_t		vnc_cmd;
+};
 #pragma pack()
 
 #define	VRING_NEED_BAIL(ring, proc)					\
@@ -250,6 +259,9 @@ struct virtio_net_hdr {
 	DTRACE_PROBE2(viona__##name, arg1, arg2, arg3, arg4)
 #define	VIONA_PROBE3(name, arg1, arg2, arg3, arg4, arg5, arg6)	\
 	DTRACE_PROBE3(viona__##name, arg1, arg2, arg3, arg4, arg5, arg6)
+#define	VIONA_PROBE4(name, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) \
+	DTRACE_PROBE4(viona__##name, arg1, arg2, arg3, arg4, arg5, arg6, arg7, \
+	arg8)
 #define	VIONA_PROBE5(name, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, \
 	arg9, arg10) \
 	DTRACE_PROBE5(viona__##name, arg1, arg2, arg3, arg4, arg5, arg6, arg7, \
@@ -284,10 +296,29 @@ struct virtio_net_hdr {
 #define	VIRTIO_NET_F_HOST_TSO4		(1 << 11) /* host can accept TSO */
 #define	VIRTIO_NET_F_MRG_RXBUF		(1 << 15) /* host can merge RX bufs */
 #define	VIRTIO_NET_F_STATUS		(1 << 16) /* cfg status field present */
+#define	VIRTIO_NET_F_CTRL_VQ		(1 << 17) /* control queue present */
+#define	VIRTIO_NET_F_CTRL_RX		(1 << 18) /* RX controls available */
 #define	VIRTIO_F_RING_NOTIFY_ON_EMPTY	(1 << 24)
 #define	VIRTIO_F_RING_INDIRECT_DESC	(1 << 28)
 #define	VIRTIO_F_RING_EVENT_IDX		(1 << 29)
 
+/*
+ * Control Queue Classes
+ */
+#define	VIRTIO_NET_CTRL_RX		0
+#define	VIRTIO_NET_CTRL_MAC		1
+
+/*
+ * CTRL_RX commands
+ */
+#define	VIRTIO_NET_CTRL_RX_PROMISC	0
+#define	VIRTIO_NET_CTRL_RX_ALLMULTI	1
+
+/*
+ * Control queue ack values
+ */
+#define	VIRTIO_NET_CQ_OK		0
+#define	VIRTIO_NET_CQ_ERR		1
 
 void viona_ring_alloc(viona_link_t *, viona_vring_t *);
 void viona_ring_free(viona_vring_t *);
@@ -309,7 +340,8 @@ uint16_t viona_ring_num_avail(viona_vring_t *);
 
 void viona_rx_init(void);
 void viona_rx_fini(void);
-int viona_rx_set(viona_link_t *);
+int viona_rx_set(viona_link_t *, mac_client_promisc_type_t);
+int viona_rx_set_promisc(viona_link_t *, mac_client_promisc_type_t);
 void viona_rx_clear(viona_link_t *);
 void viona_worker_rx(viona_vring_t *, viona_link_t *);
 
@@ -317,6 +349,8 @@ extern kmutex_t viona_force_copy_lock;
 void viona_worker_tx(viona_vring_t *, viona_link_t *);
 void viona_tx_ring_alloc(viona_vring_t *, const uint16_t);
 void viona_tx_ring_free(viona_vring_t *, const uint16_t);
+
+void viona_worker_ctrl(viona_vring_t *, viona_link_t *);
 
 void viona_neti_attach(void);
 void viona_neti_detach(void);

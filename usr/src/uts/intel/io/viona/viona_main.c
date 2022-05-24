@@ -36,6 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -69,7 +70,7 @@
  *
  * Each viona link has two viona_vring_t entities, RX and TX, for handling data
  * transfers to and from the guest.  They represent an interface to the
- * standard virtio ring structures.  When intiailized and active, each ring is
+ * standard virtio ring structures.  When initialized and active, each ring is
  * backed by a kernel worker thread (parented to the bhyve process for the
  * instance) which handles ring events.  The RX worker has the simple task of
  * watching for ring shutdown conditions.  The TX worker does that in addition
@@ -256,6 +257,8 @@
 	VIRTIO_NET_F_GUEST_TSO4 |	\
 	VIRTIO_NET_F_MRG_RXBUF |	\
 	VIRTIO_NET_F_STATUS |		\
+	VIRTIO_NET_F_CTRL_VQ |		\
+	VIRTIO_NET_F_CTRL_RX |		\
 	VIRTIO_F_RING_NOTIFY_ON_EMPTY |	\
 	VIRTIO_F_RING_INDIRECT_DESC)
 
@@ -731,10 +734,13 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 
 	viona_ring_alloc(link, &link->l_vrings[VIONA_VQ_RX]);
 	viona_ring_alloc(link, &link->l_vrings[VIONA_VQ_TX]);
+	viona_ring_alloc(link, &link->l_vrings[VIONA_VQ_CTRL]);
 
-	if ((err = viona_rx_set(link)) != 0) {
+	/* XXX - control initial promisc via new field in vioc_create_t ? */
+	if ((err = viona_rx_set(link, MAC_CLIENT_PROMISC_MULTI)) != 0) {
 		viona_ring_free(&link->l_vrings[VIONA_VQ_RX]);
 		viona_ring_free(&link->l_vrings[VIONA_VQ_TX]);
+		viona_ring_free(&link->l_vrings[VIONA_VQ_CTRL]);
 		goto bail;
 	}
 
@@ -830,6 +836,7 @@ viona_ioc_delete(viona_soft_state_t *ss, boolean_t on_close)
 
 	viona_ring_free(&link->l_vrings[VIONA_VQ_RX]);
 	viona_ring_free(&link->l_vrings[VIONA_VQ_TX]);
+	viona_ring_free(&link->l_vrings[VIONA_VQ_CTRL]);
 	pollhead_clean(&link->l_pollhead);
 	ss->ss_link = NULL;
 	mutex_exit(&ss->ss_lock);

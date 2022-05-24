@@ -84,7 +84,7 @@
 #define	VIONA_R_CFG7	31
 #define	VIONA_R_MAX	31
 
-#define	VIONA_REGSZ	VIONA_R_MAX+1
+#define	VIONA_REGSZ	(VIONA_R_MAX + 1)
 
 /*
  * Queue definitions.
@@ -94,6 +94,8 @@
 #define	VIONA_CTLQ	2
 
 #define	VIONA_MAXQ	3
+
+#define	VIONA_CTLQ_SIZE	64	/* XXX - QEMU appears to use 64 */
 
 /*
  * Debug printf
@@ -148,10 +150,8 @@ pci_viona_iosize(struct pci_devinst *pi)
 static uint16_t
 pci_viona_qsize(struct pci_viona_softc *sc, int qnum)
 {
-	/* XXX no ctl queue currently */
-	if (qnum == VIONA_CTLQ) {
-		return (0);
-	}
+	if (qnum == VIONA_CTLQ)
+		return (VIONA_CTLQ_SIZE);
 
 	return (sc->vsc_vq_size);
 }
@@ -160,15 +160,6 @@ static void
 pci_viona_ring_reset(struct pci_viona_softc *sc, int ring)
 {
 	assert(ring < VIONA_MAXQ);
-
-	switch (ring) {
-	case VIONA_RXQ:
-	case VIONA_TXQ:
-		break;
-	case VIONA_CTLQ:
-	default:
-		return;
-	}
 
 	for (;;) {
 		int res;
@@ -194,6 +185,7 @@ pci_viona_update_status(struct pci_viona_softc *sc, uint32_t value)
 		DPRINTF(("viona: device reset requested !\n"));
 		pci_viona_ring_reset(sc, VIONA_RXQ);
 		pci_viona_ring_reset(sc, VIONA_TXQ);
+		pci_viona_ring_reset(sc, VIONA_CTLQ);
 	}
 
 	sc->vsc_status = value;
@@ -263,10 +255,6 @@ pci_viona_ring_init(struct pci_viona_softc *sc, uint64_t pfn)
 	int			error;
 
 	assert(qnum < VIONA_MAXQ);
-
-	if (qnum == VIONA_CTLQ) {
-		return;
-	}
 
 	sc->vsc_pfn[qnum] = (pfn << VRING_PFN);
 
@@ -398,6 +386,9 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	struct pci_viona_softc *sc;
 	const char *vnic;
 	pthread_t tid;
+
+	if (get_config_bool_default("viona.debug", false))
+		pci_viona_debug = 1;
 
 	vnic = get_config_value_node(nvl, "vnic");
 	if (vnic == NULL) {
@@ -594,20 +585,10 @@ pci_viona_qnotify(struct pci_viona_softc *sc, int ring)
 {
 	int error;
 
-	switch (ring) {
-	case VIONA_TXQ:
-	case VIONA_RXQ:
-		error = ioctl(sc->vsc_vnafd, VNA_IOC_RING_KICK, ring);
-		if (error != 0) {
-			WPRINTF(("ioctl viona ring %d kick failed %d\n",
-			    ring, errno));
-		}
-		break;
-	case VIONA_CTLQ:
-		DPRINTF(("viona: control qnotify!\n"));
-		break;
-	default:
-		break;
+	error = ioctl(sc->vsc_vnafd, VNA_IOC_RING_KICK, ring);
+	if (error != 0) {
+		WPRINTF(("ioctl viona ring %d kick failed %d\n",
+		    ring, errno));
 	}
 }
 

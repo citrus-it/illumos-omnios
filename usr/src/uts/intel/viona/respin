@@ -1,0 +1,13 @@
+#!/bin/ksh
+
+top="`git rev-parse --show-toplevel`"
+
+cd $top/usr/src/uts/intel/viona
+
+set -e
+dmake NO_GENUNIX_UNIQUIFY=
+scp obj64/viona themis:/tmp/
+scp $top/usr/src/cmd/bhyve/bhyve themis:/tmp/
+ssh themis pfexec update_drv -v viona
+ssh themis pfexec cp /tmp/bhyve /usr/sbin/bhyve
+

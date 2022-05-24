@@ -36,6 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 
@@ -538,6 +539,8 @@ viona_worker(void *arg)
 		viona_worker_rx(ring, link);
 	} else if (ring == &link->l_vrings[VIONA_VQ_TX]) {
 		viona_worker_tx(ring, link);
+	} else if (ring == &link->l_vrings[VIONA_VQ_CTRL]) {
+		viona_worker_ctrl(ring, link);
 	} else {
 		panic("unexpected ring: %p", (void *)ring);
 	}
@@ -654,7 +657,7 @@ vq_map_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,
 
 /*
  * Walk an indirect buffer descriptor `desc`, attempting to map the pages
- * backing the regions of guest memory covered by its contituent descriptors.
+ * backing the regions of guest memory covered by its constituent descriptors.
  */
 static int
 vq_map_indir_desc_bufs(viona_vring_t *ring, const struct virtio_desc *desc,

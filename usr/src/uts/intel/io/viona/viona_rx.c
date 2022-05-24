@@ -36,6 +36,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2021 Oxide Computer Company
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -412,7 +413,7 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 
 	/*
 	 * If no other errors were encounted during the copy, was the expected
-	 * amount of data transfered?
+	 * amount of data transferred?
 	 */
 	if (err == 0 && copied != msz) {
 		VIONA_PROBE5(too_short, viona_vring_t *, ring,
@@ -642,13 +643,13 @@ viona_rx_classified(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 }
 
 static void
-viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+viona_rx_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
     boolean_t is_loopback)
 {
 	viona_vring_t *ring = (viona_vring_t *)arg;
 	mac_handle_t mh = ring->vr_link->l_mh;
-	mblk_t *mp_mcast_only = NULL;
-	mblk_t **mpp = &mp_mcast_only;
+	mblk_t *mp_not_broadcast = NULL;
+	mblk_t **mpp = &mp_not_broadcast;
 
 	/* Drop traffic if ring is inactive or renewing its lease */
 	if (ring->vr_state != VRS_RUN ||
@@ -658,8 +659,8 @@ viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	}
 
 	/*
-	 * In addition to multicast traffic, broadcast packets will also arrive
-	 * via the MAC_CLIENT_PROMISC_MULTI handler. The mac_rx_set() callback
+	 * In addition to unicast and multicast traffic, broadcast packets will
+	 * also arrive via the promiscuous handler. The mac_rx_set() callback
 	 * for fully-classified traffic has already delivered that broadcast
 	 * traffic, so it should be suppressed here, rather than duplicating it
 	 * to the guest.
@@ -693,12 +694,12 @@ viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 			}
 
 			if (err != 0) {
-				VIONA_RING_STAT_INCR(ring, rx_mcast_check);
+				VIONA_RING_STAT_INCR(ring, rx_promisc_check);
 			}
 		}
 
 		/* Chain up matching packets while discarding others */
-		if (err == 0 && mhi.mhi_dsttype == MAC_ADDRTYPE_MULTICAST) {
+		if (err == 0 && mhi.mhi_dsttype != MAC_ADDRTYPE_BROADCAST) {
 			*mpp = mp;
 			mpp = &mp->b_next;
 		} else {
@@ -708,24 +709,49 @@ viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		mp = mp_next;
 	}
 
-	if (mp_mcast_only != NULL) {
-		viona_rx_common(ring, mp_mcast_only, is_loopback);
+	if (mp_not_broadcast != NULL) {
+		viona_rx_common(ring, mp_not_broadcast, is_loopback);
 	}
 }
 
 int
-viona_rx_set(viona_link_t *link)
+viona_rx_set_promisc(viona_link_t *link, mac_client_promisc_type_t promisc)
+{
+	viona_vring_t *ring = &link->l_vrings[VIONA_VQ_RX];
+	int err = 0;
+
+	mutex_enter(&ring->vr_lock);
+
+	if (link->l_mcpt == promisc)
+		goto out;
+
+	if (link->l_mph != NULL) {
+		mac_promisc_remove(link->l_mph);
+		link->l_mph = NULL;
+	}
+
+	err = mac_promisc_add(link->l_mch, promisc,
+	    viona_rx_promisc, ring, &link->l_mph,
+	    MAC_PROMISC_FLAGS_NO_TX_LOOP | MAC_PROMISC_FLAGS_VLAN_TAG_STRIP);
+
+	if (err == 0)
+		link->l_mcpt = promisc;
+
+out:
+	mutex_exit(&ring->vr_lock);
+	return (err);
+}
+
+int
+viona_rx_set(viona_link_t *link, mac_client_promisc_type_t promisc)
 {
 	viona_vring_t *ring = &link->l_vrings[VIONA_VQ_RX];
 	int err;
 
 	mac_rx_set(link->l_mch, viona_rx_classified, ring);
-	err = mac_promisc_add(link->l_mch, MAC_CLIENT_PROMISC_MULTI,
-	    viona_rx_mcast, ring, &link->l_mph,
-	    MAC_PROMISC_FLAGS_NO_TX_LOOP | MAC_PROMISC_FLAGS_VLAN_TAG_STRIP);
-	if (err != 0) {
+	err = viona_rx_set_promisc(link, promisc);
+	if (err != 0)
 		mac_rx_clear(link->l_mch);
-	}
 
 	return (err);
 }
@@ -733,6 +759,8 @@ viona_rx_set(viona_link_t *link)
 void
 viona_rx_clear(viona_link_t *link)
 {
-	mac_promisc_remove(link->l_mph);
-	mac_rx_clear(link->l_mch);
+	if (link->l_mph != NULL)
+		mac_promisc_remove(link->l_mph);
+	if (link->l_mch != NULL)
+		mac_rx_clear(link->l_mch);
 }

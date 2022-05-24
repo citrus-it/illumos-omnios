@@ -12,6 +12,7 @@
 /*
  * Copyright 2013 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_VIONA_IO_H_
@@ -52,7 +53,8 @@ typedef struct vioc_ring_msi {
 enum viona_vq_id {
 	VIONA_VQ_RX = 0,
 	VIONA_VQ_TX = 1,
-	VIONA_VQ_MAX = 2
+	VIONA_VQ_CTRL = 2,
+	VIONA_VQ_MAX = 3
 };
 
 typedef struct vioc_intr_poll {
