@@ -827,9 +827,6 @@ pci_emul_assign_bar(struct pci_devinst *const pdi, const int idx,
 		limit = 0;
 		mask = PCIM_BIOS_ADDR_MASK;
 		lobits = 0;
-#ifndef __FreeBSD__
-		addr = 0;
-#endif
 		break;
 	default:
 		printf("pci_emul_alloc_base: invalid bar type %d\n", type);
@@ -844,6 +841,8 @@ pci_emul_assign_bar(struct pci_devinst *const pdi, const int idx,
 		error = pci_emul_alloc_resource(baseptr, limit, size, &addr);
 		if (error != 0)
 			return (error);
+	} else {
+		addr = 0;
 	}
 
 	pdi->pi_bar[idx].type = type;
