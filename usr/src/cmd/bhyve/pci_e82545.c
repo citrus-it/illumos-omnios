@@ -1296,6 +1296,11 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 			    "(%d) -- dropped", hdrlen);
 			goto done;
 		}
+		if (ckinfo[1].ck_valid && hdrlen < ckinfo[1].ck_off + 2) {
+			WPRINTF("TSO hdrlen too small for TCP/UDP fields "
+			    "(%d) -- dropped", hdrlen);
+			goto done;
+		}
 	}
 
 	/* Allocate, fill and prepend writable header vector. */
