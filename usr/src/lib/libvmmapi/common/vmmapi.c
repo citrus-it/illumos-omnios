@@ -122,6 +122,15 @@ vm_create(const char *name)
 }
 
 void
+vm_close(struct vmctx *vm)
+{
+	assert(vm != NULL);
+
+	close(vm->fd);
+	free(vm);
+}
+
+void
 vm_destroy(struct vmctx *vm)
 {
 	assert(vm != NULL);
