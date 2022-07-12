@@ -94,6 +94,10 @@ enum {
 	VM_PCIROM,
 };
 
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
 /*
  * Get the length and name of the memory segment identified by 'segid'.
  * Note that system memory segments are identified with a nul name.
@@ -337,4 +341,9 @@ int	vm_setup_freebsd_registers_i386(struct vmctx *vmctx, int vcpu,
 					uint32_t esp);
 void	vm_setup_freebsd_gdt(uint64_t *gdtr);
 #endif
+
+#ifdef	__cplusplus
+}
+#endif
+
 #endif	/* _VMMAPI_H_ */
