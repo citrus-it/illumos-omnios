@@ -1449,7 +1449,6 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		(void) vm_suspend(svm_sc->vm, VM_SUSPEND_TRIPLEFAULT);
 		handled = 1;
 		break;
-	case VMCB_EXIT_INVD:
 	case VMCB_EXIT_INVLPGA:
 		/* privileged invalidation instructions */
 		vm_inject_ud(svm_sc->vm, vcpu);
@@ -1465,8 +1464,9 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		vm_inject_ud(svm_sc->vm, vcpu);
 		handled = 1;
 		break;
+	case VMCB_EXIT_INVD:
 	case VMCB_EXIT_WBINVD:
-		/* ignore WBINDVD */
+		/* ignore exit */
 		handled = 1;
 		break;
 	case VMCB_EXIT_VMMCALL:
