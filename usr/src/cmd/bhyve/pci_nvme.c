@@ -2185,9 +2185,10 @@ pci_nvme_out_of_range(struct pci_nvme_blockstore *nvstore, uint64_t slba,
 
 static int
 pci_nvme_append_iov_req(struct pci_nvme_softc *sc, struct pci_nvme_ioreq *req,
-	uint64_t gpaddr, size_t size, int do_write, uint64_t lba)
+	uint64_t gpaddr, size_t size, int do_write, uint64_t offset)
 {
 	int iovidx;
+	bool range_is_contiguous;
 
 	if (req == NULL)
 		return (-1);
@@ -2196,8 +2197,17 @@ pci_nvme_append_iov_req(struct pci_nvme_softc *sc, struct pci_nvme_ioreq *req,
 		return (-1);
 	}
 
-	/* concatenate contig block-iovs to minimize number of iovs */
-	if ((req->prev_gpaddr + req->prev_size) == gpaddr) {
+	/*
+	 * Minimize the number of IOVs by concatenating contiguous address
+	 * ranges. If the IOV count is zero, there is no previous range to
+	 * concatenate.
+	 */
+	if (req->io_req.br_iovcnt == 0)
+		range_is_contiguous = false;
+	else
+		range_is_contiguous = (req->prev_gpaddr + req->prev_size) == gpaddr;
+
+	if (range_is_contiguous) {
 		iovidx = req->io_req.br_iovcnt - 1;
 
 		req->io_req.br_iov[iovidx].iov_base =
@@ -2211,7 +2221,7 @@ pci_nvme_append_iov_req(struct pci_nvme_softc *sc, struct pci_nvme_ioreq *req,
 	} else {
 		iovidx = req->io_req.br_iovcnt;
 		if (iovidx == 0) {
-			req->io_req.br_offset = lba;
+			req->io_req.br_offset = offset;
 			req->io_req.br_resid = 0;
 			req->io_req.br_param = req;
 		}
