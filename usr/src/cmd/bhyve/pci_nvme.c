@@ -1027,7 +1027,7 @@ aen_thr(void *arg)
 		pci_nvme_aen_process(sc);
 		pthread_cond_wait(&sc->aen_cond, &sc->aen_mtx);
 	}
-#ifdef __FreeBSD__
+#ifdef __FreeBSD__	/* Smatch spots unreachable code */
 	pthread_mutex_unlock(&sc->aen_mtx);
 
 	pthread_exit(NULL);
@@ -2630,14 +2630,10 @@ nvme_opc_dataset_mgmt(struct pci_nvme_softc *sc,
     struct pci_nvme_ioreq *req,
     uint16_t *status)
 {
-	struct nvme_dsm_range *range;
+	struct nvme_dsm_range *range = NULL;
 	uint32_t nr, r, non_zero, dr;
 	int err;
 	bool pending = false;
-
-#ifndef __FreeBSD__
-	range = NULL;
-#endif
 
 	if ((sc->ctrldata.oncs & NVME_ONCS_DSM) == 0) {
 		pci_nvme_status_genc(status, NVME_SC_INVALID_OPCODE);
