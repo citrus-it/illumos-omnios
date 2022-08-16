@@ -53,7 +53,7 @@ struct pci_devinst;
 struct memory_region;
 
 struct pci_devemu {
-	char      *pe_emu;		/* Name of device emulation */
+	const char      *pe_emu;	/* Name of device emulation */
 
 	/* instance creation */
 	int       (*pe_init)(struct vmctx *, struct pci_devinst *,
