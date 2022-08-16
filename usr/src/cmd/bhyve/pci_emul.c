@@ -333,7 +333,7 @@ done:
 }
 
 void
-pci_print_supported_devices()
+pci_print_supported_devices(void)
 {
 	struct pci_devemu **pdpp, *pdp;
 
