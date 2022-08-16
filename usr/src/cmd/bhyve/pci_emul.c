@@ -2458,7 +2458,7 @@ pci_emul_dior(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 	return (value);
 }
 
-struct pci_devemu pci_dummy = {
+static const struct pci_devemu pci_dummy = {
 	.pe_emu = "dummy",
 	.pe_init = pci_emul_dinit,
 	.pe_barwrite = pci_emul_diow,
