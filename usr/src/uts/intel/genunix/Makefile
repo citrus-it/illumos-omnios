@@ -78,6 +78,7 @@ CPPFLAGS	+= -I$(SRC)/common
 CPPFLAGS	+= -I$(SRC)/uts/common/fs/zfs
 
 CPPFLAGS	+= -I$(UTSBASE)/i86pc
+CPPFLAGS	+= -I$(UTSBASE)/oxide
 
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-value

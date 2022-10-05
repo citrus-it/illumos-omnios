@@ -524,3 +524,9 @@ kernel_ipcc_ackstart(void)
 	VERIFY3U(ipcc_init, <, IPCC_INIT_DEVTREE);
 	return (ipcc_ackstart(&kernel_ipcc_ops, kernel_ipcc_arg));
 }
+
+void
+kernel_ipcc_bootstamp(ipcc_bootstamp_t stamp)
+{
+	ipcc_bootstamp(&kernel_ipcc_ops, kernel_ipcc_arg, stamp);
+}

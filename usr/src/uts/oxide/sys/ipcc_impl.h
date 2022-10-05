@@ -48,6 +48,7 @@ typedef enum ipcc_hss_cmd {
 	IPCC_HSS_ROT,
 	IPCC_HSS_ADD_MEASUREMENTS,
 	IPCC_HSS_IMAGEBLOCK,
+	IPCC_HSS_BOOTSTAMP,
 } ipcc_hss_cmd_t;
 
 typedef enum ipcc_sp_cmd {
@@ -163,6 +164,8 @@ extern void ipcc_panic_stack(uintptr_t, const char *, off_t);
 extern void ipcc_panic_vdata(const char *, va_list);
 extern void ipcc_panic_data(const char *, ...);
 extern int ipcc_panic(const ipcc_ops_t *, void *);
+
+extern void ipcc_bootstamp(const ipcc_ops_t *, void *, uint8_t);
 
 /*
  * extern int ipcc_alert(ipcc_ops_t *, void *,

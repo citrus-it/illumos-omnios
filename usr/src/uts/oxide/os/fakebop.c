@@ -483,6 +483,8 @@ apob_init(void)
 {
 	const bt_prop_t *apob_prop = find_bt_prop(BTPROP_NAME_APOB_ADDRESS);
 
+	kernel_ipcc_bootstamp(APOB_INIT);
+
 	if (apob_prop == NULL) {
 		bop_panic("APOB address property %s is missing; don't "
 		    "know how to probe memory ourselves",
@@ -611,6 +613,8 @@ _start(uint64_t ramdisk_paddr, size_t ramdisk_len)
 	eb_create_properties(ramdisk_paddr, ramdisk_len);
 
 	DBG_MSG("\n\n*** Entered illumos in _start()\n");
+
+	kernel_ipcc_bootstamp(BS_START);
 
 	eb_set_tunables();
 

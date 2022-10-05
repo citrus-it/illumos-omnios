@@ -844,6 +844,7 @@
 #ifdef	DEBUG
 #include <sys/random.h>
 #endif
+#include <sys/kernel_ipcc.h>
 
 extern void streams_msg_init(void);
 extern int segkp_fromheap;
@@ -4323,6 +4324,7 @@ kmem_init(void)
 	list_create(&kmem_caches, sizeof (kmem_cache_t),
 	    offsetof(kmem_cache_t, cache_link));
 
+	kernel_ipcc_bootstamp(KMEM_ARENAS);
 	kmem_metadata_arena = vmem_create("kmem_metadata", NULL, 0, PAGESIZE,
 	    vmem_alloc, vmem_free, heap_arena, 8 * PAGESIZE,
 	    VM_SLEEP | VMC_NO_QCACHE);
@@ -4426,12 +4428,14 @@ kmem_init(void)
 	if (kmem_flags & (KMF_AUDIT | KMF_RANDOMIZE)) {
 		if (kmem_transaction_log_size == 0)
 			kmem_transaction_log_size = kmem_maxavail() / 50;
+		kernel_ipcc_bootstamp(KMEM_XLOG_INIT);
 		kmem_transaction_log = kmem_log_init(kmem_transaction_log_size);
 	}
 
 	if (kmem_flags & (KMF_CONTENTS | KMF_RANDOMIZE)) {
 		if (kmem_content_log_size == 0)
 			kmem_content_log_size = kmem_maxavail() / 50;
+		kernel_ipcc_bootstamp(KMEM_CLOG_INIT);
 		kmem_content_log = kmem_log_init(kmem_content_log_size);
 	}
 
@@ -4490,6 +4494,7 @@ kmem_init(void)
 	/*
 	 * Initialize the platform-specific aligned/DMA memory allocator.
 	 */
+	kernel_ipcc_bootstamp(KMEM_KA_INIT);
 	ka_init();
 
 	/*

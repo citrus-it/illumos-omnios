@@ -69,6 +69,7 @@
 #include <sys/io/milan/ccx.h>
 #include <sys/io/milan/fabric.h>
 #include <milan/milan_apob.h>
+#include <sys/kernel_ipcc.h>
 
 /*
  * some globals for patching the result of cpuid
@@ -264,6 +265,7 @@ mlsetup(struct regs *rp)
 	 * mcpu_hwthread, and we need mcpu_hwthread to set up brand strings for
 	 * cpuid in a later pass.
 	 */
+	kernel_ipcc_bootstamp(FABRIC_TOPO_INIT);
 	milan_fabric_topo_init();
 	CPU->cpu_m.mcpu_hwthread =
 	    milan_fabric_find_thread_by_cpuid(CPU->cpu_id);
@@ -284,6 +286,7 @@ mlsetup(struct regs *rp)
 	 * so it must be done before the BASIC cpuid pass.  This will be run on
 	 * APs later on.
 	 */
+	kernel_ipcc_bootstamp(CCX_INIT);
 	milan_ccx_init();
 
 	/*
@@ -363,6 +366,7 @@ mlsetup(struct regs *rp)
 	if (boothowto & RB_DEBUGENTER)
 		kmdb_enter();
 
+	kernel_ipcc_bootstamp(APOB_RESERVE_PHYS);
 	milan_apob_reserve_phys();
 
 	cpu_vm_data_init(CPU);

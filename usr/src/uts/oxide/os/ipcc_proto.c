@@ -835,6 +835,13 @@ ipcc_panic_data(const char *fmt, ...)
 	va_end(ap);
 }
 
+void
+ipcc_bootstamp(const ipcc_ops_t *ops, void *arg, uint8_t stamp)
+{
+	(void) ipcc_command(ops, arg, IPCC_HSS_BOOTSTAMP, IPCC_SP_ACK,
+	    &stamp, sizeof (stamp), NULL, NULL);
+}
+
 /*
  * ipcc_alert(const ipcc_ops_t *ops, void *arg,
  * ipcc_measurements(const ipcc_ops_t *ops, void *arg,

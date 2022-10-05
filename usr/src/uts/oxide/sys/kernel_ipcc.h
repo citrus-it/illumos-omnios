@@ -39,6 +39,56 @@ extern int kernel_ipcc_macs(ipcc_mac_t *);
 extern int kernel_ipcc_status(uint64_t *);
 extern int kernel_ipcc_ackstart(void);
 
+typedef enum {
+	BS_START,
+	APOB_INIT,
+	FABRIC_TOPO_INIT,
+	CCX_INIT,
+	APOB_RESERVE_PHYS,
+	MAIN,
+	STARTUP,
+		SSP_INIT,
+		STARTUP_INIT,
+		STARTUP_MEMLIST,
+			MMU_INIT,
+			BUILD_MEM_NODES,
+			KBM_PROBE,
+			PERFORM_ALLOCATIONS,
+			MEMLIST_PHYS_INSTALL,
+			MEMLIST_PHYS_AVAIL,
+			MEMLIST_FREE_UNUSED,
+			MEMLIST_PHYS_RSVD,
+			MEMLIST_FREE_UNUSED2,
+			PAGE_COLORING,
+			PAGE_CTRS_ALLOC,
+			PCF_INIT,
+			KPHYSM_INIT,
+			INIT_DEBUG_INFO,
+			BOOT_MAPIN,
+		STARTUP_KMEM,
+			LAYOUT_KERNEL_VA,
+			KMEM_INIT,
+				KMEM_ARENAS,
+				KMEM_XLOG_INIT,
+				KMEM_CLOG_INIT,
+				KMEM_KA_INIT,
+		STARTUP_VM,
+			KVM_INIT,
+			PCIE_CFGSPACE_REMAP,
+			PMEM_INIT,
+		FABRIC_INIT,
+		STARTUP_SMAP,
+		STARTUP_MODULES,
+		STARTUP_END,
+	VM_INIT,
+	MOUNTROOT,
+	FORCEATTACH,
+	START_MP,
+	START_INITPROC,
+	READY,
+} ipcc_bootstamp_t;
+extern void kernel_ipcc_bootstamp(ipcc_bootstamp_t);
+
 #ifdef __cplusplus
 }
 #endif

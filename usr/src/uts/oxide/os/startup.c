@@ -620,10 +620,15 @@ startup(void)
 	kpm_enable = 0;
 	CPUSET_ONLY(cpu_ready_set, 0);	/* cpu 0 is boot cpu */
 
+	kernel_ipcc_bootstamp(SSP_INIT);
 	ssp_init();
+	kernel_ipcc_bootstamp(STARTUP_INIT);
 	startup_init();
+	kernel_ipcc_bootstamp(STARTUP_MEMLIST);
 	startup_memlist();
+	kernel_ipcc_bootstamp(STARTUP_KMEM);
 	startup_kmem();
+	kernel_ipcc_bootstamp(STARTUP_VM);
 	startup_vm();
 
 	/*
@@ -641,13 +646,17 @@ startup(void)
 	 * At this point in time, go through and initialize the Milan SoC's I/O
 	 * fabric. This includes the SMU, DXIO, NBIO, etc.
 	 */
+	kernel_ipcc_bootstamp(FABRIC_INIT);
 	milan_fabric_init();
 	if (smm_init() != 0)
 		cmn_err(CE_WARN, "SMI handler initialisation failed");
 
+	kernel_ipcc_bootstamp(STARTUP_SMAP);
 	startup_smap();
+	kernel_ipcc_bootstamp(STARTUP_MODULES);
 	startup_modules();
 
+	kernel_ipcc_bootstamp(STARTUP_END);
 	startup_end();
 
 	/* XXX find the right place for this */
@@ -930,8 +939,10 @@ startup_memlist(void)
 	 * The default is to enforce PROT_EXEC on processors that support NX.
 	 * Boot seems to round up the "len", but 8 seems to be big enough.
 	 */
+	kernel_ipcc_bootstamp(MMU_INIT);
 	mmu_init();
 
+	kernel_ipcc_bootstamp(BUILD_MEM_NODES);
 	startup_build_mem_nodes(bootops->boot_mem->physinstalled);
 
 	if (BOP_GETPROPLEN(bootops, "enforce-prot-exec") >= 0) {
@@ -956,6 +967,7 @@ startup_memlist(void)
 	npages = physinstalled - 1; /* avail_filter() skips page 0, so "- 1" */
 	obp_pages = 0;
 	va = KERNEL_TEXT;
+	kernel_ipcc_bootstamp(KBM_PROBE);
 	while (kbm_probe(&va, &len, &pfn, &prot) != 0) {
 		npages -= len >> MMU_PAGESHIFT;
 		if (va >= (uintptr_t)e_moddata)
@@ -1104,6 +1116,7 @@ startup_memlist(void)
 	/*
 	 * do all the initial allocations
 	 */
+	kernel_ipcc_bootstamp(PERFORM_ALLOCATIONS);
 	perform_allocations();
 
 	/*
@@ -1112,6 +1125,7 @@ startup_memlist(void)
 	 * - phys_avail is phys_install minus any memory mapped before this
 	 *    point above KERNEL_TEXT.
 	 */
+	kernel_ipcc_bootstamp(MEMLIST_PHYS_INSTALL);
 	current = phys_install = memlist;
 	copy_memlist_filter(bootops->boot_mem->physinstalled, &current, NULL);
 	if ((caddr_t)current > (caddr_t)memlist + memlist_sz)
@@ -1119,6 +1133,7 @@ startup_memlist(void)
 	if (prom_debug)
 		print_memlist("phys_install", phys_install);
 
+	kernel_ipcc_bootstamp(MEMLIST_PHYS_AVAIL);
 	phys_avail = current;
 	PRM_POINT("Building phys_avail:\n");
 	copy_memlist_filter(bootops->boot_mem->physinstalled, &current,
@@ -1132,6 +1147,7 @@ startup_memlist(void)
 	 * Free unused memlist items, which may be used by memory DR driver
 	 * at runtime.
 	 */
+	kernel_ipcc_bootstamp(MEMLIST_FREE_UNUSED);
 	if ((caddr_t)current < (caddr_t)memlist + memlist_sz) {
 		memlist_free_block((caddr_t)current,
 		    (caddr_t)memlist + memlist_sz - (caddr_t)current);
@@ -1140,6 +1156,7 @@ startup_memlist(void)
 	/*
 	 * Build reserved memspace
 	 */
+	kernel_ipcc_bootstamp(MEMLIST_PHYS_RSVD);
 	current = phys_rsvd;
 	copy_memlist_filter(bootops->boot_mem->rsvdmem, &current, NULL);
 	if ((caddr_t)current > (caddr_t)phys_rsvd + rsvdmemlist_sz)
@@ -1151,6 +1168,7 @@ startup_memlist(void)
 	 * Free unused memlist items, which may be used by memory DR driver
 	 * at runtime.
 	 */
+	kernel_ipcc_bootstamp(MEMLIST_FREE_UNUSED2);
 	if ((caddr_t)current < (caddr_t)phys_rsvd + rsvdmemlist_sz) {
 		memlist_free_block((caddr_t)current,
 		    (caddr_t)phys_rsvd + rsvdmemlist_sz - (caddr_t)current);
@@ -1159,12 +1177,14 @@ startup_memlist(void)
 	/*
 	 * setup page coloring
 	 */
+	kernel_ipcc_bootstamp(PAGE_COLORING);
 	page_coloring_setup(pagecolor_mem);
 	page_lock_init();	/* currently a no-op */
 
 	/*
 	 * free page list counters
 	 */
+	kernel_ipcc_bootstamp(PAGE_CTRS_ALLOC);
 	(void) page_ctrs_alloc(page_ctrs_mem);
 
 	/*
@@ -1172,6 +1192,7 @@ startup_memlist(void)
 	 * boot time.
 	 */
 
+	kernel_ipcc_bootstamp(PCF_INIT);
 	pcf_init();
 
 	/*
@@ -1179,16 +1200,19 @@ startup_memlist(void)
 	 */
 	availrmem_initial = availrmem = freemem = 0;
 	PRM_POINT("Calling kphysm_init()...");
+	kernel_ipcc_bootstamp(KPHYSM_INIT);
 	npages = kphysm_init(pp_base, npages);
 	PRM_POINT("kphysm_init() done");
 	PRM_DEBUG(npages);
 
+	kernel_ipcc_bootstamp(INIT_DEBUG_INFO);
 	init_debug_info();
 
 	/*
 	 * Now that page_t's have been initialized, remove all the
 	 * initial allocation pages from the kernel free page lists.
 	 */
+	kernel_ipcc_bootstamp(BOOT_MAPIN);
 	boot_mapin((caddr_t)valloc_base, valloc_sz);
 	boot_mapin((caddr_t)MISC_VA_BASE, MISC_VA_SIZE);
 	PRM_POINT("startup_memlist() done");
@@ -1249,6 +1273,7 @@ startup_kmem(void)
 	/* We have to re-do this now that we've modified _userlimit. */
 	mmu_calc_user_slots();
 
+	kernel_ipcc_bootstamp(LAYOUT_KERNEL_VA);
 	layout_kernel_va();
 
 	/*
@@ -1261,6 +1286,7 @@ startup_kmem(void)
 	/*
 	 * Initialize kernel memory allocator.
 	 */
+	kernel_ipcc_bootstamp(KMEM_INIT);
 	kmem_init();
 
 	/*
@@ -1651,6 +1677,7 @@ startup_vm(void)
 	 * Initialize VM system
 	 */
 	PRM_POINT("Calling kvm_init()...");
+	kernel_ipcc_bootstamp(KVM_INIT);
 	kvm_init();
 	PRM_POINT("kvm_init() done");
 
@@ -1674,6 +1701,7 @@ startup_vm(void)
 	/*
 	 * Tell PCIe configuration space to switch to device arena mappings.
 	 */
+	kernel_ipcc_bootstamp(PCIE_CFGSPACE_REMAP);
 	pcie_cfgspace_remap();
 
 	/*
@@ -1685,8 +1713,6 @@ startup_vm(void)
 
 	cmn_err(CE_CONT, "?mem = %luK (0x%lx)\n",
 	    physinstalled << (MMU_PAGESHIFT - 10), ptob(physinstalled));
-
-	kernel_ipcc_init(IPCC_INIT_KVMAVAIL);
 
 	/*
 	 * disable automatic large pages for small memory systems or
@@ -1761,7 +1787,10 @@ startup_vm(void)
 	setup_vaddr_for_ppcopy(CPU);
 
 	segdev_init();
+	kernel_ipcc_bootstamp(PMEM_INIT);
 	pmem_init();
+
+	kernel_ipcc_init(IPCC_INIT_KVMAVAIL);
 
 	PRM_POINT("startup_vm() done");
 }

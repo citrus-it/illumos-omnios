@@ -83,6 +83,7 @@
 
 #include <c2/audit.h>
 #include <sys/bootprops.h>
+#include <sys/kernel_ipcc.h>
 
 /* well known processes */
 proc_t *proc_sched;		/* memory scheduler */
@@ -439,6 +440,8 @@ main(void)
 #endif
 	extern void	progressbar_start(void);
 
+	kernel_ipcc_bootstamp(MAIN);
+
 	/*
 	 * In the horrible world of x86 in-lines, you can't get symbolic
 	 * structure offsets a la genassym.  This assertion is here so
@@ -469,6 +472,7 @@ main(void)
 	 * created(in thread_init()). After that, it is safe to create threads
 	 * that could exit. These exited threads will get reaped.
 	 */
+	kernel_ipcc_bootstamp(STARTUP);
 	startup();
 	segkmem_gc();
 	callb_init();
@@ -516,6 +520,7 @@ main(void)
 	/*
 	 * initialize vm related stuff.
 	 */
+	kernel_ipcc_bootstamp(VM_INIT);
 	vm_init();
 
 	/*
@@ -540,6 +545,7 @@ main(void)
 
 	boot_image_locate();
 
+	kernel_ipcc_bootstamp(MOUNTROOT);
 	vfs_mountroot();	/* Mount the root file system */
 	errorq_init();		/* after vfs_mountroot() so DDI root is ready */
 	cpu_kstat_init(CPU);	/* after vfs_mountroot() so TOD is valid */
@@ -588,6 +594,7 @@ main(void)
 	 * pcmcia nexus) so that devices enumerated via hotplug is
 	 * available before I/O subsystem is fully initialized.
 	 */
+	kernel_ipcc_bootstamp(FORCEATTACH);
 	i_ddi_forceattach_drivers();
 
 	/*
@@ -627,6 +634,7 @@ main(void)
 	/*
 	 * Perform MP initialization, if any.
 	 */
+	kernel_ipcc_bootstamp(START_MP);
 	start_other_cpus(0);
 
 #ifdef	__sparc
@@ -673,6 +681,8 @@ main(void)
 	 * FAMOUS_PIDS will have to be updated.
 	 */
 
+	kernel_ipcc_bootstamp(START_INITPROC);
+
 	/* create init process */
 	if (newproc(start_init, NULL, defaultcid, 59, NULL,
 	    FAMOUS_PID_INIT))
@@ -712,6 +722,8 @@ main(void)
 
 	/* system is now ready */
 	mutex_exit(&ualock);
+
+	kernel_ipcc_bootstamp(READY);
 
 	bcopy("sched", PTOU(curproc)->u_psargs, 6);
 	bcopy("sched", PTOU(curproc)->u_comm, 5);
