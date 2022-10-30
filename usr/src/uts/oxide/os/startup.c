@@ -1125,7 +1125,6 @@ startup_memlist(void)
 	 * - phys_avail is phys_install minus any memory mapped before this
 	 *    point above KERNEL_TEXT.
 	 */
-	kernel_ipcc_bootstamp(MEMLIST_PHYS_INSTALL);
 	current = phys_install = memlist;
 	copy_memlist_filter(bootops->boot_mem->physinstalled, &current, NULL);
 	if ((caddr_t)current > (caddr_t)memlist + memlist_sz)
@@ -1133,7 +1132,6 @@ startup_memlist(void)
 	if (prom_debug)
 		print_memlist("phys_install", phys_install);
 
-	kernel_ipcc_bootstamp(MEMLIST_PHYS_AVAIL);
 	phys_avail = current;
 	PRM_POINT("Building phys_avail:\n");
 	copy_memlist_filter(bootops->boot_mem->physinstalled, &current,
@@ -1147,7 +1145,6 @@ startup_memlist(void)
 	 * Free unused memlist items, which may be used by memory DR driver
 	 * at runtime.
 	 */
-	kernel_ipcc_bootstamp(MEMLIST_FREE_UNUSED);
 	if ((caddr_t)current < (caddr_t)memlist + memlist_sz) {
 		memlist_free_block((caddr_t)current,
 		    (caddr_t)memlist + memlist_sz - (caddr_t)current);
@@ -1156,7 +1153,6 @@ startup_memlist(void)
 	/*
 	 * Build reserved memspace
 	 */
-	kernel_ipcc_bootstamp(MEMLIST_PHYS_RSVD);
 	current = phys_rsvd;
 	copy_memlist_filter(bootops->boot_mem->rsvdmem, &current, NULL);
 	if ((caddr_t)current > (caddr_t)phys_rsvd + rsvdmemlist_sz)
@@ -1168,7 +1164,6 @@ startup_memlist(void)
 	 * Free unused memlist items, which may be used by memory DR driver
 	 * at runtime.
 	 */
-	kernel_ipcc_bootstamp(MEMLIST_FREE_UNUSED2);
 	if ((caddr_t)current < (caddr_t)phys_rsvd + rsvdmemlist_sz) {
 		memlist_free_block((caddr_t)current,
 		    (caddr_t)phys_rsvd + rsvdmemlist_sz - (caddr_t)current);
@@ -1177,14 +1172,12 @@ startup_memlist(void)
 	/*
 	 * setup page coloring
 	 */
-	kernel_ipcc_bootstamp(PAGE_COLORING);
 	page_coloring_setup(pagecolor_mem);
 	page_lock_init();	/* currently a no-op */
 
 	/*
 	 * free page list counters
 	 */
-	kernel_ipcc_bootstamp(PAGE_CTRS_ALLOC);
 	(void) page_ctrs_alloc(page_ctrs_mem);
 
 	/*
@@ -1192,7 +1185,6 @@ startup_memlist(void)
 	 * boot time.
 	 */
 
-	kernel_ipcc_bootstamp(PCF_INIT);
 	pcf_init();
 
 	/*
@@ -1200,19 +1192,16 @@ startup_memlist(void)
 	 */
 	availrmem_initial = availrmem = freemem = 0;
 	PRM_POINT("Calling kphysm_init()...");
-	kernel_ipcc_bootstamp(KPHYSM_INIT);
 	npages = kphysm_init(pp_base, npages);
 	PRM_POINT("kphysm_init() done");
 	PRM_DEBUG(npages);
 
-	kernel_ipcc_bootstamp(INIT_DEBUG_INFO);
 	init_debug_info();
 
 	/*
 	 * Now that page_t's have been initialized, remove all the
 	 * initial allocation pages from the kernel free page lists.
 	 */
-	kernel_ipcc_bootstamp(BOOT_MAPIN);
 	boot_mapin((caddr_t)valloc_base, valloc_sz);
 	boot_mapin((caddr_t)MISC_VA_BASE, MISC_VA_SIZE);
 	PRM_POINT("startup_memlist() done");
