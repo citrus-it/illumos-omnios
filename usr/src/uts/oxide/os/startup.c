@@ -939,10 +939,8 @@ startup_memlist(void)
 	 * The default is to enforce PROT_EXEC on processors that support NX.
 	 * Boot seems to round up the "len", but 8 seems to be big enough.
 	 */
-	kernel_ipcc_bootstamp(MMU_INIT);
 	mmu_init();
 
-	kernel_ipcc_bootstamp(BUILD_MEM_NODES);
 	startup_build_mem_nodes(bootops->boot_mem->physinstalled);
 
 	if (BOP_GETPROPLEN(bootops, "enforce-prot-exec") >= 0) {
@@ -967,7 +965,6 @@ startup_memlist(void)
 	npages = physinstalled - 1; /* avail_filter() skips page 0, so "- 1" */
 	obp_pages = 0;
 	va = KERNEL_TEXT;
-	kernel_ipcc_bootstamp(KBM_PROBE);
 	while (kbm_probe(&va, &len, &pfn, &prot) != 0) {
 		npages -= len >> MMU_PAGESHIFT;
 		if (va >= (uintptr_t)e_moddata)
@@ -1116,7 +1113,6 @@ startup_memlist(void)
 	/*
 	 * do all the initial allocations
 	 */
-	kernel_ipcc_bootstamp(PERFORM_ALLOCATIONS);
 	perform_allocations();
 
 	/*

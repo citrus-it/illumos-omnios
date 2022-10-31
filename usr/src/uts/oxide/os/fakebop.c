@@ -483,8 +483,6 @@ apob_init(void)
 {
 	const bt_prop_t *apob_prop = find_bt_prop(BTPROP_NAME_APOB_ADDRESS);
 
-	kernel_ipcc_bootstamp(APOB_INIT);
-
 	if (apob_prop == NULL) {
 		bop_panic("APOB address property %s is missing; don't "
 		    "know how to probe memory ourselves",

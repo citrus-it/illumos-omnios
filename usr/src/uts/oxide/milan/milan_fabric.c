@@ -70,6 +70,7 @@
 #include <sys/io/milan/pcie_impl.h>
 #include <sys/io/milan/pcie_rsmu.h>
 #include <sys/io/milan/smu_impl.h>
+#include <sys/kernel_ipcc.h>
 
 #include <asm/bitmap.h>
 
@@ -1897,7 +1898,9 @@ milan_dxio_rpc_sm_reload(milan_iodie_t *iodie)
 
 	rpc.mdr_req = MILAN_DXIO_OP_RELOAD_SM;
 
+	kernel_ipcc_bootstamp(MF_DXIO_RPC_SM_RELOAD);
 	milan_dxio_rpc(iodie, &rpc);
+	kernel_ipcc_bootstamp(MF_DXIO_RPC_SM_RELOAD_DONE);
 	if (rpc.mdr_smu_resp != MILAN_SMU_RPC_OK ||
 	    rpc.mdr_dxio_resp != MILAN_DXIO_RPC_OK) {
 		cmn_err(CE_WARN, "DXIO SM Reload RPC Failed: SMU 0x%x, "
@@ -3090,6 +3093,7 @@ milan_dxio_init(milan_iodie_t *iodie, void *arg)
 	}
 
 
+	kernel_ipcc_bootstamp(MF_DXIO_RPC_INIT);
 	if (!milan_dxio_rpc_init(iodie)) {
 		return (1);
 	}
@@ -3098,6 +3102,7 @@ milan_dxio_init(milan_iodie_t *iodie, void *arg)
 	 * XXX These 0x4f values were kind of given to us. Do better than a
 	 * magic constant, rm.
 	 */
+	kernel_ipcc_bootstamp(MF_DXIO_CLOCK_GATING);
 	if (!milan_dxio_rpc_clock_gating(iodie, 0x4f, 0x4f)) {
 		return (1);
 	}
@@ -3109,6 +3114,7 @@ milan_dxio_init(milan_iodie_t *iodie, void *arg)
 	 * can't say why. XXX We should probably disable NTB hotplug because we
 	 * don't have them just in case something changes here.
 	 */
+	kernel_ipcc_bootstamp(MF_DXIO_SET_VARS);
 	if (!milan_dxio_rpc_set_var(iodie, MILAN_DXIO_VAR_PCIE_COMPL, 1) ||
 	    !milan_dxio_rpc_set_var(iodie, MILAN_DXIO_VAR_SLIP_INTERVAL, 0)) {
 		return (1);
@@ -3121,6 +3127,7 @@ milan_dxio_init(milan_iodie_t *iodie, void *arg)
 	 * firmware in its expected path we don't set that.  Older DXIO firmware
 	 * doesn't support this so we skip it there.
 	 */
+	kernel_ipcc_bootstamp(MF_DXIO_POWEROFF_CONFIG);
 	if (milan_dxio_version_at_least(iodie, 45, 682) &&
 	    !milan_dxio_rpc_pcie_poweroff_config(iodie, 0, B_FALSE)) {
 		return (1);
@@ -3132,6 +3139,7 @@ milan_dxio_init(milan_iodie_t *iodie, void *arg)
 	 * and then also to indicate that we want to use the v1 ancillary data
 	 * format.
 	 */
+	kernel_ipcc_bootstamp(MF_DXIO_SET_VARS2);
 	if (!milan_dxio_rpc_set_var(iodie, MLIAN_DXIO_VAR_RET_AFTER_MAP, 1) ||
 	    !milan_dxio_rpc_set_var(iodie, MILAN_DXIO_VAR_RET_AFTER_CONF, 1) ||
 	    !milan_dxio_rpc_set_var(iodie, MILAN_DXIO_VAR_ANCILLARY_V1, 1)) {
@@ -3155,6 +3163,7 @@ milan_dxio_init(milan_iodie_t *iodie, void *arg)
 	 * XXX Should we gamble and set things that aren't unconditionally set
 	 * so we don't rely on hw defaults?
 	 */
+	kernel_ipcc_bootstamp(MF_DXIO_SET_VARS3);
 	if (!milan_dxio_rpc_set_var(iodie, MILAN_DXIO_VAR_PHY_PROG, 1) ||
 	    !milan_dxio_rpc_set_var(iodie, MILAN_DXIO_VAR_SKIP_PSP, 1)) {
 		return (0);
@@ -5172,9 +5181,13 @@ milan_fabric_init(void)
 	 * process will also save our own allocations of these resources,
 	 * allowing us to use them for our own purposes or for PCI.
 	 */
+	kernel_ipcc_bootstamp(MF_INIT_MEMLISTS);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_memlists, NULL);
+	kernel_ipcc_bootstamp(MF_ROUTE_PCI_BUS);
 	milan_route_pci_bus(fabric);
+	kernel_ipcc_bootstamp(MF_ROUTE_IO_PORTS);
 	milan_route_io_ports(fabric);
+	kernel_ipcc_bootstamp(MF_ROUTE_MMIO);
 	milan_route_mmio(fabric);
 
 	/*
@@ -5185,6 +5198,7 @@ milan_fabric_init(void)
 	 * XXX We still need to go back and figure out how to assign MMIO to
 	 * IOMS instances and program the DF.
 	 */
+	kernel_ipcc_bootstamp(MF_INIT_TOM);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_tom, NULL);
 
 	/*
@@ -5193,8 +5207,11 @@ milan_fabric_init(void)
 	 * configuration space retries should work, though this isn't sufficient
 	 * for them to work.
 	 */
+	kernel_ipcc_bootstamp(MF_INIT_PCIE_REFCLK);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_pcie_refclk, NULL);
+	kernel_ipcc_bootstamp(MF_INIT_PCI_TO);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_pci_to, NULL);
+	kernel_ipcc_bootstamp(MF_INIT_IOHC_FEATURES);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_iohc_features, NULL);
 
 	/*
@@ -5204,12 +5221,17 @@ milan_fabric_init(void)
 	 * explicitly told to in the PPR or through other means. This is going
 	 * to be weird and you have every right to complain.
 	 */
+	kernel_ipcc_bootstamp(MF_INIT_IOHC_FCH_LINK);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_iohc_fch_link, NULL);
+	kernel_ipcc_bootstamp(MF_INIT_ARBITRATION_IOMS);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_arbitration_ioms,
 	    NULL);
+	kernel_ipcc_bootstamp(MF_INIT_ARBITRATION_NBIF);
 	milan_fabric_walk_nbif(fabric, milan_fabric_init_arbitration_nbif,
 	    NULL);
+	kernel_ipcc_bootstamp(MF_INIT_SDP_CONTROL);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_sdp_control, NULL);
+	kernel_ipcc_bootstamp(MF_INIT_NBIF_SYSHUB_DMA);
 	milan_fabric_walk_nbif(fabric, milan_fabric_init_nbif_syshub_dma,
 	    NULL);
 
@@ -5223,6 +5245,7 @@ milan_fabric_init(void)
 	 * need to go through and deal with interrupt routing and how that
 	 * interface with each of the northbridges here.
 	 */
+	kernel_ipcc_bootstamp(MF_INIT_IOAPIC);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_ioapic, NULL);
 
 	/*
@@ -5230,6 +5253,7 @@ milan_fabric_init(void)
 	 * with the IOAPIC initialization. We may want to do this, but it can at
 	 * least be its own function.
 	 */
+	kernel_ipcc_bootstamp(MF_INIT_BUS_NUM);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_bus_num, NULL);
 
 	/*
@@ -5250,6 +5274,7 @@ milan_fabric_init(void)
 	 */
 
 	/* XXX Need a way to know which devs to enable on the board */
+	kernel_ipcc_bootstamp(MF_INIT_NBIF_DEV_STRAPS);
 	milan_fabric_walk_nbif(fabric, milan_fabric_init_nbif_dev_straps, NULL);
 
 	/*
@@ -5257,6 +5282,7 @@ milan_fabric_init(void)
 	 * We do two passes, one to get the NBIF instances and another to deal
 	 * with the special instance that we believe is for the southbridge.
 	 */
+	kernel_ipcc_bootstamp(MF_INIT_NBIF_BRIDGE);
 	milan_fabric_walk_ioms(fabric, milan_fabric_init_nbif_bridge, NULL);
 
 	/*
@@ -5280,30 +5306,35 @@ milan_fabric_init(void)
 	 *
 	 * XXX htf do we want to handle errors
 	 */
+	kernel_ipcc_bootstamp(MF_DXIO_INIT);
 	if (milan_fabric_walk_iodie(fabric, milan_dxio_init, NULL) != 0) {
 		cmn_err(CE_WARN, "DXIO Initialization failed: lasciate ogni "
 		    "speranza voi che pcie");
 		return;
 	}
 
+	kernel_ipcc_bootstamp(MF_DXIO_PLAT_DATA);
 	if (milan_fabric_walk_iodie(fabric, milan_dxio_plat_data, NULL) != 0) {
 		cmn_err(CE_WARN, "DXIO Initialization failed: no platform "
 		    "data");
 		return;
 	}
 
+	kernel_ipcc_bootstamp(MF_DXIO_LOAD_DATA);
 	if (milan_fabric_walk_iodie(fabric, milan_dxio_load_data, NULL) != 0) {
 		cmn_err(CE_WARN, "DXIO Initialization failed: failed to load "
 		    "data into dxio");
 		return;
 	}
 
+	kernel_ipcc_bootstamp(MF_DXIO_MORE_CONF);
 	if (milan_fabric_walk_iodie(fabric, milan_dxio_more_conf, NULL) != 0) {
 		cmn_err(CE_WARN, "DXIO Initialization failed: failed to do yet "
 		    "more configuration");
 		return;
 	}
 
+	kernel_ipcc_bootstamp(MF_DXIO_STATE_MACHINE);
 	if (milan_fabric_walk_iodie(fabric, milan_dxio_state_machine, NULL) !=
 	    0) {
 		cmn_err(CE_WARN, "DXIO Initialization failed: failed to walk "
@@ -5318,19 +5349,23 @@ milan_fabric_init(void)
 	 * through and set up the bridges so that way we can actual handle them
 	 * aborting transactions and related.
 	 */
+	kernel_ipcc_bootstamp(MF_INIT_PCIE_PORTS);
 	milan_fabric_walk_pcie_port(fabric, milan_fabric_init_pcie_ports, NULL);
+	kernel_ipcc_bootstamp(MF_INIT_BRIDGES);
 	milan_fabric_walk_bridge(fabric, milan_fabric_init_bridges, NULL);
 
 	/*
 	 * XXX This is a terrible hack. We should really fix pci_boot.c and we
 	 * better before we go to market.
 	 */
+	kernel_ipcc_bootstamp(MF_HACK_BRIDGES);
 	milan_fabric_hack_bridges(fabric);
 
 	/*
 	 * At this point, go talk to the SMU to actually initialize our hotplug
 	 * support.
 	 */
+	kernel_ipcc_bootstamp(MF_HOTPLUG_INIT);
 	if (!milan_hotplug_init(fabric)) {
 		cmn_err(CE_WARN, "Eh, just don't unplug anything. I'm sure it "
 		    "will be fine. Not like someone's going to come and steal "
@@ -5342,4 +5377,5 @@ milan_fabric_init(void)
 	 * futher we should lock all the various MMIO assignment registers,
 	 * especially ones we don't intend to use.
 	 */
+	kernel_ipcc_bootstamp(MF_DONE);
 }
