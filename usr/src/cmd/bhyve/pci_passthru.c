@@ -506,7 +506,7 @@ msix_table_write(struct vmctx *ctx, int vcpu, struct passthru_softc *sc,
 }
 
 static int
-init_msix_table(struct vmctx *ctx, struct passthru_softc *sc)
+init_msix_table(struct vmctx *ctx __unused, struct passthru_softc *sc)
 {
 	struct pci_devinst *pi = sc->psc_pi;
 	uint32_t table_size, table_offset;
@@ -569,7 +569,7 @@ init_msix_table(struct vmctx *ctx, struct passthru_softc *sc)
 }
 
 static int
-cfginitbar(struct vmctx *ctx, struct passthru_softc *sc)
+cfginitbar(struct vmctx *ctx __unused, struct passthru_softc *sc)
 {
 	struct pci_devinst *pi = sc->psc_pi;
 	uint_t i;
@@ -693,8 +693,8 @@ passthru_legacy_config(nvlist_t *nvl, const char *opt)
 }
 
 static int
-passthru_init_rom(struct vmctx *const ctx, struct passthru_softc *const sc,
-    const char *const romfile)
+passthru_init_rom(struct vmctx *const ctx __unused,
+    struct passthru_softc *const sc, const char *const romfile)
 {
 	if (romfile == NULL) {
 		return (0);
@@ -837,8 +837,8 @@ msixcap_access(struct passthru_softc *sc, int coff)
 }
 
 static int
-passthru_cfgread(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
-		int coff, int bytes, uint32_t *rv)
+passthru_cfgread(struct vmctx *ctx __unused, int vcpu __unused,
+    struct pci_devinst *pi, int coff, int bytes, uint32_t *rv)
 {
 	struct passthru_softc *sc;
 
@@ -987,8 +987,8 @@ passthru_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 }
 
 static uint64_t
-passthru_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
-	      uint64_t offset, int size)
+passthru_read(struct vmctx *ctx __unused, int vcpu __unused,
+    struct pci_devinst *pi, int baridx, uint64_t offset, int size)
 {
 	struct passthru_softc *sc = pi->pi_arg;
 	uint64_t val;
