@@ -481,10 +481,11 @@ blockif_thr(void *arg)
 
 #ifdef	__FreeBSD__
 static void
-blockif_sigcont_handler(int signal, enum ev_type type, void *arg)
+blockif_sigcont_handler(int signal __unused, enum ev_type type __unused,
+    void *arg __unused)
 #else
 static void
-blockif_sigcont_handler(int signal)
+blockif_sigcont_handler(int signal __unused)
 #endif
 {
 	struct blockif_sig_elem *bse;
@@ -822,7 +823,7 @@ err:
 }
 
 static void
-blockif_resized(int fd, enum ev_type type, void *arg)
+blockif_resized(int fd, enum ev_type type __unused, void *arg)
 {
 	struct blockif_ctxt *bc;
 	struct stat sb;
