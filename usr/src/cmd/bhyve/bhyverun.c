@@ -368,7 +368,7 @@ parse_int_value(const char *key, const char *value, int minval, int maxval)
  * vm_set_topology().  vmm.ko may enforce tighter limits.
  */
 static void
-calc_topolopgy(void)
+calc_topology(void)
 {
 	const char *value;
 	bool explicit_cpus;
@@ -1592,7 +1592,8 @@ main(int argc, char *argv[])
 	illumos_priv_init();
 #endif
 
-	calc_topolopgy();
+	calc_topology();
+
 #ifdef __FreeBSD__
 	build_vcpumaps();
 #endif
