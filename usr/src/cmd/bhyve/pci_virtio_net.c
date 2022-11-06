@@ -139,15 +139,14 @@ static int pci_vtnet_cfgwrite(void *, int, int, uint32_t);
 static void pci_vtnet_neg_features(void *, uint64_t);
 
 static struct virtio_consts vtnet_vi_consts = {
-	"vtnet",		/* our name */
-	VTNET_MAXQ - 1,		/* we currently support 2 virtqueues */
-	sizeof(struct virtio_net_config), /* config reg size */
-	pci_vtnet_reset,	/* reset */
-	NULL,			/* device-wide qnotify -- not used */
-	pci_vtnet_cfgread,	/* read PCI config */
-	pci_vtnet_cfgwrite,	/* write PCI config */
-	pci_vtnet_neg_features,	/* apply negotiated features */
-	VTNET_S_HOSTCAPS,	/* our capabilities */
+	.vc_name =	"vtnet",
+	.vc_nvq =	VTNET_MAXQ - 1,
+	.vc_cfgsize =	sizeof(struct virtio_net_config),
+	.vc_reset =	pci_vtnet_reset,
+	.vc_cfgread =	pci_vtnet_cfgread,
+	.vc_cfgwrite =	pci_vtnet_cfgwrite,
+	.vc_apply_features = pci_vtnet_neg_features,
+	.vc_hv_caps =	VTNET_S_HOSTCAPS,
 };
 
 static void
