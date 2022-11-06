@@ -121,7 +121,7 @@ enum blockif_wce {
 #endif
 
 struct blockif_ctxt {
-	int			bc_magic;
+	unsigned int		bc_magic;
 	int			bc_fd;
 	int			bc_ischr;
 	int			bc_isgeom;
