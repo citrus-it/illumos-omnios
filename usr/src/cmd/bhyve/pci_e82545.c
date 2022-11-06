@@ -1414,7 +1414,12 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 		/* Include respective part of payload IOV. */
 		for (nleft = now; pv < iovcnt && nleft > 0; nleft -= nnow) {
 			nnow = MIN(nleft, iov[pv].iov_len - pvoff);
-			tiov[tiovcnt].iov_base = iov[pv].iov_base + pvoff;
+#ifdef	__FreeBSD__
+			tiov[tiovcnt].iov_base = (uint8_t *)iov[pv].iov_base +
+			    pvoff;
+#else
+			tiov[tiovcnt].iov_base += pvoff;
+#endif
 			tiov[tiovcnt++].iov_len = nnow;
 			if (pvoff + nnow == iov[pv].iov_len) {
 				pv++;
