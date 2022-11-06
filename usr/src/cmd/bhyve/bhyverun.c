@@ -52,11 +52,11 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <sys/mman.h>
 #include <sys/time.h>
-#include <sys/cpuset.h>
 
 #ifdef __FreeBSD__
 #include <amd64/vmm/intel/vmcs.h>
 #else
+#include <sys/cpuset.h>
 #include <intel/vmcs.h>
 #endif
 
@@ -84,12 +84,14 @@ __FBSDID("$FreeBSD$");
 #ifndef WITHOUT_CAPSICUM
 #include <machine/vmm_dev.h>
 #endif
+#ifdef	__FreeBSD__
+#include <machine/vmm_instruction_emul.h>
+#endif
 #include <vmmapi.h>
 
 #include "bhyverun.h"
 #include "acpi.h"
 #include "atkbdc.h"
-#include "console.h"
 #include "bootrom.h"
 #include "config.h"
 #include "inout.h"
@@ -107,9 +109,7 @@ __FBSDID("$FreeBSD$");
 #include "smbiostbl.h"
 #include "xmsr.h"
 #include "spinup_ap.h"
-#include "rfb.h"
 #include "rtc.h"
-#include "vga.h"
 #include "vmgenc.h"
 #ifndef __FreeBSD__
 #include "privileges.h"
@@ -213,18 +213,24 @@ struct bhyvestats {
 	uint64_t	vmexit_hlt;
 	uint64_t	vmexit_pause;
 	uint64_t	vmexit_mtrap;
+#ifdef	__FreeBSD__
+	uint64_t	vmexit_inst_emul;
+#else
 	uint64_t	vmexit_mmio;
 	uint64_t	vmexit_inout;
+	uint64_t	mmio_unhandled;
+#endif
 	uint64_t	cpu_switch_rotate;
 	uint64_t	cpu_switch_direct;
-	uint64_t	mmio_unhandled;
 } stats;
 
 struct mt_vmm_info {
 	pthread_t	mt_thr;
 	struct vmctx	*mt_ctx;
 	int		mt_vcpu;
+#ifndef	__FreeBSD__
 	uint64_t	mt_startrip;
+#endif
 } *mt_vmm_info;
 
 #ifdef	__FreeBSD__
@@ -256,13 +262,16 @@ usage(int code)
 		"       -B type,key=value,...: set SMBIOS information\n"
 #endif
 		"       -C: include guest memory in core file\n"
-		"       -c: number of cpus and/or topology specification\n"
+		"       -c: number of CPUs and/or topology specification\n"
 		"       -D: destroy on power-off\n"
 #ifndef __FreeBSD__
-	        "       -d: suspend cpu at boot\n"
+		"       -d: suspend cpu at boot\n"
 #endif
 		"       -e: exit on unhandled I/O access\n"
-		"       -H: vmexit from the guest on hlt\n"
+#ifdef	__FreeBSD__
+		"       -G: start a debug server\n"
+#endif
+		"       -H: vmexit from the guest on HLT\n"
 		"       -h: help\n"
 		"       -k: key=value flat config file\n"
 		"       -K: PS2 keyboard layout\n"
@@ -275,11 +284,11 @@ usage(int code)
 #endif
 		"       -S: guest memory cannot be swapped\n"
 		"       -s: <slot,driver,configinfo> PCI slot config\n"
-		"       -U: uuid\n"
+		"       -U: UUID\n"
 		"       -u: RTC keeps UTC time\n"
 		"       -W: force virtio to use single-vector MSI\n"
 		"       -w: ignore unimplemented MSRs\n"
-		"       -x: local apic is in x2APIC mode\n"
+		"       -x: local APIC is in x2APIC mode\n"
 		"       -Y: disable MPtable generation\n",
 		progname, (int)strlen(progname), "", (int)strlen(progname), "",
 		(int)strlen(progname), "");
@@ -408,48 +417,14 @@ calc_topolopgy(void)
 		guest_ncpus = ncpus;
 }
 
-#ifndef WITHOUT_CAPSICUM
-/*
- * 11-stable capsicum helpers
- */
-static void
-bhyve_caph_cache_catpages(void)
-{
-
-	(void)catopen("libc", NL_CAT_LOCALE);
-}
-
-static int
-bhyve_caph_limit_stdoe(void)
-{
-	cap_rights_t rights;
-	unsigned long cmds[] = { TIOCGETA, TIOCGWINSZ };
-	int i, fds[] = { STDOUT_FILENO, STDERR_FILENO };
-
-	cap_rights_init(&rights, CAP_FCNTL, CAP_FSTAT, CAP_IOCTL);
-	cap_rights_set(&rights, CAP_WRITE);
-
-	for (i = 0; i < nitems(fds); i++) {
-		if (cap_rights_limit(fds[i], &rights) < 0 && errno != ENOSYS)
-			return (-1);
-
-		if (cap_ioctls_limit(fds[i], cmds, nitems(cmds)) < 0 && errno != ENOSYS)
-			return (-1);
-
-		if (cap_fcntls_limit(fds[i], CAP_FCNTL_GETFL) < 0 && errno != ENOSYS)
-			return (-1);
-	}
-
-	return (0);
-}
-
-#endif
-
 #ifdef	__FreeBSD__
 static int
 pincpu_parse(const char *opt)
 {
 	int vcpu, pcpu;
+	const char *value;
+	char *newval;
+	char key[16];
 
 	if (sscanf(opt, "%d:%d", &vcpu, &pcpu) != 2) {
 		fprintf(stderr, "invalid format: %s\n", opt);
@@ -599,19 +574,10 @@ fbsdrun_start_thread(void *param)
 	return (NULL);
 }
 
-#ifdef __FreeBSD__
-void
-fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip)
-#else
 void
 fbsdrun_addcpu(struct vmctx *ctx, int newcpu, uint64_t rip, bool suspend)
-#endif
 {
 	int error;
-
-#ifdef __FreeBSD__
-	assert(fromcpu == BSP);
-#endif
 
 	/*
 	 * The 'newcpu' must be activated in the context of 'fromcpu'. If
@@ -625,18 +591,21 @@ fbsdrun_addcpu(struct vmctx *ctx, int newcpu, uint64_t rip, bool suspend)
 
 	CPU_SET_ATOMIC(newcpu, &cpumask);
 
-#ifndef __FreeBSD__
 	if (suspend)
 		(void) vm_suspend_cpu(ctx, newcpu);
-#endif
 
 	/*
 	 * Set up the vmexit struct to allow execution to start
 	 * at the given RIP
 	 */
+#ifdef	__FreeBSD__
+	vmexit[newcpu].rip = rip;
+	vmexit[newcpu].inst_length = 0;
+#else
+	mt_vmm_info[newcpu].mt_startrip = rip;
+#endif
 	mt_vmm_info[newcpu].mt_ctx = ctx;
 	mt_vmm_info[newcpu].mt_vcpu = newcpu;
-	mt_vmm_info[newcpu].mt_startrip = rip;
 
 	error = pthread_create(&mt_vmm_info[newcpu].mt_thr, NULL,
 	    fbsdrun_start_thread, &mt_vmm_info[newcpu]);
@@ -656,6 +625,7 @@ fbsdrun_deletecpu(struct vmctx *ctx, int vcpu)
 	return (CPU_EMPTY(&cpumask));
 }
 
+#ifndef	__FreeBSD__
 static void
 vmentry_mmio_read(int vcpu, uint64_t gpa, uint8_t bytes, uint64_t data)
 {
@@ -715,6 +685,7 @@ vmentry_inout_write(int vcpu, uint16_t port, uint8_t bytes)
 	inout->port = port;
 	inout->eax = 0;
 }
+#endif
 
 static int
 vmexit_handle_notify(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu,
@@ -823,8 +794,7 @@ static int
 vmexit_spinup_ap(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 {
 
-	(void)spinup_ap(ctx, *pvcpu,
-		    vme->u.spinup_ap.vcpu, vme->u.spinup_ap.rip);
+	(void)spinup_ap(ctx, vme->u.spinup_ap.vcpu, vme->u.spinup_ap.rip);
 
 	return (VMEXIT_CONTINUE);
 }
@@ -1365,6 +1335,24 @@ do_open(const char *vmname)
 	return (ctx);
 }
 
+#ifdef	__FreeBSD__
+static void
+spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
+{
+	int error;
+	uint64_t rip;
+
+	error = vm_get_register(ctx, vcpu, VM_REG_GUEST_RIP, &rip);
+	assert(error == 0);
+
+	fbsdrun_set_capabilities(ctx, vcpu);
+	error = vm_set_capability(ctx, vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
+	assert(error == 0);
+
+	fbsdrun_addcpu(ctx, vcpu, rip, suspend);
+}
+#endif
+
 static bool
 parse_config_option(const char *option)
 {
@@ -1497,10 +1485,10 @@ main(int argc, char *argv[])
 #endif
 #ifdef	__FreeBSD__
 		case 'p':
-			if (pincpu_parse(optarg) != 0) {
-				errx(EX_USAGE, "invalid vcpu pinning "
-				    "configuration '%s'", optarg);
-			}
+                        if (pincpu_parse(optarg) != 0) {
+                            errx(EX_USAGE, "invalid vcpu pinning "
+                                 "configuration '%s'", optarg);
+                        }
 			break;
 #endif
                 case 'c':
@@ -1624,8 +1612,8 @@ main(int argc, char *argv[])
 
 	ctx = do_open(vmname);
 
-        max_vcpus = num_vcpus_allowed(ctx);
-        if (guest_ncpus > max_vcpus) {
+	max_vcpus = num_vcpus_allowed(ctx);
+	if (guest_ncpus > max_vcpus) {
 		fprintf(stderr, "%d vCPUs requested but only %d available\n",
 			guest_ncpus, max_vcpus);
 		exit(4);
@@ -1680,13 +1668,6 @@ main(int argc, char *argv[])
 	pmtmr_init(ctx);
 #endif
 
-	/* Allocate per-VCPU resources. */
-	vmexit = calloc(guest_ncpus, sizeof(*vmexit));
-	mt_vmm_info = calloc(guest_ncpus, sizeof(*mt_vmm_info));
-#ifndef	__FreeBSD__
-	vmentry = calloc(guest_ncpus, sizeof(*vmentry));
-#endif
-
 	/*
 	 * Exit if a device emulation finds an error in its initilization
 	 */
@@ -1733,7 +1714,7 @@ main(int argc, char *argv[])
 	assert(error == 0);
 
 	/*
- 	 * build the guest tables, MP etc.
+	 * build the guest tables, MP etc.
 	 */
 	if (get_config_bool_default("x86.mptable", true)) {
 		error = mptable_build(ctx, guest_ncpus);
@@ -1774,11 +1755,21 @@ main(int argc, char *argv[])
 	illumos_priv_lock();
 #endif
 
+	/* Allocate per-VCPU resources. */
+	vmexit = calloc(guest_ncpus, sizeof(*vmexit));
+	mt_vmm_info = calloc(guest_ncpus, sizeof(*mt_vmm_info));
+#ifndef	__FreeBSD__
+	vmentry = calloc(guest_ncpus, sizeof(*vmentry));
+#endif
+
 #ifdef __FreeBSD__
 	/*
-	 * Add CPU 0
+	 * Add all vCPUs.
 	 */
-	fbsdrun_addcpu(ctx, BSP, BSP, rip);
+	for (int vcpu = 0; vcpu < guest_ncpus; vcpu++) {
+		bool suspend = (vcpu != BSP);
+		spinup_vcpu(ctx, vcpu, suspend);
+	}
 #else
 	/* Set BSP to run (unlike the APs which wait for INIT) */
 	error = vm_set_run_state(ctx, BSP, VRS_RUN, 0);
