@@ -76,7 +76,7 @@ __FBSDID("$FreeBSD$");
  */
 #define	PRIO(x)			((x) & 0xf0)
 
-#define	VLAPIC_VERSION		(16)
+#define	VLAPIC_VERSION		(0x14)
 
 /*
  * The 'vlapic->timer_lock' is used to provide mutual exclusion between the
