@@ -179,9 +179,11 @@ struct net_backend {
 	/* Size of backend-specific private data. */
 	size_t priv_size;
 
-	/* Room for backend-specific data. */
-	char opaque[0];
+	/* Backend-specific private data follows. */
 };
+
+#define	NET_BE_PRIV(be)		((void *)((be) + 1))
+#define	NET_BE_SIZE(be)		(sizeof(*be) + (be)->priv_size)
 
 SET_DECLARE(net_backend_set, struct net_backend);
 
@@ -220,7 +222,7 @@ struct tap_priv {
 static void
 tap_cleanup(struct net_backend *be)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 
 	if (priv->mevp) {
 		mevent_delete(priv->mevp);
@@ -235,7 +237,7 @@ static int
 tap_init(struct net_backend *be, const char *devname,
     nvlist_t *nvl __unused, net_be_rxeof_t cb, void *param)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 	char tbuf[80];
 	int opt = 1;
 #if defined(INET6) || defined(INET)
@@ -336,7 +338,7 @@ tap_send(struct net_backend *be, const struct iovec *iov, int iovcnt)
 static ssize_t
 tap_peek_recvlen(struct net_backend *be)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 	ssize_t ret;
 
 	if (priv->bbuflen > 0) {
@@ -366,7 +368,7 @@ tap_peek_recvlen(struct net_backend *be)
 static ssize_t
 tap_recv(struct net_backend *be, const struct iovec *iov, int iovcnt)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 	ssize_t ret;
 
 	if (priv->bbuflen > 0) {
@@ -394,7 +396,7 @@ tap_recv(struct net_backend *be, const struct iovec *iov, int iovcnt)
 static void
 tap_recv_enable(struct net_backend *be)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 
 	mevent_enable(priv->mevp);
 }
@@ -402,7 +404,7 @@ tap_recv_enable(struct net_backend *be)
 static void
 tap_recv_disable(struct net_backend *be)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 
 	mevent_disable(priv->mevp);
 }
@@ -466,7 +468,7 @@ static int
 ng_init(struct net_backend *be, const char *devname __unused,
 	 nvlist_t *nvl, net_be_rxeof_t cb, void *param)
 {
-	struct tap_priv *p = (struct tap_priv *)be->opaque;
+	struct tap_priv *p = NET_BE_PRIV(be);
 	struct ngm_connect ngc;
 	const char *value, *nodename;
 	int sbsz;
@@ -642,7 +644,7 @@ netmap_set_vnet_hdr_len(struct net_backend *be, int vnet_hdr_len)
 {
 	int err;
 	struct nmreq req;
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	nmreq_init(&req, priv->ifname);
 	req.nr_cmd = NETMAP_BDG_VNET_HDR;
@@ -699,7 +701,7 @@ static int
 netmap_init(struct net_backend *be, const char *devname,
     nvlist_t *nvl __unused, net_be_rxeof_t cb, void *param)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	strlcpy(priv->ifname, devname, sizeof(priv->ifname));
 	priv->ifname[sizeof(priv->ifname) - 1] = '\0';
@@ -730,7 +732,7 @@ netmap_init(struct net_backend *be, const char *devname,
 static void
 netmap_cleanup(struct net_backend *be)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	if (priv->mevp) {
 		mevent_delete(priv->mevp);
@@ -745,7 +747,7 @@ static ssize_t
 netmap_send(struct net_backend *be, const struct iovec *iov,
 	    int iovcnt)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 	struct netmap_ring *ring;
 	ssize_t totlen = 0;
 	int nm_buf_size;
@@ -824,7 +826,7 @@ txsync:
 static ssize_t
 netmap_peek_recvlen(struct net_backend *be)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 	struct netmap_ring *ring = priv->rx;
 	uint32_t head = ring->head;
 	ssize_t totlen = 0;
@@ -844,7 +846,7 @@ netmap_peek_recvlen(struct net_backend *be)
 static ssize_t
 netmap_recv(struct net_backend *be, const struct iovec *iov, int iovcnt)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 	struct netmap_slot *slot = NULL;
 	struct netmap_ring *ring;
 	uint8_t *iov_frag_buf;
@@ -911,7 +913,7 @@ netmap_recv(struct net_backend *be, const struct iovec *iov, int iovcnt)
 static void
 netmap_recv_enable(struct net_backend *be)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	mevent_enable(priv->mevp);
 }
@@ -919,7 +921,7 @@ netmap_recv_enable(struct net_backend *be)
 static void
 netmap_recv_disable(struct net_backend *be)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	mevent_disable(priv->mevp);
 }
@@ -985,7 +987,7 @@ typedef struct be_dlpi_priv {
 static void
 be_dlpi_cleanup(net_backend_t *be)
 {
-	be_dlpi_priv_t *priv = (be_dlpi_priv_t *)be->opaque;
+	be_dlpi_priv_t *priv = NET_BE_PRIV(be);
 
 	if (priv->bdp_dhp != NULL)
 		dlpi_close(priv->bdp_dhp);
@@ -1009,7 +1011,7 @@ static int
 be_dlpi_init(net_backend_t *be, const char *devname __unused,
      nvlist_t *nvl, net_be_rxeof_t cb, void *param)
 {
-	be_dlpi_priv_t *priv = (be_dlpi_priv_t *)be->opaque;
+	be_dlpi_priv_t *priv = NET_BE_PRIV(be);
 	const char *vnic;
 	int ret;
 
@@ -1098,7 +1100,7 @@ error:
 static ssize_t
 be_dlpi_send(net_backend_t *be, const struct iovec *iov, int iovcnt)
 {
-	be_dlpi_priv_t *priv = (be_dlpi_priv_t *)be->opaque;
+	be_dlpi_priv_t *priv = NET_BE_PRIV(be);
 	ssize_t len = 0;
 	int ret;
 
@@ -1127,7 +1129,7 @@ be_dlpi_send(net_backend_t *be, const struct iovec *iov, int iovcnt)
 static ssize_t
 be_dlpi_peek_recvlen(net_backend_t *be)
 {
-	be_dlpi_priv_t *priv = (be_dlpi_priv_t *)be->opaque;
+	be_dlpi_priv_t *priv = NET_BE_PRIV(be);
 	dlpi_recvinfo_t recv;
 	size_t len;
 	int ret;
@@ -1170,7 +1172,7 @@ be_dlpi_peek_recvlen(net_backend_t *be)
 static ssize_t
 be_dlpi_recv(net_backend_t *be, const struct iovec *iov, int iovcnt)
 {
-	be_dlpi_priv_t *priv = (be_dlpi_priv_t *)be->opaque;
+	be_dlpi_priv_t *priv = NET_BE_PRIV(be);
 	size_t len;
 	int ret;
 
@@ -1207,7 +1209,7 @@ be_dlpi_recv(net_backend_t *be, const struct iovec *iov, int iovcnt)
 static void
 be_dlpi_recv_enable(net_backend_t *be)
 {
-	be_dlpi_priv_t *priv = (be_dlpi_priv_t *)be->opaque;
+	be_dlpi_priv_t *priv = NET_BE_PRIV(be);
 
 	mevent_enable(priv->bdp_mevp);
 }
@@ -1215,7 +1217,7 @@ be_dlpi_recv_enable(net_backend_t *be)
 static void
 be_dlpi_recv_disable(net_backend_t *be)
 {
-	be_dlpi_priv_t *priv = (be_dlpi_priv_t *)be->opaque;
+	be_dlpi_priv_t *priv = NET_BE_PRIV(be);
 
 	mevent_disable(priv->bdp_mevp);
 }
@@ -1236,7 +1238,7 @@ be_dlpi_set_cap(net_backend_t *be, uint64_t features,
 static int
 be_dlpi_get_mac(net_backend_t *be, void *buf, size_t *buflen)
 {
-	be_dlpi_priv_t *priv = (be_dlpi_priv_t *)be->opaque;
+	be_dlpi_priv_t *priv = NET_BE_PRIV(be);
 	uchar_t physaddr[DLPI_PHYSADDR_MAX];
 	size_t physaddrlen = DLPI_PHYSADDR_MAX;
 	int ret;
@@ -1394,7 +1396,7 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
 		return (EINVAL);
 	}
 
-	nbe = calloc(1, sizeof(*nbe) + tbe->priv_size);
+	nbe = calloc(1, NET_BE_SIZE(tbe));
 	*nbe = *tbe;	/* copy the template */
 	nbe->fd = -1;
 	nbe->sc = param;
