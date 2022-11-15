@@ -78,11 +78,6 @@ __FBSDID("$FreeBSD$");
 #include "pci_emul.h"
 #include "vmgenc.h"
 
-#ifndef	__FreeBSD__
-/* Until the in-gate ACPI is updated, map the new name to the old. */
-#define	ACPI_NAMESEG_SIZE	ACPI_NAME_SIZE
-#endif
-
 /*
  * Define the base address of the ACPI tables, the sizes of some tables,
  * and the offsets to the individual tables,
