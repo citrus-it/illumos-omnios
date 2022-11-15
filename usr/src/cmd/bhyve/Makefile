@@ -31,6 +31,7 @@ clobber	:=	TARGET = clobber
 
 SRCS =	acpi.c			\
 	atkbdc.c		\
+	basl.c			\
 	bhyvegc.c		\
 	bhyverun.c		\
 	block_if.c		\
