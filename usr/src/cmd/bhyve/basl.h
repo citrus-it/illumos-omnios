@@ -8,6 +8,11 @@
 
 #include <contrib/dev/acpica/include/acpi.h>
 
+#ifndef	__FreeBSD__
+/* Until the in-gate ACPI is updated, map the new name to the old. */
+#define	ACPI_NAMESEG_SIZE	ACPI_NAME_SIZE
+#endif
+
 #define ACPI_GAS_ACCESS_WIDTH_LEGACY 0
 #define ACPI_GAS_ACCESS_WIDTH_UNDEFINED 0
 #define ACPI_GAS_ACCESS_WIDTH_BYTE 1
@@ -48,5 +53,7 @@ int basl_table_append_gas(struct basl_table *table, uint8_t space_id,
     uint64_t address);
 int basl_table_append_int(struct basl_table *table, uint64_t val, uint8_t size);
 int basl_table_append_length(struct basl_table *table, uint8_t size);
+int basl_table_append_pointer(struct basl_table *table,
+    const uint8_t src_signature[ACPI_NAMESEG_SIZE], uint8_t size);
 int basl_table_create(struct basl_table **table, struct vmctx *ctx,
     const uint8_t *name, uint32_t alignment, uint32_t off);
