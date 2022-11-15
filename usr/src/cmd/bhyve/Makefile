@@ -40,6 +40,7 @@ SRCS =	acpi.c			\
 	config.c		\
 	fwctl.c			\
 	gdb.c			\
+	hexdump.c		\
 	inout.c			\
 	ioapic.c		\
 	mem.c			\
