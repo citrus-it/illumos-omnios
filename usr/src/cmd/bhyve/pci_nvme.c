@@ -2666,7 +2666,13 @@ nvme_opc_dataset_mgmt(struct pci_nvme_softc *sc,
 	nr = cmd->cdw10 & 0xff;
 
 	/* copy locally because a range entry could straddle PRPs */
+#ifdef	__FreeBSD__
 	range = calloc(1, NVME_MAX_DSM_TRIM);
+#else
+	_Static_assert(NVME_MAX_DSM_TRIM % sizeof(struct nvme_dsm_range) == 0,
+	    "NVME_MAX_DSM_TRIM is not a multiple of struct size");
+	range = calloc(NVME_MAX_DSM_TRIM / sizeof (*range), sizeof (*range));
+#endif
 	if (range == NULL) {
 		pci_nvme_status_genc(status, NVME_SC_INTERNAL_DEVICE_ERROR);
 		goto out;
@@ -3186,8 +3192,13 @@ pci_nvme_parse_config(struct pci_nvme_softc *sc, nvlist_t *nvl)
 	sc->num_cqueues = sc->max_queues;
 	sc->dataset_management = NVME_DATASET_MANAGEMENT_AUTO;
 	sectsz = 0;
+#ifdef	__FreeBSD__
 	snprintf(sc->ctrldata.sn, sizeof(sc->ctrldata.sn),
 	         "NVME-%d-%d", sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
+#else
+	snprintf((char *)sc->ctrldata.sn, sizeof(sc->ctrldata.sn),
+	         "NVME-%d-%d", sc->nsc_pi->pi_slot, sc->nsc_pi->pi_func);
+#endif
 
 	value = get_config_value_node(nvl, "maxq");
 	if (value != NULL)
