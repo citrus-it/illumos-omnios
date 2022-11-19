@@ -191,7 +191,15 @@ struct msixcap {
 	uint16_t	msgctrl;
 	uint32_t	table_info;	/* bar index and offset within it */
 	uint32_t	pba_info;	/* bar index and offset within it */
-} __packed;
+} __packed __aligned(4);
+#ifndef	__FreeBSD__
+/*
+ * Upstream divergence note: the __aligned(4) was added for illumos.
+ * __packed forces the alignment to 1 and pci_passthru.c casts a uint32_t * to
+ * the address of an instance of this struct on the stack. Ensure the struct
+ * itself is aligned to support this. This should be upstreamed.
+ */
+#endif
 static_assert(sizeof(struct msixcap) == 12, "compile-time assertion failed");
 
 struct pciecap {

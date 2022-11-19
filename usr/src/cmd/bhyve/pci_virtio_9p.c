@@ -98,7 +98,11 @@ struct pci_vt9p_request {
 
 struct pci_vt9p_config {
 	uint16_t tag_len;
+#ifdef	__FreeBSD__
 	char tag[0];
+#else
+	char tag[VT9P_MAXTAGSZ];
+#endif
 } __attribute__((packed));
 
 static int pci_vt9p_send(struct l9p_request *, const struct iovec *,
@@ -312,16 +316,16 @@ pci_vt9p_init(struct vmctx *ctx __unused, struct pci_devinst *pi, nvlist_t *nvl)
 	}
 
 	sc = calloc(1, sizeof(struct pci_vt9p_softc));
-#ifndef __FreeBSD__
+#ifdef	__FreeBSD__
+	sc->vsc_config = calloc(1, sizeof(struct pci_vt9p_config) +
+	    VT9P_MAXTAGSZ);
+#else
 	if (sc == NULL) {
 		EPRINTLN("virtio-9p: soft state allocation failure: %s",
 		    strerror(errno));
 		return (1);
 	}
-#endif
-	sc->vsc_config = calloc(1, sizeof(struct pci_vt9p_config) +
-	    VT9P_MAXTAGSZ);
-#ifndef __FreeBSD__
+	sc->vsc_config = calloc(1, sizeof(struct pci_vt9p_config));
 	if (sc == NULL) {
 		EPRINTLN("virtio-9p: vsc_config allocation failure: %s",
 		    strerror(errno));
