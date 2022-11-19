@@ -53,8 +53,7 @@ struct basl_table {
 	uint32_t len;
 	uint32_t off;
 	uint32_t alignment;
-	STAILQ_HEAD(basl_table_checksum_list,
-	    basl_table_checksum) checksums;
+	STAILQ_HEAD(basl_table_checksum_list, basl_table_checksum) checksums;
 	STAILQ_HEAD(basl_table_length_list, basl_table_length) lengths;
 	STAILQ_HEAD(basl_table_pointer_list, basl_table_pointer) pointers;
 };
@@ -289,7 +288,7 @@ basl_finish_set_length(struct basl_table *const table)
 		assert(length->off < table->len);
 		assert(length->off + length->size <= table->len);
 
-		basl_le_enc(table->data + length->off, table->len,
+		basl_le_enc((uint8_t *)table->data + length->off, table->len,
 		    length->size);
 	}
 
