@@ -6,7 +6,10 @@
 
 #pragma once
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
 #include <contrib/dev/acpica/include/acpi.h>
+#pragma clang diagnostic pop
 
 #ifndef	__FreeBSD__
 /* Until the in-gate ACPI is updated, map the new name to the old. */
@@ -25,7 +28,7 @@
 #define BASL_TABLE_ALIGNMENT 0x10
 #define BASL_TABLE_ALIGNMENT_FACS 0x40
 
-#define BASL_TABLE_CHECKSUM_LEN_FULL_TABLE (-1)
+#define BASL_TABLE_CHECKSUM_LEN_FULL_TABLE (-1U)
 
 #define BASL_EXEC(x)                                                         \
 	do {                                                                 \
