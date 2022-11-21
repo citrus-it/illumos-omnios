@@ -14,7 +14,15 @@
 #ifndef	__FreeBSD__
 /* Until the in-gate ACPI is updated, map the new name to the old. */
 #define	ACPI_NAMESEG_SIZE	ACPI_NAME_SIZE
-#endif
+/*
+ * Also to avoid type conflicts without having to pepper the code with ifdefs,
+ * redefine these constants to be uint8_t *
+ */
+#undef ACPI_SIG_FACS
+#undef ACPI_SIG_MCFG
+#define	ACPI_SIG_FACS           (const uint8_t *)"FACS"
+#define	ACPI_SIG_MCFG		(const uint8_t *)"MCFG"
+#endif /* !__FreeBSD__ */
 
 #define ACPI_GAS_ACCESS_WIDTH_LEGACY 0
 #define ACPI_GAS_ACCESS_WIDTH_UNDEFINED 0
