@@ -20,8 +20,10 @@
  */
 #undef ACPI_SIG_FACS
 #undef ACPI_SIG_MCFG
+#undef ACPI_SIG_HPET
 #define	ACPI_SIG_FACS           (const uint8_t *)"FACS"
 #define	ACPI_SIG_MCFG		(const uint8_t *)"MCFG"
+#define	ACPI_SIG_HPET		(const uint8_t *)"HPET"
 #endif /* !__FreeBSD__ */
 
 #define ACPI_GAS_ACCESS_WIDTH_LEGACY 0
