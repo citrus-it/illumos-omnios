@@ -24,12 +24,14 @@
 #undef ACPI_SIG_MADT
 #undef ACPI_SIG_DSDT
 #undef ACPI_SIG_FADT
+#undef ACPI_SIG_XSDT
 #define	ACPI_SIG_FACS           (const uint8_t *)"FACS"
 #define	ACPI_SIG_MCFG		(const uint8_t *)"MCFG"
 #define	ACPI_SIG_HPET		(const uint8_t *)"HPET"
 #define	ACPI_SIG_MADT		(const uint8_t *)"APIC"
 #define	ACPI_SIG_DSDT		(const uint8_t *)"DSDT"
 #define	ACPI_SIG_FADT		(const uint8_t *)"FACP"
+#define	ACPI_SIG_XSDT		(const uint8_t *)"XSDT"
 #endif /* !__FreeBSD__ */
 
 #define ACPI_GAS_ACCESS_WIDTH_LEGACY 0
