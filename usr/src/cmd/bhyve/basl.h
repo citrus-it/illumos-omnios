@@ -25,6 +25,8 @@
 #undef ACPI_SIG_DSDT
 #undef ACPI_SIG_FADT
 #undef ACPI_SIG_XSDT
+#undef ACPI_SIG_RSDT
+#undef ACPI_RSDP_NAME
 #define	ACPI_SIG_FACS           (const uint8_t *)"FACS"
 #define	ACPI_SIG_MCFG		(const uint8_t *)"MCFG"
 #define	ACPI_SIG_HPET		(const uint8_t *)"HPET"
@@ -32,6 +34,8 @@
 #define	ACPI_SIG_DSDT		(const uint8_t *)"DSDT"
 #define	ACPI_SIG_FADT		(const uint8_t *)"FACP"
 #define	ACPI_SIG_XSDT		(const uint8_t *)"XSDT"
+#define	ACPI_SIG_RSDT		(const uint8_t *)"RSDT"
+#define	ACPI_RSDP_NAME		(const uint8_t *)"RSDP"
 #endif /* !__FreeBSD__ */
 
 #define ACPI_GAS_ACCESS_WIDTH_LEGACY 0
