@@ -6,10 +6,10 @@
 
 #pragma once
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <contrib/dev/acpica/include/acpi.h>
-#pragma clang diagnostic pop
+#pragma GCC diagnostic pop
 
 #ifndef	__FreeBSD__
 /* Until the in-gate ACPI is updated, map the new name to the old. */
