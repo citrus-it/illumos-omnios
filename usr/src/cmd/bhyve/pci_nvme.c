@@ -976,6 +976,7 @@ pci_nvme_aen_process(struct pci_nvme_softc *sc)
 				EPRINTLN("%s unknown AEN notice type %u",
 				    __func__, aen->event_data);
 				status = NVME_SC_INTERNAL_DEVICE_ERROR;
+				lid = 0;
 				break;
 			}
 			if ((PCI_NVME_AEI_NOTICE_MASK(aen->event_data) & mask) == 0)
@@ -1010,6 +1011,7 @@ pci_nvme_aen_process(struct pci_nvme_softc *sc)
 			/* bad type?!? */
 			EPRINTLN("%s unknown AEN type %u", __func__, atype);
 			status = NVME_SC_INTERNAL_DEVICE_ERROR;
+			lid = 0;
 			break;
 		}
 
