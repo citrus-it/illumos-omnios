@@ -1536,13 +1536,10 @@ nvme_opc_identify(struct pci_nvme_softc* sc, struct nvme_command* command,
 	void *dest;
 	uint16_t status;
 
-#ifndef __FreeBSD__
-	status = 0;
-#endif
-
 	DPRINTF("%s identify 0x%x nsid 0x%x", __func__,
 	        command->cdw10 & 0xFF, command->nsid);
 
+	status = 0;
 	pci_nvme_status_genc(&status, NVME_SC_SUCCESS);
 
 	switch (command->cdw10 & 0xFF) {
@@ -2392,14 +2389,11 @@ pci_nvme_io_done(struct blockif_req *br, int err)
 	struct nvme_submission_queue *sq = req->nvme_sq;
 	uint16_t code, status;
 
-#ifndef __FreeBSD__
-	status = 0;
-#endif
-
 	DPRINTF("%s error %d %s", __func__, err, strerror(err));
 
 	/* TODO return correct error */
 	code = err ? NVME_SC_DATA_TRANSFER_ERROR : NVME_SC_SUCCESS;
+	status = 0;
 	pci_nvme_status_genc(&status, code);
 
 	pci_nvme_set_completion(req->sc, sq, req->sqid, req->cid, status);
@@ -2459,15 +2453,12 @@ nvme_write_read_ram(struct pci_nvme_softc *sc,
 	enum nvme_copy_dir dir;
 	uint16_t status;
 
-#ifndef __FreeBSD__
-	status = 0;
-#endif
-
 	if (is_write)
 		dir = NVME_COPY_TO_PRP;
 	else
 		dir = NVME_COPY_FROM_PRP;
 
+	status = 0;
 	if (nvme_prp_memcpy(sc->nsc_pi->pi_vmctx, prp1, prp2,
 	    buf + offset, bytes, dir))
 		pci_nvme_status_genc(&status,
@@ -2615,10 +2606,7 @@ pci_nvme_dealloc_sm(struct blockif_req *br, int err)
 	bool done = true;
 	uint16_t status;
 
-#ifndef __FreeBSD__
 	status = 0;
-#endif
-
 	if (err) {
 		pci_nvme_status_genc(&status, NVME_SC_INTERNAL_DEVICE_ERROR);
 	} else if ((req->prev_gpaddr + 1) == (req->prev_size)) {
@@ -2777,10 +2765,6 @@ pci_nvme_handle_io_cmd(struct pci_nvme_softc* sc, uint16_t idx)
 	struct nvme_submission_queue *sq;
 	uint16_t status;
 	uint16_t sqhead;
-
-#ifndef __FreeBSD__
-	status = 0;
-#endif
 
 	/* handle all submissions up to sq->tail index */
 	sq = &sc->submit_queues[idx];
