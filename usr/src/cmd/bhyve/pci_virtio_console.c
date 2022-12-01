@@ -277,11 +277,10 @@ static int
 pci_vtcon_sock_add(struct pci_vtcon_softc *sc, const char *port_name,
     const nvlist_t *nvl)
 {
+	struct pci_vtcon_sock *sock = NULL;
 #ifdef __FreeBSD__
-	struct pci_vtcon_sock *sock;
 	struct sockaddr_un sun;
 #else
-	struct pci_vtcon_sock *sock = NULL;
 	/* Our compiler #defines 'sun' as '1'.  Awesome. */
 	struct sockaddr_un addr;
 #endif
