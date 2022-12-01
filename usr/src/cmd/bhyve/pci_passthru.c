@@ -264,7 +264,7 @@ cfginitmsi(struct passthru_softc *sc)
 	uint32_t u32;
 	struct pci_devinst *pi = sc->psc_pi;
 	struct msixcap msixcap;
-	uint32_t *msixcap_ptr;
+	char *msixcap_ptr;
 
 	/*
 	 * Parse the capabilities and cache the location of the MSI
@@ -299,16 +299,16 @@ cfginitmsi(struct passthru_softc *sc)
 				 */
 				sc->psc_msix.capoff = ptr;
 				caplen = 12;
-				msixcap_ptr = (uint32_t*) &msixcap;
+				msixcap_ptr = (char *)&msixcap;
 				capptr = ptr;
 				while (caplen > 0) {
 					u32 = passthru_read_config(sc,
 					    capptr, 4);
-					*msixcap_ptr = u32;
+					memcpy(msixcap_ptr, &u32, 4);
 					pci_set_cfgdata32(pi, capptr, u32);
 					caplen -= 4;
 					capptr += 4;
-					msixcap_ptr++;
+					msixcap_ptr += 4;
 				}
 			}
 			ptr = passthru_read_config(sc, ptr + PCICAP_NEXTPTR, 1);
