@@ -789,16 +789,7 @@ vmexit_wrmsr(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 	return (VMEXIT_CONTINUE);
 }
 
-#ifdef __FreeBSD__
-static int
-vmexit_spinup_ap(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu __unused)
-{
-
-	(void)spinup_ap(ctx, vme->u.spinup_ap.vcpu, vme->u.spinup_ap.rip);
-
-	return (VMEXIT_CONTINUE);
-}
-#else
+#ifndef __FreeBSD__
 static int
 vmexit_run_state(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 {
@@ -1095,9 +1086,7 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_WRMSR]  = vmexit_wrmsr,
 	[VM_EXITCODE_MTRAP]  = vmexit_mtrap,
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
-#ifdef __FreeBSD__
-	[VM_EXITCODE_SPINUP_AP] = vmexit_spinup_ap,
-#else
+#ifndef __FreeBSD__
 	[VM_EXITCODE_RUN_STATE] = vmexit_run_state,
 	[VM_EXITCODE_PAGING] = vmexit_paging,
 	[VM_EXITCODE_HLT] = vmexit_hlt,
