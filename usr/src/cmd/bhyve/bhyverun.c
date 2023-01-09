@@ -199,7 +199,7 @@ static const int BSP = 0;
 
 static cpuset_t cpumask;
 
-static void vm_loop(struct vmctx *ctx, int vcpu, uint64_t rip);
+static void vm_loop(struct vmctx *ctx, int vcpu);
 
 static struct vm_exit *vmexit;
 #ifndef __FreeBSD__
@@ -567,7 +567,7 @@ fbsdrun_start_thread(void *param)
 
 	gdb_cpu_add(vcpu);
 
-	vm_loop(mtp->mt_ctx, vcpu, mtp->mt_startrip);
+	vm_loop(mtp->mt_ctx, vcpu);
 
 	/* not reached */
 	exit(1);
@@ -575,16 +575,10 @@ fbsdrun_start_thread(void *param)
 }
 
 void
-fbsdrun_addcpu(struct vmctx *ctx, int newcpu, uint64_t rip, bool suspend)
+fbsdrun_addcpu(struct vmctx *ctx, int newcpu, bool suspend)
 {
 	int error;
 
-	/*
-	 * The 'newcpu' must be activated in the context of 'fromcpu'. If
-	 * vm_activate_cpu() is delayed until newcpu's pthread starts running
-	 * then vmm.ko is out-of-sync with bhyve and this can create a race
-	 * with vm_suspend().
-	 */
 	error = vm_activate_cpu(ctx, newcpu);
 	if (error != 0)
 		err(EX_OSERR, "could not activate CPU %d", newcpu);
@@ -594,16 +588,6 @@ fbsdrun_addcpu(struct vmctx *ctx, int newcpu, uint64_t rip, bool suspend)
 	if (suspend)
 		(void) vm_suspend_cpu(ctx, newcpu);
 
-	/*
-	 * Set up the vmexit struct to allow execution to start
-	 * at the given RIP
-	 */
-#ifdef	__FreeBSD__
-	vmexit[newcpu].rip = rip;
-	vmexit[newcpu].inst_length = 0;
-#else
-	mt_vmm_info[newcpu].mt_startrip = rip;
-#endif
 	mt_vmm_info[newcpu].mt_ctx = ctx;
 	mt_vmm_info[newcpu].mt_vcpu = newcpu;
 
@@ -1132,7 +1116,7 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 };
 
 static void
-vm_loop(struct vmctx *ctx, int vcpu, uint64_t startrip)
+vm_loop(struct vmctx *ctx, int vcpu)
 {
 	int error, rc;
 	enum vm_exitcode exitcode;
@@ -1149,9 +1133,6 @@ vm_loop(struct vmctx *ctx, int vcpu, uint64_t startrip)
 #endif
 	error = vm_active_cpus(ctx, &active_cpus);
 	assert(CPU_ISSET(vcpu, &active_cpus));
-
-	error = vm_set_register(ctx, vcpu, VM_REG_GUEST_RIP, startrip);
-	assert(error == 0);
 
 	ventry = &vmentry[vcpu];
 	vexit = &vmexit[vcpu];
@@ -1274,6 +1255,9 @@ fbsdrun_set_capabilities(struct vmctx *ctx, int cpu)
 
 #ifdef	__FreeBSD__
 	vm_set_capability(ctx, cpu, VM_CAP_ENABLE_INVPCID, 1);
+
+	err = vm_set_capability(ctx, cpu, VM_CAP_IPI_EXIT, 1);
+	assert(err == 0);
 #endif
 }
 
@@ -1356,16 +1340,20 @@ static void
 spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
 {
 	int error;
-	uint64_t rip;
 
-	error = vm_get_register(ctx, vcpu, VM_REG_GUEST_RIP, &rip);
-	assert(error == 0);
+	if (vcpu != BSP) {
+		fbsdrun_set_capabilities(ctx, vcpu);
 
-	fbsdrun_set_capabilities(ctx, vcpu);
-	error = vm_set_capability(ctx, vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
-	assert(error == 0);
+		/*
+		 * Enable the 'unrestricted guest' mode for APs.
+		 *
+		 * APs startup in power-on 16-bit mode.
+		 */
+		error = vm_set_capability(ctx, vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
+		assert(error == 0);
+	}
 
-	fbsdrun_addcpu(ctx, vcpu, rip, suspend);
+	fbsdrun_addcpu(ctx, vcpu, suspend);
 }
 #endif
 
@@ -1790,7 +1778,7 @@ main(int argc, char *argv[])
 	/* Set BSP to run (unlike the APs which wait for INIT) */
 	error = vm_set_run_state(ctx, BSP, VRS_RUN, 0);
 	assert(error == 0);
-	fbsdrun_addcpu(ctx, BSP, rip,
+	fbsdrun_addcpu(ctx, BSP,
 	    get_config_bool_default("suspend_at_boot", false));
 
 	/* Add subsequent CPUs, which will wait until INIT/SIPI-ed */

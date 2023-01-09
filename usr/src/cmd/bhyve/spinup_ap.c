@@ -100,17 +100,6 @@ spinup_ap(struct vmctx *ctx, int newcpu, uint64_t rip)
 	error = vcpu_reset(ctx, newcpu);
 	assert(error == 0);
 
-	fbsdrun_set_capabilities(ctx, newcpu);
-
-	/*
-	 * Enable the 'unrestricted guest' mode for 'newcpu'.
-	 *
-	 * Set up the processor state in power-on 16-bit mode, with the CS:IP
-	 * init'd to the specified low-mem 4K page.
-	 */
-	error = vm_set_capability(ctx, newcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
-	assert(error == 0);
-
 	spinup_ap_realmode(ctx, newcpu, &rip);
 
 	vm_resume_cpu(ctx, newcpu);
@@ -132,6 +121,6 @@ spinup_halted_ap(struct vmctx *ctx, int newcpu)
 	error = vm_set_run_state(ctx, newcpu, VRS_HALT, 0);
 	assert(error == 0);
 
-	fbsdrun_addcpu(ctx, newcpu, 0, false);
+	fbsdrun_addcpu(ctx, newcpu, false);
 }
 #endif /* __FreeBSD__ */
