@@ -1075,6 +1075,37 @@ vmexit_breakpoint(struct vmctx *ctx __unused, struct vm_exit *vme, int *pvcpu)
 	return (VMEXIT_CONTINUE);
 }
 
+#ifdef	__FreeBSD__
+static int
+vmexit_ipi(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu __unused)
+{
+	int error = -1;
+	int i;
+	switch (vme->u.ipi.mode) {
+	case APIC_DELMODE_INIT:
+		CPU_FOREACH_ISSET(i, &vme->u.ipi.dmask) {
+			error = vm_suspend_cpu(ctx, i);
+			if (error) {
+				warnx("%s: failed to suspend cpu %d\n",
+				    __func__, i);
+				break;
+			}
+		}
+		break;
+	case APIC_DELMODE_STARTUP:
+		CPU_FOREACH_ISSET(i, &vme->u.ipi.dmask) {
+			spinup_ap(ctx, i, vme->u.ipi.vector << PAGE_SHIFT);
+		}
+		error = 0;
+		break;
+	default:
+		break;
+	}
+
+	return (error);
+}
+#endif
+
 static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_INOUT]  = vmexit_inout,
 	[VM_EXITCODE_MMIO]  = vmexit_mmio,
@@ -1095,6 +1126,9 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_TASK_SWITCH] = vmexit_task_switch,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
 	[VM_EXITCODE_BPT] = vmexit_breakpoint,
+#ifdef	__FreeBSD__
+	[VM_EXITCODE_IPI] = vmexit_ipi,
+#endif
 };
 
 static void
