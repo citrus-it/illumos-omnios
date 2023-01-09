@@ -556,13 +556,25 @@ fbsdrun_start_thread(void *param)
 {
 	char tname[MAXCOMLEN + 1];
 	struct mt_vmm_info *mtp;
+#ifdef	__FreeBSD__
+	int error, vcpu;
+#else
 	int vcpu;
+#endif
 
 	mtp = param;
 	vcpu = mtp->mt_vcpu;
 
 	snprintf(tname, sizeof(tname), "vcpu %d", vcpu);
 	pthread_set_name_np(mtp->mt_thr, tname);
+
+#ifdef	__FreeBSD__
+	if (vcpumap[vcpu] != NULL) {
+		error = pthread_setaffinity_np(pthread_self(),
+		    sizeof(cpuset_t), vcpumap[vcpu]);
+		assert(error == 0);
+	}
+#endif
 
 	gdb_cpu_add(vcpu);
 
@@ -1123,13 +1135,6 @@ vm_loop(struct vmctx *ctx, int vcpu)
 	cpuset_t active_cpus;
 	struct vm_entry *ventry;
 
-#ifdef	__FreeBSD__
-	if (vcpumap[vcpu] != NULL) {
-		error = pthread_setaffinity_np(pthread_self(),
-		    sizeof(cpuset_t), vcpumap[vcpu]);
-		assert(error == 0);
-	}
-#endif
 	error = vm_active_cpus(ctx, &active_cpus);
 	assert(CPU_ISSET(vcpu, &active_cpus));
 
