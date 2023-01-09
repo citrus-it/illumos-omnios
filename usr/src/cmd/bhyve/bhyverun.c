@@ -201,7 +201,6 @@ static cpuset_t cpumask;
 
 static void vm_loop(struct vmctx *ctx, int vcpu);
 
-static struct vm_exit *vmexit;
 #ifndef __FreeBSD__
 static struct vm_entry *vmentry;
 #endif
@@ -711,7 +710,7 @@ vmexit_inout(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 		fprintf(stderr, "Unhandled %s%c 0x%04x at 0x%lx\n",
 		    in ? "in" : "out",
 		    bytes == 1 ? 'b' : (bytes == 2 ? 'w' : 'l'),
-		    inout.port, vmexit->rip);
+		    inout.port, vme->rip);
 		return (VMEXIT_ABORT);
 	} else {
 		/*
@@ -1118,10 +1117,10 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 static void
 vm_loop(struct vmctx *ctx, int vcpu)
 {
+	struct vm_exit vme;
 	int error, rc;
 	enum vm_exitcode exitcode;
 	cpuset_t active_cpus;
-	struct vm_exit *vexit;
 	struct vm_entry *ventry;
 
 #ifdef	__FreeBSD__
@@ -1135,10 +1134,9 @@ vm_loop(struct vmctx *ctx, int vcpu)
 	assert(CPU_ISSET(vcpu, &active_cpus));
 
 	ventry = &vmentry[vcpu];
-	vexit = &vmexit[vcpu];
 
 	while (1) {
-		error = vm_run(ctx, vcpu, ventry, vexit);
+		error = vm_run(ctx, vcpu, ventry, &vme);
 		if (error != 0)
 			break;
 
@@ -1150,14 +1148,14 @@ vm_loop(struct vmctx *ctx, int vcpu)
 			bzero(ventry, sizeof (*ventry));
 		}
 
-		exitcode = vexit->exitcode;
+		exitcode = vme.exitcode;
 		if (exitcode >= VM_EXITCODE_MAX || handler[exitcode] == NULL) {
 			fprintf(stderr, "vm_loop: unexpected exitcode 0x%x\n",
 			    exitcode);
 			exit(4);
 		}
 
-		rc = (*handler[exitcode])(ctx, vexit, &vcpu);
+		rc = (*handler[exitcode])(ctx, &vme, &vcpu);
 
 		switch (rc) {
 		case VMEXIT_CONTINUE:
@@ -1760,7 +1758,6 @@ main(int argc, char *argv[])
 #endif
 
 	/* Allocate per-VCPU resources. */
-	vmexit = calloc(guest_ncpus, sizeof(*vmexit));
 	mt_vmm_info = calloc(guest_ncpus, sizeof(*mt_vmm_info));
 #ifndef	__FreeBSD__
 	vmentry = calloc(guest_ncpus, sizeof(*vmentry));
