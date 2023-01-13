@@ -87,6 +87,7 @@ spinup_ap_realmode(struct vmctx *ctx, int newcpu, uint64_t rip)
 	error = vm_set_register(ctx, newcpu, VM_REG_GUEST_CS, cs);
 	assert(error == 0);
 }
+#endif /* __FreeBSD__ */
 
 void
 spinup_ap(struct vmctx *ctx, int newcpu, uint64_t rip)
@@ -99,27 +100,9 @@ spinup_ap(struct vmctx *ctx, int newcpu, uint64_t rip)
 	error = vcpu_reset(ctx, newcpu);
 	assert(error == 0);
 
+#ifdef	__FreeBSD__
 	spinup_ap_realmode(ctx, newcpu, rip);
 
 	vm_resume_cpu(ctx, newcpu);
+#endif
 }
-#else /* __FreeBSD__ */
-void
-spinup_halted_ap(struct vmctx *ctx, int newcpu)
-{
-	int error;
-
-	assert(newcpu != 0);
-	assert(newcpu < guest_ncpus);
-
-	error = vcpu_reset(ctx, newcpu);
-	assert(error == 0);
-
-	fbsdrun_set_capabilities(ctx, newcpu);
-
-	error = vm_set_run_state(ctx, newcpu, VRS_HALT, 0);
-	assert(error == 0);
-
-	fbsdrun_addcpu(ctx, newcpu, false);
-}
-#endif /* __FreeBSD__ */

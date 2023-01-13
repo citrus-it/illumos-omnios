@@ -1201,7 +1201,7 @@ num_vcpus_allowed(struct vmctx *ctx)
 		return (1);
 }
 
-void
+static void
 fbsdrun_set_capabilities(struct vmctx *ctx, int cpu)
 {
 	int err, tmp;
@@ -1338,15 +1338,23 @@ do_open(const char *vmname)
 	return (ctx);
 }
 
-#ifdef	__FreeBSD__
 static void
 spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
 {
 	int error;
 
 	if (vcpu != BSP) {
+#ifndef	__FreeBSD__
+		/*
+		 * On illumos, all APs are spun up halted and run-state
+		 * transitions (INIT, SIPI, etc) are handled in-kernel.
+		 */
+		spinup_ap(ctx, vcpu, 0);
+#endif
+
 		fbsdrun_set_capabilities(ctx, vcpu);
 
+#ifdef	__FreeBSD__
 		/*
 		 * Enable the 'unrestricted guest' mode for APs.
 		 *
@@ -1354,11 +1362,17 @@ spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
 		 */
 		error = vm_set_capability(ctx, vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
 		assert(error == 0);
+#endif
 	}
+
+#ifndef	__FreeBSD__
+	error = vm_set_run_state(ctx, vcpu,
+	    vcpu == BSP ? VRS_RUN : VRS_HALT, 0);
+	assert(error == 0);
+#endif
 
 	fbsdrun_addcpu(ctx, vcpu, suspend);
 }
-#endif
 
 static bool
 parse_config_option(const char *option)
@@ -1768,26 +1782,19 @@ main(int argc, char *argv[])
 	vmentry = calloc(guest_ncpus, sizeof(*vmentry));
 #endif
 
-#ifdef __FreeBSD__
 	/*
 	 * Add all vCPUs.
 	 */
 	for (int vcpu = 0; vcpu < guest_ncpus; vcpu++) {
+#ifdef	__FreeBSD__
 		bool suspend = (vcpu != BSP);
+#else
+		bool suspend = vcpu == BSP &&
+		    get_config_bool_default("suspend_at_boot", false);
+#endif
 		spinup_vcpu(ctx, vcpu, suspend);
 	}
-#else
-	/* Set BSP to run (unlike the APs which wait for INIT) */
-	error = vm_set_run_state(ctx, BSP, VRS_RUN, 0);
-	assert(error == 0);
-	fbsdrun_addcpu(ctx, BSP,
-	    get_config_bool_default("suspend_at_boot", false));
 
-	/* Add subsequent CPUs, which will wait until INIT/SIPI-ed */
-	for (uint_t i = 1; i < guest_ncpus; i++) {
-		spinup_halted_ap(ctx, i);
-	}
-#endif
 	/*
 	 * Head off to the main event dispatch loop
 	 */
