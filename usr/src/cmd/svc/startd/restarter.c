@@ -1480,7 +1480,7 @@ enable_inst(scf_handle_t *h, restarter_inst_t *inst,
 		case RESTARTER_STATE_MAINT:
 			/*
 			 * We only want to pull the instance out of maintenance
-			 * if the disable is on adminstrative request.  The
+			 * if the disable is an administrative request.  The
 			 * graph engine sends _DISABLE events whenever a
 			 * service isn't in the disabled state, and we don't
 			 * want to pull the service out of maintenance if,

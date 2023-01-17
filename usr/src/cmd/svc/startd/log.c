@@ -475,6 +475,10 @@ log_transition(const restarter_inst_t *inst, start_outcome_t outcome)
 		severity = LOG_INFO;
 	} else {
 		switch (outcome) {
+		case DISABLE_REQUESTED:
+			action = gettext("transitioned to disabled by "
+			    "request (see 'svcs -xv' for details)");
+			break;
 		case MAINT_REQUESTED:
 			action = gettext("transitioned to maintenance by "
 			    "request (see 'svcs -xv' for details)");

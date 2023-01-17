@@ -189,7 +189,7 @@ static const struct restarter_state_transition_reason restarter_str[] = {
 	{
 	    restarter_str_bad_repo_state,
 	    "bad_repo_state",
-	    "an SMF repository inconsistecy exists"
+	    "an SMF repository inconsistency exists"
 	},
 
 	/*

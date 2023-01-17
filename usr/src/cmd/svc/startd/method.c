@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2023 Oxide Computer Company
  */
 
 /*
@@ -38,11 +39,11 @@
  *   contract into the terms of the new contract.  There should be limits to
  *   (a), though, since we don't want to keep the contract around forever.  To
  *   this end we'll say that services in the offline state may have a contract
- *   to be transfered and services in the disabled or maintenance states cannot.
- *   This means that when a service transitions from online (or degraded) to
- *   offline, the contract should be preserved, and when the service transitions
- *   from offline to online (i.e., the start method), we'll transfer inherited
- *   contracts.
+ *   to be transferred and services in the disabled or maintenance states
+ *   cannot. This means that when a service transitions from online (or
+ *   degraded) to offline, the contract should be preserved, and when the
+ *   service transitions from offline to online (i.e., the start method), we'll
+ *   transfer inherited contracts.
  */
 
 #include <sys/contract/process.h>
@@ -76,6 +77,15 @@
 #include "startd.h"
 
 #define	SBIN_SH		"/sbin/sh"
+
+/*
+ * This is the set of exit status codes which are considered successful. That
+ * is they do not trigger an attempted restart or transition to maintenance.
+ */
+#define	SUCCESSFUL_EXIT(code) \
+    ((code) == SMF_EXIT_OK || \
+    (code) == SMF_EXIT_NODAEMON || \
+    (code) == SMF_EXIT_TEMP_DISABLE)
 
 /*
  * Used to tell if contracts are in the process of being
@@ -989,8 +999,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 			goto contract_out;
 		}
 
-		if (!WIFEXITED(ret_status) &&
-		    WEXITSTATUS(ret_status) != SMF_EXIT_NODAEMON) {
+		if (!WIFEXITED(ret_status)) {
 			/*
 			 * If method didn't exit itself (it was killed by an
 			 * external entity, etc.), consider the entire
@@ -1019,8 +1028,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		}
 
 		*exit_code = WEXITSTATUS(ret_status);
-		if (*exit_code != SMF_EXIT_OK &&
-		    *exit_code != SMF_EXIT_NODAEMON) {
+		if (!SUCCESSFUL_EXIT(*exit_code)) {
 			log_error(LOG_WARNING,
 			    "%s: Method \"%s\" failed with exit status %d.\n",
 			    inst->ri_i.i_fmri, method, WEXITSTATUS(ret_status));
@@ -1029,7 +1037,10 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		log_instance(inst, B_TRUE, "Method \"%s\" exited with status "
 		    "%d.", mname, *exit_code);
 
-		/* Note: we will take this path for SMF_EXIT_NODAEMON */
+		/*
+		 * Note: we will take this path and clear the contract for
+		 * SMF_EXIT_NODAEMON and SMF_EXIT_TEMP_DISABLE.
+		 */
 		if (*exit_code != SMF_EXIT_OK)
 			goto contract_out;
 
@@ -1077,13 +1088,14 @@ assured_kill:
 
 contract_out:
 	/*
-	 * Abandon contracts for transient methods, methods that exit with
-	 * SMF_EXIT_NODAEMON & methods that fail.
+	 * Abandon contracts for transient methods, method that fail and
+	 * those which have successfully exited but not with SMF_EXIT_OK.
 	 */
 	transient = method_is_transient(inst, type);
 	if ((transient || *exit_code != SMF_EXIT_OK || result != 0) &&
-	    (restarter_is_kill_method(method) < 0))
+	    (restarter_is_kill_method(method) < 0)) {
 		method_remove_contract(inst, !transient, B_TRUE);
+	}
 
 out:
 	if (ctfd >= 0)
@@ -1177,8 +1189,7 @@ retry:
 
 	r = method_run(&inst, info->sf_method_type, &exit_code);
 
-	if (r == 0 &&
-	    (exit_code == SMF_EXIT_OK || exit_code == SMF_EXIT_NODAEMON)) {
+	if (r == 0 && SUCCESSFUL_EXIT(exit_code)) {
 		/* Success! */
 		assert(inst->ri_i.i_next_state != RESTARTER_STATE_NONE);
 
@@ -1198,17 +1209,28 @@ retry:
 		}
 
 		/*
-		 * For methods that exit with SMF_EXIT_NODAEMON, we already
-		 * called method_remove_contract in method_run.
+		 * For methods that exit successfully, we already called
+		 * method_remove_contract in method_run.
 		 */
 
 		/*
 		 * We don't care whether the handle was rebound because this is
 		 * the last thing we do with it.
 		 */
-		(void) restarter_instance_update_states(local_handle, inst,
-		    inst->ri_i.i_next_state, RESTARTER_STATE_NONE,
-		    info->sf_event_type, info->sf_reason);
+
+		if (exit_code == SMF_EXIT_TEMP_DISABLE) {
+			/* XXX - new code? */
+			reason = restarter_str_disable_request;
+			(void) restarter_instance_update_states(local_handle,
+			    inst, RESTARTER_STATE_DISABLED,
+			    RESTARTER_STATE_NONE,
+			    RERR_NONE, reason);
+		} else {
+			(void) restarter_instance_update_states(local_handle,
+			    inst, inst->ri_i.i_next_state,
+			    RESTARTER_STATE_NONE, info->sf_event_type,
+			    info->sf_reason);
+		}
 
 		(void) update_fault_count(inst, FAULT_COUNT_RESET);
 
