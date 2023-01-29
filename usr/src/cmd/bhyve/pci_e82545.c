@@ -1328,6 +1328,16 @@ e82545_transmit(struct e82545_softc *sc, uint16_t head, uint16_t tail,
 #ifdef	__FreeBSD__
 			iov->iov_base = (uint8_t *)iov->iov_base + now;
 #else
+			/*
+			 * The type of iov_base changed in SUS (XPG4v2) from
+			 * caddr_t (char * - note signed) to 'void *'. On
+			 * illumos, bhyve is not currently compiled with XPG4v2
+			 * or higher, and so we can't cast the RHS to unsigned.
+			 * error: pointer targets in assignment differ in
+			 *	  signedness
+			 * This also means that we need to apply some casts to
+			 * (caddr_t) below.
+			 */
 			iov->iov_base += now;
 #endif
 			iov->iov_len -= now;

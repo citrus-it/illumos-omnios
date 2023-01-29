@@ -1366,6 +1366,12 @@ spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
 	}
 
 #ifndef	__FreeBSD__
+	/*
+	 * The value of 'suspend' for the BSP depends on whether the -d
+	 * (suspend_at_boot) flag was given to bhyve. Regardless of that
+	 * value we always want to set the BSP to VRS_RUN and all others to
+	 * VRS_HALT.
+	 */
 	error = vm_set_run_state(ctx, vcpu,
 	    vcpu == BSP ? VRS_RUN : VRS_HALT, 0);
 	assert(error == 0);
