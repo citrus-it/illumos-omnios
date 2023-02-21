@@ -2446,6 +2446,29 @@ milan_dxio_rpc_retrieve_engine(milan_iodie_t *iodie)
 	return (B_TRUE);
 }
 
+static boolean_t
+milan_dxio_rpc_retrieve_error_log(milan_iodie_t *iodie, uint_t engine_id,
+    zen_dxio_error_log_t *elp)
+{
+	milan_dxio_rpc_t rpc = { 0 };
+
+	rpc.mdr_req = MILAN_DXIO_OP_GET_ERROR_LOG;
+	rpc.mdr_engine = (uint32_t)((uintptr_t)elp >> 32);
+	rpc.mdr_arg0 = (uintptr_t)elp & 0xffffffff;
+	rpc.mdr_arg1 = sizeof (*elp) / 4;;
+	rpc.mdr_arg2 = engine_id;
+
+	milan_dxio_rpc(iodie, &rpc);
+	if (rpc.mdr_smu_resp != MILAN_SMU_RPC_OK ||
+	    rpc.mdr_dxio_resp != MILAN_DXIO_RPC_OK) {
+		cmn_err(CE_WARN, "DXIO Retrieve Error Log Failed: SMU 0x%x, "
+		    "DXIO: 0x%x", rpc.mdr_smu_resp, rpc.mdr_dxio_resp);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
 static int
 milan_dump_versions(milan_iodie_t *iodie, void *arg)
 {
@@ -3901,6 +3924,8 @@ milan_dxio_map_engines(milan_fabric_t *fabric, milan_iodie_t *iodie)
 		if (en->zde_type != DXIO_ENGINE_PCIE)
 			continue;
 
+		(void) milan_dxio_rpc_retrieve_error_log(iodie, i,
+		    &iodie->errlog[i]);
 
 		pc = milan_fabric_find_pcie_core_by_lanes(iodie,
 		    en->zde_start_lane, en->zde_end_lane);
@@ -6160,6 +6185,11 @@ milan_fabric_init(void)
 
 	milan_pcie_populate_dbg(&milan_fabric, MPCS_POST_HOTPLUG,
 	    MILAN_IODIE_MATCH_ANY);
+
+#if 0
+	(void) milan_fabric_walk_pcie_rc(fabric, milan_pcie_populate_error_log,
+	    NULL);
+#endif
 
 	/*
 	 * XXX At some point, maybe not here, but before we really go too much

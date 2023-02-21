@@ -139,6 +139,8 @@ struct milan_iodie {
 	milan_ioms_t		mi_ioms[MILAN_IOMS_PER_IODIE];
 	milan_ccd_t		mi_ccds[MILAN_MAX_CCDS_PER_IODIE];
 	milan_soc_t		*mi_soc;
+
+	zen_dxio_error_log_t	errlog[0xf];
 };
 
 struct milan_soc {

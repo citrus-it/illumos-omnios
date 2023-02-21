@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2023 Oxide Computer Company
  */
 
 #ifndef _SYS_IO_MILAN_DXIO_IMPL_H
@@ -199,6 +199,64 @@ typedef struct zen_dxio_platform {
 	uint8_t			zdp_rsvd1[2];
 	zen_dxio_engine_t	zdp_engines[];
 } zen_dxio_platform_t;
+
+/* XXX */
+
+#define	ZEN_DXIO_ERROR_LOG_NUM_LGS	5
+
+typedef struct zen_dxio_error_log_header {
+	uint8_t			zddh_engine_type;
+	uint8_t			zddh_num_dwords;
+	uint8_t			zddh_version;
+	uint8_t			zddh_rsvd0;
+} zen_dxio_error_log_header_t;
+
+typedef struct zen_dxio_error_log_lgs {
+	uint32_t		zddl_start_lane;
+	uint32_t		zddl_end_lane;
+	uint32_t		zddl_lane_req_status;
+	uint32_t		zddl_hwdebug;
+} zen_dxio_error_log_lgs_t;
+
+typedef struct zen_dxio_error_log_dxio {
+	uint8_t			zddd_num_lgroups;
+	uint8_t			zddd_version;
+	uint8_t			zddd_rsvd0[2];
+	zen_dxio_error_log_lgs_t	zddd_lgs[ZEN_DXIO_ERROR_LOG_NUM_LGS];
+} zen_dxio_error_log_dxio_t;
+
+typedef struct zen_dxio_error_log_proto_pcie {
+	uint8_t			zddpp_version;
+	uint8_t			zddpp_rsvd0[3];
+	uint32_t		zddpp_link_state;
+	uint8_t			zddpp_link_speed;
+	uint8_t			zddpp_link_width;
+	uint8_t			zddpp_link_active;
+	uint8_t			zddpp_rsvd1;
+	uint32_t		zddpp_software_reset_control;
+	uint32_t		zddpp_rsvd2;
+} zen_dxio_error_log_proto_pcie_t;
+
+typedef struct zen_dxio_error_log_proto_base {
+	uint32_t		zddpb_rsvd0[5];
+} zen_dxio_error_log_proto_base_t;
+
+typedef struct zen_dxio_error_log_proto_sata {
+	uint32_t		zddps_rsvd0[5];
+} zen_dxio_error_log_proto_sata_t;
+
+typedef union zen_dxio_error_log_proto {
+	zen_dxio_error_log_proto_base_t	zddp_base;
+	zen_dxio_error_log_proto_pcie_t	zddp_pcie;
+	zen_dxio_error_log_proto_sata_t	zddp_sata;
+} zen_dxio_error_log_proto_t;
+
+typedef struct zen_dxio_error_log {
+	zen_dxio_error_log_header_t	zdd_header;
+	zen_dxio_error_log_dxio_t	zdd_dxio;
+	zen_dxio_error_log_proto_t	zdd_proto;
+} zen_dxio_error_log_t;
+
 #pragma pack()	/* pragma pack(1) */
 
 /*
@@ -374,7 +432,7 @@ typedef enum smu_exp_type {
 
 /*
  * XXX it may be nicer for us to define our own semantic set of bits here that
- * dont' change based on verison and then we change it.
+ * don't change based on version and then we change it.
  */
 typedef enum smu_enta_bits {
 	SMU_ENTA_PRSNT		= 1 << 0,
