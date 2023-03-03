@@ -30,6 +30,7 @@ clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
 
 SRCS =	acpi.c			\
+	acpi_device.c		\
 	atkbdc.c		\
 	basl.c			\
 	bhyvegc.c		\
