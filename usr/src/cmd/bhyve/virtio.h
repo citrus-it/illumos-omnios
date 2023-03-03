@@ -198,7 +198,6 @@ vring_size_aligned(u_int qsz)
 	return (roundup2(vring_size(qsz, VRING_ALIGN), VRING_ALIGN));
 }
 
-struct vmctx;
 struct pci_devinst;
 struct vqueue_info;
 
@@ -438,10 +437,10 @@ void	vq_relchain_publish(struct vqueue_info *vq);
 void	vq_relchain(struct vqueue_info *vq, uint16_t idx, uint32_t iolen);
 void	vq_endchains(struct vqueue_info *vq, int used_all_avail);
 
-uint64_t vi_pci_read(struct vmctx *ctx, struct pci_devinst *pi,
-		     int baridx, uint64_t offset, int size);
-void	vi_pci_write(struct vmctx *ctx, struct pci_devinst *pi,
-		     int baridx, uint64_t offset, int size, uint64_t value);
+uint64_t vi_pci_read(struct pci_devinst *pi, int baridx, uint64_t offset,
+	    int size);
+void	vi_pci_write(struct pci_devinst *pi, int baridx, uint64_t offset,
+	    int size, uint64_t value);
 
 #ifndef __FreeBSD__
 void	vi_vq_init(struct virtio_softc *, uint32_t);

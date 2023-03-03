@@ -56,8 +56,7 @@ struct pci_devemu {
 	const char      *pe_emu;	/* Name of device emulation */
 
 	/* instance creation */
-	int       (*pe_init)(struct vmctx *, struct pci_devinst *,
-			     nvlist_t *);
+	int       (*pe_init)(struct pci_devinst *, nvlist_t *);
 	int	(*pe_legacy_config)(nvlist_t *, const char *);
 	const char *pe_alias;
 
@@ -65,22 +64,18 @@ struct pci_devemu {
 	void	(*pe_write_dsdt)(struct pci_devinst *);
 
 	/* config space read/write callbacks */
-	int	(*pe_cfgwrite)(struct vmctx *ctx,
-			       struct pci_devinst *pi, int offset,
+	int	(*pe_cfgwrite)(struct pci_devinst *pi, int offset,
 			       int bytes, uint32_t val);
-	int	(*pe_cfgread)(struct vmctx *ctx,
-			      struct pci_devinst *pi, int offset,
+	int	(*pe_cfgread)(struct pci_devinst *pi, int offset,
 			      int bytes, uint32_t *retval);
 
 	/* BAR read/write callbacks */
-	void      (*pe_barwrite)(struct vmctx *ctx,
-				 struct pci_devinst *pi, int baridx,
+	void      (*pe_barwrite)(struct pci_devinst *pi, int baridx,
 				 uint64_t offset, int size, uint64_t value);
-	uint64_t  (*pe_barread)(struct vmctx *ctx,
-				struct pci_devinst *pi, int baridx,
+	uint64_t  (*pe_barread)(struct pci_devinst *pi, int baridx,
 				uint64_t offset, int size);
 
-	void	(*pe_baraddr)(struct vmctx *ctx, struct pci_devinst *pi,
+	void	(*pe_baraddr)(struct pci_devinst *pi,
 			      int baridx, int enabled, uint64_t address);
 #ifndef __FreeBSD__
 	void	(*pe_lintrupdate)(struct pci_devinst *pi);

@@ -63,8 +63,7 @@ static struct pci_hostbridge_model {
 #endif
 
 static int
-pci_hostbridge_init(struct vmctx *ctx __unused, struct pci_devinst *pi,
-    nvlist_t *nvl)
+pci_hostbridge_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	const char *value;
 	u_int vendor, device;
@@ -129,7 +128,8 @@ pci_hostbridge_init(struct vmctx *ctx __unused, struct pci_devinst *pi,
 	if (vendor == 0x8086 && (device == 0x1237 || device == 0x29b0)) {
 		const uintptr_t start = 0xf0000;
 		const size_t len = 0x10000;
-		void *system_bios_region = paddr_guest2host(ctx, start, len);
+		void *system_bios_region = paddr_guest2host(pi->pi_vmctx,
+		    start, len);
 		assert(system_bios_region != NULL);
 		bzero(system_bios_region, len);
 	}

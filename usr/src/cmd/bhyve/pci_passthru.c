@@ -744,11 +744,12 @@ passthru_init_rom(struct vmctx *const ctx __unused,
  }
 
 static int
-passthru_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+passthru_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	int error, memflags, pptfd;
 	struct passthru_softc *sc;
 	const char *path;
+	struct vmctx *ctx = pi->pi_vmctx;
 
 	pptfd = -1;
 	sc = NULL;
@@ -837,8 +838,7 @@ msixcap_access(struct passthru_softc *sc, int coff)
 }
 
 static int
-passthru_cfgread(struct vmctx *ctx __unused, struct pci_devinst *pi, int coff,
-    int bytes, uint32_t *rv)
+passthru_cfgread(struct pci_devinst *pi, int coff, int bytes, uint32_t *rv)
 {
 	struct passthru_softc *sc;
 
@@ -889,12 +889,12 @@ passthru_cfgread(struct vmctx *ctx __unused, struct pci_devinst *pi, int coff,
 }
 
 static int
-passthru_cfgwrite(struct vmctx *ctx, struct pci_devinst *pi, int coff,
-    int bytes, uint32_t val)
+passthru_cfgwrite(struct pci_devinst *pi, int coff, int bytes, uint32_t val)
 {
 	int error, msix_table_entries, i;
 	struct passthru_softc *sc;
 	uint16_t cmd_old;
+	struct vmctx *ctx = pi->pi_vmctx;
 
 	sc = pi->pi_arg;
 
@@ -966,10 +966,11 @@ passthru_cfgwrite(struct vmctx *ctx, struct pci_devinst *pi, int coff,
 }
 
 static void
-passthru_write(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
-    uint64_t offset, int size, uint64_t value)
+passthru_write(struct pci_devinst *pi, int baridx, uint64_t offset, int size,
+    uint64_t value)
 {
 	struct passthru_softc *sc = pi->pi_arg;
+	struct vmctx *ctx = pi->pi_vmctx;
 
 	if (baridx == pci_msix_table_bar(pi)) {
 		msix_table_write(ctx, sc, offset, size, value);
@@ -987,8 +988,7 @@ passthru_write(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
 }
 
 static uint64_t
-passthru_read(struct vmctx *ctx __unused, struct pci_devinst *pi, int baridx,
-    uint64_t offset, int size)
+passthru_read(struct pci_devinst *pi, int baridx, uint64_t offset, int size)
 {
 	struct passthru_softc *sc = pi->pi_arg;
 	uint64_t val;
@@ -1094,9 +1094,11 @@ passthru_addr_rom(struct pci_devinst *const pi, const int idx,
 }
 
 static void
-passthru_addr(struct vmctx *ctx, struct pci_devinst *pi, int baridx,
+passthru_addr(struct pci_devinst *pi, int baridx,
     int enabled, uint64_t address)
 {
+	struct vmctx *ctx = pi->pi_vmctx;
+
 	switch (pi->pi_bar[baridx].type) {
 	case PCIBAR_IO:
 		/* IO BARs are emulated */
