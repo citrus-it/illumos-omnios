@@ -1456,7 +1456,7 @@ set_defaults(void)
 int
 main(int argc, char *argv[])
 {
-	int c, error, err;
+	int c, error;
 	int max_vcpus, memflags;
 	struct vmctx *ctx;
 	uint64_t rip;
@@ -1651,20 +1651,21 @@ main(int argc, char *argv[])
 		memflags |= VM_MEM_F_INCORE;
 	vm_set_memflags(ctx, memflags);
 #ifdef	__FreeBSD__
-	err = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
+	error = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
 #else
+	int _errno;
 	do {
 		errno = 0;
-		err = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
-		error = errno;
-		if (err != 0 && error == ENOMEM) {
+		error = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
+		_errno = errno;
+		if (error != 0 && _errno == ENOMEM) {
 			(void) fprintf(stderr, "Unable to allocate memory "
 			    "(%llu), retrying in 1 second\n", memsize);
 			sleep(1);
 		}
-	} while (error == ENOMEM);
+	} while (_errno == ENOMEM);
 #endif
-	if (err) {
+	if (error) {
 		fprintf(stderr, "Unable to set up memory (%d)\n", errno);
 		exit(4);
 	}
