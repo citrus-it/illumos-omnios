@@ -302,7 +302,7 @@ static int set_desc_ldtr, get_desc_ldtr;
 static int set_cs, set_ds, set_es, set_fs, set_gs, set_ss, set_tr, set_ldtr;
 static int get_cs, get_ds, get_es, get_fs, get_gs, get_ss, get_tr, get_ldtr;
 static int set_x2apic_state, get_x2apic_state;
-enum x2apic_state x2apic_state;
+static enum x2apic_state x2apic_state;
 static int run;
 static int do_pause, do_resume;
 static int get_cpu_topology;
@@ -525,25 +525,20 @@ print_intinfo(const char *banner, uint64_t info)
 static bool
 cpu_vendor_intel(void)
 {
-	u_int regs[4];
-	char cpu_vendor[13];
+	u_int regs[4], v[3];
 
 	do_cpuid(0, regs);
-	((u_int *)&cpu_vendor)[0] = regs[1];
-	((u_int *)&cpu_vendor)[1] = regs[3];
-	((u_int *)&cpu_vendor)[2] = regs[2];
-	cpu_vendor[12] = '\0';
+	v[0] = regs[1];
+	v[1] = regs[3];
+	v[2] = regs[2];
 
-	if (strcmp(cpu_vendor, "AuthenticAMD") == 0) {
-		return (false);
-	} else if (strcmp(cpu_vendor, "HygonGenuine") == 0) {
-		return (false);
-	} else if (strcmp(cpu_vendor, "GenuineIntel") == 0) {
+	if (memcmp(v, "GenuineIntel", sizeof(v)) == 0)
 		return (true);
-	} else {
-		fprintf(stderr, "Unknown cpu vendor \"%s\"\n", cpu_vendor);
-		exit(1);
-	}
+	if (memcmp(v, "AuthenticAMD", sizeof(v)) == 0 ||
+	    memcmp(v, "HygonGenuine", sizeof(v)) == 0)
+		return (false);
+	fprintf(stderr, "Unknown cpu vendor \"%s\"\n", (const char *)v);
+	exit(1);
 }
 
 static int
