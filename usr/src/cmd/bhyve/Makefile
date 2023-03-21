@@ -72,6 +72,7 @@ SRCS =	acpi.c			\
 	privileges.c		\
 	ps2kbd.c		\
 	ps2mouse.c		\
+	qemu_fwcfg.c		\
 	rfb.c			\
 	rtc.c			\
 	smbiostbl.c		\
