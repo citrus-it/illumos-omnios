@@ -81,8 +81,7 @@ struct pci_devemu {
 	void	(*pe_lintrupdate)(struct pci_devinst *pi);
 #endif /* __FreeBSD__ */
 };
-
-#define PCI_EMUL_SET(x)   DATA_SET(pci_devemu_set, x);
+#define PCI_EMUL_SET(x)   DATA_SET(pci_devemu_set, x)
 
 enum pcibar_type {
 	PCIBAR_NONE,
