@@ -1699,19 +1699,11 @@ main(int argc, char *argv[])
 		exit(4);
 	}
 
-#ifdef	__FreeBSD__
 	if (qemu_fwcfg_add_file("opt/bhyve/hw.ncpu", sizeof(guest_ncpus),
 	    &guest_ncpus) != 0) {
 		fprintf(stderr, "Could not add qemu fwcfg opt/bhyve/hw.ncpu");
 		exit(4);
 	}
-#else
-	if (qemu_fwcfg_add_file((uint8_t *)"opt/bhyve/hw.ncpu",
-	    sizeof(guest_ncpus), &guest_ncpus) != 0) {
-		fprintf(stderr, "Could not add qemu fwcfg opt/bhyve/hw.ncpu");
-		exit(4);
-	}
-#endif
 
 	/*
 	 * Exit if a device emulation finds an error in its initilization
