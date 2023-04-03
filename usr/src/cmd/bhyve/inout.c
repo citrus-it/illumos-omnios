@@ -117,7 +117,7 @@ register_default_iohandler(int start, int size)
 }
 
 int
-emulate_inout(struct vmctx *ctx, int vcpu, struct vm_inout *inout)
+emulate_inout(struct vmctx *ctx, struct vcpu *vcpu, struct vm_inout *inout)
 {
 	struct inout_handler handler;
 	inout_func_t hfunc;
