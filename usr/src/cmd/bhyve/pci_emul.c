@@ -386,7 +386,8 @@ pci_config_read_reg(const struct pcisel *const host_sel, nvlist_t *nvl,
 		return read_config(host_sel, reg, size);
 #else
 		/* illumos does not yet support "host" */
-		return (-1);
+		err(4,
+		    "pci_config_read_reg does not support 'host' on illumos");
 #endif
 	} else {
 		return strtol(config, NULL, 16);

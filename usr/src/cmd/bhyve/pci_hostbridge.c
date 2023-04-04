@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <strings.h>
+#include <err.h>
 #endif
 __FBSDID("$FreeBSD$");
 
@@ -78,20 +79,23 @@ pci_hostbridge_init(struct pci_devinst *pi, nvlist_t *nvl)
 	value = get_config_value_node(nvl, "vendor");
 	if (value != NULL)
 		vendor = strtol(value, NULL, 0);
+	else
+		vendor = pci_config_read_reg(NULL, nvl, PCIR_VENDOR, 2, vendor);
 	value = get_config_value_node(nvl, "devid");
 	if (value != NULL)
 		device = strtol(value, NULL, 0);
+	else
+		device = pci_config_read_reg(NULL, nvl, PCIR_DEVICE, 2, device);
 
 #ifndef __FreeBSD__
 	const char *model = get_config_value_node(nvl, "model");
 
 	if (model != NULL && (vendor != 0 || device != 0)) {
-		fprintf(stderr, "pci_hostbridge: cannot specify model "
-		    "and vendor/device");
+		warnx("pci_hostbridge: cannot specify model and vendor/device");
 		return (-1);
 	} else if ((vendor != 0 && device == 0) ||
 	    (vendor == 0 && device != 0)) {
-		fprintf(stderr, "pci_hostbridge: must specify both vendor and"
+		warnx("pci_hostbridge: must specify both vendor and "
 		    "device for custom hostbridge");
 		return (-1);
 	}
@@ -109,8 +113,7 @@ pci_hostbridge_init(struct pci_devinst *pi, nvlist_t *nvl)
 			break;
 		}
 		if (vendor == 0) {
-			fprintf(stderr, "pci_hostbridge: invalid model '%s'",
-			    model);
+			warnx("pci_hostbridge: invalid model '%s'", model);
 			return (-1);
 		}
 	}
@@ -150,8 +153,15 @@ pci_hostbridge_init(struct pci_devinst *pi, nvlist_t *nvl)
 static int
 pci_amd_hostbridge_legacy_config(nvlist_t *nvl, const char *opts __unused)
 {
-	set_config_value_node(nvl, "vendor", "0x1022");	/* AMD */
-	set_config_value_node(nvl, "devid", "0x7432");	/* made up */
+	nvlist_t *pci_regs;
+
+	pci_regs = create_relative_config_node(nvl, "pcireg");
+	if (pci_regs == NULL) {
+		warnx("amd_hostbridge: failed to create pciregs node");
+		return (-1);
+	}
+	set_config_value_node(pci_regs, "vendor", "0x1022");	/* AMD */
+	set_config_value_node(pci_regs, "device", "0x7432");	/* made up */
 
 	return (0);
 }
