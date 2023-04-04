@@ -16,8 +16,13 @@ uint32_t read_config(const struct pcisel *sel, long reg, int width);
 void write_config(const struct pcisel *sel, long reg, int width, uint32_t data);
 
 #ifndef	__FreeBSD__
-void illumos_pci_init(void);
-void illumos_pci_fini(void);
+/*
+ * This is not the right place for these, but it is also not the right place
+ * for {read,write}_config().
+ */
+void pci_illumos_init(void);
+void pci_illumos_fini(void);
+int pci_illumos_find_lpc(struct pcisel *const);
 #endif
 
 #endif /* _PCI_PASSTHRU_H_ */

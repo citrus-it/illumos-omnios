@@ -382,13 +382,7 @@ pci_config_read_reg(const struct pcisel *const host_sel, nvlist_t *nvl,
 	if (config == NULL) {
 		return def;
 	} else if (host_sel != NULL && strcmp(config, "host") == 0) {
-#ifdef	__FreeBSD__
 		return read_config(host_sel, reg, size);
-#else
-		/* illumos does not yet support "host" */
-		err(4,
-		    "pci_config_read_reg does not support 'host' on illumos");
-#endif
 	} else {
 		return strtol(config, NULL, 16);
 	}
