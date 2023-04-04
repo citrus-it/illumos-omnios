@@ -54,6 +54,7 @@ SRCS =	acpi.c			\
 	pci_emul.c		\
 	pci_fbuf.c		\
 	pci_hostbridge.c	\
+	pci_illumos.c		\
 	pci_irq.c		\
 	pci_lpc.c		\
 	pci_nvme.c		\
@@ -140,6 +141,7 @@ $(PROG) := LDLIBS += \
 	-l9p \
 	-lcmdutils \
 	-lcrypto \
+	-ldevinfo \
 	-ldladm \
 	-ldlpi \
 	-lidspace \

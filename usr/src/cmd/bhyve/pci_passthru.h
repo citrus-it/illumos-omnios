@@ -12,7 +12,12 @@
 
 #include "pci_emul.h"
 
-uint32_t read_config(struct pci_devinst *pi, long reg, int width);
-void write_config(struct pci_devinst *pi, long reg, int width, uint32_t data);
+uint32_t read_config(const struct pcisel *sel, long reg, int width);
+void write_config(const struct pcisel *sel, long reg, int width, uint32_t data);
+
+#ifndef	__FreeBSD__
+void illumos_pci_init(void);
+void illumos_pci_fini(void);
+#endif
 
 #endif /* _PCI_PASSTHRU_H_ */

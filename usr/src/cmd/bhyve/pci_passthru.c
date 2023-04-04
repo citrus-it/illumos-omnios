@@ -134,22 +134,6 @@ passthru_write_config(const struct passthru_softc *sc, long reg, int width,
 	(void) ioctl(sc->pptfd, PPT_CFG_WRITE, &pi);
 }
 
-uint32_t
-read_config(struct pci_devinst *pi, long reg, int width)
-{
-	struct passthru_softc *sc = pi->pi_arg;
-
-	return (passthru_read_config(sc, reg, width));
-}
-
-void
-write_config(struct pci_devinst *pi, long reg, int width, uint32_t data)
-{
-	struct passthru_softc *sc = pi->pi_arg;
-
-	passthru_write_config(sc, reg, width, data);
-}
-
 static int
 passthru_get_bar(struct passthru_softc *sc, int bar, enum pcibar_type *type,
     uint64_t *base, uint64_t *size)
