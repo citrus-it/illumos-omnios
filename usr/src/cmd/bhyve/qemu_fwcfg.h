@@ -5,6 +5,9 @@
  * Author: Corvin Köhne <c.koehne@beckhoff.com>
  */
 
+#ifndef __QEMU_FWCFG_H__
+#define	__QEMU_FWCFG_H__
+
 #pragma once
 
 #include <vmmapi.h>
@@ -21,3 +24,5 @@ struct qemu_fwcfg_item {
 int qemu_fwcfg_add_file(const char *name,
     const uint32_t size, void *const data);
 int qemu_fwcfg_init(struct vmctx *const ctx);
+
+#endif /* !__QEMU_FWCFG_H__ */

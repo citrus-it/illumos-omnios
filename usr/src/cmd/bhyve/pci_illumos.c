@@ -53,30 +53,30 @@ pci_illumos_fini(void)
 static bool
 is_pci(di_node_t node)
 {
-        const char *name;
-        char *compat;
-        int nents;
+	const char *name;
+	char *compat;
+	int nents;
 
-        name = di_node_name(node);
-        if (strncmp("pci", name, 3) == 0)
-                return (name[3] != '\0');
+	name = di_node_name(node);
+	if (strncmp("pci", name, 3) == 0)
+		return (name[3] != '\0');
 
-        nents = di_prop_lookup_strings(DDI_DEV_T_ANY, node, "compatible",
-            &compat);
-        if (nents <= 0)
-                return (false);
+	nents = di_prop_lookup_strings(DDI_DEV_T_ANY, node, "compatible",
+	    &compat);
+	if (nents <= 0)
+		return (false);
 
-        for (uint_t i = 0; i < nents; i++) {
-                if (strncmp("pciclass,", compat, strlen("pciclass,")) == 0 ||
-                    strncmp("pciexclass,", compat, strlen("pciexclass,")) ==
-                    0) {
-                        return (true);
-                }
+	for (uint_t i = 0; i < nents; i++) {
+		if (strncmp("pciclass,", compat, strlen("pciclass,")) == 0 ||
+		    strncmp("pciexclass,", compat, strlen("pciexclass,")) ==
+		    0) {
+			return (true);
+		}
 
-                compat += strlen(compat) + 1;
-        }
+		compat += strlen(compat) + 1;
+	}
 
-        return (false);
+	return (false);
 }
 
 static int
