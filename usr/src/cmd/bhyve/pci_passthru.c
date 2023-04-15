@@ -83,6 +83,9 @@ struct passthru_softc {
 	int pptfd;
 	int msi_limit;
 	int msix_limit;
+
+	cfgread_handler psc_pcir_rhandler[PCI_REGMAX + 1];
+	cfgwrite_handler psc_pcir_whandler[PCI_REGMAX + 1];
 };
 
 static int
@@ -649,6 +652,23 @@ done:
 	return (error);
 }
 
+int
+set_pcir_handler(struct passthru_softc *sc, int reg, int len,
+    cfgread_handler rhandler, cfgwrite_handler whandler)
+{
+	if (reg > PCI_REGMAX || reg + len > PCI_REGMAX + 1)
+		return (-1);
+
+	for (int i = reg; i < reg + len; ++i) {
+		assert(sc->psc_pcir_rhandler[i] == NULL || rhandler == NULL);
+		assert(sc->psc_pcir_whandler[i] == NULL || whandler == NULL);
+		sc->psc_pcir_rhandler[i] = rhandler;
+		sc->psc_pcir_whandler[i] = whandler;
+	}
+
+	return (0);
+}
+
 static int
 passthru_legacy_config(nvlist_t *nvl, const char *opt)
 {
@@ -822,12 +842,9 @@ msixcap_access(struct passthru_softc *sc, int coff)
 }
 
 static int
-passthru_cfgread(struct pci_devinst *pi, int coff, int bytes, uint32_t *rv)
+passthru_cfgread_default(struct passthru_softc *sc,
+    struct pci_devinst *pi __unused, int coff, int bytes, uint32_t *rv)
 {
-	struct passthru_softc *sc;
-
-	sc = pi->pi_arg;
-
 	/*
 	 * PCI BARs and MSI capability is emulated.
 	 */
@@ -873,14 +890,25 @@ passthru_cfgread(struct pci_devinst *pi, int coff, int bytes, uint32_t *rv)
 }
 
 static int
-passthru_cfgwrite(struct pci_devinst *pi, int coff, int bytes, uint32_t val)
+passthru_cfgread(struct pci_devinst *pi, int coff, int bytes, uint32_t *rv)
 {
-	int error, msix_table_entries, i;
 	struct passthru_softc *sc;
-	uint16_t cmd_old;
-	struct vmctx *ctx = pi->pi_vmctx;
 
 	sc = pi->pi_arg;
+
+	if (sc->psc_pcir_rhandler[coff] != NULL)
+		return (sc->psc_pcir_rhandler[coff](sc, pi, coff, bytes, rv));
+
+	return (passthru_cfgread_default(sc, pi, coff, bytes, rv));
+}
+
+static int
+passthru_cfgwrite_default(struct passthru_softc *sc, struct pci_devinst *pi,
+    int coff, int bytes, uint32_t val)
+{
+	int error, msix_table_entries, i;
+	uint16_t cmd_old;
+	struct vmctx *ctx = pi->pi_vmctx;
 
 	/*
 	 * PCI BARs are emulated
@@ -947,6 +975,19 @@ passthru_cfgwrite(struct pci_devinst *pi, int coff, int bytes, uint32_t val)
 	}
 
 	return (0);
+}
+
+static int
+passthru_cfgwrite(struct pci_devinst *pi, int coff, int bytes, uint32_t val)
+{
+	struct passthru_softc *sc;
+
+	sc = pi->pi_arg;
+
+	if (sc->psc_pcir_whandler[coff] != NULL)
+		return (sc->psc_pcir_whandler[coff](sc, pi, coff, bytes, val));
+
+	return (passthru_cfgwrite_default(sc, pi, coff, bytes, val));
 }
 
 static void
