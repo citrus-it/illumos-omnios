@@ -618,8 +618,29 @@ cfginitbar(struct vmctx *ctx __unused, struct passthru_softc *sc)
 static int
 cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 {
-	struct pci_devinst *pi = sc->psc_pi;
 	int error;
+	struct pci_devinst *pi = sc->psc_pi;
+	uint8_t intline, intpin;
+
+
+	/*
+	 * Copy physical PCI header to virtual config space. INTLINE and INTPIN
+	 * shouldn't be aligned with their physical value and they are already set by
+	 * pci_emul_init().
+	 */
+	intline = pci_get_cfgdata8(pi, PCIR_INTLINE);
+	intpin = pci_get_cfgdata8(pi, PCIR_INTPIN);
+	for (int i = 0; i <= PCIR_MAXLAT; i += 4) {
+#ifdef	__FreeBSD__
+		pci_set_cfgdata32(pi, i, read_config(&sc->psc_sel, i, 4));
+#else
+		pci_set_cfgdata32(pi, i, passthru_read_config(sc, i, 4));
+#endif
+	}
+	for (int i = 0; i <= PCIR_MAXLAT; i += 4) {
+	}
+	pci_set_cfgdata8(pi, PCIR_INTLINE, intline);
+	pci_set_cfgdata8(pi, PCIR_INTPIN, intpin);
 
 	if (cfginitmsi(sc) != 0) {
 		warnx("failed to initialize MSI for PCI %d", sc->pptfd);
@@ -646,6 +667,15 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 			goto done;
 		}
 	}
+
+	/* Emulate most PCI header register. */
+	if ((error = set_pcir_handler(sc, 0, PCIR_MAXLAT + 1,
+	    passthru_cfgread_emulate, passthru_cfgwrite_emulate)) != 0)
+		goto done;
+
+	/* Allow access to the physical command and status register. */
+	if ((error = set_pcir_handler(sc, PCIR_COMMAND, 0x04, NULL, NULL)) != 0)
+		goto done;
 
 	error = 0;				/* success */
 done:
@@ -806,16 +836,6 @@ done:
 }
 
 static int
-bar_access(int coff)
-{
-	if ((coff >= PCIR_BAR(0) && coff < PCIR_BAR(PCI_BARMAX + 1)) ||
-	    coff == PCIR_BIOS)
-		return (1);
-	else
-		return (0);
-}
-
-static int
 msicap_access(struct passthru_softc *sc, int coff)
 {
 	int caplen;
@@ -846,10 +866,9 @@ passthru_cfgread_default(struct passthru_softc *sc,
     struct pci_devinst *pi __unused, int coff, int bytes, uint32_t *rv)
 {
 	/*
-	 * PCI BARs and MSI capability is emulated.
+	 * MSI capability is emulated.
 	 */
-	if (bar_access(coff) || msicap_access(sc, coff) ||
-	    msixcap_access(sc, coff))
+	if (msicap_access(sc, coff) || msixcap_access(sc, coff))
 		return (-1);
 
 	/*
@@ -858,17 +877,6 @@ passthru_cfgread_default(struct passthru_softc *sc,
 	 */
 	if (msixcap_access(sc, coff))
 		return (-1);
-
-#ifdef LEGACY_SUPPORT
-	/*
-	 * Emulate PCIR_CAP_PTR if this device does not support MSI capability
-	 * natively.
-	 */
-	if (sc->psc_msi.emulated) {
-		if (coff >= PCIR_CAP_PTR && coff < PCIR_CAP_PTR + 4)
-			return (-1);
-	}
-#endif
 
 	/*
 	 * Emulate the command register.  If a single read reads both the
@@ -887,6 +895,14 @@ passthru_cfgread_default(struct passthru_softc *sc,
 	*rv = passthru_read_config(sc, coff, bytes);
 
 	return (0);
+}
+
+int
+passthru_cfgread_emulate(struct passthru_softc *sc __unused,
+    struct pci_devinst *pi __unused, int coff __unused, int bytes __unused,
+    uint32_t *rv __unused)
+{
+	return (-1);
 }
 
 static int
@@ -909,12 +925,6 @@ passthru_cfgwrite_default(struct passthru_softc *sc, struct pci_devinst *pi,
 	int error, msix_table_entries, i;
 	uint16_t cmd_old;
 	struct vmctx *ctx = pi->pi_vmctx;
-
-	/*
-	 * PCI BARs are emulated
-	 */
-	if (bar_access(coff))
-		return (-1);
 
 	/*
 	 * MSI capability is emulated
@@ -975,6 +985,14 @@ passthru_cfgwrite_default(struct passthru_softc *sc, struct pci_devinst *pi,
 	}
 
 	return (0);
+}
+
+int
+passthru_cfgwrite_emulate(struct passthru_softc *sc __unused,
+    struct pci_devinst *pi __unused, int coff __unused, int bytes __unused,
+    uint32_t val __unused)
+{
+	return (-1);
 }
 
 static int
