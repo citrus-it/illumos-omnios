@@ -740,18 +740,22 @@ legacy_emulate_cpuid(struct vm *vm, int vcpu_id, uint32_t *eax, uint32_t *ebx,
 				/*
 				 * Expose known-safe features.
 				 */
-				regs[1] &= (CPUID_STDEXT_FSGSBASE |
+				regs[1] &= CPUID_STDEXT_FSGSBASE |
 				    CPUID_STDEXT_BMI1 | CPUID_STDEXT_HLE |
 				    CPUID_STDEXT_AVX2 | CPUID_STDEXT_SMEP |
 				    CPUID_STDEXT_BMI2 |
 				    CPUID_STDEXT_ERMS | CPUID_STDEXT_RTM |
 				    CPUID_STDEXT_AVX512F |
+				    CPUID_STDEXT_AVX512DQ |
 				    CPUID_STDEXT_RDSEED |
 				    CPUID_STDEXT_SMAP |
 				    CPUID_STDEXT_AVX512PF |
 				    CPUID_STDEXT_AVX512ER |
-				    CPUID_STDEXT_AVX512CD | CPUID_STDEXT_SHA);
-				regs[2] = 0;
+				    CPUID_STDEXT_AVX512CD | CPUID_STDEXT_SHA |
+				    CPUID_STDEXT_AVX512BW |
+				    CPUID_STDEXT_AVX512VL;
+				regs[2] &= CPUID_STDEXT2_VAES |
+				    CPUID_STDEXT2_VPCLMULQDQ;
 				regs[3] &= CPUID_STDEXT3_MD_CLEAR;
 
 				/* Advertise INVPCID if it is enabled. */
