@@ -39,6 +39,7 @@ SRCS =	acpi.c			\
 	bootrom.c		\
 	console.c		\
 	config.c		\
+	crc16.c			\
 	fwctl.c			\
 	gdb.c			\
 	hexdump.c		\
