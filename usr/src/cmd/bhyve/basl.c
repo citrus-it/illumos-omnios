@@ -24,6 +24,7 @@
 #endif
 
 #include "basl.h"
+#include "qemu_loader.h"
 
 struct basl_table_checksum {
 	STAILQ_ENTRY(basl_table_checksum) chain;
@@ -59,6 +60,8 @@ struct basl_table {
 };
 static STAILQ_HEAD(basl_table_list, basl_table) basl_tables = STAILQ_HEAD_INITIALIZER(
     basl_tables);
+
+static struct qemu_loader *basl_loader;
 
 static __inline uint64_t
 basl_le_dec(void *pp, size_t len)
@@ -167,6 +170,20 @@ basl_finish_install_guest_tables(struct basl_table *const table, uint32_t *const
 	}
 	memcpy(gva, table->data, table->len);
 
+	/* Cause guest bios to copy the ACPI table into guest memory. */
+#ifdef	__FreeBSD__
+	BASL_EXEC(
+	    qemu_fwcfg_add_file(table->fwcfg_name, table->len, table->data));
+	BASL_EXEC(qemu_loader_alloc(basl_loader, table->fwcfg_name,
+	    table->alignment, QEMU_LOADER_ALLOC_HIGH));
+#else
+	BASL_EXEC(
+	    qemu_fwcfg_add_file((const char *)table->fwcfg_name,
+	    table->len, table->data));
+	BASL_EXEC(qemu_loader_alloc(basl_loader, table->fwcfg_name,
+	    table->alignment, QEMU_LOADER_ALLOC_HIGH));
+#endif
+
 	return (0);
 }
 
@@ -223,6 +240,10 @@ basl_finish_patch_checksums(struct basl_table *const table)
 			sum += *(gva + i);
 		}
 		*checksum_gva = -sum;
+
+		/* Cause guest bios to patch the checksum. */
+		BASL_EXEC(qemu_loader_add_checksum(basl_loader,
+		    table->fwcfg_name, checksum->off, checksum->start, len));
 	}
 
 	return (0);
@@ -296,6 +317,11 @@ basl_finish_patch_pointers(struct basl_table *const table)
 		val = basl_le_dec(gva + pointer->off, pointer->size);
 		val += BHYVE_ACPI_BASE + src_table->off;
 		basl_le_enc(gva + pointer->off, val, pointer->size);
+
+		/* Cause guest bios to patch the pointer. */
+		BASL_EXEC(
+		    qemu_loader_add_pointer(basl_loader, table->fwcfg_name,
+			src_table->fwcfg_name, pointer->off, pointer->size));
 	}
 
 	return (0);
@@ -345,6 +371,7 @@ basl_finish(void)
 		 */
 		BASL_EXEC(basl_finish_patch_checksums(table));
 	}
+	BASL_EXEC(qemu_loader_finish(basl_loader));
 
 	return (0);
 }
@@ -352,7 +379,12 @@ basl_finish(void)
 int
 basl_init(void)
 {
-	return (0);
+#ifdef	__FreeBSD__
+	return (qemu_loader_create(&basl_loader, QEMU_FWCFG_FILE_TABLE_LOADER));
+#else
+	return (qemu_loader_create(&basl_loader,
+	    (uint8_t *)QEMU_FWCFG_FILE_TABLE_LOADER));
+#endif
 }
 
 int

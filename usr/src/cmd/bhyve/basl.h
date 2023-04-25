@@ -40,6 +40,8 @@
 #define	ACPI_SIG_SPCR		(const uint8_t *)"SPCR"
 #endif /* !__FreeBSD__ */
 
+#include "qemu_fwcfg.h"
+
 #define ACPI_GAS_ACCESS_WIDTH_LEGACY 0
 #define ACPI_GAS_ACCESS_WIDTH_UNDEFINED 0
 #define ACPI_GAS_ACCESS_WIDTH_BYTE 1
@@ -87,8 +89,6 @@
 			return (error);                                      \
 		}                                                            \
 	} while (0)
-
-#define QEMU_FWCFG_MAX_NAME 56
 
 struct basl_table;
 
