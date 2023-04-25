@@ -388,11 +388,13 @@ usr/src/cmd/bhyve/acpi_device.h
 usr/src/cmd/bhyve/ahci.h
 usr/src/cmd/bhyve/atkbdc.h
 usr/src/cmd/bhyve/audio.h
+usr/src/cmd/bhyve/basl.h
 usr/src/cmd/bhyve/bhyvegc.h
 usr/src/cmd/bhyve/bhyverun.h
 usr/src/cmd/bhyve/block_if.h
 usr/src/cmd/bhyve/bootrom.h
 usr/src/cmd/bhyve/console.h
+usr/src/cmd/bhyve/crc16.h
 usr/src/cmd/bhyve/dbgport.h
 usr/src/cmd/bhyve/debug.h
 usr/src/cmd/bhyve/inout.h
@@ -407,6 +409,7 @@ usr/src/cmd/bhyve/pci_lpc.h
 usr/src/cmd/bhyve/pctestdev.h
 usr/src/cmd/bhyve/ps2kbd.h
 usr/src/cmd/bhyve/ps2mouse.h
+usr/src/cmd/bhyve/qemu_loader.h
 usr/src/cmd/bhyve/rtc.h
 usr/src/cmd/bhyve/smbiostbl.h
 usr/src/cmd/bhyve/sockstream.h
