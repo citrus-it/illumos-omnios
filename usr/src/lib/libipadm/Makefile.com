@@ -23,6 +23,7 @@
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+# Copyright 2023 Oxide Computer Company
 #
 
 LIBRARY = libipadm.a
@@ -42,12 +43,7 @@ LDLIBS +=	-lc -linetutil -lsocket -ldlpi -lnvpair -ldhcpagent \
 SRCDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
-CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	$(CNOWARN_UNINIT)
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
-
-# not linted
-SMATCH=off
 
 .KEEP_STATE:
 

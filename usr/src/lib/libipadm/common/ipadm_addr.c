@@ -601,7 +601,7 @@ static ipadm_status_t
 i_ipadm_nvl2ainfo_common(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 {
 	nvlist_t		*nvladdr;
-	char			*name;
+	char			*name = NULL;
 	char			*propstr = NULL;
 	char			*sname, *dname;
 	nvpair_t		*nvp;
@@ -624,6 +624,9 @@ i_ipadm_nvl2ainfo_common(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 		if (err != 0)
 			return (ipadm_errno2status(err));
 	}
+
+	if (name == NULL)
+		return (IPADM_FAILURE);
 
 	if (is_addr) {
 		/*
@@ -722,7 +725,7 @@ i_ipadm_nvl2ainfo_persist(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 {
 	nvlist_t		*nvladdr;
 	struct ifaddrs		*ifa;
-	char			*name;
+	char			*name = NULL;
 	char			*ifname = NULL;
 	char			*aobjname = NULL;
 	char			*propstr = NULL;
@@ -756,6 +759,9 @@ i_ipadm_nvl2ainfo_persist(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 			return (ipadm_errno2status(err));
 	}
 
+	if (name == NULL)
+		return (IPADM_FAILURE);
+
 	ifa = &ainfo->ia_ifa;
 	(void) strlcpy(ainfo->ia_aobjname, aobjname,
 	    sizeof (ainfo->ia_aobjname));
@@ -763,14 +769,16 @@ i_ipadm_nvl2ainfo_persist(nvlist_t *nvl, ipadm_addr_info_t *ainfo)
 		return (IPADM_NO_MEMORY);
 	if (is_addr) {
 		struct sockaddr_in6 data;
+		void *buf;
 
 		/*
 		 * We got an address from the nvlist `nvl'.
 		 * Parse `nvladdr' and populate `ifa->ifa_addr'.
 		 */
 		ainfo->ia_atype = atype;
-		if ((ifa->ifa_addr = calloc(1, size)) == NULL)
+		if ((buf = calloc(1, size)) == NULL)
 			return (IPADM_NO_MEMORY);
+		ifa->ifa_addr = (struct sockaddr *)buf;
 		switch (atype) {
 		case IPADM_ADDR_STATIC:
 			ifa->ifa_addr->sa_family = af;
@@ -2643,7 +2651,7 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 	ipadm_status_t		status;
 	sa_family_t		af;
 	sa_family_t		daf;
-	sa_family_t		other_af;
+	sa_family_t		other_af = AF_INET; /* To appease -Wuninit */
 	boolean_t		created_af = B_FALSE;
 	boolean_t		created_other_af = B_FALSE;
 	ipadm_addr_type_t	type;
@@ -3442,6 +3450,9 @@ i_ipadm_addr_persist(ipadm_handle_t iph, const ipadm_addrobj_t ipaddr,
 		break;
 	case IPADM_ADDR_IPV6_ADDRCONF:
 		status = i_ipadm_add_intfid2nvl(nvl, ipaddr);
+		break;
+	default:
+		status = IPADM_FAILURE;
 		break;
 	}
 	if (status != IPADM_SUCCESS)

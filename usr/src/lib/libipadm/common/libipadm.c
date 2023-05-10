@@ -601,7 +601,7 @@ ipadm_status_t
 i_ipadm_init_addrobj(ipadm_handle_t iph, nvlist_t *nvl)
 {
 	nvpair_t	*nvp;
-	char		*name;
+	char		*name = NULL;
 	char		*aobjname = NULL, *pval = NULL, *ifname = NULL;
 	sa_family_t	af = AF_UNSPEC;
 	ipadm_addr_type_t atype = IPADM_ADDR_NONE;
@@ -627,6 +627,8 @@ i_ipadm_init_addrobj(ipadm_handle_t iph, nvlist_t *nvl)
 	}
 	if (err != 0)
 		return (ipadm_errno2status(err));
+	if (name == NULL)
+		return (IPADM_FAILURE);
 
 	switch (atype) {
 	case IPADM_ADDR_STATIC:
@@ -787,7 +789,8 @@ i_ipadm_init_ifs(ipadm_handle_t iph, const char *ifs, nvlist_t **allifs)
 	nvlist_t		*nvl = NULL;
 	size_t			nvlsize, bufsize;
 	ipmgmt_initif_arg_t	*iargp;
-	char			*buf = NULL, *nvlbuf = NULL;
+	void			*buf = NULL;
+	char			*nvlbuf = NULL;
 	ipmgmt_get_rval_t	*rvalp = NULL;
 	int			err;
 	ipadm_status_t		status = IPADM_SUCCESS;
@@ -808,7 +811,7 @@ i_ipadm_init_ifs(ipadm_handle_t iph, const char *ifs, nvlist_t **allifs)
 	}
 
 	/* populate the door_call argument structure */
-	iargp = (void *)buf;
+	iargp = (ipmgmt_initif_arg_t *)buf;
 	iargp->ia_cmd = IPMGMT_CMD_INITIF;
 	iargp->ia_flags = 0;
 	iargp->ia_family = AF_UNSPEC;
