@@ -40,6 +40,7 @@ SRCS =	acpi.c			\
 	console.c		\
 	config.c		\
 	crc16.c			\
+	e820.c			\
 	fwctl.c			\
 	gdb.c			\
 	hexdump.c		\
