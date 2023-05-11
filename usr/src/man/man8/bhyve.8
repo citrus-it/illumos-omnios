@@ -24,7 +24,7 @@
 .\"
 .\" Portions Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd June 1, 2022
+.Dd May 5, 2023
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -880,7 +880,7 @@ Be sure to create a per-guest copy of the template VARS file from
 .Bd -literal -offset indent
 bhyve -c 2 -m 4g -w -H \e
   -s 0,hostbridge \e
-  -s 31,lpc -p com1,stdio \e
+  -s 31,lpc -l com1,stdio \e
   -l bootrom,/usr/share/bhyve/firmware/BHYVE_UEFI.fd,BHYVE_UEFI_VARS.fd \e
    uefivm
 .Ed
