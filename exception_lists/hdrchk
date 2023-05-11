@@ -397,6 +397,7 @@ usr/src/cmd/bhyve/console.h
 usr/src/cmd/bhyve/crc16.h
 usr/src/cmd/bhyve/dbgport.h
 usr/src/cmd/bhyve/debug.h
+usr/src/cmd/bhyve/e820.h
 usr/src/cmd/bhyve/inout.h
 usr/src/cmd/bhyve/ioapic.h
 usr/src/cmd/bhyve/kernemu_dev.h
