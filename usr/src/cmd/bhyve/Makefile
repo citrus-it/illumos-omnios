@@ -131,7 +131,8 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(SRC)/uts/intel/io/vmm \
 		-I$(SRC)/uts/common \
 		-I$(SRC)/uts/intel \
-		-DWITHOUT_CAPSICUM
+		-DWITHOUT_CAPSICUM \
+		-DOPENSSL_API_COMPAT=0x10100000L
 
 SMOFF += all_func_returns
 rfb.o := SMOFF=
