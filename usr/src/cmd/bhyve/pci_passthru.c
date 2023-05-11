@@ -1173,3 +1173,24 @@ static const struct pci_devemu passthru = {
 	.pe_baraddr	= passthru_addr,
 };
 PCI_EMUL_SET(passthru);
+
+
+/*
+ * This isn't the right place for these functions which, on FreeBSD, can
+ * read or write from arbitrary devices. They are not supported on illumos;
+ * not least because bhyve is generally run in a non-global zone which doesn't
+ * have access to the devinfo tree.
+ */
+uint32_t
+read_config(const struct pcisel *sel __unused, long reg __unused,
+    int width __unused)
+{
+	return (-1);
+}
+
+void
+write_config(const struct pcisel *sel __unused, long reg __unused,
+    int width __unused, uint32_t data __unused)
+{
+       errx(4, "write_config() unimplemented on illumos");
+}

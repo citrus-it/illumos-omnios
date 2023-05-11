@@ -479,6 +479,7 @@ pci_lpc_read(struct pci_devinst *pi __unused, int baridx __unused,
 #define LPC_SUBVEND_0	0x0000
 #define LPC_SUBDEV_0	0x0000
 
+#ifdef	__FreeBSD__
 static int
 pci_lpc_get_sel(struct pcisel *const sel)
 {
@@ -486,7 +487,6 @@ pci_lpc_get_sel(struct pcisel *const sel)
 
 	memset(sel, 0, sizeof(*sel));
 
-#ifdef	__FreeBSD__
 	for (uint8_t slot = 0; slot <= PCI_SLOTMAX; ++slot) {
 		uint8_t max_func = 0;
 
@@ -510,14 +510,21 @@ pci_lpc_get_sel(struct pcisel *const sel)
 	warnx("%s: Unable to find host selector of LPC bridge.", __func__);
 
 	return (-1);
-#else
-	/*
-	 * On illumos, this currently only works if bhyve is invoked with the
-	 * appropriate privileges and access to the devinfo driver.
-	 */
-	return (pci_illumos_find_lpc(sel));
-#endif
 }
+#else
+/*
+ * This function is used to find the PCI selector for the host's LPC so that
+ * its various IDs can be used to configure the guest LPC with the same values
+ * when the `host` keyword is used in the configuration.
+ * On illumos we always just report that we cannot find the host LPC. This is
+ * likely to be true in the case that we're running in a zone anyway.
+ */
+static int
+pci_lpc_get_sel(struct pcisel *const sel __unused)
+{
+	return (-1);
+}
+#endif
 
 static int
 pci_lpc_init(struct pci_devinst *pi, nvlist_t *nvl)
@@ -551,7 +558,6 @@ pci_lpc_init(struct pci_devinst *pi, nvlist_t *nvl)
 	if (pci_lpc_get_sel(&sel) == 0)
 		selp = &sel;
 
-#ifdef	__FreeBSD__
 	vendor = pci_config_read_reg(selp, nvl, PCIR_VENDOR, 2, LPC_VENDOR);
 	device = pci_config_read_reg(selp, nvl, PCIR_DEVICE, 2, LPC_DEV);
 	revid = pci_config_read_reg(selp, nvl, PCIR_REVID, 1, LPC_REVID);
@@ -559,24 +565,6 @@ pci_lpc_init(struct pci_devinst *pi, nvlist_t *nvl)
 	    LPC_SUBVEND_0);
 	subdevice = pci_config_read_reg(selp, nvl, PCIR_SUBDEV_0, 2,
 	    LPC_SUBDEV_0);
-#else
-	pci_illumos_init();
-
-	vendor = pci_config_read_reg(selp, nvl, PCIR_VENDOR, 2, LPC_VENDOR);
-	device = pci_config_read_reg(selp, nvl, PCIR_DEVICE, 2, LPC_DEV);
-
-	/*
-	 * We pass NULL as the first argument to these as we cannot currently
-	 * retrieve the host values for these on illumos.
-	 */
-	revid = pci_config_read_reg(NULL, nvl, PCIR_REVID, 1, LPC_REVID);
-	subvendor = pci_config_read_reg(NULL, nvl, PCIR_SUBVEND_0, 2,
-	    LPC_SUBVEND_0);
-	subdevice = pci_config_read_reg(NULL, nvl, PCIR_SUBDEV_0, 2,
-	    LPC_SUBDEV_0);
-
-	pci_illumos_fini();
-#endif
 
 	/* initialize config space */
 	pci_set_cfgdata16(pi, PCIR_VENDOR, vendor);

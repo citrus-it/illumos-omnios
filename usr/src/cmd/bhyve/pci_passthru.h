@@ -28,14 +28,4 @@ int passthru_cfgwrite_emulate(struct passthru_softc *sc, struct pci_devinst *pi,
 int set_pcir_handler(struct passthru_softc *sc, int reg, int len,
     cfgread_handler rhandler, cfgwrite_handler whandler);
 
-#ifndef	__FreeBSD__
-/*
- * This is not the right place for these, but it is also not the right place
- * for {read,write}_config().
- */
-void pci_illumos_init(void);
-void pci_illumos_fini(void);
-int pci_illumos_find_lpc(struct pcisel *const);
-#endif
-
 #endif /* _PCI_PASSTHRU_H_ */
