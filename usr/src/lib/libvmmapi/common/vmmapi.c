@@ -255,6 +255,10 @@ vm_vcpu_open(struct vmctx *ctx, int vcpuid)
 	struct vcpu *vcpu;
 
 	vcpu = malloc(sizeof(*vcpu));
+#ifndef	__FreeBSD__
+	if (vcpu == NULL)
+		return (vcpu);
+#endif
 	vcpu->ctx = ctx;
 	vcpu->vcpuid = vcpuid;
 	return (vcpu);
