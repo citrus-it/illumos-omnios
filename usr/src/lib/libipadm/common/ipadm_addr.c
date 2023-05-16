@@ -2155,18 +2155,10 @@ i_ipadm_lookupadd_addrobj(ipadm_handle_t iph, ipadm_addrobj_t ipaddr)
 	rvalp = &rval;
 	err = ipadm_door_call(iph, &larg, sizeof (larg), (void **)&rvalp,
 	    sizeof (rval), B_FALSE);
-	if (err == 0) {
-		/*
-		 * Save daemon-generated state.  Unconditionally copy
-		 * the `lnum` from the daemon, and copy `aobjname' if
-		 * we did not give a name.
-		 */
-		ipaddr->ipadm_lifnum = rval.ir_lnum;
-		if (ipaddr->ipadm_aobjname[0] == '\0') {
-			(void) strlcpy(ipaddr->ipadm_aobjname,
-			    rval.ir_aobjname,
-			    sizeof (ipaddr->ipadm_aobjname));
-		}
+	if (err == 0 && ipaddr->ipadm_aobjname[0] == '\0') {
+		/* copy the daemon generated `aobjname' into `ipadddr' */
+		(void) strlcpy(ipaddr->ipadm_aobjname, rval.ir_aobjname,
+		    sizeof (ipaddr->ipadm_aobjname));
 	}
 	if (err == EEXIST)
 		return (IPADM_ADDROBJ_EXISTS);
@@ -2656,6 +2648,7 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 	boolean_t		legacy = (iph->iph_flags & IPH_LEGACY);
 	boolean_t		aobjfound = B_FALSE;
 	boolean_t		is_6to4;
+	boolean_t		placeholder = B_FALSE;
 	struct lifreq		lifr;
 	uint64_t		ifflags;
 	boolean_t		is_boot = (iph->iph_flags & IPH_IPMGMTD);
@@ -2718,6 +2711,13 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 		status = i_ipadm_lookupadd_addrobj(iph, addr);
 		if (status != IPADM_SUCCESS)
 			return (status);
+		/*
+		 * Record that the address object in the daemon is a
+		 * placeholder. This is important when it comes to cleaning up
+		 * after an error in the case of IPv6 addrconf address object.
+		 * See below.
+		 */
+		placeholder = B_TRUE;
 	}
 
 	is_6to4 = i_ipadm_is_6to4(iph, ifname);
@@ -2826,6 +2826,12 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 		break;
 	case IPADM_ADDR_IPV6_ADDRCONF:
 		status = i_ipadm_create_ipv6addrs(iph, addr, flags);
+		/*
+		 * If we have successfully created an address, the entry in
+		 * ipmgmtd is no longer a placeholder.
+		 */
+		if (status == IPADM_SUCCESS)
+			placeholder = B_FALSE;
 		break;
 	default:
 		status = IPADM_INVALID_ARG;
@@ -2838,6 +2844,10 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 		    gifname);
 	}
 
+fail:
+	if (status == IPADM_DHCP_IPC_TIMEOUT || status == IPADM_SUCCESS)
+		return (status);
+
 	/*
 	 * If address was not created successfully, unplumb the interface
 	 * if it was plumbed implicitly in this function and remove the
@@ -2845,25 +2855,39 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 	 * If IPH_LEGACY is set, then remove the addrobj only if it was
 	 * created in this function.
 	 */
-fail:
-	if (status != IPADM_DHCP_IPC_TIMEOUT &&
-	    status != IPADM_SUCCESS) {
-		if (!legacy) {
-			if (created_af || created_other_af) {
-				if (created_af) {
-					(void) i_ipadm_delete_if(iph, ifname,
-					    af, flags);
-				}
-				if (created_other_af) {
-					(void) i_ipadm_delete_if(iph, ifname,
-					    other_af, flags);
-				}
-			} else {
-				(void) i_ipadm_delete_addrobj(iph, addr, flags);
+	if (!legacy) {
+		if (created_af || created_other_af) {
+			if (created_af) {
+				(void) i_ipadm_delete_if(iph, ifname, af,
+				    flags);
 			}
-		} else if (!aobjfound) {
+			if (created_other_af) {
+				(void) i_ipadm_delete_if(iph, ifname, other_af,
+				    flags);
+			}
+		} else if (placeholder &&
+		    addr->ipadm_atype == IPADM_ADDR_IPV6_ADDRCONF) {
+			/*
+			 * The entry in ipmgmtd is still a placeholder - we did
+			 * not get far enough through to create a real entry
+			 * before encountering an error. Since an IPv6 addrconf
+			 * address object can be associated with a number of IP
+			 * addresses, ipmgmtd uses the logical interface number
+			 * as part of the lookup key for these, and the
+			 * daemon's placeholder has a logical interface of -1.
+			 * Pass that value explicitly so that the placeholder
+			 * entry is properly cleaned up.
+			 */
+			int32_t lifnum = addr->ipadm_lifnum;
+
+			addr->ipadm_lifnum = -1;
+			(void) i_ipadm_delete_addrobj(iph, addr, flags);
+			addr->ipadm_lifnum = lifnum;
+		} else {
 			(void) i_ipadm_delete_addrobj(iph, addr, flags);
 		}
+	} else if (!aobjfound) {
+		(void) i_ipadm_delete_addrobj(iph, addr, flags);
 	}
 
 	return (status);
