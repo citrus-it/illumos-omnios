@@ -2155,18 +2155,10 @@ i_ipadm_lookupadd_addrobj(ipadm_handle_t iph, ipadm_addrobj_t ipaddr)
 	rvalp = &rval;
 	err = ipadm_door_call(iph, &larg, sizeof (larg), (void **)&rvalp,
 	    sizeof (rval), B_FALSE);
-	if (err == 0) {
-		/*
-		 * Save daemon-generated state.  Unconditionally copy
-		 * the `lnum` from the daemon, and copy `aobjname' if
-		 * we did not give a name.
-		 */
-		ipaddr->ipadm_lifnum = rval.ir_lnum;
-		if (ipaddr->ipadm_aobjname[0] == '\0') {
-			(void) strlcpy(ipaddr->ipadm_aobjname,
-			    rval.ir_aobjname,
-			    sizeof (ipaddr->ipadm_aobjname));
-		}
+	if (err == 0 && ipaddr->ipadm_aobjname[0] == '\0') {
+		/* copy the daemon generated `aobjname' into `ipadddr' */
+		(void) strlcpy(ipaddr->ipadm_aobjname, rval.ir_aobjname,
+		    sizeof (ipaddr->ipadm_aobjname));
 	}
 	if (err == EEXIST)
 		return (IPADM_ADDROBJ_EXISTS);
@@ -2656,11 +2648,13 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 	boolean_t		legacy = (iph->iph_flags & IPH_LEGACY);
 	boolean_t		aobjfound = B_FALSE;
 	boolean_t		is_6to4;
+	boolean_t		placeholder = B_FALSE;
 	struct lifreq		lifr;
 	uint64_t		ifflags;
 	boolean_t		is_boot = (iph->iph_flags & IPH_IPMGMTD);
 	boolean_t		is_ipmp;
 	char			gifname[LIFGRNAMSIZ];
+	int32_t			lifnum;
 
 	/* check for solaris.network.interface.config authorization */
 	if (!ipadm_check_auth())
@@ -2671,7 +2665,7 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 	if (status != IPADM_SUCCESS)
 		return (status);
 	/*
-	 * For Legacy case, check if an addrobj already exists for the
+	 * For the Legacy case, check if an addrobj already exists for the
 	 * given logical interface name. If one does not exist,
 	 * a default name will be generated and added to the daemon's
 	 * aobjmap.
@@ -2718,13 +2712,28 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 		status = i_ipadm_lookupadd_addrobj(iph, addr);
 		if (status != IPADM_SUCCESS)
 			return (status);
+		/*
+		 * Record that the address object in the daemon is currently a
+		 * placeholder. This is important to know so that address
+		 * objects are properly cleaned up after an error.
+		 */
+		placeholder = B_TRUE;
 	}
 
 	is_6to4 = i_ipadm_is_6to4(iph, ifname);
 	/* Plumb the IP interfaces if necessary */
 	status = i_ipadm_create_if(iph, ifname, af, flags);
 	if (status != IPADM_SUCCESS && status != IPADM_IF_EXISTS) {
+		/*
+		 * If we are deleting a placeholder, we need to set lifnum to
+		 * the -1 sentinel value so that the daemon can match the
+		 * proper object.
+		 */
+		lifnum = addr->ipadm_lifnum;
+		if (placeholder)
+			addr->ipadm_lifnum = -1;
 		(void) i_ipadm_delete_addrobj(iph, addr, IPADM_OPT_ACTIVE);
+		addr->ipadm_lifnum = lifnum;
 		return (status);
 	}
 	if (status == IPADM_SUCCESS)
@@ -2838,6 +2847,10 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 		    gifname);
 	}
 
+fail:
+	if (status == IPADM_DHCP_IPC_TIMEOUT || status == IPADM_SUCCESS)
+		return (status);
+
 	/*
 	 * If address was not created successfully, unplumb the interface
 	 * if it was plumbed implicitly in this function and remove the
@@ -2845,26 +2858,33 @@ ipadm_create_addr(ipadm_handle_t iph, ipadm_addrobj_t addr, uint32_t flags)
 	 * If IPH_LEGACY is set, then remove the addrobj only if it was
 	 * created in this function.
 	 */
-fail:
-	if (status != IPADM_DHCP_IPC_TIMEOUT &&
-	    status != IPADM_SUCCESS) {
-		if (!legacy) {
-			if (created_af || created_other_af) {
-				if (created_af) {
-					(void) i_ipadm_delete_if(iph, ifname,
-					    af, flags);
-				}
-				if (created_other_af) {
-					(void) i_ipadm_delete_if(iph, ifname,
-					    other_af, flags);
-				}
-			} else {
-				(void) i_ipadm_delete_addrobj(iph, addr, flags);
-			}
-		} else if (!aobjfound) {
+	if (legacy) {
+		if (!aobjfound)
 			(void) i_ipadm_delete_addrobj(iph, addr, flags);
-		}
+		return (status);
 	}
+
+	if (created_af || created_other_af) {
+		if (created_af)
+			(void) i_ipadm_delete_if(iph, ifname, af, flags);
+		if (created_other_af)
+			(void) i_ipadm_delete_if(iph, ifname, other_af, flags);
+		return (status);
+	}
+
+	/*
+	 * If the entry in ipmgmtd is still a placeholder, we encountered an
+	 * error before creating a real entry. Since an IPv6 address object can
+	 * be associated with a number of IP addresses, ipmgmtd uses the
+	 * logical interface number as part of the lookup key, and uses -1 as a
+	 * sentinel value for a placeholder address. We pass that explicitly
+	 * here so that the placeholder entry is properly cleaned up.
+	 */
+	lifnum = addr->ipadm_lifnum;
+	if (placeholder)
+		addr->ipadm_lifnum = -1;
+	(void) i_ipadm_delete_addrobj(iph, addr, flags);
+	addr->ipadm_lifnum = lifnum;
 
 	return (status);
 }
