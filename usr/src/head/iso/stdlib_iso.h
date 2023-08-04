@@ -22,6 +22,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2014 PALO, Richard.
+ * Copyright 2023 Oxide Computer Company
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -125,12 +126,14 @@ extern int atoi(const char *);
 extern long int atol(const char *);
 extern void *bsearch(const void *, const void *, size_t, size_t,
 	int (*)(const void *, const void *));
+
 #if __cplusplus >= 199711L && defined(__SUNPRO_CC)
 extern "C++" {
 	void *bsearch(const void *, const void *, size_t, size_t,
 		int (*)(const void *, const void *));
 }
 #endif /* __cplusplus >= 199711L && defined(__SUNPRO_CC) */
+
 extern void *calloc(size_t, size_t);
 extern div_t div(int, int);
 extern _NORETURN_KYWD void exit(int)
@@ -145,11 +148,13 @@ extern size_t mbstowcs(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
 	size_t);
 extern int mbtowc(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD, size_t);
 extern void qsort(void *, size_t, size_t, int (*)(const void *, const void *));
+
 #if __cplusplus >= 199711L && defined(__SUNPRO_CC)
 extern "C++" {
 	void qsort(void *, size_t, size_t, int (*)(const void *, const void *));
 }
 #endif /* __cplusplus >= 199711L && defined(__SUNPRO_CC) */
+
 extern int rand(void);
 extern void *realloc(void *, size_t);
 extern void srand(unsigned int);
@@ -168,6 +173,15 @@ extern "C++" {
 	inline ldiv_t div(long _l1, long _l2) { return ldiv(_l1, _l2); }
 }
 #endif /* __cplusplus */
+
+#if __cplusplus >= 201103L
+extern "C++" {
+	inline long long abs(long long _l) { return llabs(_l); }
+	inline lldiv_t   div(long long _l1, long long _l2) {
+		return lldiv(_l1, _l2);
+	}
+}
+#endif
 
 #if __cplusplus >= 199711L
 }
