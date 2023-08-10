@@ -57,7 +57,7 @@ int	netbe_get_mac(net_backend_t *, void *, size_t *);
 
 /*
  * Network device capabilities taken from the VirtIO standard.
- * Despite the name, these capabilities can be used by different frontents
+ * Despite the name, these capabilities can be used by different frontends
  * (virtio-net, ptnet) and supported by different backends (netmap, tap, ...).
  */
 #define	VIRTIO_NET_F_CSUM	(1 <<  0) /* host handles partial cksum */
