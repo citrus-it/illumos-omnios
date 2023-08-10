@@ -11,14 +11,27 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef	__FreeBSD__
 #include <sys/vmm.h>
+#include <machine/vmm.h>
+#endif
 #include <vmmapi.h>
 
+#include "acpi_device.h"
 #include "config.h"
 #include "tpm_device.h"
 
+#define TPM_ACPI_DEVICE_NAME "TPM"
+#define TPM_ACPI_HARDWARE_ID "MSFT0101"
+
 struct tpm_device {
 	struct vmctx *vm_ctx;
+	struct acpi_device *acpi_dev;
+};
+
+static const struct acpi_device_emul tpm_acpi_device_emul = {
+	.name = TPM_ACPI_DEVICE_NAME,
+	.hid = TPM_ACPI_HARDWARE_ID,
 };
 
 void
@@ -27,6 +40,7 @@ tpm_device_destroy(struct tpm_device *const dev)
 	if (dev == NULL)
 		return;
 
+	acpi_device_destroy(dev->acpi_dev);
 	free(dev);
 }
 
@@ -57,6 +71,11 @@ tpm_device_create(struct tpm_device **const new_dev, struct vmctx *const vm_ctx,
 	}
 
 	dev->vm_ctx = vm_ctx;
+
+	error = acpi_device_create(&dev->acpi_dev, dev, dev->vm_ctx,
+	    &tpm_acpi_device_emul);
+	if (error)
+		goto err_out;
 
 	*new_dev = dev;
 
