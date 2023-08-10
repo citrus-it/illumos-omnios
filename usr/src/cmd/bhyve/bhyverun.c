@@ -206,23 +206,6 @@ static void vm_loop(struct vmctx *ctx, struct vcpu *vcpu);
 static struct vm_entry *vmentry;
 #endif
 
-static struct bhyvestats {
-	uint64_t	vmexit_bogus;
-	uint64_t	vmexit_reqidle;
-	uint64_t	vmexit_hlt;
-	uint64_t	vmexit_pause;
-	uint64_t	vmexit_mtrap;
-#ifdef	__FreeBSD__
-	uint64_t	vmexit_inst_emul;
-#else
-	uint64_t	vmexit_mmio;
-	uint64_t	vmexit_inout;
-	uint64_t	mmio_unhandled;
-#endif
-	uint64_t	cpu_switch_rotate;
-	uint64_t	cpu_switch_direct;
-} stats;
-
 static struct vcpu_info {
 	struct vmctx    *ctx;
 	struct vcpu     *vcpu;
@@ -692,8 +675,6 @@ vmexit_inout(struct vmctx *ctx, struct vcpu *vcpu, struct vm_exit *vme)
 	bool in;
 	uint8_t bytes;
 
-	stats.vmexit_inout++;
-
 	inout = vme->u.inout;
 	in = (inout.flags & INOUT_IN) != 0;
 	bytes = inout.bytes;
@@ -876,8 +857,6 @@ vmexit_bogus(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 
 	assert(vme->inst_length == 0);
 
-	stats.vmexit_bogus++;
-
 	return (VMEXIT_CONTINUE);
 }
 
@@ -888,8 +867,6 @@ vmexit_reqidle(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 
 	assert(vme->inst_length == 0);
 
-	stats.vmexit_reqidle++;
-
 	return (VMEXIT_CONTINUE);
 }
 
@@ -897,8 +874,6 @@ static int
 vmexit_hlt(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
     struct vm_exit *vme __unused)
 {
-
-	stats.vmexit_hlt++;
 
 	/*
 	 * Just continue execution with the next instruction. We use
@@ -912,9 +887,6 @@ static int
 vmexit_pause(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
     struct vm_exit *vme __unused)
 {
-
-	stats.vmexit_pause++;
-
 	return (VMEXIT_CONTINUE);
 }
 
@@ -923,8 +895,6 @@ vmexit_mtrap(struct vmctx *ctx __unused, struct vcpu *vcpu, struct vm_exit *vme)
 {
 
 	assert(vme->inst_length == 0);
-
-	stats.vmexit_mtrap++;
 
 	gdb_cpu_mtrap(vcpu);
 
@@ -967,8 +937,6 @@ vmexit_mmio(struct vmctx *ctx __unused, struct vcpu *vcpu, struct vm_exit *vme)
 	struct vm_mmio mmio;
 	bool is_read;
 
-	stats.vmexit_mmio++;
-
 	mmio = vme->u.mmio;
 	is_read = (mmio.read != 0);
 
@@ -976,7 +944,6 @@ vmexit_mmio(struct vmctx *ctx __unused, struct vcpu *vcpu, struct vm_exit *vme)
 
 	if (err == ESRCH) {
 		fprintf(stderr, "Unhandled memory access to 0x%lx\n", mmio.gpa);
-		stats.mmio_unhandled++;
 
 		/*
 		 * Access to non-existent physical addresses is not likely to
