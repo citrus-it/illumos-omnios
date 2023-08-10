@@ -553,6 +553,7 @@ qemu_fwcfg_parse_cmdline_arg(const char *opt)
 	struct qemu_fwcfg_user_file *fwcfg_file;
 	struct stat sb;
 	const char *opt_ptr, *opt_end;
+	ssize_t bytes_read;
 	int fd;
 	
 	fwcfg_file = malloc(sizeof(*fwcfg_file));
@@ -632,30 +633,14 @@ qemu_fwcfg_parse_cmdline_arg(const char *opt)
 			close(fd);
 			return (ENOMEM);
 		}
-#ifdef	__FreeBSD__
-		fwcfg_file->size = read(fd, fwcfg_file->data, sb.st_size);
-		if ((ssize_t)fwcfg_file->size < 0) {
+		bytes_read = read(fd, fwcfg_file->data, sb.st_size);
+		if (bytes_read < 0 || bytes_read != sb.st_size) {
 			warn("Unable to read file \"%s\"", opt_ptr);
 			free(fwcfg_file->data);
 			close(fd);
 			return (-1);
-		} else if (fwcfg_file->size < sb.st_size) {
-			warnx("Only read %u bytes of file \"%s\"",
-			    fwcfg_file->size, opt_ptr);
 		}
-#else
-		ssize_t l = read(fd, fwcfg_file->data, sb.st_size);
-		if (l < 0) {
-			warn("Unable to read file \"%s\"", opt_ptr);
-			free(fwcfg_file->data);
-			close(fd);
-			return (-1);
-		} else if (l < sb.st_size) {
-			warnx("Only read %u bytes of file \"%s\"",
-			    l, opt_ptr);
-		}
-		fwcfg_file->size = l;
-#endif
+		fwcfg_file->size = bytes_read;
 
 		close(fd);
 	} else {
