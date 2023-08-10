@@ -116,8 +116,6 @@ __FBSDID("$FreeBSD$");
 #include "privileges.h"
 #endif
 
-#define GUEST_NIO_PORT		0x488	/* guest upcalls via i/o port */
-
 #define MB		(1024UL * 1024)
 #define GB		(1024UL * MB)
 
@@ -651,19 +649,6 @@ vmentry_inout_write(struct vcpu *vcpu, uint16_t port, uint8_t bytes)
 #endif
 
 static int
-vmexit_handle_notify(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
-    struct vm_exit *vme __unused, uint32_t eax __unused)
-{
-#if BHYVE_DEBUG
-	/*
-	 * put guest-driven debug here
-	 */
-#endif
-	return (VMEXIT_CONTINUE);
-}
-
-// XXXSYNC
-static int
 vmexit_inout(struct vmctx *ctx, struct vcpu *vcpu, struct vm_exit *vme)
 {
 	int error;
@@ -674,13 +659,6 @@ vmexit_inout(struct vmctx *ctx, struct vcpu *vcpu, struct vm_exit *vme)
 	inout = vme->u.inout;
 	in = (inout.flags & INOUT_IN) != 0;
 	bytes = inout.bytes;
-
-        /* Extra-special case of host notifications */
-        if (!in && inout.port == GUEST_NIO_PORT) {
-                error = vmexit_handle_notify(ctx, vcpu, vme, inout.eax);
-		vmentry_inout_write(vcpu, inout.port, bytes);
-		return (error);
-	}
 
 	error = emulate_inout(ctx, vcpu, &inout);
 	if (error) {
