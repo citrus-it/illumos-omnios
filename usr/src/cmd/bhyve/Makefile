@@ -37,8 +37,8 @@ SRCS =	acpi.c			\
 	bhyverun.c		\
 	block_if.c		\
 	bootrom.c		\
-	console.c		\
 	config.c		\
+	console.c		\
 	crc16.c			\
 	e820.c			\
 	fwctl.c			\
@@ -46,6 +46,7 @@ SRCS =	acpi.c			\
 	hexdump.c		\
 	inout.c			\
 	ioapic.c		\
+	iov.c			\
 	mem.c			\
 	mevent.c		\
 	mptbl.c			\
@@ -80,6 +81,7 @@ SRCS =	acpi.c			\
 	rtc.c			\
 	smbiostbl.c		\
 	sockstream.c		\
+	spinup_ap.c		\
 	task_switch.c		\
 	tpm_device.c		\
 	uart_emul.c		\
@@ -89,8 +91,6 @@ SRCS =	acpi.c			\
 	virtio.c		\
 	vmgenc.c		\
 	xmsr.c			\
-	spinup_ap.c		\
-	iov.c			\
 	bhyve_sol_glue.c
 
 # We are not yet performing instruction emulation in userspace, so going to the
