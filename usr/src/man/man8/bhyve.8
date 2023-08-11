@@ -490,6 +490,12 @@ if not explicitly specified.
 Disable emulation of guest trim requests via
 .Dv DIOCGDELETE
 requests.
+.It Cm bootindex= Ns Ar index
+Add the device to the bootorder at
+.Ar index .
+A fwcfg file is used to specify the bootorder.
+The guest firmware may ignore or not have support for this fwcfg file.
+In that case, this feature will not work as expected.
 .El
 .Pp
 .Sy 9P device backends :
@@ -569,6 +575,12 @@ Add
 as option ROM to the PCI device.
 The ROM will be loaded by firmware and should be capable of initialising the
 device.
+.It Cm bootindex= Ns Ar index
+Add the device to the bootorder at
+.Ar index .
+A fwcfg file is used to specify the bootorder.
+The guest firmware may ignore or not have support for this fwcfg file.
+In that case, this feature will not work as expected.
 .El
 .Pp
 Guest memory must be wired using the
