@@ -1038,7 +1038,7 @@ vmexit_ipi(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 }
 #endif
 
-static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
+static const vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_INOUT]  = vmexit_inout,
 #ifndef __FreeBSD__
 	[VM_EXITCODE_MMIO]  = vmexit_mmio,
@@ -1054,7 +1054,6 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 #ifndef __FreeBSD__
 	[VM_EXITCODE_RUN_STATE] = vmexit_run_state,
 	[VM_EXITCODE_PAGING] = vmexit_paging,
-	[VM_EXITCODE_HLT] = vmexit_hlt,
 #endif
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_TASK_SWITCH] = vmexit_task_switch,
@@ -1063,6 +1062,8 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 #ifdef	__FreeBSD__
 	[VM_EXITCODE_IPI] = vmexit_ipi,
 #endif
+	[VM_EXITCODE_HLT] = vmexit_hlt,
+	[VM_EXITCODE_PAUSE] = vmexit_pause,
 };
 
 static void
@@ -1141,7 +1142,7 @@ num_vcpus_allowed(struct vmctx *ctx, struct vcpu *vcpu)
 }
 
 static void
-fbsdrun_set_capabilities(struct vcpu *vcpu, bool bsp)
+fbsdrun_set_capabilities(struct vcpu *vcpu)
 {
 	int err, tmp;
 
@@ -1153,8 +1154,6 @@ fbsdrun_set_capabilities(struct vcpu *vcpu, bool bsp)
 			exit(4);
 		}
 		vm_set_capability(vcpu, VM_CAP_HALT_EXIT, 1);
-		if (bsp)
-			handler[VM_EXITCODE_HLT] = vmexit_hlt;
 	}
 #else
 	/*
@@ -1181,8 +1180,6 @@ fbsdrun_set_capabilities(struct vcpu *vcpu, bool bsp)
 			exit(4);
 		}
 		vm_set_capability(vcpu, VM_CAP_PAUSE_EXIT, 1);
-		if (bsp)
-			handler[VM_EXITCODE_PAUSE] = vmexit_pause;
         }
 
 	if (get_config_bool_default("x86.x2apic", false))
@@ -1290,7 +1287,7 @@ spinup_vcpu(struct vcpu_info *vi, bool bsp, bool suspend)
 		spinup_ap(vi->vcpu, 0);
 #endif
 
-		fbsdrun_set_capabilities(vi->vcpu, false);
+		fbsdrun_set_capabilities(vi->vcpu);
 
 #ifdef	__FreeBSD__
 		/*
@@ -1592,7 +1589,7 @@ main(int argc, char *argv[])
 		exit(4);
 	}
 
-	fbsdrun_set_capabilities(bsp, true);
+	fbsdrun_set_capabilities(bsp);
 
        /* Allocate per-VCPU resources. */
 	vcpu_info = calloc(guest_ncpus, sizeof(*vcpu_info));
