@@ -218,7 +218,7 @@ static void
 usage(int code)
 {
 
-        fprintf(stderr,
+	fprintf(stderr,
 #ifdef	__FreeBSD__
 		"Usage: %s [-AaCDeHhPSuWwxY]\n"
 #else
@@ -1178,7 +1178,7 @@ fbsdrun_set_capabilities(struct vcpu *vcpu)
 			exit(4);
 		}
 		vm_set_capability(vcpu, VM_CAP_PAUSE_EXIT, 1);
-        }
+	}
 
 	if (get_config_bool_default("x86.x2apic", false))
 		err = vm_set_x2apic_state(vcpu, X2APIC_ENABLED);
@@ -1452,7 +1452,7 @@ main(int argc, char *argv[])
 			}
 			break;
 #endif
-                case 'c':
+		case 'c':
 			if (topology_parse(optarg) != 0) {
 			    errx(EX_USAGE, "invalid cpu topology "
 				"'%s'", optarg);
@@ -1495,7 +1495,7 @@ main(int argc, char *argv[])
 		case 'S':
 			set_config_bool("memory.wired", true);
 			break;
-                case 'm':
+		case 'm':
 			set_config_value("memory.size", optarg);
 			break;
 		case 'o':
