@@ -28,6 +28,7 @@
 #undef ACPI_SIG_RSDT
 #undef ACPI_RSDP_NAME
 #undef ACPI_SIG_SPCR
+#undef ACPI_SIG_TPM2
 #define	ACPI_SIG_FACS           (const uint8_t *)"FACS"
 #define	ACPI_SIG_MCFG		(const uint8_t *)"MCFG"
 #define	ACPI_SIG_HPET		(const uint8_t *)"HPET"
@@ -38,6 +39,7 @@
 #define	ACPI_SIG_RSDT		(const uint8_t *)"RSDT"
 #define	ACPI_RSDP_NAME		(const uint8_t *)"RSDP"
 #define	ACPI_SIG_SPCR		(const uint8_t *)"SPCR"
+#define	ACPI_SIG_TPM2		(const uint8_t *)"TPM2"
 #endif /* !__FreeBSD__ */
 
 #include "qemu_fwcfg.h"
