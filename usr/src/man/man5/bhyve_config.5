@@ -142,6 +142,15 @@ Specify the keyboard layout name with the file name in
 .Pa /usr/share/bhyve/kbdlayout .
 This value only works when loaded with UEFI mode for VNC, and when a VNC client
 that doesn't support the QEMU Extended Key Event Message us used.
+.It Va tpm.path Ta string Ta Ta
+Path to the host TPM device.
+This is typically /dev/tpm0.
+.It Va tpm.type Ta string Ta Ta
+Type of the TPM device passed to the guest.
+Currently, only "passthru" is supported.
+.It Va tpm.version Ta string Ta 2.0 Ta
+Version of the TPM device according to the TCG specification.
+Currently, only version 2.0 is supported.
 .It Va rtc.use_localtime Ta bool Ta true Ta
 The real time clock uses the local time of the host.
 If this is set to false, the real time clock uses UTC.
