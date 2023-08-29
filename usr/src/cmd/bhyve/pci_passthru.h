@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Beckhoff Automation GmbH & Co. KG
  * Author: Corvin K<C3><B6>hne <c.koehne@beckhoff.com>
