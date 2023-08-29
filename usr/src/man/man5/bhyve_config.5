@@ -123,9 +123,15 @@ If no suffix is given, the value is assumed to be in mebibytes.
 .It Va memory.wired Ta bool Ta false Ta
 Wire guest memory.
 .It Va acpi_tables Ta bool Ta false Ta
-Generate ACPI tables; these tables are
-.Em not
-used on illumos.
+Generate ACPI tables.
+.It Va acpi_tables_in_memory Ta bool Ta true Ta
+.Xr bhyve 8
+always exposes ACPI tables by FwCfg.
+For backward compatibility bhyve copies them into the guest memory as well.
+This can cause problems if the guest uses the in-memory version, since certain
+advanced features, such as TPM emulation, are exposed only via FwCfg.
+Therefore, it is recommended to set this flag to false when running Windows
+guests.
 .It Va destroy_on_poweroff Ta bool Ta false Ta
 Destroy the VM on guest-initiated power-off.
 .It Va gdb.address Ta string Ta localhost Ta
