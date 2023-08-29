@@ -36,7 +36,6 @@
 #include <strings.h>
 #include <err.h>
 #endif
-__FBSDID("$FreeBSD$");
 
 #include <stdlib.h>
 
