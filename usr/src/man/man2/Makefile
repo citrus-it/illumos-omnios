@@ -191,6 +191,7 @@ MANLINKS=	_Exit.2				\
 		fchown.2			\
 		fchownat.2			\
 		fchroot.2			\
+		fexecve.2			\
 		fork1.2				\
 		forkall.2			\
 		forkallx.2			\
@@ -301,6 +302,7 @@ execlp.2			:= LINKSRC = exec.2
 execv.2				:= LINKSRC = exec.2
 execve.2			:= LINKSRC = exec.2
 execvp.2			:= LINKSRC = exec.2
+fexecve.2			:= LINKSRC = exec.2
 
 _Exit.2				:= LINKSRC = exit.2
 _exit.2				:= LINKSRC = exit.2

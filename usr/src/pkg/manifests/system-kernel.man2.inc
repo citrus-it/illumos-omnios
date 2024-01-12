@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2013, OmniTI Computer Consulting, Inc.
+# Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2017 Peter Tribble
 # Copyright 2018, Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
@@ -71,6 +72,7 @@ link path=usr/share/man/man2/fchown.2 target=chown.2
 link path=usr/share/man/man2/fchownat.2 target=chown.2
 link path=usr/share/man/man2/fchroot.2 target=chroot.2
 file path=usr/share/man/man2/fcntl.2
+link path=usr/share/man/man2/fexecve.2 target=exec.2
 file path=usr/share/man/man2/fork.2
 link path=usr/share/man/man2/fork1.2 target=fork.2
 link path=usr/share/man/man2/forkall.2 target=fork.2

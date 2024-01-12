@@ -26,8 +26,9 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 /*
+ * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -102,6 +103,8 @@ uint_t auxv_hwcap32_3 = 0;	/* 32-bit version of auxv_hwcap3 */
 #endif
 
 #define	PSUIDFLAGS		(SNOCD|SUGID)
+
+#define	DEVFD			"/dev/fd/"
 
 /*
  * These are consumed within the specific exec modules, but are defined here
@@ -226,7 +229,32 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	if ((error = pn_get((char *)fname, UIO_USERSPACE, &pn)) != 0)
 		goto out;
 	pn_alloc(&resolvepn);
-	if ((error = lookuppn(&pn, &resolvepn, FOLLOW, &dir, &vp)) != 0) {
+
+	if (strncmp(pn.pn_path, DEVFD, sizeof (DEVFD) - 1) == 0) {
+		/*
+		 * /dev/fd/NN is a path constructed by libc to implement
+		 * fexecve(2). In this case, we extract the file descriptor
+		 * from the path and look up the vnode corresponding to the
+		 * file descriptor.
+		 */
+		char *p, *fdp;
+		int fd;
+
+		p = fdp = pn.pn_path + sizeof (DEVFD) - 1;
+		fd = stoi(&p);
+
+		error = 0;
+		if (fd < 0 || *p != '\0' || p == fdp ||
+		    (error = fgetstartvp(fd, NULL, &vp)) != 0) {
+			pn_free(&resolvepn);
+			pn_free(&pn);
+			if (error == 0)
+				error = EBADF;
+			goto out;
+		}
+		(void) pn_set(&resolvepn, pn.pn_path);
+	} else if ((error =
+	    lookuppn(&pn, &resolvepn, FOLLOW, &dir, &vp)) != 0) {
 		pn_free(&resolvepn);
 		pn_free(&pn);
 		if (error != EINVAL)
