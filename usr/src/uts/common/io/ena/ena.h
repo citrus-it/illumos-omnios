@@ -90,7 +90,7 @@ extern "C" {
  * The default amount of time we will wait for an admin command to
  * complete, specified in microseconds. In this case, 500 milliseconds.
  */
-#define	ENA_ADMIN_CMD_DEF_TIMEOUT	MSEC2NSEC(500)
+#define	ENA_ADMIN_CMD_DEF_TIMEOUT	MSEC2NSEC(5000)
 
 /*
  * Property macros.
@@ -438,8 +438,9 @@ typedef enum ena_rxq_state {
 	ENA_RXQ_STATE_HOST_ALLOC	= 1 << 0,
 	ENA_RXQ_STATE_CQ_CREATED	= 1 << 1,
 	ENA_RXQ_STATE_SQ_CREATED	= 1 << 2,
-	ENA_RXQ_STATE_READY		= 1 << 3, /* RxQ ready and waiting */
-	ENA_RXQ_STATE_RUNNING		= 1 << 4, /* intrs enabled */
+	ENA_RXQ_STATE_SQ_FILLED		= 1 << 3,
+	ENA_RXQ_STATE_READY		= 1 << 4, /* RxQ ready and waiting */
+	ENA_RXQ_STATE_RUNNING		= 1 << 5, /* intrs enabled */
 } ena_rxq_state_t;
 
 typedef struct ena_rx_ctrl_block {
@@ -675,6 +676,7 @@ typedef struct ena {
 	/* These statistics are device-wide. */
 	kstat_t			*ena_device_basic_kstat;
 	kstat_t			*ena_device_extended_kstat;
+	uint64_t		ena_device_basic_stat_time;
 
 	/*
 	 * This tracks AENQ-related stats, it is implicitly
@@ -696,6 +698,7 @@ typedef struct ena {
 	 * Hardware info
 	 */
 	uint32_t		ena_supported_features;
+	uint32_t		ena_capabilities;
 	uint8_t			ena_dma_width;
 	boolean_t		ena_link_up;
 	boolean_t		ena_link_autoneg;
@@ -830,6 +833,9 @@ extern int ena_get_feature(ena_t *, enahw_resp_desc_t *,
 extern int ena_admin_get_basic_stats(ena_t *, enahw_resp_desc_t *);
 extern int ena_admin_get_eni_stats(ena_t *, enahw_resp_desc_t *);
 extern int enahw_resp_status_to_errno(ena_t *, enahw_resp_status_t);
+extern void enahw_update_reg_cache(const ena_t *);
+extern void enahw_status(const ena_t *);
+extern boolean_t enahw_check_status(const ena_t *);
 
 /*
  * Rx/Tx allocations

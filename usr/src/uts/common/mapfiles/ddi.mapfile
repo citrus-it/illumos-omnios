@@ -176,6 +176,8 @@ SYMBOL_SCOPE {
 	list_next			{ FLAGS = EXTERN };
 	list_remove			{ FLAGS = EXTERN };
 	list_remove_head		{ FLAGS = EXTERN };
+	membar_producer			{ FLAGS = EXTERN };
+	membar_consumer			{ FLAGS = EXTERN };
 	memcpy				{ FLAGS = EXTERN };
 	memset				{ FLAGS = EXTERN };
 	miocack				{ FLAGS = EXTERN };

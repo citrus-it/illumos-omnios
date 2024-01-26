@@ -350,7 +350,7 @@ ena_err(const ena_t *ena, const char *fmt, ...)
 /*
  * Set this to B_TRUE to enable debug messages.
  */
-boolean_t ena_debug = B_FALSE;
+boolean_t ena_debug = B_TRUE;
 
 /*
  * Log a debug message. We force all debug messages to go to the
@@ -369,9 +369,9 @@ ena_dbg(const ena_t *ena, const char *fmt, ...)
 		va_end(ap);
 
 		if (ena != NULL && ena->ena_dip != NULL) {
-			dev_err(ena->ena_dip, CE_NOTE, "!%s", msg);
+			dev_err(ena->ena_dip, CE_NOTE, "%s", msg);
 		} else {
-			cmn_err(CE_NOTE, "!%s", msg);
+			cmn_err(CE_NOTE, "%s", msg);
 		}
 	}
 }
@@ -399,6 +399,8 @@ ena_aenq_work(ena_t *ena)
 	boolean_t processed = B_FALSE;
 	enahw_aenq_desc_t *desc = &aenq->eaenq_descs[head_mod];
 	uint64_t ts;
+
+	ena_dbg(ena, "%s", __func__);
 
 	ts = ((uint64_t)desc->ead_ts_high << 32) | (uint64_t)desc->ead_ts_low;
 	ENA_DMA_SYNC(aenq->eaenq_dma, DDI_DMA_SYNC_FORKERNEL);
@@ -473,6 +475,8 @@ ena_cleanup_pci(ena_t *ena)
 static void
 ena_cleanup_regs_map(ena_t *ena)
 {
+	ena->ena_reg_base = 0;
+	ena->ena_reg_size = 0;
 	ddi_regs_map_free(&ena->ena_reg_hdl);
 }
 
@@ -620,6 +624,14 @@ ena_aenq_default_hdlr(void *data, enahw_aenq_desc_t *desc)
 }
 
 static void
+ena_aenq_keepalive_hdlr(void *data, enahw_aenq_desc_t *desc)
+{
+	const ena_t *ena = data;
+
+	ena_dbg(ena, "Keepalive");
+}
+
+static void
 ena_aenq_link_change_hdlr(void *data, enahw_aenq_desc_t *desc)
 {
 	ena_t *ena = data;
@@ -672,6 +684,7 @@ ena_aenq_set_def_hdlrs(ena_aenq_t *aenq)
 	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_REFRESH_CAPABILITIES] =
 	    ena_aenq_default_hdlr;
 }
+
 /*
  * Initialize the Async Event Notification Queue.
  */
@@ -707,6 +720,8 @@ ena_aenq_init(ena_t *ena)
 
 	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_LINK_CHANGE] =
 	    ena_aenq_link_change_hdlr;
+	aenq->eaenq_hdlrs[ENAHW_AENQ_GROUP_KEEP_ALIVE] =
+	    ena_aenq_keepalive_hdlr;
 
 	ENA_DMA_VERIFY_ADDR(ena, aenq->eaenq_dma.edb_cookie->dmac_laddress);
 	addr_low = (uint32_t)(aenq->eaenq_dma.edb_cookie->dmac_laddress);
@@ -1002,6 +1017,12 @@ ena_check_versions(ena_t *ena)
 	ena->ena_ctrl_subminor_vsn = ENAHW_CTRL_SUBMINOR_VSN(ctrl_vsn);
 	ena->ena_ctrl_impl_id = ENAHW_CTRL_IMPL_ID(ctrl_vsn);
 
+	ena_dbg(ena, "device version: %d.%d",
+	    ena->ena_dev_major_vsn, ena->ena_dev_minor_vsn);
+	ena_dbg(ena, "controller version: %d.%d.%d implementation %d",
+	    ena->ena_ctrl_major_vsn, ena->ena_ctrl_minor_vsn,
+	    ena->ena_ctrl_subminor_vsn, ena->ena_ctrl_impl_id);
+
 	if (ena->ena_ctrl_subminor_vsn < ENA_CTRL_SUBMINOR_VSN_MIN) {
 		ena_err(ena, "unsupported controller version: %u.%u.%u",
 		    ena->ena_ctrl_major_vsn, ena->ena_ctrl_minor_vsn,
@@ -1031,7 +1052,8 @@ ena_setup_aenq(ena_t *ena)
 	to_enable = BIT(ENAHW_AENQ_GROUP_LINK_CHANGE) |
 	    BIT(ENAHW_AENQ_GROUP_FATAL_ERROR) |
 	    BIT(ENAHW_AENQ_GROUP_WARNING) |
-	    BIT(ENAHW_AENQ_GROUP_NOTIFICATION);
+	    BIT(ENAHW_AENQ_GROUP_NOTIFICATION) |
+	    BIT(ENAHW_AENQ_GROUP_KEEP_ALIVE);
 	to_enable &= resp_feat->efa_supported_groups;
 
 	bzero(&cmd, sizeof (cmd));
@@ -1088,6 +1110,17 @@ ena_cleanup_device_init(ena_t *ena)
 	ena_stat_aenq_cleanup(ena);
 }
 
+static void
+ena_check(void *arg)
+{
+	const ena_t *ena = arg;
+
+	for (;;) {
+		enahw_status(ena);
+		drv_usecwait(500);
+	}
+}
+
 static boolean_t
 ena_attach_device_init(ena_t *ena)
 {
@@ -1101,6 +1134,9 @@ ena_attach_device_init(ena_t *ena)
 	uint8_t *maddr;
 	uint32_t supported_features;
 	int ret = 0;
+
+	(void) thread_create(NULL, 0, ena_check, ena, 0, &p0, TS_RUN,
+	    minclsyspri);
 
 	rval = ena_hw_bar_read32(ena, ENAHW_REG_DEV_STS);
 	if ((rval & ENAHW_DEV_STS_READY_MASK) == 0) {
@@ -1120,6 +1156,16 @@ ena_attach_device_init(ena_t *ena)
 		ena_err(ena, "device gave invalid reset timeout");
 		return (B_FALSE);
 	}
+
+	ena_hw_bar_write32(ena, ENAHW_REG_ASQ_BASE_LO, 0);
+	ena_hw_bar_write32(ena, ENAHW_REG_ASQ_BASE_HI, 0);
+	ena_hw_bar_write32(ena, ENAHW_REG_ASQ_CAPS, 0);
+	ena_hw_bar_write32(ena, ENAHW_REG_ACQ_BASE_LO, 0);
+	ena_hw_bar_write32(ena, ENAHW_REG_ACQ_BASE_HI, 0);
+	ena_hw_bar_write32(ena, ENAHW_REG_ACQ_CAPS, 0);
+	ena_hw_bar_write32(ena, ENAHW_REG_AENQ_CAPS, 0);
+	ena_hw_bar_write32(ena, ENAHW_REG_AENQ_BASE_LO, 0);
+	ena_hw_bar_write32(ena, ENAHW_REG_AENQ_BASE_HI, 0);
 
 	expired = gethrtime() + timeout;
 
@@ -1213,6 +1259,8 @@ ena_attach_device_init(ena_t *ena)
 	 * nanoseconds.
 	 */
 	cmd_timeout = MSEC2NSEC(ENAHW_CAPS_ADMIN_CMD_TIMEOUT(rval) * 100);
+	ena_dbg(ena, "admin command timeout: %llxns", cmd_timeout);
+
 	aq->ea_cmd_timeout_ns = max(cmd_timeout, ena_admin_cmd_timeout_ns);
 
 	if (aq->ea_cmd_timeout_ns == 0) {
@@ -1236,7 +1284,8 @@ ena_attach_device_init(ena_t *ena)
 	 * admin queue completions, we just poll -- it seems to work
 	 * just fine.
 	 */
-	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, 0);
+	// XXX fix comment
+	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, 1);
 	aq->ea_poll_mode = B_TRUE;
 
 	bzero(&resp, sizeof (resp));
@@ -1252,6 +1301,7 @@ ena_attach_device_init(ena_t *ena)
 	ena_dbg(ena, "device version: %u", feat->efda_device_version);
 	ena_dbg(ena, "supported features: 0x%x",
 	    feat->efda_supported_features);
+	ena_dbg(ena, "device capabilities: 0x%x", feat->efda_capabilities);
 	ena_dbg(ena, "phys addr width: %u", feat->efda_phys_addr_width);
 	ena_dbg(ena, "virt addr width: %u", feat->efda_virt_addr_with);
 	maddr = feat->efda_mac_addr;
@@ -1261,6 +1311,7 @@ ena_attach_device_init(ena_t *ena)
 
 	bcopy(maddr, ena->ena_mac_addr, ETHERADDRL);
 	ena->ena_max_mtu = feat->efda_max_mtu;
+	ena->ena_capabilities = feat->efda_capabilities;
 	supported_features = feat->efda_supported_features;
 	ena->ena_supported_features = supported_features;
 	feat = NULL;
@@ -1810,12 +1861,14 @@ ena_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		ena->ena_attach_seq = desc->ead_seq;
+
 	}
 
 	/*
 	 * Now that interrupts are enabled make sure to tell the
 	 * device that all AENQ descriptors are ready for writing.
 	 */
+	ena_hw_bar_write32(ena, ENAHW_REG_INTERRUPT_MASK, 0);
 	ena_hw_bar_write32(ena, ENAHW_REG_AENQ_HEAD_DB,
 	    ena->ena_aenq.eaenq_num_descs);
 
@@ -1826,6 +1879,9 @@ ena_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 ena_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
+#if 1
+	return (DDI_FAILURE);
+#else
 	ena_t *ena = ddi_get_driver_private(dip);
 
 	if (ena == NULL) {
@@ -1863,6 +1919,7 @@ ena_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ddi_set_driver_private(dip, NULL);
 	kmem_free(ena, sizeof (ena_t));
 	return (DDI_SUCCESS);
+#endif
 }
 
 static struct cb_ops ena_cb_ops = {

@@ -43,4 +43,7 @@ SYMBOL_SCOPE {
 	fnvlist_add_string		{ FLAGS = EXTERN };
 	ncpus_online			{ FLAGS = EXTERN };
 	utsname				{ FLAGS = EXTERN };
+	p0				{ FLAGS = EXTERN };
+	minclsyspri			{ FLAGS = EXTERN };
+	thread_create			{ FLAGS = EXTERN };
 };

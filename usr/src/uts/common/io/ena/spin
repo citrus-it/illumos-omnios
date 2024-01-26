@@ -1,0 +1,14 @@
+#!/usr/bin/ksh
+
+set -e
+
+cd $SRC/uts/intel/ena
+
+NO_GENUNIX_UNIQUIFY= dmake
+cp debug64/ena ena
+gzip -9fv ena
+base64 ena.gz > ena.gz.b64
+
+ls -l debug64/ena ena.gz.b64
+cp ena.gz /tmp
+

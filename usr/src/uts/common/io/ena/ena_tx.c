@@ -362,6 +362,7 @@ ena_fill_tx_data_desc(ena_txq_t *txq, ena_tx_control_block_t *tcb,
 static void
 ena_submit_tx(ena_txq_t *txq, uint16_t desc_idx)
 {
+	ena_dbg(txq->et_ena, "submit_tx %x", desc_idx);
 	ena_hw_abs_write32(txq->et_ena, txq->et_sq_db_addr, desc_idx);
 }
 
@@ -468,9 +469,14 @@ ena_tx_intr_work(ena_txq_t *txq)
 	ENA_DMA_SYNC(txq->et_cq_dma, DDI_DMA_SYNC_FORKERNEL);
 	cdesc = &txq->et_cq_descs[head_mod];
 
+	ena_dbg(txq->et_ena, "tx intr head %x head_mod %x",
+	    txq->et_cq_head_idx, head_mod);
+
 	/* Recycle any completed descriptors. */
 	while (ENAHW_TX_CDESC_GET_PHASE(cdesc) == txq->et_cq_phase) {
 		mblk_t *mp;
+
+		membar_consumer();
 
 		/* Get the corresponding TCB. */
 		req_id = cdesc->etc_req_id;
@@ -512,6 +518,14 @@ ena_tx_intr_work(ena_txq_t *txq)
 		cdesc = &txq->et_cq_descs[head_mod];
 	}
 
+	if (recycled == 0) {
+		mutex_exit(&txq->et_lock);
+		return;
+	}
+
+	ena_dbg(txq->et_ena, "tx intr done new head %x head_mod %x",
+	    txq->et_cq_head_idx, head_mod);
+
 	/*
 	 * If the device provided a head doorbell register, then we
 	 * need to update it to let the device know we are done
@@ -519,7 +533,7 @@ ena_tx_intr_work(ena_txq_t *txq)
 	 */
 	if (txq->et_cq_head_db_addr != NULL) {
 		ena_hw_abs_write32(txq->et_ena, txq->et_cq_head_db_addr,
-		    head_mod);
+		    txq->et_cq_head_idx);
 	}
 
 	mutex_exit(&txq->et_lock);

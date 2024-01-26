@@ -17,10 +17,20 @@
 static void
 ena_refill_rx(ena_rxq_t *rxq, uint16_t num)
 {
+	ena_t *ena = rxq->er_ena;
+	uint16_t tail_mod;
+
 	VERIFY3P(rxq, !=, NULL);
 	ASSERT(MUTEX_HELD(&rxq->er_lock));
 	ASSERT3U(num, <=, rxq->er_sq_num_descs);
-	uint16_t tail_mod = rxq->er_sq_tail_idx & (rxq->er_sq_num_descs - 1);
+
+	if (num == 0)
+		return;
+
+	tail_mod = rxq->er_sq_tail_idx & (rxq->er_sq_num_descs - 1);
+
+	ena_dbg(ena, "ena_refill_rx(%p, %x) tail %x(%x)", rxq, num,
+	    rxq->er_sq_tail_idx, tail_mod);
 
 	while (num != 0) {
 		enahw_rx_desc_t *desc = &rxq->er_sq_descs[tail_mod];
@@ -31,15 +41,17 @@ ena_refill_rx(ena_rxq_t *rxq, uint16_t num)
 		VERIFY3P(desc, !=, NULL);
 		VERIFY3P(rcb, !=, NULL);
 		VERIFY3P(desc, >=, rxq->er_sq_descs);
-		VERIFY3P(desc, <=,
-		    (rxq->er_sq_descs + rxq->er_sq_num_descs - 1));
+		VERIFY3P(desc, <=, rxq->er_sq_descs +
+		    (rxq->er_sq_num_descs - 1) * sizeof (*desc));
 
 		desc->erd_length = rcb->ercb_dma.edb_len;
 		desc->erd_req_id = tail_mod;
 		VERIFY3P(rcb->ercb_dma.edb_cookie, !=, NULL);
-		ena_set_dma_addr_values(rxq->er_ena,
+		ena_set_dma_addr_values(ena,
 		    rcb->ercb_dma.edb_cookie->dmac_laddress,
 		    &desc->erd_buff_addr_lo, &desc->erd_buff_addr_hi);
+
+		ENAHW_RX_DESC_CLEAR(desc);
 		ENAHW_RX_DESC_SET_PHASE(desc, phase);
 		ENAHW_RX_DESC_SET_FIRST(desc);
 		ENAHW_RX_DESC_SET_LAST(desc);
@@ -49,15 +61,24 @@ ena_refill_rx(ena_rxq_t *rxq, uint16_t num)
 		tail_mod = rxq->er_sq_tail_idx & (rxq->er_sq_num_descs - 1);
 
 		if (tail_mod == 0) {
-			rxq->er_sq_phase = !rxq->er_sq_phase;
+			rxq->er_sq_phase ^= 1;
+			ena_dbg(ena, "SQ wrap, new phase %d",
+			    rxq->er_sq_phase);
 		}
 
 		num--;
 	}
 
+	//ena_dbg(ena, "ena_refill_rx new tail %x(%x)",
+	    //rxq->er_sq_tail_idx, tail_mod);
+
 	ENA_DMA_SYNC(rxq->er_sq_dma, DDI_DMA_SYNC_FORDEV);
-	ena_hw_abs_write32(rxq->er_ena, rxq->er_sq_db_addr,
-	    rxq->er_sq_tail_idx);
+	ena_hw_abs_write32(ena, rxq->er_sq_db_addr, rxq->er_sq_tail_idx);
+	membar_producer();
+	//delay(drv_usectohz(100 * 1000));
+
+	ena_dbg(ena, "ena_refill_rx wrote new tail %x(%x)",
+	    rxq->er_sq_tail_idx, tail_mod);
 }
 
 void
@@ -246,6 +267,7 @@ ena_cleanup_rxq(ena_rxq_t *rxq)
 		rxq->er_sq_tail_idx = 0;
 		rxq->er_sq_phase = 0;
 		rxq->er_state &= ~ENA_RXQ_STATE_SQ_CREATED;
+		rxq->er_state &= ~ENA_RXQ_STATE_SQ_FILLED;
 	}
 
 	if ((rxq->er_state & ENA_RXQ_STATE_CQ_CREATED) != 0) {
@@ -290,8 +312,13 @@ ena_ring_rx_start(mac_ring_driver_t rh, uint64_t gen_num)
 	ena_t *ena = rxq->er_ena;
 	uint32_t intr_ctrl;
 
+	ena_dbg(ena, "rx_start %p, flags: %x", rxq, rxq->er_state);
+
 	mutex_enter(&rxq->er_lock);
-	ena_refill_rx(rxq, rxq->er_sq_num_descs);
+	if ((rxq->er_state & ENA_RXQ_STATE_SQ_FILLED) == 0) {
+		ena_refill_rx(rxq, rxq->er_sq_num_descs - 1);
+		rxq->er_state |= ENA_RXQ_STATE_SQ_FILLED;
+	}
 	rxq->er_m_gen_num = gen_num;
 	rxq->er_intr_limit = ena->ena_rxq_intr_limit;
 	mutex_exit(&rxq->er_lock);
@@ -326,7 +353,8 @@ ena_ring_rx(ena_rxq_t *rxq, int poll_bytes)
 
 	cdesc = &rxq->er_cq_descs[head_mod];
 	VERIFY3P(cdesc, >=, rxq->er_cq_descs);
-	VERIFY3P(cdesc, <=, (rxq->er_cq_descs + rxq->er_cq_num_descs - 1));
+	VERIFY3P(cdesc, <=, rxq->er_cq_descs +
+	    (rxq->er_cq_num_descs - 1) * sizeof (*cdesc));
 
 	while (ENAHW_RX_CDESC_PHASE(cdesc) == rxq->er_cq_phase) {
 		boolean_t first, last;
@@ -337,6 +365,12 @@ ena_ring_rx(ena_rxq_t *rxq, int poll_bytes)
 		enahw_io_l4_proto_t l4proto;
 		boolean_t l4csum_checked;
 		uint32_t hflags = 0;
+
+		ENA_DMA_SYNC(rxq->er_cq_dma, DDI_DMA_SYNC_FORKERNEL);
+		membar_consumer();
+
+		ena_dbg(ena, "ring_rx %p, head %x(%x)",
+		    rxq, rxq->er_cq_head_idx, head_mod);
 
 		VERIFY3U(head_mod, <, rxq->er_cq_num_descs);
 		/*
@@ -470,7 +504,9 @@ next_desc:
 		head_mod = rxq->er_cq_head_idx & (rxq->er_cq_num_descs - 1);
 
 		if (head_mod == 0) {
-			rxq->er_cq_phase = !rxq->er_cq_phase;
+			rxq->er_cq_phase ^= 1;
+			ena_dbg(ena, "CQ wrap, new phase %d",
+			    rxq->er_cq_phase);
 		}
 
 		if (polling && (total_bytes > poll_bytes)) {
@@ -488,14 +524,21 @@ next_desc:
 		    (rxq->er_cq_descs + rxq->er_cq_num_descs - 1));
 	}
 
-	mutex_enter(&rxq->er_stat_lock);
-	rxq->er_stat.ers_packets.value.ui64 += num_frames;
-	rxq->er_stat.ers_bytes.value.ui64 += total_bytes;
-	mutex_exit(&rxq->er_stat_lock);
+	if (num_frames > 0) {
+		mutex_enter(&rxq->er_stat_lock);
+		rxq->er_stat.ers_packets.value.ui64 += num_frames;
+		rxq->er_stat.ers_bytes.value.ui64 += total_bytes;
+		mutex_exit(&rxq->er_stat_lock);
 
-	DTRACE_PROBE4(rx__frames, mblk_t *, head, boolean_t, polling, uint64_t,
-	    num_frames, uint64_t, total_bytes);
-	ena_refill_rx(rxq, num_frames);
+		ena_dbg(ena,
+		    "ring_rx_done %p, %lx frames, head %x(%x), polling=%d",
+		    rxq, num_frames, rxq->er_cq_head_idx, head_mod, polling);
+
+		DTRACE_PROBE4(rx__frames, mblk_t *, head, boolean_t, polling,
+		    uint64_t, num_frames, uint64_t, total_bytes);
+		ena_refill_rx(rxq, num_frames);
+	}
+
 	return (head);
 }
 

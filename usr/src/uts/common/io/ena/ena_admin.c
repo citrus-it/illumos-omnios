@@ -20,6 +20,7 @@
 
 #include "ena_hw.h"
 #include "ena.h"
+#include <sys/atomic.h>
 
 /*
  * Mark the context as complete (a response has been received).
@@ -42,7 +43,7 @@ ena_release_cmd_ctx(ena_t *ena, ena_cmd_ctx_t *ctx)
 	ctx->ectx_cmd_opcode = ENAHW_CMD_NONE;
 
 	mutex_enter(&ena->ena_aq.ea_sq_lock);
-	list_insert_head(&ena->ena_aq.ea_cmd_ctxs_free, ctx);
+	list_insert_tail(&ena->ena_aq.ea_cmd_ctxs_free, ctx);
 	ena->ena_aq.ea_pending_cmds--;
 	mutex_exit(&ena->ena_aq.ea_sq_lock);
 }
@@ -107,6 +108,9 @@ ena_admin_submit_cmd(ena_t *ena, enahw_cmd_desc_t *cmd, enahw_resp_desc_t *resp,
 		sq->eas_phase = !sq->eas_phase;
 	}
 
+	membar_producer();
+	ena_dbg(ena, "Rang doorbell %x, opcode %x, pending %x", sq->eas_tail,
+	    cmd->ecd_opcode, aq->ea_pending_cmds);
 	ena_hw_abs_write32(ena, sq->eas_dbaddr, sq->eas_tail);
 	mutex_exit(&aq->ea_sq_lock);
 	*ctx = lctx;
@@ -136,11 +140,15 @@ ena_admin_read_resp(ena_t *ena, enahw_resp_desc_t *hwresp)
 		mutex_enter(&aq->ea_stat_lock);
 		aq->ea_stats.cmds_fail++;
 		mutex_exit(&aq->ea_stat_lock);
+		ena_dbg(ena, "failed command %x, opcode %x, status %x",
+		    cmd_id, ctx->ectx_cmd_opcode, hwresp->erd_status);
 		DTRACE_PROBE4(cmd__fail, enahw_resp_desc_t *, hwresp,
 		    ena_cmd_ctx_t *, ctx, uint16_t, head_mod, uint8_t, phase);
 		return;
 	}
 
+	ena_dbg(ena, "completed command %x, opcode %x",
+	    cmd_id, ctx->ectx_cmd_opcode);
 	DTRACE_PROBE4(cmd__success, enahw_resp_desc_t *, hwresp,
 	    ena_cmd_ctx_t *, ctx, uint16_t, head_mod, uint8_t, phase);
 	mutex_enter(&aq->ea_stat_lock);
@@ -161,18 +169,22 @@ ena_admin_process_responses(ena_t *ena)
 	uint8_t phase = cq->eac_phase & ENAHW_RESP_PHASE_MASK;
 
 	ENA_DMA_SYNC(cq->eac_dma, DDI_DMA_SYNC_FORKERNEL);
-	hwresp = &cq->eac_entries[head_mod];
-	while ((hwresp->erd_flags & ENAHW_RESP_PHASE_MASK) == phase) {
+
+	for (;;) {
+		hwresp = &cq->eac_entries[head_mod];
+		if ((hwresp->erd_flags & ENAHW_RESP_PHASE_MASK) != phase)
+			break;
+
+		membar_consumer();
+		ENA_DMA_SYNC(cq->eac_dma, DDI_DMA_SYNC_FORKERNEL);
+
 		ena_admin_read_resp(ena, hwresp);
 
 		cq->eac_head++;
 		head_mod = cq->eac_head & modulo_mask;
 
-		if (head_mod == 0) {
+		if (head_mod == 0)
 			phase = !phase;
-		}
-
-		hwresp = &cq->eac_entries[head_mod];
 	}
 
 	cq->eac_phase = phase;
@@ -217,7 +229,20 @@ ena_admin_poll_for_resp(ena_t *ena, ena_cmd_ctx_t *ctx)
 			 * thing to do is to spin or panic; we choose
 			 * to panic.
 			 */
+
 			panic("timed out waiting for admin response");
+
+#if 0
+			ena_err(ena, "^Timed out waiting for admin response");
+			ena_adminq_t *aq = &ena->ena_aq;
+			ena_admin_sq_t *sq = &aq->ea_sq;
+			mutex_enter(&aq->ea_sq_lock);
+			ENA_DMA_SYNC(sq->eas_dma, DDI_DMA_SYNC_FORDEV);
+			ena_hw_abs_write32(ena, sq->eas_dbaddr, sq->eas_tail);
+			ena_err(ena, "^Rang doorbell %x", sq->eas_tail);
+			mutex_exit(&aq->ea_sq_lock);
+			expire += ena->ena_aq.ea_cmd_timeout_ns;
+#endif
 		}
 	}
 
@@ -520,6 +545,8 @@ ena_destroy_sq(ena_t *ena, uint16_t hw_idx, boolean_t is_tx)
 	enahw_cmd_desc_t cmd;
 	enahw_cmd_destroy_sq_t *cmd_sq = &cmd.ecd_cmd.ecd_destroy_sq;
 	enahw_resp_desc_t resp;
+	enahw_sq_direction_t dir =
+	    is_tx ? ENAHW_SQ_DIRECTION_TX : ENAHW_SQ_DIRECTION_RX;
 	ena_cmd_ctx_t *ctx = NULL;
 	int ret;
 
@@ -527,7 +554,7 @@ ena_destroy_sq(ena_t *ena, uint16_t hw_idx, boolean_t is_tx)
 	bzero(&resp, sizeof (resp));
 	cmd.ecd_opcode = ENAHW_CMD_DESTROY_SQ;
 	cmd_sq->edsq_idx = hw_idx;
-	ENAHW_CMD_DESTROY_SQ_DIR(cmd_sq, is_tx);
+	ENAHW_CMD_DESTROY_SQ_DIR(cmd_sq, dir);
 
 	if ((ret = ena_admin_submit_cmd(ena, &cmd, &resp, &ctx)) != 0) {
 		ena_err(ena, "failed to submit Destroy SQ command: %d", ret);

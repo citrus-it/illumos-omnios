@@ -839,6 +839,19 @@ typedef enum enahw_feature_id {
 } enahw_feature_id_t;
 
 /*
+ * Device capabilities.
+ *
+ * common: ena_admin_aq_caps_id
+ */
+typedef enum enahw_capability_id {
+	ENAHW_CAP_ENI_STATS			= 0,
+	ENAHW_CAP_ENA_SRD_INFO			= 1,
+	ENAHW_CAP_CUSTOMER_METRICS		= 2,
+	ENAHW_CAP_EXTENDED_RESET		= 3,
+	ENAHW_CAP_CDESC_MBZ			= 4,
+} enahw_capability_id_t;
+
+/*
  * The following macros define the maximum version we support for each
  * feature. These are the feature versions we use to communicate with
  * the feature command. Linux has these values spread throughout the
@@ -957,7 +970,12 @@ typedef struct enahw_feat_dev_attr {
 	 * (enahw_feature_id).
 	 */
 	uint32_t efda_supported_features;
-	uint32_t efda_rsvd1;
+
+	/*
+	 * Bitmap representing device capabilities.
+	 * (enahw_capability_id)
+	 */
+	uint32_t efda_capabilities;
 
 	/* Number of bits used for physical/vritual address. */
 	uint32_t efda_phys_addr_width;
@@ -1768,6 +1786,7 @@ typedef struct enahw_rx_desc {
 #define	ENAHW_RX_DESC_COMP_REQ_SHIFT	4
 #define	ENAHW_RX_DESC_COMP_REQ_MASK	BIT(4)
 
+#define	ENAHW_RX_DESC_CLEAR(desc)	((desc)->erd_ctrl = 0)
 #define	ENAHW_RX_DESC_SET_PHASE(desc, val)				\
 	((desc)->erd_ctrl |= ((val) & ENAHW_RX_DESC_PHASE_MASK))
 

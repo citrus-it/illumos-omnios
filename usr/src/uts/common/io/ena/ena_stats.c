@@ -66,11 +66,20 @@ ena_stat_device_basic_update(kstat_t *ksp, int rw)
 		return (EACCES);
 	}
 
+	mutex_enter(&ena->ena_lock);
+	if (ena->ena_device_basic_stat_time + MSEC2NSEC(500) > gethrtime()) {
+		mutex_exit(&ena->ena_lock);
+		return (0);
+	}
+	mutex_exit(&ena->ena_lock);
+
 	if ((ret = ena_admin_get_basic_stats(ena, &resp)) != 0) {
 		return (ret);
 	}
 
 	mutex_enter(&ena->ena_lock);
+
+	ena->ena_device_basic_stat_time = gethrtime();
 
 	ebs->ebs_tx_bytes.value.ui64 =
 	    ((uint64_t)stats->erbs_tx_bytes_high << 32) |
@@ -430,6 +439,17 @@ ena_m_stat(void *arg, uint_t stat, uint64_t *val)
 	ena_t *ena = arg;
 	ena_basic_stat_t *ebs = ena->ena_device_basic_kstat->ks_data;
 	int ret = 0;
+
+	switch (stat) {
+	case MAC_STAT_NORCVBUF:
+	case MAC_STAT_RBYTES:
+	case MAC_STAT_IPACKETS:
+	case MAC_STAT_OBYTES:
+	case MAC_STAT_OPACKETS:
+		break;
+	default:
+		return (ENOTSUP);
+	}
 
 	ret = ena_stat_device_basic_update(ena->ena_device_basic_kstat,
 	    KSTAT_READ);

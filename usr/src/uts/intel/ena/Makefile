@@ -31,6 +31,8 @@ LDFLAGS		+= -N misc/mac
 
 MAPFILES	+= ddi mac kernel
 
+CERRWARN     += -_gcc=-Wno-unused
+
 .KEEP_STATE:
 
 def:		$(DEF_DEPS)
