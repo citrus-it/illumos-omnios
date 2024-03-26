@@ -500,13 +500,54 @@ fletcher_4_byteswap(const void *buf, size_t size, zio_cksum_t *zcp)
 	}
 }
 
+/* Incremental Fletcher 4 */
+
+static inline void
+fletcher_4_incremental_combine(zio_cksum_t *zcp, const size_t size,
+    const zio_cksum_t *nzcp)
+{
+	const uint64_t c1 = size / sizeof (uint32_t);
+	const uint64_t c2 = c1 * (c1 + 1) / 2;
+	const uint64_t c3 = c2 * (c1 + 2) / 3;
+
+	zcp->zc_word[3] += nzcp->zc_word[3] + c1 * zcp->zc_word[2] +
+	    c2 * zcp->zc_word[1] + c3 * zcp->zc_word[0];
+	zcp->zc_word[2] += nzcp->zc_word[2] + c1 * zcp->zc_word[1] +
+	    c2 * zcp->zc_word[0];
+	zcp->zc_word[1] += nzcp->zc_word[1] + c1 * zcp->zc_word[0];
+	zcp->zc_word[0] += nzcp->zc_word[0];
+}
+
+static inline void
+fletcher_4_incremental_impl(boolean_t native, const void *buf, size_t size,
+    zio_cksum_t *zcp)
+{
+	static const uint64_t FLETCHER_4_INC_MAX = 8ULL << 20;
+	uint64_t len;
+
+	while (size > 0) {
+		zio_cksum_t nzc;
+
+		len = MIN(size, FLETCHER_4_INC_MAX);
+
+		if (native)
+			fletcher_4_native(buf, len, &nzc);
+		else
+			fletcher_4_byteswap(buf, len, &nzc);
+
+		fletcher_4_incremental_combine(zcp, len, &nzc);
+
+		size -= len;
+		buf += len;
+	}
+}
+
 int
 fletcher_4_incremental_native(void *buf, size_t size, void *data)
 {
 	zio_cksum_t *zcp = data;
 
-	ASSERT(IS_P2ALIGNED(size, sizeof (uint32_t)));
-	fletcher_4_scalar_native(buf, size, zcp);
+	fletcher_4_incremental_impl(B_TRUE, buf, size, zcp);
 	return (0);
 }
 
@@ -515,8 +556,7 @@ fletcher_4_incremental_byteswap(void *buf, size_t size, void *data)
 {
 	zio_cksum_t *zcp = data;
 
-	ASSERT(IS_P2ALIGNED(size, sizeof (uint32_t)));
-	fletcher_4_scalar_byteswap(buf, size, zcp);
+	fletcher_4_incremental_impl(B_FALSE, buf, size, zcp);
 	return (0);
 }
 
