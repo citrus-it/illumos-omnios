@@ -66,7 +66,11 @@ typedef struct fletcher_4_func {
 	const char *name;
 } fletcher_4_ops_t;
 
+#ifdef __amd64
 extern const fletcher_4_ops_t fletcher_4_avx2_ops;
+extern const fletcher_4_ops_t fletcher_4_sse2_ops;
+extern const fletcher_4_ops_t fletcher_4_ssse3_ops;
+#endif
 
 #ifdef	__cplusplus
 }

@@ -30,6 +30,7 @@ VERS= .1
 
 amd64_OBJS_SHARED=		\
 	zfs_fletcher_intel.o	\
+	zfs_fletcher_sse.o
 
 OBJS_SHARED=			\
 	$($(MACH64)_OBJS_SHARED)\
@@ -85,8 +86,7 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 # not linted
 SMATCH=off
 
-pics/zfs_fletcher.o := CPPFLAGS += -DLIBZFS
-pics/zfs_fletcher_intel.o := CPPFLAGS += -DLIBZFS
+CPPFLAGS += -DLIBZFS
 
 LDLIBS +=	-lz
 NATIVE_LIBS += libz.so

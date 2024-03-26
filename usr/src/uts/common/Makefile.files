@@ -1479,6 +1479,7 @@ ZFS_COMMON_OBJS +=		\
 
 amd64_ZFS_SHARED_OBJS +=	\
 	zfs_fletcher_intel.o	\
+	zfs_fletcher_sse.o
 
 ZFS_SHARED_OBJS +=		\
 	$($(MACH64)_ZFS_SHARED_OBJS)	\

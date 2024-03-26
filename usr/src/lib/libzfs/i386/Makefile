@@ -27,6 +27,7 @@
 include ../Makefile.com
 
 pics/zfs_fletcher_intel.o := CTFCVTFLAGS += -m
+pics/zfs_fletcher_sse.o := CTFCVTFLAGS += -m
 CTFMRGFLAGS += -m
 
 install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTCOMPATLINKS)
