@@ -289,7 +289,7 @@ const char *raidz_rec_name[] = {
 #define	BENCH_D_COLS	(8ULL)
 #define	BENCH_COLS	(BENCH_D_COLS + PARITY_PQR)
 #define	BENCH_ZIO_SIZE	(1ULL << SPA_OLD_MAXBLOCKSHIFT)	/* 128 kiB */
-#define	BENCH_NS	MSEC2NSEC(25)			/* 25ms */
+#define	BENCH_NS	MSEC2NSEC(1)			/* 1ms */
 
 typedef void (*benchmark_fn)(raidz_map_t *rm, const int fn);
 
@@ -339,7 +339,7 @@ benchmark_raidz_impl(raidz_map_t *bench_rm, const int fn, benchmark_fn bench_fn)
 		t_start = gethrtime();
 
 		do {
-			for (i = 0; i < 25; i++, run_cnt++)
+			for (i = 0; i < 5; i++, run_cnt++)
 				bench_fn(bench_rm, fn);
 
 			t_diff = gethrtime() - t_start;

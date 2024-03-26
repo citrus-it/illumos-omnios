@@ -597,7 +597,7 @@ fletcher_4_incremental_byteswap(void *buf, size_t size, void *data)
 	fletcher_4_fastest_impl.compute_ ## type = src->compute_ ## type; \
 }
 
-#define	FLETCHER_4_BENCH_NS	(MSEC2NSEC(50))		/* 50ms */
+#define	FLETCHER_4_BENCH_NS	(MSEC2NSEC(1))		/* 1ms */
 
 static void
 fletcher_4_benchmark_impl(boolean_t native, char *data, size_t data_size)
