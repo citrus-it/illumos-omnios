@@ -64,12 +64,38 @@ int fletcher_4_impl_set(const char *selector);
 void fletcher_4_init(void);
 void fletcher_4_fini(void);
 
+
+/* Internal fletcher ctx */
+
+typedef struct zfs_fletcher_sse {
+	uint64_t v[2] __attribute__((aligned(16)));
+} zfs_fletcher_sse_t;
+
+typedef struct zfs_fletcher_avx {
+	uint64_t v[4] __attribute__((aligned(32)));
+} zfs_fletcher_avx_t;
+
+typedef struct zfs_fletcher_avx512 {
+	uint64_t v[8] __attribute__((aligned(64)));
+} zfs_fletcher_avx512_t;
+
+typedef union fletcher_4_ctx {
+	zio_cksum_t scalar;
+#ifdef __amd64
+	zfs_fletcher_sse_t sse[4];
+	zfs_fletcher_avx_t avx[4];
+	zfs_fletcher_avx512_t avx512[4];
+#endif
+} fletcher_4_ctx_t;
+
 /*
  * fletcher checksum struct
  */
-typedef void (*fletcher_4_init_f)(zio_cksum_t *);
-typedef void (*fletcher_4_fini_f)(zio_cksum_t *);
-typedef void (*fletcher_4_compute_f)(const void *, size_t, zio_cksum_t *);
+typedef void (*fletcher_4_init_f)(fletcher_4_ctx_t *);
+typedef void (*fletcher_4_fini_f)(fletcher_4_ctx_t *, zio_cksum_t *);
+typedef void (*fletcher_4_compute_f)(fletcher_4_ctx_t *,
+    const void *, size_t);
+
 typedef struct fletcher_4_func {
 	fletcher_4_init_f init_native;
 	fletcher_4_fini_f fini_native;

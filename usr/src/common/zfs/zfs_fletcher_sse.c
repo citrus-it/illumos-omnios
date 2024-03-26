@@ -43,40 +43,30 @@
 
 #ifdef __amd64
 
+#include <sys/types.h>
+#include <sys/sunddi.h>
 #include <sys/spa_checksum.h>
+#include <sys/byteorder.h>
 #include <sys/simd.h>
 #include <zfs_fletcher.h>
+#ifndef _KERNEL
+#include <strings.h>
+#endif
 
 struct zfs_fletcher_sse_array {
 	uint64_t v[2] __attribute__((aligned(16)));
 };
 
 static void
-fletcher_4_sse2_init(zio_cksum_t *zcp)
+fletcher_4_sse2_init(fletcher_4_ctx_t *ctx)
 {
-	kfpu_begin();
-
-	/* clear sse registers */
-	__asm("pxor %xmm0, %xmm0");
-	__asm("pxor %xmm1, %xmm1");
-	__asm("pxor %xmm2, %xmm2");
-	__asm("pxor %xmm3, %xmm3");
+	bzero(ctx->sse, 4 * sizeof (zfs_fletcher_sse_t));
 }
 
 static void
-fletcher_4_sse2_fini(zio_cksum_t *zcp)
+fletcher_4_sse2_fini(fletcher_4_ctx_t *ctx, zio_cksum_t *zcp)
 {
-	struct zfs_fletcher_sse_array a, b, c, d;
 	uint64_t A, B, C, D;
-
-	__asm("movdqa %%xmm0, %0":"=m" (a.v));
-	__asm("movdqa %%xmm1, %0":"=m" (b.v));
-	__asm("psllq $0x2, %xmm2");
-	__asm("movdqa %%xmm2, %0":"=m" (c.v));
-	__asm("psllq $0x3, %xmm3");
-	__asm("movdqa %%xmm3, %0":"=m" (d.v));
-
-	kfpu_end();
 
 	/*
 	 * The mixing matrix for checksum calculation is:
@@ -88,19 +78,41 @@ fletcher_4_sse2_fini(zio_cksum_t *zcp)
 	 * c and d are multiplied by 4 and 8, respectively,
 	 * before spilling the vectors out to memory.
 	 */
-	A = a.v[0] + a.v[1];
-	B = 2*b.v[0] + 2*b.v[1] - a.v[1];
-	C = c.v[0] - b.v[0] + c.v[1] - 3*b.v[1];
-	D = d.v[0] - c.v[0] + d.v[1] - 2*c.v[1] + b.v[1];
+	A = ctx->sse[0].v[0] + ctx->sse[0].v[1];
+	B = 2 * ctx->sse[1].v[0] + 2 * ctx->sse[1].v[1] - ctx->sse[0].v[1];
+	C = 4 * ctx->sse[2].v[0] - ctx->sse[1].v[0] + 4 * ctx->sse[2].v[1] -
+	    3 * ctx->sse[1].v[1];
+	D = 8 * ctx->sse[3].v[0] - 4 * ctx->sse[2].v[0] + 8 * ctx->sse[3].v[1] -
+	    8 * ctx->sse[2].v[1] + ctx->sse[1].v[1];
 
 	ZIO_SET_CHECKSUM(zcp, A, B, C, D);
 }
 
+#define	FLETCHER_4_SSE_RESTORE_CTX(ctx)				\
+{								\
+	__asm("movdqu %0, %%xmm0" :: "m" ((ctx)->sse[0]));	\
+	__asm("movdqu %0, %%xmm1" :: "m" ((ctx)->sse[1]));	\
+	__asm("movdqu %0, %%xmm2" :: "m" ((ctx)->sse[2]));	\
+	__asm("movdqu %0, %%xmm3" :: "m" ((ctx)->sse[3]));	\
+}
+
+#define	FLETCHER_4_SSE_SAVE_CTX(ctx)				\
+{								\
+	__asm("movdqu %%xmm0, %0" : "=m" ((ctx)->sse[0]));	\
+	__asm("movdqu %%xmm1, %0" : "=m" ((ctx)->sse[1]));	\
+	__asm("movdqu %%xmm2, %0" : "=m" ((ctx)->sse[2]));	\
+	__asm("movdqu %%xmm3, %0" : "=m" ((ctx)->sse[3]));	\
+}
+
 static void
-fletcher_4_sse2_native(const void *buf, uint64_t size, zio_cksum_t *unused)
+fletcher_4_sse2_native(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 {
 	const uint64_t *ip = buf;
 	const uint64_t *ipend = (uint64_t *)((uint8_t *)ip + size);
+
+	kfpu_begin();
+
+	FLETCHER_4_SSE_RESTORE_CTX(ctx);
 
 	__asm("pxor %xmm4, %xmm4");
 
@@ -118,27 +130,38 @@ fletcher_4_sse2_native(const void *buf, uint64_t size, zio_cksum_t *unused)
 		__asm("paddq %xmm1, %xmm2");
 		__asm("paddq %xmm2, %xmm3");
 	}
+
+	FLETCHER_4_SSE_SAVE_CTX(ctx);
+
+	kfpu_end();
 }
 
 static void
-fletcher_4_sse2_byteswap(const void *buf, uint64_t size, zio_cksum_t *unused)
+fletcher_4_sse2_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 {
 	const uint32_t *ip = buf;
 	const uint32_t *ipend = (uint32_t *)((uint8_t *)ip + size);
 
-	for (; ip < ipend; ip += 2) {
-		uint32_t scratch;
+	kfpu_begin();
 
-		__asm("bswapl %0" : "=r"(scratch) : "0"(*ip));
-		__asm("movd %0, %%xmm5" :: "r"(scratch));
-		__asm("bswapl %0" : "=r"(scratch) : "0"(*(ip + 1)));
-		__asm("movd %0, %%xmm6" :: "r"(scratch));
+	FLETCHER_4_SSE_RESTORE_CTX(ctx);
+
+	for (; ip < ipend; ip += 2) {
+		uint32_t scratch1 = BSWAP_32(ip[0]);
+		uint32_t scratch2 = BSWAP_32(ip[1]);
+
+		__asm("movd %0, %%xmm5" :: "r"(scratch1));
+		__asm("movd %0, %%xmm6" :: "r"(scratch2));
 		__asm("punpcklqdq %xmm6, %xmm5");
 		__asm("paddq %xmm5, %xmm0");
 		__asm("paddq %xmm0, %xmm1");
 		__asm("paddq %xmm1, %xmm2");
 		__asm("paddq %xmm2, %xmm3");
 	}
+
+	FLETCHER_4_SSE_SAVE_CTX(ctx);
+
+	kfpu_end();
 }
 
 static boolean_t
@@ -165,14 +188,19 @@ const fletcher_4_ops_t fletcher_4_sse2_ops = {
 };
 
 static void
-fletcher_4_ssse3_byteswap(const void *buf, uint64_t size, zio_cksum_t *unused)
+fletcher_4_ssse3_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 {
-	static const struct zfs_fletcher_sse_array mask = {
+	static const zfs_fletcher_sse_t mask = {
 		.v = { 0x0405060700010203, 0x0C0D0E0F08090A0B }
 	};
 
 	const uint64_t *ip = buf;
 	const uint64_t *ipend = (uint64_t *)((uint8_t *)ip + size);
+
+	kfpu_begin();
+
+	FLETCHER_4_SSE_RESTORE_CTX(ctx);
+
 
 	__asm("movdqa %0, %%xmm7"::"m" (mask));
 	__asm("pxor %xmm4, %xmm4");
@@ -192,6 +220,10 @@ fletcher_4_ssse3_byteswap(const void *buf, uint64_t size, zio_cksum_t *unused)
 		__asm("paddq %xmm1, %xmm2");
 		__asm("paddq %xmm2, %xmm3");
 	}
+
+	FLETCHER_4_SSE_SAVE_CTX(ctx);
+
+	kfpu_end();
 }
 
 static boolean_t fletcher_4_ssse3_valid(void)
