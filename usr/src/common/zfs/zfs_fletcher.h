@@ -118,6 +118,7 @@ extern const fletcher_4_ops_t fletcher_4_avx2_ops;
 extern const fletcher_4_ops_t fletcher_4_sse2_ops;
 extern const fletcher_4_ops_t fletcher_4_ssse3_ops;
 extern const fletcher_4_ops_t fletcher_4_avx512f_ops;
+extern const fletcher_4_ops_t fletcher_4_avx512bw_ops;
 #endif
 
 #ifdef	__cplusplus

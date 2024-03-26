@@ -187,6 +187,7 @@ static const fletcher_4_ops_t *fletcher_4_impls[] = {
 	&fletcher_4_sse2_ops,
 	&fletcher_4_ssse3_ops,
 	&fletcher_4_avx512f_ops,
+	&fletcher_4_avx512bw_ops,
 #endif
 };
 
