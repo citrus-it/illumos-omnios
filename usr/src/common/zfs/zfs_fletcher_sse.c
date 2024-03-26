@@ -165,7 +165,7 @@ fletcher_4_sse2_valid(void)
 	if (zfs_fletcher4_fpu_enabled == 0)
 		return (B_FALSE);
 #endif
-	return (zfs_sse2_available());
+	return (kfpu_allowed() && zfs_sse2_available());
 }
 
 const fletcher_4_ops_t fletcher_4_sse2_ops = {

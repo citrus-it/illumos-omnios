@@ -158,7 +158,7 @@ fletcher_4_avx2_valid(void)
 	if (zfs_fletcher4_fpu_enabled == 0)
 		return (B_FALSE);
 #endif
-	return (zfs_avx_available() && zfs_avx2_available());
+	return (kfpu_allowed() && zfs_avx_available() && zfs_avx2_available());
 }
 
 const fletcher_4_ops_t fletcher_4_avx2_ops = {
