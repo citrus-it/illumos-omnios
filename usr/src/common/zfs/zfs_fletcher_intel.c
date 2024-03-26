@@ -169,7 +169,8 @@ const fletcher_4_ops_t fletcher_4_avx2_ops = {
 	.fini_byteswap = fletcher_4_avx2_fini,
 	.compute_byteswap = fletcher_4_avx2_byteswap,
 	.valid = fletcher_4_avx2_valid,
-	.uses_fpu = B_TRUE,
+	.uses_fpu_native = B_TRUE,
+	.uses_fpu_byteswap = B_TRUE,
 	.name = "avx2"
 };
 

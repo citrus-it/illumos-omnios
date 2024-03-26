@@ -171,7 +171,8 @@ static const fletcher_4_ops_t fletcher_4_scalar_ops = {
 	.fini_byteswap = fletcher_4_scalar_fini,
 	.compute_byteswap = fletcher_4_scalar_byteswap,
 	.valid = fletcher_4_scalar_valid,
-	.uses_fpu = B_FALSE,
+	.uses_fpu_native = B_FALSE,
+	.uses_fpu_byteswap = B_FALSE,
 	.name = "scalar"
 };
 
@@ -451,12 +452,12 @@ fletcher_4_native_impl(const void *buf, size_t size, zio_cksum_t *zcp)
 	fletcher_4_ctx_t ctx;
 	const fletcher_4_ops_t *ops = fletcher_4_impl_get();
 
-	if (ops->uses_fpu)
+	if (ops->uses_fpu_native)
 		kfpu_begin();
 	ops->init_native(&ctx);
 	ops->compute_native(&ctx, buf, size);
 	ops->fini_native(&ctx, zcp);
-	if (ops->uses_fpu)
+	if (ops->uses_fpu_native)
 		kfpu_end();
 }
 
@@ -495,12 +496,12 @@ fletcher_4_byteswap_impl(const void *buf, size_t size, zio_cksum_t *zcp)
 	fletcher_4_ctx_t ctx;
 	const fletcher_4_ops_t *ops = fletcher_4_impl_get();
 
-	if (ops->uses_fpu)
+	if (ops->uses_fpu_byteswap)
 		kfpu_begin();
 	ops->init_byteswap(&ctx);
 	ops->compute_byteswap(&ctx, buf, size);
 	ops->fini_byteswap(&ctx, zcp);
-	if (ops->uses_fpu)
+	if (ops->uses_fpu_byteswap)
 		kfpu_end();
 }
 
@@ -605,7 +606,7 @@ fletcher_4_incremental_byteswap(void *buf, size_t size, void *data)
 	fletcher_4_fastest_impl.init_ ## type = src->init_ ## type;	  \
 	fletcher_4_fastest_impl.fini_ ## type = src->fini_ ## type;	  \
 	fletcher_4_fastest_impl.compute_ ## type = src->compute_ ## type; \
-	fletcher_4_fastest_impl.uses_fpu = src->uses_fpu;		  \
+	fletcher_4_fastest_impl.uses_fpu_ ## type = src->uses_fpu_ ## type; \
 }
 
 #define	FLETCHER_4_BENCH_NS	(MSEC2NSEC(1))		/* 1ms */
@@ -757,12 +758,15 @@ abd_fletcher_4_init(zio_abd_checksum_data_t *cdp)
 	const fletcher_4_ops_t *ops = fletcher_4_impl_get();
 	cdp->acd_private = (void *) ops;
 
-	if (ops->uses_fpu)
-		kfpu_begin();
-	if (cdp->acd_byteorder == ZIO_CHECKSUM_NATIVE)
+	if (cdp->acd_byteorder == ZIO_CHECKSUM_NATIVE) {
+		if (ops->uses_fpu_native)
+			kfpu_begin();
 		ops->init_native(cdp->acd_ctx);
-	else
+	} else {
+		if (ops->uses_fpu_byteswap)
+			kfpu_begin();
 		ops->init_byteswap(cdp->acd_ctx);
+	}
 
 }
 
@@ -773,13 +777,16 @@ abd_fletcher_4_fini(zio_abd_checksum_data_t *cdp)
 
 	ASSERT(ops);
 
-	if (cdp->acd_byteorder == ZIO_CHECKSUM_NATIVE)
+	if (cdp->acd_byteorder == ZIO_CHECKSUM_NATIVE) {
 		ops->fini_native(cdp->acd_ctx, cdp->acd_zcp);
-	else
+		if (ops->uses_fpu_native)
+			kfpu_end();
+	} else {
 		ops->fini_byteswap(cdp->acd_ctx, cdp->acd_zcp);
+		if (ops->uses_fpu_byteswap)
+			kfpu_end();
+	}
 
-	if (ops->uses_fpu)
-		kfpu_end();
 }
 
 

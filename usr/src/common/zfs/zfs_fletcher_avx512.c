@@ -165,7 +165,8 @@ const fletcher_4_ops_t fletcher_4_avx512f_ops = {
 	.fini_byteswap = fletcher_4_avx512f_fini,
 	.compute_byteswap = fletcher_4_avx512f_byteswap,
 	.valid = fletcher_4_avx512f_valid,
-	.uses_fpu = B_TRUE,
+	.uses_fpu_native = B_TRUE,
+	.uses_fpu_byteswap = B_TRUE,
 	.name = "avx512f"
 };
 
@@ -208,7 +209,8 @@ const fletcher_4_ops_t fletcher_4_avx512bw_ops = {
 	.fini_byteswap = fletcher_4_avx512f_fini,
 	.compute_byteswap = fletcher_4_avx512bw_byteswap,
 	.valid = fletcher_4_avx512f_valid,
-	.uses_fpu = B_TRUE,
+	.uses_fpu_native = B_TRUE,
+	.uses_fpu_byteswap = B_TRUE,
 	.name = "avx512bw"
 };
 

@@ -176,7 +176,8 @@ const fletcher_4_ops_t fletcher_4_sse2_ops = {
 	.fini_byteswap = fletcher_4_sse2_fini,
 	.compute_byteswap = fletcher_4_sse2_byteswap,
 	.valid = fletcher_4_sse2_valid,
-	.uses_fpu = B_TRUE,
+	.uses_fpu_native = B_TRUE,
+	.uses_fpu_byteswap = B_TRUE,
 	.name = "sse2"
 };
 
@@ -234,7 +235,8 @@ const fletcher_4_ops_t fletcher_4_ssse3_ops = {
 	.fini_byteswap = fletcher_4_sse2_fini,
 	.compute_byteswap = fletcher_4_ssse3_byteswap,
 	.valid = fletcher_4_ssse3_valid,
-	.uses_fpu = B_TRUE,
+	.uses_fpu_native = B_TRUE,
+	.uses_fpu_byteswap = B_TRUE,
 	.name = "ssse3"
 };
 
