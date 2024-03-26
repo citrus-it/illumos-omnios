@@ -42,10 +42,10 @@
 
 #ifdef __amd64
 
-#include <sys/spa_checksum.h>
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #include <sys/simd.h>
+#include <sys/spa_checksum.h>
 #include <zfs_fletcher.h>
 #ifndef _KERNEL
 #include <strings.h>

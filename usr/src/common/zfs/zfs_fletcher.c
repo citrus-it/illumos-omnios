@@ -134,6 +134,7 @@
 #include <sys/mutex.h>
 #include <sys/sysmacros.h>
 #include <sys/byteorder.h>
+#include <sys/simd.h>
 #include <sys/spa.h>
 #include <sys/zio_checksum.h>
 #include <sys/zfs_context.h>
