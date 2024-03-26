@@ -54,7 +54,6 @@
 static void
 fletcher_4_avx2_init(fletcher_4_ctx_t *ctx)
 {
-	kfpu_begin();
 	bzero(ctx->avx, 4 * sizeof (zfs_fletcher_avx_t));
 }
 
@@ -84,7 +83,6 @@ fletcher_4_avx2_fini(fletcher_4_ctx_t *ctx, zio_cksum_t *zcp)
 	    64 * ctx->avx[3].v[3];
 
 	ZIO_SET_CHECKSUM(zcp, A, B, C, D);
-	kfpu_end();
 }
 
 #define	FLETCHER_4_AVX2_RESTORE_CTX(ctx)			\
@@ -171,6 +169,7 @@ const fletcher_4_ops_t fletcher_4_avx2_ops = {
 	.fini_byteswap = fletcher_4_avx2_fini,
 	.compute_byteswap = fletcher_4_avx2_byteswap,
 	.valid = fletcher_4_avx2_valid,
+	.uses_fpu = B_TRUE,
 	.name = "avx2"
 };
 

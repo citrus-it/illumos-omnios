@@ -60,7 +60,6 @@ struct zfs_fletcher_sse_array {
 static void
 fletcher_4_sse2_init(fletcher_4_ctx_t *ctx)
 {
-	kfpu_begin();
 	bzero(ctx->sse, 4 * sizeof (zfs_fletcher_sse_t));
 }
 
@@ -87,7 +86,6 @@ fletcher_4_sse2_fini(fletcher_4_ctx_t *ctx, zio_cksum_t *zcp)
 	    8 * ctx->sse[2].v[1] + ctx->sse[1].v[1];
 
 	ZIO_SET_CHECKSUM(zcp, A, B, C, D);
-	kfpu_end();
 }
 
 #define	FLETCHER_4_SSE_RESTORE_CTX(ctx)				\
@@ -178,6 +176,7 @@ const fletcher_4_ops_t fletcher_4_sse2_ops = {
 	.fini_byteswap = fletcher_4_sse2_fini,
 	.compute_byteswap = fletcher_4_sse2_byteswap,
 	.valid = fletcher_4_sse2_valid,
+	.uses_fpu = B_TRUE,
 	.name = "sse2"
 };
 
@@ -235,6 +234,7 @@ const fletcher_4_ops_t fletcher_4_ssse3_ops = {
 	.fini_byteswap = fletcher_4_sse2_fini,
 	.compute_byteswap = fletcher_4_ssse3_byteswap,
 	.valid = fletcher_4_ssse3_valid,
+	.uses_fpu = B_TRUE,
 	.name = "ssse3"
 };
 
