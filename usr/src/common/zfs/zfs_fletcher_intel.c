@@ -54,6 +54,7 @@
 static void
 fletcher_4_avx2_init(fletcher_4_ctx_t *ctx)
 {
+	kfpu_begin();
 	bzero(ctx->avx, 4 * sizeof (zfs_fletcher_avx_t));
 }
 
@@ -83,6 +84,7 @@ fletcher_4_avx2_fini(fletcher_4_ctx_t *ctx, zio_cksum_t *zcp)
 	    64 * ctx->avx[3].v[3];
 
 	ZIO_SET_CHECKSUM(zcp, A, B, C, D);
+	kfpu_end();
 }
 
 #define	FLETCHER_4_AVX2_RESTORE_CTX(ctx)			\
@@ -107,22 +109,18 @@ fletcher_4_avx2_native(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 	const uint64_t *ip = buf;
 	const uint64_t *ipend = (uint64_t *)((uint8_t *)ip + size);
 
-	kfpu_begin();
-
 	FLETCHER_4_AVX2_RESTORE_CTX(ctx);
 
-	for (; ip < ipend; ip += 2) {
+	do {
 		__asm("vpmovzxdq %0, %%ymm4"::"m" (*ip));
 		__asm("vpaddq %ymm4, %ymm0, %ymm0");
 		__asm("vpaddq %ymm0, %ymm1, %ymm1");
 		__asm("vpaddq %ymm1, %ymm2, %ymm2");
 		__asm("vpaddq %ymm2, %ymm3, %ymm3");
-	}
+	} while ((ip += 2) < ipend);
 
 	FLETCHER_4_AVX2_SAVE_CTX(ctx);
 	__asm("vzeroupper");
-
-	kfpu_end();
 }
 
 static void
@@ -135,13 +133,11 @@ fletcher_4_avx2_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 	const uint64_t *ip = buf;
 	const uint64_t *ipend = (uint64_t *)((uint8_t *)ip + size);
 
-	kfpu_begin();
-
 	FLETCHER_4_AVX2_RESTORE_CTX(ctx);
 
 	__asm("vmovdqu %0, %%ymm5" :: "m" (mask));
 
-	for (; ip < ipend; ip += 2) {
+	do {
 		__asm("vpmovzxdq %0, %%ymm4"::"m" (*ip));
 		__asm("vpshufb %ymm5, %ymm4, %ymm4");
 
@@ -149,12 +145,10 @@ fletcher_4_avx2_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 		__asm("vpaddq %ymm0, %ymm1, %ymm1");
 		__asm("vpaddq %ymm1, %ymm2, %ymm2");
 		__asm("vpaddq %ymm2, %ymm3, %ymm3");
-	}
+	} while ((ip += 2) < ipend);
 
 	FLETCHER_4_AVX2_SAVE_CTX(ctx);
 	__asm("vzeroupper");
-
-	kfpu_end();
 }
 
 static boolean_t

@@ -60,6 +60,7 @@ struct zfs_fletcher_sse_array {
 static void
 fletcher_4_sse2_init(fletcher_4_ctx_t *ctx)
 {
+	kfpu_begin();
 	bzero(ctx->sse, 4 * sizeof (zfs_fletcher_sse_t));
 }
 
@@ -86,6 +87,7 @@ fletcher_4_sse2_fini(fletcher_4_ctx_t *ctx, zio_cksum_t *zcp)
 	    8 * ctx->sse[2].v[1] + ctx->sse[1].v[1];
 
 	ZIO_SET_CHECKSUM(zcp, A, B, C, D);
+	kfpu_end();
 }
 
 #define	FLETCHER_4_SSE_RESTORE_CTX(ctx)				\
@@ -110,13 +112,11 @@ fletcher_4_sse2_native(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 	const uint64_t *ip = buf;
 	const uint64_t *ipend = (uint64_t *)((uint8_t *)ip + size);
 
-	kfpu_begin();
-
 	FLETCHER_4_SSE_RESTORE_CTX(ctx);
 
 	__asm("pxor %xmm4, %xmm4");
 
-	for (; ip < ipend; ip += 2) {
+	do {
 		__asm("movdqu %0, %%xmm5" :: "m"(*ip));
 		__asm("movdqa %xmm5, %xmm6");
 		__asm("punpckldq %xmm4, %xmm5");
@@ -129,11 +129,9 @@ fletcher_4_sse2_native(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 		__asm("paddq %xmm0, %xmm1");
 		__asm("paddq %xmm1, %xmm2");
 		__asm("paddq %xmm2, %xmm3");
-	}
+	} while ((ip += 2) < ipend);
 
 	FLETCHER_4_SSE_SAVE_CTX(ctx);
-
-	kfpu_end();
 }
 
 static void
@@ -142,11 +140,9 @@ fletcher_4_sse2_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 	const uint32_t *ip = buf;
 	const uint32_t *ipend = (uint32_t *)((uint8_t *)ip + size);
 
-	kfpu_begin();
-
 	FLETCHER_4_SSE_RESTORE_CTX(ctx);
 
-	for (; ip < ipend; ip += 2) {
+	do {
 		uint32_t scratch1 = BSWAP_32(ip[0]);
 		uint32_t scratch2 = BSWAP_32(ip[1]);
 
@@ -157,11 +153,9 @@ fletcher_4_sse2_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 		__asm("paddq %xmm0, %xmm1");
 		__asm("paddq %xmm1, %xmm2");
 		__asm("paddq %xmm2, %xmm3");
-	}
+	} while ((ip += 2) < ipend);
 
 	FLETCHER_4_SSE_SAVE_CTX(ctx);
-
-	kfpu_end();
 }
 
 static boolean_t
@@ -197,15 +191,13 @@ fletcher_4_ssse3_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 	const uint64_t *ip = buf;
 	const uint64_t *ipend = (uint64_t *)((uint8_t *)ip + size);
 
-	kfpu_begin();
-
 	FLETCHER_4_SSE_RESTORE_CTX(ctx);
 
 
 	__asm("movdqa %0, %%xmm7"::"m" (mask));
 	__asm("pxor %xmm4, %xmm4");
 
-	for (; ip < ipend; ip += 2) {
+	do {
 		__asm("movdqu %0, %%xmm5"::"m" (*ip));
 		__asm("pshufb %xmm7, %xmm5");
 		__asm("movdqa %xmm5, %xmm6");
@@ -219,11 +211,9 @@ fletcher_4_ssse3_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 		__asm("paddq %xmm0, %xmm1");
 		__asm("paddq %xmm1, %xmm2");
 		__asm("paddq %xmm2, %xmm3");
-	}
+	} while ((ip += 2) < ipend);
 
 	FLETCHER_4_SSE_SAVE_CTX(ctx);
-
-	kfpu_end();
 }
 
 static boolean_t fletcher_4_ssse3_valid(void)
