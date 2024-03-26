@@ -226,6 +226,8 @@ static boolean_t fletcher_4_initialized = B_FALSE;
 
 #define	IMPL_READ(i)	(*(volatile uint32_t *) &(i))
 
+#define	FLETCHER_MIN_SIMD_SIZE	64
+
 void
 fletcher_init(zio_cksum_t *zcp)
 {
@@ -454,7 +456,7 @@ fletcher_4_native_impl(const void *buf, size_t size, zio_cksum_t *zcp)
 void
 fletcher_4_native(const void *buf, size_t size, zio_cksum_t *zcp)
 {
-	const uint64_t p2size = P2ALIGN(size, 64);
+	const uint64_t p2size = P2ALIGN(size, FLETCHER_MIN_SIMD_SIZE);
 
 	ASSERT(IS_P2ALIGNED(size, sizeof (uint32_t)));
 	if (size == 0 || p2size == 0) {
@@ -494,7 +496,7 @@ fletcher_4_byteswap_impl(const void *buf, size_t size, zio_cksum_t *zcp)
 void
 fletcher_4_byteswap(const void *buf, size_t size, zio_cksum_t *zcp)
 {
-	const uint64_t p2size = P2ALIGN(size, 64);
+	const uint64_t p2size = P2ALIGN(size, FLETCHER_MIN_SIMD_SIZE);
 
 	ASSERT(IS_P2ALIGNED(size, sizeof (uint32_t)));
 
@@ -711,7 +713,6 @@ fletcher_4_init(void)
 		kstat_byteswap->value.ui64 = stat->byteswap;
 	}
 
-
 	fletcher_4_kstat = kstat_create("zfs", 0, "fletcher_4_bench", "misc",
 	    KSTAT_TYPE_NAMED, ARRAY_SIZE(fletcher_4_supp_impls) * 2,
 	    KSTAT_FLAG_VIRTUAL);
@@ -735,3 +736,83 @@ fletcher_4_fini(void)
 	}
 }
 #endif /* !LIBZFS */
+
+/* ABD adapters */
+
+static void
+abd_fletcher_4_init(zio_abd_checksum_data_t *cdp)
+{
+	const fletcher_4_ops_t *ops = fletcher_4_impl_get();
+	cdp->acd_private = (void *) ops;
+
+	if (cdp->acd_byteorder == ZIO_CHECKSUM_NATIVE)
+		ops->init_native(cdp->acd_ctx);
+	else
+		ops->init_byteswap(cdp->acd_ctx);
+}
+
+static void
+abd_fletcher_4_fini(zio_abd_checksum_data_t *cdp)
+{
+	fletcher_4_ops_t *ops = (fletcher_4_ops_t *)cdp->acd_private;
+
+	ASSERT(ops);
+
+	if (cdp->acd_byteorder == ZIO_CHECKSUM_NATIVE)
+		ops->fini_native(cdp->acd_ctx, cdp->acd_zcp);
+	else
+		ops->fini_byteswap(cdp->acd_ctx, cdp->acd_zcp);
+}
+
+static void
+abd_fletcher_4_simd2scalar(boolean_t native, void *data, size_t size,
+    zio_abd_checksum_data_t *cdp)
+{
+	zio_cksum_t *zcp = cdp->acd_zcp;
+
+	ASSERT3U(size, <, FLETCHER_MIN_SIMD_SIZE);
+
+	abd_fletcher_4_fini(cdp);
+	cdp->acd_private = (void *)&fletcher_4_scalar_ops;
+
+	if (native)
+		fletcher_4_incremental_native(data, size, zcp);
+	else
+		fletcher_4_incremental_byteswap(data, size, zcp);
+}
+
+static int
+abd_fletcher_4_iter(void *data, size_t size, void *private)
+{
+	zio_abd_checksum_data_t *cdp = (zio_abd_checksum_data_t *)private;
+	fletcher_4_ctx_t *ctx = cdp->acd_ctx;
+	fletcher_4_ops_t *ops = (fletcher_4_ops_t *)cdp->acd_private;
+	boolean_t native = cdp->acd_byteorder == ZIO_CHECKSUM_NATIVE;
+	uint64_t asize = P2ALIGN(size, FLETCHER_MIN_SIMD_SIZE);
+
+	ASSERT(IS_P2ALIGNED(size, sizeof (uint32_t)));
+
+	if (asize > 0) {
+		if (native)
+			ops->compute_native(ctx, data, asize);
+		else
+			ops->compute_byteswap(ctx, data, asize);
+
+		size -= asize;
+		data = (char *)data + asize;
+	}
+
+	if (size > 0) {
+		ASSERT3U(size, <, FLETCHER_MIN_SIMD_SIZE);
+		/* At this point we have to switch to scalar impl */
+		abd_fletcher_4_simd2scalar(native, data, size, cdp);
+	}
+
+	return (0);
+}
+
+zio_abd_checksum_func_t fletcher_4_abd_ops = {
+	.acf_init = abd_fletcher_4_init,
+	.acf_fini = abd_fletcher_4_fini,
+	.acf_iter = abd_fletcher_4_iter
+};
