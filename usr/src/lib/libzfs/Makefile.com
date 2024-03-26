@@ -29,6 +29,7 @@ LIBRARY= libzfs.a
 VERS= .1
 
 amd64_OBJS_SHARED=		\
+	zfs_fletcher_avx512.o	\
 	zfs_fletcher_intel.o	\
 	zfs_fletcher_sse.o
 

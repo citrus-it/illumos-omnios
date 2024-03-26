@@ -1478,6 +1478,7 @@ ZFS_COMMON_OBJS +=		\
 	zthr.o
 
 amd64_ZFS_SHARED_OBJS +=	\
+	zfs_fletcher_avx512.o	\
 	zfs_fletcher_intel.o	\
 	zfs_fletcher_sse.o
 

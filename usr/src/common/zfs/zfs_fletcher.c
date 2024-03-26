@@ -173,6 +173,7 @@ static enum fletcher_selector {
 	FLETCHER_AVX2,
 	FLETCHER_SSE2,
 	FLETCHER_SSSE3,
+	FLETCHER_AVX512F,
 #endif
 	FLETCHER_CYCLE
 } fletcher_4_impl_chosen = FLETCHER_SCALAR;
@@ -187,6 +188,7 @@ static struct fletcher_4_impl_selector {
 	[ FLETCHER_AVX2 ]	= { "avx2", &fletcher_4_avx2_ops },
 	[ FLETCHER_SSE2 ]	= { "sse2", &fletcher_4_sse2_ops },
 	[ FLETCHER_SSSE3 ]	= { "ssse3", &fletcher_4_ssse3_ops },
+	[ FLETCHER_AVX512F ]	= { "ssse3", &fletcher_4_avx512f_ops },
 #endif
 #if !defined(_KERNEL)
 	[ FLETCHER_CYCLE ]	= { "cycle", &fletcher_4_scalar_ops }
@@ -200,6 +202,7 @@ static const fletcher_4_ops_t *fletcher_4_algos[] = {
 	&fletcher_4_avx2_ops,
 	&fletcher_4_sse2_ops,
 	&fletcher_4_ssse3_ops,
+	&fletcher_4_avx512f_ops,
 #endif
 };
 
@@ -404,7 +407,7 @@ fletcher_4_native(const void *buf, size_t size, zio_cksum_t *zcp)
 {
 	const fletcher_4_ops_t *ops;
 
-	if (IS_P2ALIGNED(size, 4 * sizeof (uint32_t)))
+	if (IS_P2ALIGNED(size, 8 * sizeof (uint32_t)))
 		ops = fletcher_4_impl_get();
 	else
 		ops = &fletcher_4_scalar_ops;
@@ -420,7 +423,7 @@ fletcher_4_byteswap(const void *buf, size_t size, zio_cksum_t *zcp)
 {
 	const fletcher_4_ops_t *ops;
 
-	if (IS_P2ALIGNED(size, 4 * sizeof (uint32_t)))
+	if (IS_P2ALIGNED(size, 8 * sizeof (uint32_t)))
 		ops = fletcher_4_impl_get();
 	else
 		ops = &fletcher_4_scalar_ops;
