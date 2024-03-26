@@ -127,6 +127,7 @@
 #include <ctype.h>
 #include <math.h>
 #include <sys/fs/zfs.h>
+#include <zfs_fletcher.h>
 #include <libnvpair.h>
 #include <libzutil.h>
 #include <libcmdutils.h>
@@ -366,6 +367,7 @@ ztest_func_t ztest_vdev_aux_add_remove;
 ztest_func_t ztest_split_pool;
 ztest_func_t ztest_reguid;
 ztest_func_t ztest_spa_upgrade;
+ztest_func_t ztest_fletcher;
 ztest_func_t ztest_device_removal;
 ztest_func_t ztest_remap_blocks;
 ztest_func_t ztest_spa_checkpoint_create_discard;
@@ -407,6 +409,7 @@ ztest_info_t ztest_info[] = {
 	{ ztest_reguid,				1,	&zopt_rarely	},
 	{ ztest_scrub,				1,	&zopt_often	},
 	{ ztest_spa_upgrade,			1,	&zopt_rarely	},
+	{ ztest_fletcher,			1,	&zopt_rarely	},
 	{ ztest_dsl_dataset_promote_busy,	1,	&zopt_rarely	},
 	{ ztest_vdev_attach_detach,		1,	&zopt_incessant	},
 	{ ztest_vdev_LUN_growth,		1,	&zopt_rarely	},
@@ -5338,6 +5341,47 @@ ztest_spa_prop_get_set(ztest_ds_t *zd, uint64_t id)
 	nvlist_free(props);
 
 	rw_exit(&ztest_name_lock);
+}
+
+void
+ztest_fletcher(ztest_ds_t *zd, uint64_t id)
+{
+	hrtime_t end = gethrtime() + NANOSEC;
+
+	while (gethrtime() <= end) {
+		int run_count = 100;
+		void *buf;
+		uint32_t size;
+		int *ptr;
+		int i;
+		zio_cksum_t zc_ref;
+		zio_cksum_t zc_ref_byteswap;
+
+		size = ztest_random_blocksize();
+		buf = umem_alloc(size, UMEM_NOFAIL);
+
+		for (i = 0, ptr = buf; i < size / sizeof (*ptr); i++, ptr++)
+			*ptr = ztest_random(UINT_MAX);
+
+		VERIFY0(fletcher_4_impl_set("scalar"));
+		fletcher_4_native(buf, size, &zc_ref);
+		fletcher_4_byteswap(buf, size, &zc_ref_byteswap);
+
+		VERIFY0(fletcher_4_impl_set("cycle"));
+		while (run_count-- > 0) {
+			zio_cksum_t zc;
+			zio_cksum_t zc_byteswap;
+
+			fletcher_4_byteswap(buf, size, &zc_byteswap);
+			fletcher_4_native(buf, size, &zc);
+
+			VERIFY0(bcmp(&zc, &zc_ref, sizeof (zc)));
+			VERIFY0(bcmp(&zc_byteswap, &zc_ref_byteswap,
+			    sizeof (zc_byteswap)));
+		}
+
+		umem_free(buf, size);
+	}
 }
 
 static int

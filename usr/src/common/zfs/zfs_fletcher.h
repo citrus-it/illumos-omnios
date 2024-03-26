@@ -31,7 +31,7 @@
 #define	_ZFS_FLETCHER_H
 
 #include <sys/types.h>
-#include <sys/spa.h>
+#include <sys/spa_checksum.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -42,14 +42,31 @@ extern "C" {
  */
 
 void fletcher_init(zio_cksum_t *);
-void fletcher_2_native(const void *, size_t, const void *, zio_cksum_t *);
-void fletcher_2_byteswap(const void *, size_t, const void *, zio_cksum_t *);
+void fletcher_2_native(const void *, size_t, zio_cksum_t *);
+void fletcher_2_byteswap(const void *, size_t, zio_cksum_t *);
 int fletcher_2_incremental_native(void *, size_t, void *);
 int fletcher_2_incremental_byteswap(void *, size_t, void *);
-void fletcher_4_native(const void *, size_t, const void *, zio_cksum_t *);
-void fletcher_4_byteswap(const void *, size_t, const void *, zio_cksum_t *);
+void fletcher_4_native(const void *, size_t, zio_cksum_t *);
+void fletcher_4_byteswap(const void *, size_t, zio_cksum_t *);
 int fletcher_4_incremental_native(void *, size_t, void *);
 int fletcher_4_incremental_byteswap(void *, size_t, void *);
+int fletcher_4_impl_set(const char *selector);
+void fletcher_4_init(void);
+void fletcher_4_fini(void);
+
+/*
+ * fletcher checksum struct
+ */
+typedef struct fletcher_4_func {
+	void (*init)(zio_cksum_t *);
+	void (*fini)(zio_cksum_t *);
+	void (*compute)(const void *, size_t, zio_cksum_t *);
+	void (*compute_byteswap)(const void *, size_t, zio_cksum_t *);
+	boolean_t (*valid)(void);
+	const char *name;
+} fletcher_4_ops_t;
+
+extern const fletcher_4_ops_t fletcher_4_avx2_ops;
 
 #ifdef	__cplusplus
 }

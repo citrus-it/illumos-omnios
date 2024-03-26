@@ -130,11 +130,79 @@
  */
 
 #include <sys/types.h>
+#include <sys/mutex.h>
 #include <sys/sysmacros.h>
 #include <sys/byteorder.h>
-#include <sys/zio.h>
 #include <sys/spa.h>
+#include <sys/zfs_context.h>
 #include <zfs_fletcher.h>
+
+#ifndef isspace
+#define	isspace(c)	((c) == ' ' || (c) == '\t' || (c) == '\n' || \
+			(c) == '\r' || (c) == '\f' || (c) == '\013')
+#endif
+
+#ifdef _KERNEL
+#include <sys/disp.h>
+#define	KPREEMPT_DISABLE	kpreempt_disable()
+#define	KPREEMPT_ENABLE		kpreempt_enable()
+#else
+#include <string.h>
+#define	KPREEMPT_DISABLE
+#define	KPREEMPT_ENABLE
+#endif	/* _KERNEL */
+
+static void fletcher_4_scalar_init(zio_cksum_t *zcp);
+static void fletcher_4_scalar(const void *buf, size_t size, zio_cksum_t *zcp);
+static void fletcher_4_scalar_byteswap(const void *buf, size_t size,
+    zio_cksum_t *zcp);
+static boolean_t fletcher_4_scalar_valid(void);
+
+static const fletcher_4_ops_t fletcher_4_scalar_ops = {
+	.init = fletcher_4_scalar_init,
+	.compute = fletcher_4_scalar,
+	.compute_byteswap = fletcher_4_scalar_byteswap,
+	.valid = fletcher_4_scalar_valid,
+	.name = "scalar"
+};
+
+static enum fletcher_selector {
+	FLETCHER_FASTEST = 0,
+	FLETCHER_SCALAR,
+#ifdef __amd64
+	FLETCHER_AVX2,
+#endif
+	FLETCHER_CYCLE
+} fletcher_4_impl_chosen = FLETCHER_SCALAR;
+
+static struct fletcher_4_impl_selector {
+	const char		*fis_name;
+	const fletcher_4_ops_t	*fis_ops;
+} fletcher_4_impl_selectors[] = {
+	[ FLETCHER_FASTEST ]	= { "fastest", NULL },
+	[ FLETCHER_SCALAR ]	= { "scalar", &fletcher_4_scalar_ops },
+#ifdef __amd64
+	[ FLETCHER_AVX2 ]	= { "avx2", &fletcher_4_avx2_ops },
+#endif
+#if !defined(_KERNEL)
+	[ FLETCHER_CYCLE ]	= { "cycle", &fletcher_4_scalar_ops }
+#endif
+};
+
+#ifndef LIBZFS
+static const fletcher_4_ops_t *fletcher_4_algos[] = {
+	&fletcher_4_scalar_ops,
+#ifdef __amd64
+	&fletcher_4_avx2_ops,
+#endif
+};
+
+static kmutex_t fletcher_4_impl_lock;
+
+static kstat_t *fletcher_4_kstat;
+
+static kstat_named_t fletcher_4_kstat_data[ARRAY_SIZE(fletcher_4_algos)];
+#endif
 
 void
 fletcher_init(zio_cksum_t *zcp)
@@ -167,10 +235,8 @@ fletcher_2_incremental_native(void *buf, size_t size, void *data)
 	return (0);
 }
 
-/*ARGSUSED*/
 void
-fletcher_2_native(const void *buf, size_t size,
-    const void *ctx_template, zio_cksum_t *zcp)
+fletcher_2_native(const void *buf, size_t size, zio_cksum_t *zcp)
 {
 	fletcher_init(zcp);
 	(void) fletcher_2_incremental_native((void *) buf, size, zcp);
@@ -201,20 +267,22 @@ fletcher_2_incremental_byteswap(void *buf, size_t size, void *data)
 	return (0);
 }
 
-/*ARGSUSED*/
 void
-fletcher_2_byteswap(const void *buf, size_t size,
-    const void *ctx_template, zio_cksum_t *zcp)
+fletcher_2_byteswap(const void *buf, size_t size, zio_cksum_t *zcp)
 {
 	fletcher_init(zcp);
 	(void) fletcher_2_incremental_byteswap((void *) buf, size, zcp);
 }
 
-int
-fletcher_4_incremental_native(void *buf, size_t size, void *data)
+static void
+fletcher_4_scalar_init(zio_cksum_t *zcp)
 {
-	zio_cksum_t *zcp = data;
+	ZIO_SET_CHECKSUM(zcp, 0, 0, 0, 0);
+}
 
+static void
+fletcher_4_scalar(const void *buf, size_t size, zio_cksum_t *zcp)
+{
 	const uint32_t *ip = buf;
 	const uint32_t *ipend = ip + (size / sizeof (uint32_t));
 	uint64_t a, b, c, d;
@@ -232,23 +300,11 @@ fletcher_4_incremental_native(void *buf, size_t size, void *data)
 	}
 
 	ZIO_SET_CHECKSUM(zcp, a, b, c, d);
-	return (0);
 }
 
-/*ARGSUSED*/
-void
-fletcher_4_native(const void *buf, size_t size,
-    const void *ctx_template, zio_cksum_t *zcp)
+static void
+fletcher_4_scalar_byteswap(const void *buf, size_t size, zio_cksum_t *zcp)
 {
-	fletcher_init(zcp);
-	(void) fletcher_4_incremental_native((void *) buf, size, zcp);
-}
-
-int
-fletcher_4_incremental_byteswap(void *buf, size_t size, void *data)
-{
-	zio_cksum_t *zcp = data;
-
 	const uint32_t *ip = buf;
 	const uint32_t *ipend = ip + (size / sizeof (uint32_t));
 	uint64_t a, b, c, d;
@@ -266,14 +322,190 @@ fletcher_4_incremental_byteswap(void *buf, size_t size, void *data)
 	}
 
 	ZIO_SET_CHECKSUM(zcp, a, b, c, d);
+}
+
+static boolean_t
+fletcher_4_scalar_valid(void)
+{
+	return (B_TRUE);
+}
+
+#ifndef LIBZFS
+int
+fletcher_4_impl_set(const char *val)
+{
+	const fletcher_4_ops_t *ops;
+	enum fletcher_selector idx;
+	size_t val_len;
+	unsigned i;
+
+	val_len = strlen(val);
+	while ((val_len > 0) && !!isspace(val[val_len-1])) /* trim '\n' */
+		val_len--;
+
+	for (i = 0; i < ARRAY_SIZE(fletcher_4_impl_selectors); i++) {
+		const char *name = fletcher_4_impl_selectors[i].fis_name;
+
+		if (val_len == strlen(name) &&
+		    strncmp(val, name, val_len) == 0) {
+			idx = i;
+			break;
+		}
+	}
+	if (i >= ARRAY_SIZE(fletcher_4_impl_selectors))
+		return (SET_ERROR(EINVAL));
+
+	ops = fletcher_4_impl_selectors[idx].fis_ops;
+	if (ops == NULL || !ops->valid())
+		return (SET_ERROR(ENOTSUP));
+
+	mutex_enter(&fletcher_4_impl_lock);
+	if (fletcher_4_impl_chosen != idx)
+		fletcher_4_impl_chosen = idx;
+	mutex_exit(&fletcher_4_impl_lock);
+
+	return (0);
+}
+#endif /* !LIBZFS */
+
+static inline const fletcher_4_ops_t *
+fletcher_4_impl_get(void)
+{
+#if !defined(_KERNEL) && !defined(LIBZFS)
+	if (fletcher_4_impl_chosen == FLETCHER_CYCLE) {
+		static volatile unsigned int cycle_count = 0;
+		const fletcher_4_ops_t *ops = NULL;
+		unsigned int index;
+
+		while (1) {
+			index = atomic_inc_uint_nv(&cycle_count);
+			ops = fletcher_4_algos[
+			    index % ARRAY_SIZE(fletcher_4_algos)];
+			if (ops->valid())
+				break;
+		}
+		return (ops);
+	}
+#endif
+#ifndef LIBZFS
+	membar_producer();
+#endif
+	return (fletcher_4_impl_selectors[fletcher_4_impl_chosen].fis_ops);
+}
+
+void
+fletcher_4_native(const void *buf, size_t size, zio_cksum_t *zcp)
+{
+	const fletcher_4_ops_t *ops = fletcher_4_impl_get();
+
+	ops->init(zcp);
+	ops->compute(buf, size, zcp);
+	if (ops->fini != NULL)
+		ops->fini(zcp);
+}
+
+void
+fletcher_4_byteswap(const void *buf, size_t size, zio_cksum_t *zcp)
+{
+	const fletcher_4_ops_t *ops = fletcher_4_impl_get();
+
+	ops->init(zcp);
+	ops->compute_byteswap(buf, size, zcp);
+	if (ops->fini != NULL)
+		ops->fini(zcp);
+}
+
+int
+fletcher_4_incremental_native(void *buf, size_t size, void *data)
+{
+	zio_cksum_t *zcp = data;
+	fletcher_4_scalar(buf, size, zcp);
 	return (0);
 }
 
-/*ARGSUSED*/
-void
-fletcher_4_byteswap(const void *buf, size_t size,
-    const void *ctx_template, zio_cksum_t *zcp)
+int
+fletcher_4_incremental_byteswap(void *buf, size_t size, void *data)
 {
-	fletcher_init(zcp);
-	(void) fletcher_4_incremental_byteswap((void *) buf, size, zcp);
+	zio_cksum_t *zcp = data;
+	fletcher_4_scalar_byteswap(buf, size, zcp);
+	return (0);
 }
+
+#ifndef LIBZFS
+void
+fletcher_4_init(void)
+{
+	const uint64_t bench_ns = (50 * MICROSEC); /* 50ms */
+	unsigned long best_run_count = 0;
+	unsigned long best_run_index = 0;
+	const unsigned data_size = 4096;
+	char *databuf;
+	int i;
+
+	databuf = kmem_alloc(data_size, KM_SLEEP);
+	for (i = 0; i < ARRAY_SIZE(fletcher_4_algos); i++) {
+		const fletcher_4_ops_t *ops = fletcher_4_algos[i];
+		kstat_named_t *stat = &fletcher_4_kstat_data[i];
+		unsigned long run_count = 0;
+		hrtime_t start;
+		zio_cksum_t zc;
+
+		strncpy(stat->name, ops->name, sizeof (stat->name) - 1);
+		stat->data_type = KSTAT_DATA_UINT64;
+		stat->value.ui64 = 0;
+
+		if (!ops->valid())
+			continue;
+
+		KPREEMPT_DISABLE;
+		start = gethrtime();
+		ops->init(&zc);
+		do {
+			ops->compute(databuf, data_size, &zc);
+			run_count++;
+		} while (gethrtime() < start + bench_ns);
+		if (ops->fini != NULL)
+			ops->fini(&zc);
+		KPREEMPT_ENABLE;
+
+		if (run_count > best_run_count) {
+			best_run_count = run_count;
+			best_run_index = i;
+		}
+
+		/*
+		 * Due to high overhead of gethrtime(), the performance data
+		 * here is inaccurate and much slower than it could be.
+		 * It's fine for our use though because only relative speed
+		 * is important.
+		 */
+		stat->value.ui64 = data_size * run_count *
+		    (NANOSEC / bench_ns) >> 20; /* by MB/s */
+	}
+	kmem_free(databuf, data_size);
+
+	fletcher_4_impl_selectors[FLETCHER_FASTEST].fis_ops =
+	    fletcher_4_algos[best_run_index];
+
+	mutex_init(&fletcher_4_impl_lock, NULL, MUTEX_DEFAULT, NULL);
+	fletcher_4_impl_set("fastest");
+
+	fletcher_4_kstat = kstat_create("zfs", 0, "fletcher_4_bench",
+	    "misc", KSTAT_TYPE_NAMED, ARRAY_SIZE(fletcher_4_algos),
+	    KSTAT_FLAG_VIRTUAL);
+	if (fletcher_4_kstat != NULL) {
+		fletcher_4_kstat->ks_data = fletcher_4_kstat_data;
+		kstat_install(fletcher_4_kstat);
+	}
+}
+
+void
+fletcher_4_fini(void)
+{
+	mutex_destroy(&fletcher_4_impl_lock);
+	if (fletcher_4_kstat != NULL) {
+		kstat_delete(fletcher_4_kstat);
+		fletcher_4_kstat = NULL;
+	}
+}
+#endif /* !LIBZFS */

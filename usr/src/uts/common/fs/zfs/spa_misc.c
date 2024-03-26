@@ -60,6 +60,7 @@
 #include <sys/arc.h>
 #include <sys/ddt.h>
 #include "zfs_prop.h"
+#include "zfs_fletcher.h"
 #include <sys/btree.h>
 #include <sys/zfeature.h>
 
@@ -326,6 +327,11 @@ int zfs_deadman_enabled = -1;
  */
 int zfs_fpu_enabled = 1;
 #endif
+
+/*
+ * Should we allow the use of Fletcher-4 checksum algorithms that use the FPU?
+ */
+int zfs_fletcher4_fpu_enabled = 1;
 
 /*
  * The worst case is single-sector max-parity RAID-Z blocks, in which
@@ -2266,6 +2272,7 @@ spa_init(int mode)
 	vdev_cache_stat_init();
 	vdev_mirror_stat_init();
 	vdev_raidz_math_init();
+	fletcher_4_init();
 	zfs_prop_init();
 	zpool_prop_init();
 	zpool_feature_init();
@@ -2282,6 +2289,7 @@ spa_fini(void)
 
 	spa_evict_all();
 
+	fletcher_4_fini();
 	vdev_cache_stat_fini();
 	vdev_mirror_stat_fini();
 	vdev_raidz_math_fini();

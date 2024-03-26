@@ -38,6 +38,7 @@
 
 #include "zfs_prop.h"
 #include "zfs_deleg.h"
+#include "zfs_fletcher.h"
 
 #if defined(_KERNEL)
 #include <sys/systm.h>

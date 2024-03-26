@@ -1477,7 +1477,11 @@ ZFS_COMMON_OBJS +=		\
 	zrlock.o		\
 	zthr.o
 
+amd64_ZFS_SHARED_OBJS +=	\
+	zfs_fletcher_intel.o	\
+
 ZFS_SHARED_OBJS +=		\
+	$($(MACH64)_ZFS_SHARED_OBJS)	\
 	zfeature_common.o	\
 	zfs_comutil.o		\
 	zfs_deleg.o		\

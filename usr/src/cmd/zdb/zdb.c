@@ -2791,7 +2791,7 @@ dump_l2arc_log_blocks(int fd, l2arc_dev_hdr_phys_t l2dhdr,
 			break;
 		}
 
-		fletcher_4_native(&this_lb, asize, NULL, &cksum);
+		fletcher_4_native(&this_lb, asize, &cksum);
 		if (!ZIO_CHECKSUM_EQUAL(cksum, lbps[0].lbp_cksum)) {
 			failed++;
 			if (!dump_opt['q']) {
@@ -3303,7 +3303,7 @@ dump_label(const char *dev)
 			if (nvlist_size(config, &size, NV_ENCODE_XDR) != 0)
 				size = buflen;
 
-			fletcher_4_native(buf, size, NULL, &cksum);
+			fletcher_4_native(buf, size, &cksum);
 			rec = cksum_record_insert(&config_tree, &cksum, l);
 
 			label->config = rec;
@@ -3323,7 +3323,7 @@ dump_label(const char *dev)
 			if (uberblock_verify(ub))
 				continue;
 
-			fletcher_4_native(ub, sizeof (*ub), NULL, &cksum);
+			fletcher_4_native(ub, sizeof (*ub), &cksum);
 			rec = cksum_record_insert(&uberblock_tree, &cksum, l);
 
 			label->uberblocks[i] = rec;
