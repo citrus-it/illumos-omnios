@@ -2284,10 +2284,10 @@ spa_fini(void)
 
 	spa_evict_all();
 
-	fletcher_4_fini();
 	vdev_cache_stat_fini();
 	vdev_mirror_stat_fini();
 	vdev_raidz_math_fini();
+	fletcher_4_fini();
 	zil_fini();
 	dmu_fini();
 	zio_fini();

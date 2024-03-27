@@ -543,6 +543,7 @@ void
 kernel_fini(void)
 {
 	fletcher_4_fini();
+
 	spa_fini();
 
 	system_taskq_fini();
