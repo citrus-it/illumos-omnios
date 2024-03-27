@@ -148,12 +148,6 @@ fletcher_4_avx512f_byteswap(fletcher_4_ctx_t *ctx, const void *buf,
 static boolean_t
 fletcher_4_avx512f_valid(void)
 {
-#ifndef LIBZFS
-	extern int zfs_fletcher4_fpu_enabled;
-
-	if (zfs_fletcher4_fpu_enabled == 0)
-		return (B_FALSE);
-#endif
 	return (kfpu_allowed() && zfs_avx512f_available());
 }
 
@@ -204,12 +198,6 @@ fletcher_4_avx512bw_byteswap(fletcher_4_ctx_t *ctx, const void *buf,
 static boolean_t
 fletcher_4_avx512bw_valid(void)
 {
-#ifndef LIBZFS
-	extern int zfs_fletcher4_fpu_enabled;
-
-	if (zfs_fletcher4_fpu_enabled == 0)
-		return (B_FALSE);
-#endif
 	return (kfpu_allowed() && fletcher_4_avx512f_valid() &&
 	    zfs_avx512bw_available());
 }

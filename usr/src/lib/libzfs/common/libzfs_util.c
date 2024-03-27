@@ -55,8 +55,6 @@
 #include "zfeature_common.h"
 #include <libzutil.h>
 
-int zfs_fletcher4_fpu_enabled = 1;
-
 int
 libzfs_errno(libzfs_handle_t *hdl)
 {

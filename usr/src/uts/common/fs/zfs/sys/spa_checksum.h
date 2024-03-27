@@ -69,4 +69,4 @@ typedef struct zio_cksum {
 }
 #endif
 
-#endif
+#endif /* _SPA_CHECKSUM_H */

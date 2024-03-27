@@ -152,12 +152,6 @@ fletcher_4_avx2_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 static boolean_t
 fletcher_4_avx2_valid(void)
 {
-#ifndef LIBZFS
-	extern int zfs_fletcher4_fpu_enabled;
-
-	if (zfs_fletcher4_fpu_enabled == 0)
-		return (B_FALSE);
-#endif
 	return (kfpu_allowed() && zfs_avx_available() && zfs_avx2_available());
 }
 

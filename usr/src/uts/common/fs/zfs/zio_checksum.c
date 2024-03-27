@@ -137,7 +137,7 @@ abd_fletcher_4_native(abd_t *abd, uint64_t size,
 
 	zio_abd_checksum_data_t acd = {
 		.acd_byteorder	= ZIO_CHECKSUM_NATIVE,
-		.acd_zcp 	= zcp,
+		.acd_zcp	= zcp,
 		.acd_ctx	= &ctx
 	};
 
@@ -154,7 +154,7 @@ abd_fletcher_4_byteswap(abd_t *abd, uint64_t size,
 
 	zio_abd_checksum_data_t acd = {
 		.acd_byteorder	= ZIO_CHECKSUM_BYTESWAP,
-		.acd_zcp 	= zcp,
+		.acd_zcp	= zcp,
 		.acd_ctx	= &ctx
 	};
 

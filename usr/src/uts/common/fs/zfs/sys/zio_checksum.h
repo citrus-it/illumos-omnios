@@ -66,8 +66,8 @@ typedef enum {
 typedef struct zio_abd_checksum_data {
 	zio_byteorder_t		acd_byteorder;
 	fletcher_4_ctx_t	*acd_ctx;
-	zio_cksum_t 		*acd_zcp;
-	void 			*acd_private;
+	zio_cksum_t		*acd_zcp;
+	void			*acd_private;
 } zio_abd_checksum_data_t;
 
 typedef void zio_abd_checksum_init_t(zio_abd_checksum_data_t *);

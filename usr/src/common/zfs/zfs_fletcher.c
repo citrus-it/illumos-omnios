@@ -156,11 +156,11 @@
 #include <atomic.h>
 #include <string.h>
 #ifndef SET_ERROR
-#define SET_ERROR(err) (err)
+#define	SET_ERROR(err) (err)
 #endif
 #define	KPREEMPT_DISABLE
 #define	KPREEMPT_ENABLE
-#define MEMBAR_PRODUCER
+#define	MEMBAR_PRODUCER
 #endif	/* _KERNEL */
 
 static void fletcher_4_scalar_init(fletcher_4_ctx_t *ctx);
@@ -759,10 +759,10 @@ fletcher_4_init(void)
 	    KSTAT_TYPE_NAMED, ARRAY_SIZE(fletcher_4_supp_impls) * 2,
 	    KSTAT_FLAG_VIRTUAL);
 
-        if (fletcher_4_kstat != NULL) {
-                fletcher_4_kstat->ks_data = fletcher_4_kstat_data;
-                kstat_install(fletcher_4_kstat);
-        }
+	if (fletcher_4_kstat != NULL) {
+		fletcher_4_kstat->ks_data = fletcher_4_kstat_data;
+		kstat_install(fletcher_4_kstat);
+	}
 #endif
 
 	/* Finish initialization */

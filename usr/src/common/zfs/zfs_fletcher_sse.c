@@ -159,12 +159,6 @@ fletcher_4_sse2_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 static boolean_t
 fletcher_4_sse2_valid(void)
 {
-#ifndef LIBZFS
-	extern int zfs_fletcher4_fpu_enabled;
-
-	if (zfs_fletcher4_fpu_enabled == 0)
-		return (B_FALSE);
-#endif
 	return (kfpu_allowed() && zfs_sse2_available());
 }
 
@@ -217,12 +211,6 @@ fletcher_4_ssse3_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 
 static boolean_t fletcher_4_ssse3_valid(void)
 {
-#ifndef LIBZFS
-	extern int zfs_fletcher4_fpu_enabled;
-
-	if (zfs_fletcher4_fpu_enabled == 0)
-		return (B_FALSE);
-#endif
 	return (zfs_sse2_available() && zfs_ssse3_available());
 }
 

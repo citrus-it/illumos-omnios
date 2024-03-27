@@ -329,11 +329,6 @@ int zfs_fpu_enabled = 1;
 #endif
 
 /*
- * Should we allow the use of Fletcher-4 checksum algorithms that use the FPU?
- */
-int zfs_fletcher4_fpu_enabled = 1;
-
-/*
  * The worst case is single-sector max-parity RAID-Z blocks, in which
  * case the space requirement is exactly (VDEV_RAIDZ_MAXPARITY + 1)
  * times the size; so just assume that.  Add to this the fact that
