@@ -89,8 +89,6 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 # not linted
 SMATCH=off
 
-CPPFLAGS += -DLIBZFS
-
 LDLIBS +=	-lz
 NATIVE_LIBS += libz.so
 

@@ -131,7 +131,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/mutex.h>
 #include <sys/sysmacros.h>
 #include <sys/byteorder.h>
 #include <sys/simd.h>
@@ -140,19 +139,28 @@
 #include <sys/zfs_context.h>
 #include <zfs_fletcher.h>
 
+#define	FLETCHER_MIN_SIMD_SIZE	64
+
 #ifndef isspace
 #define	isspace(c)	((c) == ' ' || (c) == '\t' || (c) == '\n' || \
 			(c) == '\r' || (c) == '\f' || (c) == '\013')
 #endif
 
 #ifdef _KERNEL
+#include <sys/atomic.h>
 #include <sys/disp.h>
 #define	KPREEMPT_DISABLE	kpreempt_disable()
 #define	KPREEMPT_ENABLE		kpreempt_enable()
+#define	MEMBAR_PRODUCER		membar_producer()
 #else
+#include <atomic.h>
 #include <string.h>
+#ifndef SET_ERROR
+#define SET_ERROR(err) (err)
+#endif
 #define	KPREEMPT_DISABLE
 #define	KPREEMPT_ENABLE
+#define MEMBAR_PRODUCER
 #endif	/* _KERNEL */
 
 static void fletcher_4_scalar_init(fletcher_4_ctx_t *ctx);
@@ -205,17 +213,19 @@ static fletcher_4_ops_t *fletcher_4_supp_impls[ARRAY_SIZE(fletcher_4_impls)];
 
 static uint32_t fletcher_4_impl_chosen = IMPL_FASTEST;
 
-#ifndef LIBZFS
+#define	IMPL_READ(i)	(*(volatile uint32_t *) &(i))
+
 static struct fletcher_4_impl_selector {
 	const char	*fis_name;
 	uint32_t	fis_sel;
 } fletcher_4_impl_selectors[] = {
-#if !defined(_KERNEL)
 	{ "cycle",	IMPL_CYCLE },
- #endif
 	{ "fastest",	IMPL_FASTEST },
 	{ "scalar",	IMPL_SCALAR }
 };
+
+#if defined(_KERNEL)
+
 static kstat_t *fletcher_4_kstat;
 static kstat_named_t fletcher_4_kstat_data[ARRAY_SIZE(fletcher_4_impls) * 2];
 
@@ -227,10 +237,6 @@ static struct fletcher_4_bench {
 
 /* Indicate that benchmark has been completed */
 static boolean_t fletcher_4_initialized = B_FALSE;
-
-#define	IMPL_READ(i)	(*(volatile uint32_t *) &(i))
-
-#define	FLETCHER_MIN_SIMD_SIZE	64
 
 void
 fletcher_init(zio_cksum_t *zcp)
@@ -364,7 +370,6 @@ fletcher_4_scalar_valid(void)
 	return (B_TRUE);
 }
 
-#ifndef LIBZFS
 int
 fletcher_4_impl_set(const char *val)
 {
@@ -404,35 +409,41 @@ fletcher_4_impl_set(const char *val)
 
 	if (err == 0) {
 		atomic_swap_32(&fletcher_4_impl_chosen, impl);
-		membar_producer();
+		MEMBAR_PRODUCER;
 	}
 
 	return (SET_ERROR(err));
 }
-#endif /* !LIBZFS */
 
+/*
+ * Returns the Fletcher 4 operations for checksums.   When a SIMD
+ * implementation is not allowed in the current context, then fallback
+ * to the fastest generic implementation.
+ */
 static inline const fletcher_4_ops_t *
 fletcher_4_impl_get(void)
 {
-	fletcher_4_ops_t *ops = NULL;
-	const uint32_t impl = IMPL_READ(fletcher_4_impl_chosen);
+	if (!kfpu_allowed())
+		return (&fletcher_4_superscalar4_ops);
+
+	const fletcher_4_ops_t *ops = NULL;
+	uint32_t impl = IMPL_READ(fletcher_4_impl_chosen);
 
 	switch (impl) {
 	case IMPL_FASTEST:
 		ASSERT(fletcher_4_initialized);
 		ops = &fletcher_4_fastest_impl;
 		break;
-#if !defined(_KERNEL) && !defined(LIBZFS)
-	case IMPL_CYCLE: {
+	case IMPL_CYCLE:
+		/* Cycle through supported implementations */
 		ASSERT(fletcher_4_initialized);
 		ASSERT3U(fletcher_4_supp_impls_cnt, >, 0);
 
 		static uint32_t cycle_count = 0;
 		uint32_t idx = (++cycle_count) % fletcher_4_supp_impls_cnt;
+
 		ops = fletcher_4_supp_impls[idx];
 		break;
-	}
-#endif
 	default:
 		ASSERT3U(fletcher_4_supp_impls_cnt, >, 0);
 		ASSERT3U(impl, <, fletcher_4_supp_impls_cnt);
@@ -467,6 +478,7 @@ fletcher_4_native(const void *buf, size_t size, zio_cksum_t *zcp)
 	const uint64_t p2size = P2ALIGN(size, FLETCHER_MIN_SIMD_SIZE);
 
 	ASSERT(IS_P2ALIGNED(size, sizeof (uint32_t)));
+
 	if (size == 0 || p2size == 0) {
 		ZIO_SET_CHECKSUM(zcp, 0, 0, 0, 0);
 
@@ -476,6 +488,7 @@ fletcher_4_native(const void *buf, size_t size, zio_cksum_t *zcp)
 		}
 	} else {
 		fletcher_4_native_impl(buf, p2size, zcp);
+
 		if (p2size < size) {
 			fletcher_4_scalar_native((fletcher_4_ctx_t *)zcp,
 			    (char *)buf + p2size, size - p2size);
@@ -514,12 +527,14 @@ fletcher_4_byteswap(const void *buf, size_t size, zio_cksum_t *zcp)
 
 	if (size == 0 || p2size == 0) {
 		ZIO_SET_CHECKSUM(zcp, 0, 0, 0, 0);
+
 		if (size > 0) {
 			fletcher_4_scalar_byteswap((fletcher_4_ctx_t *)zcp,
 			    buf, size);
 		}
 	} else {
 		fletcher_4_byteswap_impl(buf, p2size, zcp);
+
 		if (p2size < size) {
 			fletcher_4_scalar_byteswap((fletcher_4_ctx_t *)zcp,
 			    (char *)buf + p2size, size - p2size);
@@ -600,7 +615,6 @@ fletcher_4_incremental_byteswap(void *buf, size_t size, void *data)
 	return (0);
 }
 
-#ifndef LIBZFS
 #define	FLETCHER_4_FASTEST_FN_COPY(type, src)				  \
 {									  \
 	fletcher_4_fastest_impl.init_ ## type = src->init_ ## type;	  \
@@ -611,6 +625,9 @@ fletcher_4_incremental_byteswap(void *buf, size_t size, void *data)
 
 #define	FLETCHER_4_BENCH_NS	(MSEC2NSEC(1))		/* 1ms */
 
+typedef void fletcher_checksum_func_t(const void *, size_t, zio_cksum_t *);
+
+#if defined(_KERNEL)
 static void
 fletcher_4_benchmark_impl(boolean_t native, char *data, size_t data_size)
 {
@@ -621,7 +638,7 @@ fletcher_4_benchmark_impl(boolean_t native, char *data, size_t data_size)
 	zio_cksum_t zc;
 	uint32_t i, l, sel_save = IMPL_READ(fletcher_4_impl_chosen);
 
-	void (*fletcher_4_test)(const void *, size_t, zio_cksum_t *) =
+	fletcher_checksum_func_t *fletcher_4_test =
 	    native ? fletcher_4_native : fletcher_4_byteswap;
 
 	for (i = 0; i < fletcher_4_supp_impls_cnt; i++) {
@@ -667,38 +684,31 @@ fletcher_4_benchmark_impl(boolean_t native, char *data, size_t data_size)
 	/* restore original selection */
 	atomic_swap_32(&fletcher_4_impl_chosen, sel_save);
 }
+#endif /* _KERNEL */
 
-void
-fletcher_4_init(void)
+/*
+ * Initialize and benchmark all supported implementations.
+ */
+static void
+fletcher_4_benchmark(void)
 {
-	static const size_t data_size = 1 << SPA_OLD_MAXBLOCKSHIFT; /* 128kiB */
 	fletcher_4_ops_t *curr_impl;
-	char *databuf;
 	int i, c;
 
-	/* move supported impl into fletcher_4_supp_impls */
+	/* Move supported implementations into fletcher_4_supp_impls */
 	for (i = 0, c = 0; i < ARRAY_SIZE(fletcher_4_impls); i++) {
-		curr_impl = (fletcher_4_ops_t *) fletcher_4_impls[i];
+		curr_impl = (fletcher_4_ops_t *)fletcher_4_impls[i];
 
 		if (curr_impl->valid && curr_impl->valid())
 			fletcher_4_supp_impls[c++] = curr_impl;
 	}
-	membar_producer();	/* complete fletcher_4_supp_impls[] init */
+	MEMBAR_PRODUCER;	/* complete fletcher_4_supp_impls[] init */
 	fletcher_4_supp_impls_cnt = c;	/* number of supported impl */
 
-#if !defined(_KERNEL)
-	/* Skip benchmarking and use last implementation as fastest */
-	memcpy(&fletcher_4_fastest_impl,
-	    fletcher_4_supp_impls[fletcher_4_supp_impls_cnt-1],
-	    sizeof (fletcher_4_fastest_impl));
-	fletcher_4_fastest_impl.name = "fastest";
-	membar_producer();
+#if defined(_KERNEL)
+	static const size_t data_size = 1 << SPA_OLD_MAXBLOCKSHIFT; /* 128kiB */
+	char *databuf = kmem_alloc(data_size, KM_SLEEP);
 
-	fletcher_4_initialized = B_TRUE;
-	return;
-#else
-	/* Benchmark all supported implementations */
-	databuf = kmem_alloc(data_size, KM_SLEEP);
 	for (i = 0; i < data_size / sizeof (uint64_t); i++)
 		((uint64_t *)databuf)[i] = (uintptr_t)(databuf+i); /* warm-up */
 
@@ -706,9 +716,28 @@ fletcher_4_init(void)
 	fletcher_4_benchmark_impl(B_TRUE, databuf, data_size);
 
 	kmem_free(databuf, data_size);
+#else
+	/*
+	 * Skip the benchmark in user space to avoid impacting libzpool
+	 * consumers (zdb, zhack, zinject, ztest).  The last implementation
+	 * is assumed to be the fastest and used by default.
+	 */
+	memcpy(&fletcher_4_fastest_impl,
+	    fletcher_4_supp_impls[fletcher_4_supp_impls_cnt - 1],
+	    sizeof (fletcher_4_fastest_impl));
+	fletcher_4_fastest_impl.name = "fastest";
+#endif /* _KERNEL */
+}
 
+void
+fletcher_4_init(void)
+{
+	/* Determine the fastest available implementation. */
+	fletcher_4_benchmark();
+
+#if defined(_KERNEL)
 	/* install kstats for all implementations */
-	for (i = 0; i < fletcher_4_supp_impls_cnt; i++) {
+	for (uint32_t i = 0; i < fletcher_4_supp_impls_cnt; i++) {
 		struct fletcher_4_bench *stat = &fletcher_4_stat_data[i];
 		const fletcher_4_ops_t *ops = fletcher_4_supp_impls[i];
 		kstat_named_t *kstat_native = &fletcher_4_kstat_data[i * 2];
@@ -734,21 +763,22 @@ fletcher_4_init(void)
                 fletcher_4_kstat->ks_data = fletcher_4_kstat_data;
                 kstat_install(fletcher_4_kstat);
         }
+#endif
 
 	/* Finish initialization */
 	fletcher_4_initialized = B_TRUE;
-#endif
 }
 
 void
 fletcher_4_fini(void)
 {
+#if defined(_KERNEL)
 	if (fletcher_4_kstat != NULL) {
 		kstat_delete(fletcher_4_kstat);
 		fletcher_4_kstat = NULL;
 	}
+#endif
 }
-#endif /* !LIBZFS */
 
 /* ABD adapters */
 
