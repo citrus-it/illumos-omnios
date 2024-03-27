@@ -270,7 +270,8 @@ fletcher_2_incremental_native(void *buf, size_t size, void *data)
 }
 
 void
-fletcher_2_native(const void *buf, size_t size, zio_cksum_t *zcp)
+fletcher_2_native(const void *buf, size_t size,
+    const void *ctx_template __unused, zio_cksum_t *zcp)
 {
 	fletcher_init(zcp);
 	(void) fletcher_2_incremental_native((void *) buf, size, zcp);
@@ -302,7 +303,8 @@ fletcher_2_incremental_byteswap(void *buf, size_t size, void *data)
 }
 
 void
-fletcher_2_byteswap(const void *buf, size_t size, zio_cksum_t *zcp)
+fletcher_2_byteswap(const void *buf, size_t size,
+    const void *ctx_template __unused, zio_cksum_t *zcp)
 {
 	fletcher_init(zcp);
 	(void) fletcher_2_incremental_byteswap((void *) buf, size, zcp);
@@ -473,7 +475,8 @@ fletcher_4_native_impl(const void *buf, size_t size, zio_cksum_t *zcp)
 }
 
 void
-fletcher_4_native(const void *buf, size_t size, zio_cksum_t *zcp)
+fletcher_4_native(const void *buf, size_t size,
+    const void *ctx_template __unused, zio_cksum_t *zcp)
 {
 	const uint64_t p2size = P2ALIGN(size, FLETCHER_MIN_SIMD_SIZE);
 
@@ -519,7 +522,8 @@ fletcher_4_byteswap_impl(const void *buf, size_t size, zio_cksum_t *zcp)
 }
 
 void
-fletcher_4_byteswap(const void *buf, size_t size, zio_cksum_t *zcp)
+fletcher_4_byteswap(const void *buf, size_t size,
+    const void *ctx_template __unused, zio_cksum_t *zcp)
 {
 	const uint64_t p2size = P2ALIGN(size, FLETCHER_MIN_SIMD_SIZE);
 
@@ -578,9 +582,9 @@ fletcher_4_incremental_impl(boolean_t native, const void *buf, size_t size,
 		uint64_t len = MIN(size, ZFS_FLETCHER_4_INC_MAX_SIZE);
 
 		if (native)
-			fletcher_4_native(buf, len, &nzc);
+			fletcher_4_native(buf, len, NULL, &nzc);
 		else
-			fletcher_4_byteswap(buf, len, &nzc);
+			fletcher_4_byteswap(buf, len, NULL, &nzc);
 
 		fletcher_4_incremental_combine(zcp, len, &nzc);
 
@@ -625,7 +629,8 @@ fletcher_4_incremental_byteswap(void *buf, size_t size, void *data)
 
 #define	FLETCHER_4_BENCH_NS	(MSEC2NSEC(1))		/* 1ms */
 
-typedef void fletcher_checksum_func_t(const void *, size_t, zio_cksum_t *);
+typedef void fletcher_checksum_func_t(const void *, size_t, const void *,
+    zio_cksum_t *);
 
 #if defined(_KERNEL)
 static void
@@ -652,7 +657,7 @@ fletcher_4_benchmark_impl(boolean_t native, char *data, size_t data_size)
 		start = gethrtime();
 		do {
 			for (l = 0; l < 32; l++, run_count++)
-				fletcher_4_test(data, data_size, &zc);
+				fletcher_4_test(data, data_size, NULL, &zc);
 
 			run_time_ns = gethrtime() - start;
 		} while (run_time_ns < FLETCHER_4_BENCH_NS);

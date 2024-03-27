@@ -1320,7 +1320,7 @@ arc_cksum_verify(arc_buf_t *buf)
 		return;
 	}
 
-	fletcher_2_native(buf->b_data, arc_buf_size(buf), &zc);
+	fletcher_2_native(buf->b_data, arc_buf_size(buf), NULL, &zc);
 	if (!ZIO_CHECKSUM_EQUAL(*hdr->b_l1hdr.b_freeze_cksum, zc))
 		panic("buffer modified while frozen!");
 	mutex_exit(&hdr->b_l1hdr.b_freeze_lock);
@@ -1381,7 +1381,7 @@ arc_cksum_compute(arc_buf_t *buf)
 	ASSERT(!ARC_BUF_COMPRESSED(buf));
 	hdr->b_l1hdr.b_freeze_cksum = kmem_alloc(sizeof (zio_cksum_t),
 	    KM_SLEEP);
-	fletcher_2_native(buf->b_data, arc_buf_size(buf),
+	fletcher_2_native(buf->b_data, arc_buf_size(buf), NULL,
 	    hdr->b_l1hdr.b_freeze_cksum);
 	mutex_exit(&hdr->b_l1hdr.b_freeze_lock);
 	arc_buf_watch(buf);
@@ -9533,7 +9533,7 @@ l2arc_log_blk_read(l2arc_dev_t *dev,
 	 * L2BLK_GET_PSIZE returns aligned size for log blocks.
 	 */
 	asize = L2BLK_GET_PSIZE((this_lbp)->lbp_prop);
-	fletcher_4_native(this_lb, asize, &cksum);
+	fletcher_4_native(this_lb, asize, NULL, &cksum);
 	if (!ZIO_CHECKSUM_EQUAL(cksum, this_lbp->lbp_cksum)) {
 		ARCSTAT_BUMP(arcstat_l2_rebuild_abort_cksum_lb_errors);
 		zfs_dbgmsg("L2ARC log block cksum failed, offset: %llu, "
@@ -9873,7 +9873,8 @@ l2arc_log_blk_commit(l2arc_dev_t *dev, zio_t *pio, l2arc_write_callback_t *cb)
 	}
 
 	/* checksum what we're about to write */
-	fletcher_4_native(tmpbuf, asize, &l2dhdr->dh_start_lbps[0].lbp_cksum);
+	fletcher_4_native(tmpbuf, asize, NULL,
+	    &l2dhdr->dh_start_lbps[0].lbp_cksum);
 
 	abd_put(abd_buf->abd);
 
