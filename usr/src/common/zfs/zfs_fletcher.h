@@ -71,15 +71,15 @@ typedef struct zfs_fletcher_superscalar {
 } zfs_fletcher_superscalar_t;
 
 typedef struct zfs_fletcher_sse {
-	uint64_t v[2] __attribute__((aligned(16)));
+	uint64_t v[2];
 } zfs_fletcher_sse_t;
 
 typedef struct zfs_fletcher_avx {
-	uint64_t v[4] __attribute__((aligned(32)));
+	uint64_t v[4];
 } zfs_fletcher_avx_t;
 
 typedef struct zfs_fletcher_avx512 {
-	uint64_t v[8] __attribute__((aligned(64)));
+	uint64_t v[8];
 } zfs_fletcher_avx512_t;
 
 typedef union fletcher_4_ctx {
@@ -107,9 +107,9 @@ typedef struct fletcher_4_func {
 	fletcher_4_init_f init_byteswap;
 	fletcher_4_fini_f fini_byteswap;
 	fletcher_4_compute_f compute_byteswap;
+	boolean_t (*valid)(void);
 	boolean_t uses_fpu_native;
 	boolean_t uses_fpu_byteswap;
-	boolean_t (*valid)(void);
 	const char *name;
 } __attribute__((aligned(64))) fletcher_4_ops_t;
 

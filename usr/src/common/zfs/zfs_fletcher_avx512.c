@@ -170,18 +170,6 @@ const fletcher_4_ops_t fletcher_4_avx512f_ops = {
 	.name = "avx512f"
 };
 
-static boolean_t
-fletcher_4_avx512bw_valid(void)
-{
-#ifndef LIBZFS
-	extern int zfs_fletcher4_fpu_enabled;
-
-	if (zfs_fletcher4_fpu_enabled == 0)
-		return (B_FALSE);
-#endif
-	return (kfpu_allowed() && zfs_avx512bw_available());
-}
-
 static void
 fletcher_4_avx512bw_byteswap(fletcher_4_ctx_t *ctx, const void *buf,
     size_t size)
@@ -212,6 +200,20 @@ fletcher_4_avx512bw_byteswap(fletcher_4_ctx_t *ctx, const void *buf,
 
 	FLETCHER_4_AVX512_SAVE_CTX(ctx)
 }
+
+static boolean_t
+fletcher_4_avx512bw_valid(void)
+{
+#ifndef LIBZFS
+	extern int zfs_fletcher4_fpu_enabled;
+
+	if (zfs_fletcher4_fpu_enabled == 0)
+		return (B_FALSE);
+#endif
+	return (kfpu_allowed() && fletcher_4_avx512f_valid() &&
+	    zfs_avx512bw_available());
+}
+
 
 const fletcher_4_ops_t fletcher_4_avx512bw_ops = {
 	.init_native = fletcher_4_avx512f_init,

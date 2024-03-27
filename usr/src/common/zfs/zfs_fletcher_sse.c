@@ -193,7 +193,6 @@ fletcher_4_ssse3_byteswap(fletcher_4_ctx_t *ctx, const void *buf, size_t size)
 
 	FLETCHER_4_SSE_RESTORE_CTX(ctx);
 
-
 	__asm("movdqa %0, %%xmm7"::"m" (mask));
 	__asm("pxor %xmm4, %xmm4");
 
