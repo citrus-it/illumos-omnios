@@ -22,6 +22,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -314,6 +316,20 @@ print_tcpoptions(opt, optlen)
 				sack_len -= TCPOPT_SACK_LEN;
 			}
 			break;
+		case TCPOPT_MD5: {
+			uint_t i;
+
+			(void) sprintf(line, "  - TCP MD5 Signature = 0x");
+			for (i = 2; i < optlen; i++) {
+				char options[3];
+
+				(void) sprintf(options, "%02x", opt[i]);
+				(void) strcat(line, options);
+			}
+			if (optlen != 18) 	// XXX defn
+				(void) strcat(line, " !INCOMPLETE");
+			break;
+		}
 		default:
 			(void) sprintf(line,
 			"  - Option %d (unknown - %d bytes) %s",
@@ -416,6 +432,18 @@ print_tcpoptions_summary(uchar_t *opt, int optlen, char *line)
 				sack_len -= TCPOPT_SACK_LEN;
 			}
 			break;
+		case TCPOPT_MD5: {
+			uint_t i;
+
+			(void) strcat(line, "md5 0x");
+			for (i = 2; i < optlen; i++) {
+				(void) sprintf(options, "%02x", opt[i]);
+				(void) strcat(line, options);
+			}
+			if (optlen != 18) 	// XXX defn
+				(void) strcat(line, "|");
+			break;
+		}
 		default:
 			(void) sprintf(options, "unknown %d", opt[0]);
 			(void) strcat(line, options);

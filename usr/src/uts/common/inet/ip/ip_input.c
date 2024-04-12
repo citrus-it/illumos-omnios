@@ -24,6 +24,7 @@
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -2425,7 +2426,6 @@ ip_fanout_v4(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 		iraflags = ira->ira_flags;
 	}
 
-
 	/* Verify ULP checksum. Handles TCP, UDP, and SCTP */
 	if (iraflags & IRAF_VERIFY_ULP_CKSUM) {
 		if (!ip_input_cksum_v4(iraflags, mp, ipha, ira)) {
@@ -2437,6 +2437,7 @@ ip_fanout_v4(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 		/* IRAF_SCTP_CSUM_ERR could have been set */
 		iraflags = ira->ira_flags;
 	}
+
 	switch (protocol) {
 	case IPPROTO_TCP:
 		/* For TCP, discard broadcast and multicast packets. */

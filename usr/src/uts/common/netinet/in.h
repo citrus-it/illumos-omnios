@@ -5,6 +5,7 @@
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 /*
  * Copyright (c) 1982, 1986 Regents of the University of California.
@@ -574,7 +575,7 @@ struct sockaddr_in6 {
 #endif /* _BIG_ENDIAN */
 
 /*
- * IN6_IS_ADDR_V4MAPPED - A IPv4 mapped INADDR_ANY
+ * IN6_IS_ADDR_V4MAPPED_ANY - A IPv4 mapped INADDR_ANY
  * Note: This macro is currently NOT defined in RFC2553 specification
  * and not a standard macro that portable applications should use.
  */

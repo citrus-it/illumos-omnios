@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_NET_PFKEYV2_H
@@ -603,12 +604,15 @@ typedef struct sadb_x_edump {
 #define	SADB_SATYPE_UNSPEC	0
 #define	SADB_SATYPE_AH		2  /* RFC-1826 */
 #define	SADB_SATYPE_ESP		3  /* RFC-1827 */
+#define	SADB_X_SATYPE_TCPSIG	4  /* RFC-2385 */
 #define	SADB_SATYPE_RSVP	5  /* RSVP Authentication */
 #define	SADB_SATYPE_OSPFV2	6  /* OSPFv2 Authentication */
 #define	SADB_SATYPE_RIPV2	7  /* RIPv2 Authentication */
 #define	SADB_SATYPE_MIP		8  /* Mobile IPv4 Authentication */
 
 #define	SADB_SATYPE_MAX		8
+
+#define	TCPSIG_MD5_KEY_LEN	80
 
 /*
  * Algorithm types.  Gaps are present because (for the time being) these types
@@ -678,8 +682,9 @@ typedef struct sadb_x_edump {
 #define	SADB_X_EXT_EDUMP		25
 #define	SADB_X_EXT_LIFETIME_IDLE	26
 #define	SADB_X_EXT_OUTER_SENS		27
+#define	SADB_X_EXT_STR_AUTH		28
 
-#define	SADB_EXT_MAX			27
+#define	SADB_EXT_MAX			28
 
 /*
  * Identity types.
@@ -827,7 +832,12 @@ typedef struct sadb_x_edump {
 #define	SADB_X_DIAGNOSTIC_MISSING_LIFETIME	82
 
 #define	SADB_X_DIAGNOSTIC_BAD_LABEL		83
-#define	SADB_X_DIAGNOSTIC_MAX			83
+
+#define	SADB_X_DIAGNOSTIC_MISSING_ASTR		84
+#define	SADB_X_DIAGNOSTIC_DUPLICATE_ASTR	85
+#define	SADB_X_DIAGNOSTIC_MALFORMED_ASTR	86
+
+#define	SADB_X_DIAGNOSTIC_MAX			86
 
 /* Algorithm type for sadb_x_algdesc above... */
 

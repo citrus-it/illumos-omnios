@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2024 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1907,7 +1908,7 @@ ire_send_wire_v4(ire_t *ire, mblk_t *mp, void *iph_arg,
 	/*
 	 * Verify any IPv4 options.
 	 *
-	 * The presense of IP options also forces the network stack to
+	 * The presence of IP options also forces the network stack to
 	 * calculate the checksum in software.  This is because:
 	 *
 	 * Wrap around: certain partial-checksum NICs (eri, ce) limit

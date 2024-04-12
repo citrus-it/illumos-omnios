@@ -25,6 +25,7 @@
  * Copyright 2012 Milan Juri. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <unistd.h>
@@ -418,6 +419,21 @@ dump_key(uint8_t *keyp, uint_t bitlen, uint_t saltbits, FILE *where,
 	return (0);
 }
 
+int
+dump_keystr(uint8_t *keystr, uint_t bitlen, FILE *where)
+{
+	size_t keylen = bitlen / 8;
+	uint_t i;
+
+	for (i = 0; i < keylen; i++) {
+		if (isprint(keystr[i]))
+			fprintf(where, "%c", keystr[i]);
+		else
+			fprintf(where, "\\x%x", keystr[i]);
+	}
+
+	return (0);
+}
 /*
  * Print an authentication or encryption algorithm
  */
@@ -1596,6 +1612,14 @@ keysock_diag(int diagnostic)
 	case SADB_X_DIAGNOSTIC_MISSING_LIFETIME:
 		return (dgettext(TEXT_DOMAIN,
 		    "Inappropriate lifetimes"));
+	case SADB_X_DIAGNOSTIC_MISSING_ASTR:
+		return (dgettext(TEXT_DOMAIN, "Missing authentication string"));
+	case SADB_X_DIAGNOSTIC_DUPLICATE_ASTR:
+		return (dgettext(TEXT_DOMAIN,
+		    "Duplicate authentication string"));
+	case SADB_X_DIAGNOSTIC_MALFORMED_ASTR:
+		return (dgettext(TEXT_DOMAIN,
+		    "Malformed authentication string"));
 	default:
 		return (dgettext(TEXT_DOMAIN, "Unknown diagnostic code"));
 	}
@@ -1724,6 +1748,9 @@ print_sadb_msg(FILE *file, struct sadb_msg *samsg, time_t wallclock,
 		break;
 	case SADB_SATYPE_ESP:
 		(void) fprintf(file, "ESP");
+		break;
+	case SADB_X_SATYPE_TCPSIG:
+		(void) fprintf(file, "TCPSIG");
 		break;
 	case SADB_SATYPE_RSVP:
 		(void) fprintf(file, "RSVP");
@@ -2200,6 +2227,20 @@ print_key(FILE *file, char *prefix, struct sadb_key *key)
 }
 
 /*
+ * Print an SADB_X_EXT_STR_AUTH extension.
+ */
+void
+print_keystr(FILE *file, char *prefix, struct sadb_key *key)
+{
+	(void) fprintf(file, "%s", prefix);
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, "Authentication"));
+	(void) fprintf(file, dgettext(TEXT_DOMAIN, " string.\n%s"), prefix);
+	(void) fprintf(file, "\"");
+	(void) dump_keystr((uint8_t *)(key + 1), key->sadb_key_bits, file);
+	(void) fprintf(file, "\"\n");
+}
+
+/*
  * Print an SADB_EXT_IDENTITY_* extension.
  */
 void
@@ -2494,6 +2535,10 @@ print_eprop(FILE *file, char *prefix, struct sadb_prop *eprop)
 				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "for AH "));
 				break;
+			case SADB_X_SATYPE_TCPSIG:
+				(void) fprintf(file, dgettext(TEXT_DOMAIN,
+				    "for TCPSIG "));
+				break;
 			default:
 				(void) fprintf(file, dgettext(TEXT_DOMAIN,
 				    "for satype=%d "),
@@ -2734,6 +2779,10 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 		case SADB_EXT_KEY_AUTH:
 			print_key(file, dgettext(TEXT_DOMAIN,
 			    "AKY: "), (struct sadb_key *)current);
+			break;
+		case SADB_X_EXT_STR_AUTH:
+			print_keystr(file, dgettext(TEXT_DOMAIN,
+			    "AST: "), (struct sadb_key *)current);
 			break;
 		case SADB_EXT_KEY_ENCRYPT:
 			print_key(file, dgettext(TEXT_DOMAIN,
@@ -2979,6 +3028,27 @@ save_key(struct sadb_key *key, FILE *ofile)
 }
 
 /*
+ * Print save information for a key extension. Returns whether writing
+ * to the specified output file was successful or not.
+ */
+boolean_t
+save_keystr(struct sadb_key *key, FILE *ofile)
+{
+	char *prefix;
+
+	if (putc('\t', ofile) == EOF)
+		return (B_FALSE);
+
+	if (fprintf(ofile, "authstring ", prefix) < 0)
+		return (B_FALSE);
+
+	if (dump_keystr((uint8_t *)(key + 1), key->sadb_key_bits, ofile) == -1)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
  * Print save information for an identity extension.
  */
 boolean_t
@@ -3173,6 +3243,13 @@ skip_srcdst:
 			}
 			savenl();
 			break;
+		case SADB_X_EXT_STR_AUTH:
+			if (!save_keystr((struct sadb_key *)ext, ofile)) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN, "save_address"));
+			}
+			savenl();
+			break;
 		case SADB_EXT_IDENTITY_SRC:
 		case SADB_EXT_IDENTITY_DST:
 			if (!save_ident((struct sadb_ident *)ext, ofile)) {
@@ -3304,6 +3381,7 @@ static struct typetable {
 	{"all", SADB_SATYPE_UNSPEC},
 	{"ah",  SADB_SATYPE_AH},
 	{"esp", SADB_SATYPE_ESP},
+	{"tcpsig", SADB_X_SATYPE_TCPSIG},
 	/* PF_KEY NOTE:  More to come if net/pfkeyv2.h gets updated. */
 	{NULL, 0}	/* Token value is irrelevant for this entry. */
 };

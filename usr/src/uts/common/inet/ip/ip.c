@@ -26,7 +26,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2021 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2024 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -122,6 +122,7 @@
 #include <inet/udp_impl.h>
 #include <inet/rawip_impl.h>
 #include <inet/rts_impl.h>
+#include <inet/tcp_sig.h>
 
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
@@ -4427,6 +4428,7 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	ip_net_destroy(ipst);
 
 	ipmp_destroy(ipst);
+	tcpsig_destroy(ipst);
 
 	ip_kstat_fini(stackid, ipst->ips_ip_mibkp);
 	ipst->ips_ip_mibkp = NULL;
@@ -4702,6 +4704,7 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	arp_hook_init(ipst);
 	ipmp_init(ipst);
 	ipobs_init(ipst);
+	tcpsig_init(ipst);
 
 	/*
 	 * Create the taskq dispatcher thread and initialize related stuff.
@@ -14485,7 +14488,7 @@ ip_xmit(mblk_t *mp, nce_t *nce, iaflags_t ixaflags, uint_t pkt_len,
 
 	ASSERT(mp != NULL);
 	ASSERT(mp->b_datap->db_type == M_DATA);
-	ASSERT(pkt_len == msgdsize(mp));
+	ASSERT3U(pkt_len, ==, msgdsize(mp));
 
 	/*
 	 * If we have already been here and are coming back after ARP/ND.
@@ -14500,7 +14503,8 @@ ip_xmit(mblk_t *mp, nce_t *nce, iaflags_t ixaflags, uint_t pkt_len,
 		ipha_t *ipha = (ipha_t *)mp->b_rptr;
 
 		ASSERT(!isv6);
-		ASSERT(pkt_len == ntohs(((ipha_t *)mp->b_rptr)->ipha_length));
+		ASSERT3U(pkt_len, ==,
+		    ntohs(((ipha_t *)mp->b_rptr)->ipha_length));
 		if (HOOKS4_INTERESTED_PHYSICAL_OUT(ipst) &&
 		    !(ixaflags & IXAF_NO_PFHOOK)) {
 			int	error;

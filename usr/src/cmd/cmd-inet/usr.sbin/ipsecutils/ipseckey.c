@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2024 Oxide Computer Company
  */
 
 /*
@@ -94,6 +95,8 @@ static boolean_t in_cluster_mode = B_FALSE;
 	handle_errors(x, y, B_TRUE, B_TRUE)
 #define	FATAL1(w, x, y, z) ERROR1(w, x, y, z);\
 	handle_errors(w, x, B_TRUE, B_TRUE)
+
+#define	QUOTE(x) #x
 
 /* Defined as a uint64_t array for alignment purposes. */
 static uint64_t get_buffer[MAX_GET_SIZE];
@@ -356,10 +359,10 @@ static struct typetable {
 	{"all",	SADB_SATYPE_UNSPEC},
 	{"ah",	SADB_SATYPE_AH},
 	{"esp",	SADB_SATYPE_ESP},
+	{"tcpsig", SADB_X_SATYPE_TCPSIG},
 	/* PF_KEY NOTE:  More to come if net/pfkeyv2.h gets updated. */
 	{NULL,	0}	/* Token value is irrelevant for this entry. */
 };
-
 
 static int
 parsesatype(char *type, char *ebuf)
@@ -459,6 +462,7 @@ parsesatype(char *type, char *ebuf)
 #define	TOK_LABEL		55
 #define	TOK_OLABEL		56
 #define	TOK_IMPLABEL		57
+#define	TOK_AUTHSTR		58
 
 
 static struct toktable {
@@ -527,6 +531,7 @@ static struct toktable {
 	{"idst6",		TOK_IDSTADDR6,		NEXTADDR},
 
 	{"authkey",		TOK_AUTHKEY,		NEXTHEX},
+	{"authstring",		TOK_AUTHSTR,		NEXTNUMSTR},
 	{"encrkey",		TOK_ENCRKEY,		NEXTHEX},
 	{"srcidtype",		TOK_SRCIDTYPE,		NEXTIDENT},
 	{"dstidtype",		TOK_DSTIDTYPE,		NEXTIDENT},
@@ -914,6 +919,39 @@ parsekey(char *input, char *ebuf, uint_t reserved_bits)
 	if (bits & 0x7)
 		*((input[i] == '\0') ? key - 1 : key) &=
 		    0xff << (8 - (bits & 0x7));
+
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
+	return (retval);
+}
+
+static struct sadb_key *
+parseauthstr(char *input, char *ebuf)
+{
+	struct sadb_key *retval;
+	size_t alloclen, keylen;
+	char *ep = NULL;
+
+	if (input == NULL) {
+		FATAL(ep, ebuf, gettext("Unexpected end of command line, "
+		    "was expecting an authentication string.\n"));
+	}
+
+	keylen = strlen(input);
+
+	if (keylen > TCPSIG_MD5_KEY_LEN) {
+		FATAL(ep, ebuf, gettext("Authentication string is too long, "
+		    "must be < " QUOTE(TCPSIG_MD5_KEY_LEN) " characters.\n"));
+	}
+
+	alloclen = sizeof (*retval) + roundup(keylen, sizeof (uint64_t));
+	retval = malloc(alloclen);
+
+	if (retval == NULL)
+		Bail("malloc(parseauthstr)");
+	retval->sadb_key_bits = keylen * 8;
+	retval->sadb_key_len = SADB_8TO64(alloclen);
+	retval->sadb_key_reserved = 0;
+	bcopy(input, (void *)(retval + 1), keylen);
 
 	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (retval);
@@ -1529,7 +1567,7 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 			    sizeof (cli_addr));
 		}
 		/* Blank the key for paranoia's sake. */
-		bzero(buffer, buffer_size);
+		explicit_bzero(buffer, buffer_size);
 		time_critical_enter();
 		do {
 			rc = read(keysock, buffer, buffer_size);
@@ -1719,7 +1757,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 				assoc = malloc(sizeof (*assoc));
 				if (assoc == NULL)
 					Bail("malloc(assoc)");
-				bzero(assoc, sizeof (*assoc));
+				explicit_bzero(assoc, sizeof (*assoc));
 				assoc->sadb_sa_exttype = SADB_EXT_SA;
 				assoc->sadb_sa_len =
 				    SADB_8TO64(sizeof (*assoc));
@@ -1756,7 +1794,8 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 					sadb_pair = malloc(sizeof (*sadb_pair));
 					if (assoc == NULL)
 						Bail("malloc(assoc)");
-					bzero(sadb_pair, sizeof (*sadb_pair));
+					explicit_bzero(sadb_pair,
+					    sizeof (*sadb_pair));
 					totallen += sizeof (*sadb_pair);
 				}
 				if (sadb_pair->sadb_x_pair_spi != 0) {
@@ -1830,6 +1869,12 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 				if (satype == SADB_SATYPE_AH) {
 					ERROR(ep, ebuf, gettext("Cannot specify"
 					    " encryption with SA type ah.\n"));
+					break;
+				}
+				if (satype == SADB_X_SATYPE_TCPSIG) {
+					ERROR(ep, ebuf,gettext("Cannot specify"
+					    " encryption with SA type"
+					    " tcpsig.\n"));
 					break;
 				}
 				if (assoc->sadb_sa_encrypt != 0) {
@@ -2315,8 +2360,8 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		case TOK_ENCRKEY:
 			if (encrypt != NULL) {
 				ERROR(ep, ebuf, gettext(
-				    "Can only specify "
-				    "single encryption key.\n"));
+				    "Can only specify a single"
+				    " encryption key.\n"));
 				break;
 			}
 			if (assoc != NULL &&
@@ -2339,7 +2384,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		case TOK_AUTHKEY:
 			if (auth != NULL) {
 				ERROR(ep, ebuf, gettext(
-				    "Can only specify single"
+				    "Can only specify a single"
 				    " authentication key.\n"));
 				break;
 			}
@@ -2352,6 +2397,29 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			}
 			totallen += SADB_64TO8(auth->sadb_key_len);
 			auth->sadb_key_exttype = SADB_EXT_KEY_AUTH;
+			break;
+		case TOK_AUTHSTR:
+			if (satype != SADB_X_SATYPE_TCPSIG) {
+				ERROR(ep, ebuf, gettext(
+				    "An authentication string can only be "
+				    "specified for SA type tcpsig.\n"));
+				break;
+			}
+			if (auth != NULL) {
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify a single"
+				    " authentication key or string.\n"));
+				break;
+			}
+			auth = parseauthstr(*argv, ebuf);
+			argv++;
+			if (auth == NULL) {
+				ERROR(ep, ebuf, gettext(
+				    "Invalid authentication string.\n"));
+				break;
+			}
+			totallen += SADB_64TO8(auth->sadb_key_len);
+			auth->sadb_key_exttype = SADB_X_EXT_STR_AUTH;
 			break;
 		case TOK_SRCIDTYPE:
 			if (*argv == NULL || *(argv + 1) == NULL) {
@@ -2716,7 +2784,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	bcopy(&msg, nexthdr, sizeof (msg));
 	nexthdr += SADB_8TO64(sizeof (msg));
 	if (assoc != NULL) {
-		if (assoc->sadb_sa_spi == 0) {
+		if (satype != SADB_X_SATYPE_TCPSIG && assoc->sadb_sa_spi == 0) {
 			ERROR1(ep, ebuf, gettext(
 			    "The SPI value is missing for "
 			    "the association you wish to %s.\n"), thiscmd);
@@ -2772,7 +2840,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		spi = assoc->sadb_sa_spi;
 		free(assoc);
 	} else {
-		if (spi == 0)
+		if (satype != SADB_X_SATYPE_TCPSIG && spi == 0)
 			ERROR1(ep, ebuf, gettext(
 			    "Need to define SPI for %s.\n"), thiscmd);
 		ERROR1(ep, ebuf, gettext(
@@ -2817,14 +2885,14 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	if (encrypt != NULL) {
 		bcopy(encrypt, nexthdr, SADB_64TO8(encrypt->sadb_key_len));
 		nexthdr += encrypt->sadb_key_len;
-		bzero(encrypt, SADB_64TO8(encrypt->sadb_key_len));
+		explicit_bzero(encrypt, SADB_64TO8(encrypt->sadb_key_len));
 		free(encrypt);
 	}
 
 	if (auth != NULL) {
 		bcopy(auth, nexthdr, SADB_64TO8(auth->sadb_key_len));
 		nexthdr += auth->sadb_key_len;
-		bzero(auth, SADB_64TO8(auth->sadb_key_len));
+		explicit_bzero(auth, SADB_64TO8(auth->sadb_key_len));
 		free(auth);
 	}
 
@@ -3595,9 +3663,8 @@ main(int argc, char *argv[])
 	my_fmri = getenv("SMF_FMRI");
 
 	openlog("ipseckey", LOG_CONS, LOG_AUTH);
-	if (getuid() != 0) {
+	if (!priv_ineffect(PRIV_SYS_IP_CONFIG))
 		errx(1, "Insufficient privileges to run ipseckey.");
-	}
 
 	/* umask me to paranoid, I only want to create files read-only */
 	(void) umask((mode_t)00377);
@@ -3645,7 +3712,7 @@ main(int argc, char *argv[])
 			}
 			/*
 			 * The input file contains keying information, because
-			 * this is sensative, we should only accept data from
+			 * this is sensitive, we should only accept data from
 			 * this file if the file is root owned and only readable
 			 * by privileged users. If the command is being run by
 			 * the administrator, issue a warning, if this is run by

@@ -27,6 +27,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2024 Oxide Computer Company
  */
 
 #ifndef	_INET_IP_STACK_H
@@ -439,6 +440,10 @@ struct ip_stack {
 	krwlock_t		ips_ipmp_lock;
 	mod_hash_t		*ips_ipmp_grp_hash;
 
+/* tcpsig.c */
+	kmutex_t		ips_tcpsigdb_lock;
+	void			*ips_tcpsigdb;
+	//tcpsig_db_t		*ips_tcpsigdb;
 };
 typedef struct ip_stack ip_stack_t;
 
