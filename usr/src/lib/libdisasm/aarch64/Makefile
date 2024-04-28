@@ -19,34 +19,20 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include ../Makefile.lib
+ISASRCDIR=../$(MACH)/
 
-HDRS=		libdisasm.h
+include ../Makefile.com
+include ../../Makefile.lib.64
 
-HDRDIR=		common
-$(BUILD32)SUBDIRS = $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+TYPES=library standalone
 
-all :=		TARGET = all
-clean :=	TARGET = clean
-clobber :=	TARGET = clobber
-install	:=	TARGET = install
+CPPFLAGS_standalone += -Dffs=mdb_ffs -Dfls=mdb_fls
 
-.KEEP_STATE:
-
-all clean clobber install: $(SUBDIRS)
-
-install_h:	$(ROOTHDRS)
-
-check:		$(CHECKHDRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+INSTALL_DEPS_library = $(ROOTLINKS) $(ROOTLIBS)
+INSTALL_DEPS_standalone = $(ROOTLIBS)
 
 include ../Makefile.targ
