@@ -308,6 +308,7 @@ static const char *a64_prefetch_ops[] = {
  * pointer or the zero register.  We default to the zero register, and support
  * printing it as the stack pointer via DPI_SPREGS*.
  */
+#define	A64_NUM_REGS	32
 static const struct {
 	const char *r32name;
 	const char *r64name;
@@ -435,9 +436,8 @@ typedef struct a64_reg {
 } a64_reg_t;
 
 typedef struct dis_handle_arm_64 {
-	uint64_t	dha_adrp_addr;
-	uint64_t	dha_adrp_imm;
-	a64_reg_t	dha_adrp_reg;
+	uint64_t	dha_adrp_addr[A64_NUM_REGS];
+	uint64_t	dha_adrp_imm[A64_NUM_REGS];
 } dis_handle_arm_64_t;
 
 static const char *
@@ -1420,9 +1420,14 @@ a64_dis_dataproc_pcrel(dis_handle_t *dhp, uint32_t in, a64_dataproc_t *dpi)
 		imm = (immlo + (immhi << 2)) << 12;
 		dpi->dpimm_imm = (int)imm;
 		dpi->dpimm_imm += dhp->dh_addr & ~0xfff;
-		dhx->dha_adrp_addr = dhp->dh_addr;
-		dhx->dha_adrp_imm = dpi->dpimm_imm;
-		dhx->dha_adrp_reg = dpi->rd;
+
+		/*
+		 * Cache information in the disassembly handle so that it can
+		 * be cross referenced with an upcoming 'add' in order to
+		 * try and annotate it with a symbol label.
+		 */
+		dhx->dha_adrp_addr[dpi->rd.id] = dhp->dh_addr;
+		dhx->dha_adrp_imm[dpi->rd.id] = dpi->dpimm_imm;
 	} else {
 		dpi->opcode = DPI_OP_ADR;
 		imm = (immlo + (immhi << 2));
@@ -2036,19 +2041,27 @@ a64_dis_dataproc(dis_handle_t *dhp, uint32_t in, char *buf, size_t buflen)
 			    ", #0x%" PRIx64 ", lsl #12", imm);
 			break;
 		}
-		if ((dop->flags & DPI_ADRP_F) != 0) {
+		if ((dop->flags & DPI_ADRP_F) != 0 &&
+		    dpi.rd.width == A64_REGWIDTH_64) {
 			dis_handle_arm_64_t *dhx = dhp->dh_arch_private;
+			uint_t i = dpi.rd.id;
 
-			if (dhx->dha_adrp_imm != 0 &&
-			    dpi.rd.id == dhx->dha_adrp_reg.id &&
-			    dpi.rd.id == dpi.rn.id &&
-			    dhp->dh_addr == dhx->dha_adrp_addr +
-			    sizeof (uint32_t)) {
+			/*
+			 * If we recently (in the last 10 instructions - this
+			 * is pretty arbitrary) saw an `adrp` on this register,
+			 * then assume that the result after this `add` is to
+			 * set up an address of a symbol and try to print the
+			 * label.
+			 */
+			if (dhx->dha_adrp_imm[i] != 0 &&
+			    dhp->dh_addr > dhx->dha_adrp_addr[i] &&
+			    dhp->dh_addr - dhx->dha_adrp_addr[i] <
+			    sizeof (uint32_t) * 10) {
 				a64_dis_addlabel(dhp,
-				    dpi.dpimm_imm + dhx->dha_adrp_imm,
+				    dpi.dpimm_imm + dhx->dha_adrp_imm[i],
 				    buf + len, buflen - len);
 			}
-			dhx->dha_adrp_imm = 0;
+			dhx->dha_adrp_imm[i] = 0;
 		}
 
 		break;
@@ -4330,23 +4343,20 @@ a64_simd_float(uint64_t imm, a64_reg_width_t width, char *buf, size_t buflen)
 }
 
 typedef enum a64_simd_flags {
-	SIMD_F_SKIP	= 1U << 0,
-	SIMD_F_VAR1	= 1U << 1,
-	SIMD_F_VAR2	= 1U << 2,
-	SIMD_F_VAR3	= 1U << 3,
-	SIMD_F_VAR4	= 1U << 4,
-	SIMD_F_VAR5	= 1U << 5,
-	SIMD_F_VAR6	= 1U << 6,
-	SIMD_F_B	= 1U << 7,
-	SIMD_F_H	= 1U << 8,
-	SIMD_F_S	= 1U << 9,
-	SIMD_F_D	= 1U << 10,
-	SIMD_F_MIM	= 1U << 11,
-	SIMD_F_MIM1	= 1U << 12,
-	SIMD_F_RW1	= 1U << 13,	/* reg width B/H/S */
-	SIMD_F_RW2	= 1U << 14,	/* reg width H/S/D */
-	SIMD_F_RW3	= 1U << 15,	/* reg width S */
-	SIMD_F_ZERO	= 1U << 16,
+	SIMD_F_SKIP	= BIT(0),
+	SIMD_F_VAR1	= BIT(1),
+	SIMD_F_VAR2	= BIT(2),
+	SIMD_F_VAR3	= BIT(3),
+	SIMD_F_VAR4	= BIT(4),
+	SIMD_F_VAR5	= BIT(5),
+	SIMD_F_VAR6	= BIT(6),
+	SIMD_F_B	= BIT(7),
+	SIMD_F_H	= BIT(8),
+	SIMD_F_S	= BIT(9),
+	SIMD_F_D	= BIT(10),
+	SIMD_F_MIM	= BIT(11),
+	SIMD_F_MIM1	= BIT(12),
+	SIMD_F_ZERO	= BIT(13),
 } a64_simd_flags_t;
 
 /* Don't care value, short so it fits into the tables */
