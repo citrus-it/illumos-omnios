@@ -59,6 +59,7 @@ CORE_OBJS +=			\
 	dtrace_subr.o		\
 	dvma.o			\
 	dw_apb_uart.o		\
+	espi.o			\
 	fakebop.o		\
 	fpu_subr.o		\
 	hardclk.o		\

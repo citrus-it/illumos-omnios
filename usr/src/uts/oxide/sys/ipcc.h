@@ -40,6 +40,8 @@ extern "C" {
 #define	IPCC_INVENTORY		(IPCC_IOC|7)
 #define	IPCC_KEYSET		(IPCC_IOC|8)
 
+#define	IPCC_ESPI_GETCONF	(IPCC_IOC|9)
+
 /*
  * The minimum message size is a protocol detail that should be in
  * sys/ipcc_proto.h, but it is here in order that the max data size can be
