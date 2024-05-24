@@ -73,7 +73,7 @@ static struct pci_devinst *lpc_bridge;
 
 #define	LPC_UART_NUM	4
 static struct lpc_uart_softc {
-	struct uart_softc *uart_softc;
+	struct uart_ns16550_softc *uart_softc;
 	int	iobase;
 	int	irq;
 	int	enabled;
@@ -230,31 +230,39 @@ lpc_uart_io_handler(struct vmctx *ctx __unused, int in,
 	switch (bytes) {
 	case 1:
 		if (in)
-			*eax = uart_read(sc->uart_softc, offset);
+			*eax = uart_ns16550_read(sc->uart_softc, offset);
 		else
-			uart_write(sc->uart_softc, offset, *eax);
+			uart_ns16550_write(sc->uart_softc, offset, *eax);
 		break;
 	case 2:
 		if (in) {
-			*eax = uart_read(sc->uart_softc, offset);
-			*eax |= uart_read(sc->uart_softc, offset + 1) << 8;
+			*eax = uart_ns16550_read(sc->uart_softc, offset);
+			*eax |=
+			    uart_ns16550_read(sc->uart_softc, offset + 1) << 8;
 		} else {
-			uart_write(sc->uart_softc, offset, *eax);
-			uart_write(sc->uart_softc, offset + 1, *eax >> 8);
+			uart_ns16550_write(sc->uart_softc, offset, *eax);
+			uart_ns16550_write(sc->uart_softc, offset + 1,
+			    *eax >> 8);
 		}
 		break;
 #ifndef __FreeBSD__
 	case 4:
 		if (in) {
-			*eax = uart_read(sc->uart_softc, offset);
-			*eax |= uart_read(sc->uart_softc, offset + 1) << 8;
-			*eax |= uart_read(sc->uart_softc, offset + 2) << 16;
-			*eax |= uart_read(sc->uart_softc, offset + 3) << 24;
+			*eax = uart_ns16550_read(sc->uart_softc, offset);
+			*eax |= uart_ns16550_read(sc->uart_softc,
+			    offset + 1) << 8;
+			*eax |= uart_ns16550_read(sc->uart_softc,
+			    offset + 2) << 16;
+			*eax |= uart_ns16550_read(sc->uart_softc,
+			    offset + 3) << 24;
 		} else {
-			uart_write(sc->uart_softc, offset, *eax);
-			uart_write(sc->uart_softc, offset + 1, *eax >> 8);
-			uart_write(sc->uart_softc, offset + 2, *eax >> 16);
-			uart_write(sc->uart_softc, offset + 3, *eax >> 24);
+			uart_ns16550_write(sc->uart_softc, offset, *eax);
+			uart_ns16550_write(sc->uart_softc,
+			    offset + 1, *eax >> 8);
+			uart_ns16550_write(sc->uart_softc,
+			    offset + 2, *eax >> 16);
+			uart_ns16550_write(sc->uart_softc,
+			    offset + 3, *eax >> 24);
 		}
 		break;
 #endif
@@ -302,13 +310,14 @@ lpc_init(struct vmctx *ctx)
 		}
 		pci_irq_reserve(sc->irq);
 
-		sc->uart_softc = uart_init(lpc_uart_intr_assert,
+		sc->uart_softc = uart_ns16550_init(lpc_uart_intr_assert,
 				    lpc_uart_intr_deassert, sc);
 
 		asprintf(&node_name, "lpc.%s.path", name);
 		backend = get_config_value(node_name);
 		free(node_name);
-		if (uart_set_backend(sc->uart_softc, backend) != 0) {
+		if (backend != NULL &&
+		    uart_ns16550_tty_open(sc->uart_softc, backend) != 0) {
 			EPRINTLN("Unable to initialize backend '%s' "
 			    "for LPC device %s", backend, name);
 			return (-1);
@@ -317,7 +326,7 @@ lpc_init(struct vmctx *ctx)
 		bzero(&iop, sizeof(struct inout_port));
 		iop.name = name;
 		iop.port = sc->iobase;
-		iop.size = UART_IO_BAR_SIZE;
+		iop.size = UART_NS16550_IO_BAR_SIZE;
 		iop.flags = IOPORT_F_INOUT;
 		iop.handler = lpc_uart_io_handler;
 		iop.arg = sc;
@@ -450,7 +459,7 @@ pci_lpc_uart_dsdt(void)
 		dsdt_line("  Name (_CRS, ResourceTemplate ()");
 		dsdt_line("  {");
 		dsdt_indent(2);
-		dsdt_fixed_ioport(sc->iobase, UART_IO_BAR_SIZE);
+		dsdt_fixed_ioport(sc->iobase, UART_NS16550_IO_BAR_SIZE);
 		dsdt_fixed_irq(sc->irq);
 		dsdt_unindent(2);
 		dsdt_line("  })");
