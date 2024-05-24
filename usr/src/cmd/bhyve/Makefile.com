@@ -35,7 +35,6 @@ COMMON_OBJS = \
 	console.o		\
 	crc16.o			\
 	e820.o			\
-	fwctl.o			\
 	gdb.o			\
 	hexdump.o		\
 	inout.o			\
@@ -76,7 +75,6 @@ COMMON_OBJS = \
 	smbiostbl.o		\
 	sockstream.o		\
 	spinup_ap.o		\
-	task_switch.o		\
 	tpm_device.o		\
 	tpm_emul_passthru.o	\
 	tpm_intf_crb.o		\
@@ -89,9 +87,6 @@ COMMON_OBJS = \
 	vmgenc.o		\
 	xmsr.o			\
 	bhyve_sol_glue.o
-
-CLEANFILES =	$(OBJS)
-CLOBBERFILES =	$(PROG)
 
 CFLAGS +=	$(CCVERBOSE)
 CFLAGS +=	-_gcc=-Wimplicit-function-declaration
@@ -132,11 +127,32 @@ $(PROG) := LDLIBS += \
 NATIVE_LIBS += libz.so libcrypto.so
 $(PROG) := LDFLAGS += $(ZASLR)
 
-%.o: ../common/%.c
+OBJS =		$(BHYVE_OBJS:%=pics/%)
+
+CLEANFILES =	$(OBJS)
+CLOBBERFILES =	$(PROG)
+
+all: pics $(PROG)
+
+clean:
+	$(RM) $(CLEANFILES)
+
+clobber: clean
+	$(RM) $(CLOBBERFILES)
+
+pics: FRC
+	$(MKDIR) -p $@
+
+pics/%.o: ../common/%.c
 	$(COMPILE.c) -c -o $@ $<
 	$(POST_PROCESS_O)
 
-$(PROG): $(OBJS)
+pics/%.o: %.c
+	$(COMPILE.c) -c -o $@ $<
+	$(POST_PROCESS_O)
+
+$(PROG): pics $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 	$(POST_PROCESS)
 
+FRC:
