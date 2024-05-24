@@ -27,7 +27,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 
 #include <pthread.h>
 #include <pthread_np.h>

@@ -31,7 +31,6 @@
  * Copyright 2020 Oxide Computer Company
  */
 
-#include <sys/cdefs.h>
 
 #include <sys/types.h>
 #include <machine/vmm.h>

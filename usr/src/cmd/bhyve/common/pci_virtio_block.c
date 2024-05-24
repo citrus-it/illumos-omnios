@@ -39,7 +39,6 @@
  * Copyright 2014 Pluribus Networks Inc.
  */
 
-#include <sys/cdefs.h>
 
 #include <sys/param.h>
 #include <sys/linker_set.h>

@@ -36,7 +36,6 @@
  * using kqueue, and having events be persistent by default.
  */
 
-#include <sys/cdefs.h>
 
 #include <assert.h>
 #ifndef WITHOUT_CAPSICUM

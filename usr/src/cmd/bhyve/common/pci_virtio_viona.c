@@ -38,7 +38,6 @@
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
-#include <sys/cdefs.h>
 
 #include <sys/param.h>
 #include <sys/linker_set.h>

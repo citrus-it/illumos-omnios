@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 
 #include <assert.h>
 #include <err.h>

@@ -31,7 +31,6 @@
  * Copyright 2018 Joyent, Inc.
  */
 
-#include <sys/cdefs.h>
 
 #include <sys/types.h>
 #include <machine/vmm.h>
