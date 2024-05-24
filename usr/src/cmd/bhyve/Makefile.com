@@ -25,7 +25,6 @@ include $(SRC)/cmd/Makefile.ctf
 COMMON_OBJS = \
 	acpi.o			\
 	acpi_device.o		\
-	atkbdc.o		\
 	basl.o			\
 	bhyvegc.o		\
 	bhyverun.o		\
@@ -64,10 +63,7 @@ COMMON_OBJS = \
 	pci_xhci.o		\
 	pctestdev.o		\
 	pm.o			\
-	post.o			\
 	privileges.o		\
-	ps2kbd.o		\
-	ps2mouse.o		\
 	qemu_fwcfg.o		\
 	qemu_loader.o		\
 	rfb.o			\
