@@ -32,7 +32,7 @@ BHYVE_OBJS = $(COMMON_OBJS)	\
 	rfb.o			\
 	rtc.o			\
 	spinup_ap.o		\
-	task_switch.o 		\
+	task_switch.o		\
 	vga.o			\
 	vmexit.o		\
 	xmsr.o
