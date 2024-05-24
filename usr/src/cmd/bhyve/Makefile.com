@@ -35,7 +35,6 @@ COMMON_OBJS = \
 	crc16.o			\
 	gdb.o			\
 	hexdump.o		\
-	inout.o			\
 	iov.o			\
 	mem.o			\
 	mevent.o		\
