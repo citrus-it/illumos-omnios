@@ -70,5 +70,7 @@ extern int vmexit_task_switch(struct vmctx *, struct vcpu *, struct vm_exit *);
 void bhyve_init_config(void);
 void bhyve_init_vcpu(struct vcpu *vcpu);
 void bhyve_start_vcpu(struct vcpu *vcpu, bool bsp, bool suspend);
+int bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp);
+int bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp);
 
 #endif

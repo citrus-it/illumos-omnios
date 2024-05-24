@@ -85,35 +85,24 @@
 #endif
 #include <vmmapi.h>
 
-#include "bhyverun.h"
 #include "acpi.h"
-#include "atkbdc.h"
+#include "bhyverun.h"
 #include "bootrom.h"
 #include "config.h"
-#include "inout.h"
 #include "debug.h"
-#include "e820.h"
-#include "fwctl.h"
 #include "gdb.h"
 #include "ioapic.h"
-#ifdef	__FreeBSD__
-#include "kernemu_dev.h"
-#endif
 #include "mem.h"
 #include "mevent.h"
-#include "mptbl.h"
 #include "pci_emul.h"
-#include "pci_irq.h"
 #include "pci_lpc.h"
 #include "qemu_fwcfg.h"
-#include "smbiostbl.h"
 #include "tpm_device.h"
 #include "spinup_ap.h"
-#include "rtc.h"
 #include "vmgenc.h"
 #include "vmexit.h"
-#include "xmsr.h"
 #ifndef __FreeBSD__
+#include "smbiostbl.h"
 #include "privileges.h"
 #endif
 
@@ -1000,27 +989,11 @@ main(int argc, char *argv[])
 		exit(4);
 	}
 
-	error = init_msr();
-	if (error) {
-		fprintf(stderr, "init_msr error %d", error);
-		exit(4);
-	}
-
 	init_mem(guest_ncpus);
-	init_inout();
-#ifdef	__FreeBSD__
-	kernemu_dev_init();
-#endif
 	init_bootrom(ctx);
-	atkbdc_init(ctx);
-	pci_irq_init(ctx);
-	ioapic_init(ctx);
 
-	rtc_init(ctx);
-	sci_init(ctx);
-#ifndef	__FreeBSD__
-	pmtmr_init(ctx);
-#endif
+	if (bhyve_init_platform(ctx, bsp) != 0)
+		exit(4);
 
 	if (qemu_fwcfg_init(ctx) != 0) {
 		fprintf(stderr, "qemu fwcfg initialization error");
@@ -1032,16 +1005,6 @@ main(int argc, char *argv[])
 		fprintf(stderr, "Could not add qemu fwcfg opt/bhyve/hw.ncpu");
 		exit(4);
 	}
-
-	if (e820_init(ctx) != 0) {
-		fprintf(stderr, "Unable to setup E820");
-		exit(4);
-	}
-
-#ifndef	__FreeBSD__
-	if (get_config_bool_default("e820.debug", false))
-		e820_dump_table();
-#endif
 
 	/*
 	 * Exit if a device emulation finds an error in its initialization
@@ -1089,33 +1052,8 @@ main(int argc, char *argv[])
 		assert(error == 0);
 	}
 
-	/*
-	 * build the guest tables, MP etc.
-	 */
-	if (get_config_bool_default("x86.mptable", true)) {
-		error = mptable_build(ctx, guest_ncpus);
-		if (error) {
-			perror("error to build the guest tables");
-			exit(4);
-		}
-	}
-
-	error = smbios_build(ctx);
-	if (error != 0)
+	if (bhyve_init_platform_late(ctx, bsp) != 0)
 		exit(4);
-
-	if (get_config_bool("acpi_tables")) {
-		error = acpi_build(ctx, guest_ncpus);
-		assert(error == 0);
-	}
-
-	error = e820_finalize();
-	if (error != 0)
-		exit(4);
-
-	if (lpc_bootrom() && strcmp(lpc_fwcfg(), "bhyve") == 0) {
-		fwctl_init();
-	}
 
 	/*
 	 * Change the proc title to include the VM name.
