@@ -41,7 +41,6 @@
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
-#include <sys/cdefs.h>
 
 #include <sys/types.h>
 #ifndef WITHOUT_CAPSICUM

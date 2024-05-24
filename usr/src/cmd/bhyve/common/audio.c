@@ -27,7 +27,6 @@
  *
  */
 
-#include <sys/cdefs.h>
 
 #ifndef WITHOUT_CAPSICUM
 #include <sys/capsicum.h>

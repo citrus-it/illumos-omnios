@@ -38,7 +38,6 @@
  * Copyright 2020 Oxide Computer Company
  */
 
-#include <sys/cdefs.h>
 
 #include <sys/param.h>
 #include <sys/_iovec.h>

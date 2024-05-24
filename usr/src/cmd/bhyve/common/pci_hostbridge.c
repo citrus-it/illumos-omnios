@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #ifndef __FreeBSD__
 #include <errno.h>
 #include <stdlib.h>

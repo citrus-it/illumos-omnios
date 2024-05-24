@@ -33,7 +33,6 @@
    devices:
      tablet             USB tablet mouse
  */
-#include <sys/cdefs.h>
 
 #include <sys/param.h>
 #include <sys/uio.h>

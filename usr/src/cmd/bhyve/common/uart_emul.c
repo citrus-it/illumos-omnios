@@ -41,7 +41,6 @@
  * Copyright 2018 Joyent, Inc.
  */
 
-#include <sys/cdefs.h>
 
 #include <sys/types.h>
 #include <dev/ic/ns16550.h>

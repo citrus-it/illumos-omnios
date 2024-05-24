@@ -53,7 +53,6 @@
     - intr coalesce
  */
 
-#include <sys/cdefs.h>
 
 #include <sys/errno.h>
 #include <sys/types.h>

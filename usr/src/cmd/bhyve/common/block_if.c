@@ -31,7 +31,6 @@
  * Copyright 2020 Joyent, Inc.
  */
 
-#include <sys/cdefs.h>
 
 #include <sys/param.h>
 #ifndef WITHOUT_CAPSICUM
