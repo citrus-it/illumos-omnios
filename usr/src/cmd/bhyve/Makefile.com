@@ -44,7 +44,6 @@ COMMON_OBJS = \
 	pci_emul.o		\
 	pci_hostbridge.o	\
 	pci_nvme.o		\
-	pci_passthru.o		\
 	pci_virtio_9p.o		\
 	pci_virtio_block.o	\
 	pci_virtio_console.o	\

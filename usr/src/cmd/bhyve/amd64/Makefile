@@ -26,6 +26,7 @@ BHYVE_OBJS = $(COMMON_OBJS)	\
 	pci_fbuf.o		\
 	pci_irq.o		\
 	pci_lpc.o		\
+	pci_passthru.o		\
 	pci_uart.o		\
 	pci_xhci.o		\
 	pctestdev.o		\
