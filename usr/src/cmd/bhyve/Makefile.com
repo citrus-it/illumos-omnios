@@ -60,7 +60,6 @@ COMMON_OBJS = \
 	pci_virtio_viona.o	\
 	pci_xhci.o		\
 	pctestdev.o		\
-	pm.o			\
 	privileges.o		\
 	qemu_fwcfg.o		\
 	qemu_loader.o		\

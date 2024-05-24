@@ -19,6 +19,7 @@ BHYVE_OBJS = $(COMMON_OBJS)	\
 	fwctl.o			\
 	mptbl.o			\
 	post.o			\
+	pm.o			\
 	ps2kbd.o		\
 	ps2mouse.o		\
 	rtc.o			\
