@@ -21,6 +21,7 @@ BHYVE_OBJS = $(COMMON_OBJS)	\
 	post.o			\
 	ps2kbd.o		\
 	ps2mouse.o		\
+	rtc.o			\
 	task_switch.o 		\
 	vmexit.o		\
 	xmsr.o

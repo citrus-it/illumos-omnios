@@ -65,7 +65,6 @@ COMMON_OBJS = \
 	qemu_fwcfg.o		\
 	qemu_loader.o		\
 	rfb.o			\
-	rtc.o			\
 	smbiostbl.o		\
 	sockstream.o		\
 	spinup_ap.o		\
