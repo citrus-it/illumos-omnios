@@ -39,6 +39,7 @@ COMMON_OBJS = \
 	mem.o			\
 	mevent.o		\
 	net_backends.o		\
+	net_backend_dlpi.o	\
 	net_utils.o		\
 	pci_emul.o		\
 	pci_hostbridge.o	\
