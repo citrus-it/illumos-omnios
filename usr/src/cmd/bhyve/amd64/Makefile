@@ -13,8 +13,12 @@
 # Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 #
 
-BHYVE_OBJS = $(COMMON_OBJS) \
-	fwctl.o \
+BHYVE_OBJS = $(COMMON_OBJS)	\
+	atkbdc.o		\
+	fwctl.o			\
+	post.o			\
+	ps2kbd.o		\
+	ps2mouse.o		\
 	task_switch.o
 
 include ../Makefile.com
