@@ -113,7 +113,6 @@ uint16_t cpu_cores, cpu_sockets, cpu_threads;
 
 int raw_stdio = 0;
 
-static char *progname;
 static const int BSP = 0;
 
 static cpuset_t cpumask;
@@ -130,64 +129,6 @@ static struct vcpu_info {
 static cpuset_t **vcpumap;
 #endif
 
-static void
-usage(int code)
-{
-
-	fprintf(stderr,
-#ifdef	__FreeBSD__
-		"Usage: %s [-AaCDeHhPSuWwxY]\n"
-#else
-		"Usage: %s [-aCDdeHhPSuWwxY]\n"
-#endif
-		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
-#ifdef	__FreeBSD__
-		"       %*s [-G port] [-k config_file] [-l lpc] [-m mem] [-o var=value]\n"
-		"       %*s [-p vcpu:hostcpu] [-r file] [-s pci] [-U uuid] vmname\n"
-
-		"       -A: create ACPI tables\n"
-#else
-		"       %*s [-k <config_file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
-		"       %*s [-s <pci>] [-U uuid] vmname\n"
-#endif
-		"       -a: local apic is in xAPIC mode (deprecated)\n"
-#ifndef __FreeBSD__
-		"       -B type,key=value,...: set SMBIOS information\n"
-#endif
-		"       -C: include guest memory in core file\n"
-		"       -c: number of CPUs and/or topology specification\n"
-		"       -D: destroy on power-off\n"
-#ifndef __FreeBSD__
-		"       -d: suspend cpu at boot\n"
-#endif
-		"       -e: exit on unhandled I/O access\n"
-#ifdef	__FreeBSD__
-		"       -G: start a debug server\n"
-#endif
-		"       -H: vmexit from the guest on HLT\n"
-		"       -h: help\n"
-		"       -k: key=value flat config file\n"
-		"       -K: PS2 keyboard layout\n"
-		"       -l: LPC device configuration\n"
-		"       -m: memory size\n"
-		"       -o: set config 'var' to 'value'\n"
-		"       -P: vmexit from the guest on pause\n"
-#ifdef	__FreeBSD__
-		"       -p: pin 'vcpu' to 'hostcpu'\n"
-#endif
-		"       -S: guest memory cannot be swapped\n"
-		"       -s: <slot,driver,configinfo> PCI slot config\n"
-		"       -U: UUID\n"
-		"       -u: RTC keeps UTC time\n"
-		"       -W: force virtio to use single-vector MSI\n"
-		"       -w: ignore unimplemented MSRs\n"
-		"       -x: local APIC is in x2APIC mode\n"
-		"       -Y: disable MPtable generation\n",
-		progname, (int)strlen(progname), "", (int)strlen(progname), "",
-		(int)strlen(progname), "");
-
-	exit(code);
-}
 
 /*
  * XXX This parser is known to have the following issues:
@@ -197,8 +138,8 @@ usage(int code)
  * The acceptance of a null specification ('-c ""') is by design to match the
  * manual page syntax specification, this results in a topology of 1 vCPU.
  */
-static int
-topology_parse(const char *opt)
+int
+bhyve_topology_parse(const char *opt)
 {
 	char *cp, *str, *tofree;
 
@@ -308,8 +249,8 @@ calc_topology(void)
 }
 
 #ifdef	__FreeBSD__
-static int
-pincpu_parse(const char *opt)
+int
+bhyve_pincpu_parse(const char *opt)
 {
 	int vcpu, pcpu;
 	const char *value;
@@ -683,8 +624,8 @@ do_open(const char *vmname)
 	return (ctx);
 }
 
-static bool
-parse_config_option(const char *option)
+bool
+bhyve_parse_config_option(const char *option)
 {
 	const char *value;
 	char *path;
@@ -699,8 +640,8 @@ parse_config_option(const char *option)
 	return (true);
 }
 
-static void
-parse_simple_config_file(const char *path)
+void
+bhyve_parse_simple_config_file(const char *path)
 {
 	FILE *fp;
 	char *line, *cp;
@@ -719,7 +660,7 @@ parse_simple_config_file(const char *path)
 		cp = strchr(line, '\n');
 		if (cp != NULL)
 			*cp = '\0';
-		if (!parse_config_option(line))
+		if (!bhyve_parse_config_option(line))
 			errx(4, "%s line %u: invalid config option '%s'", path,
 			    lineno, line);
 	}
@@ -727,8 +668,8 @@ parse_simple_config_file(const char *path)
 	fclose(fp);
 }
 
-static void
-parse_gdb_options(const char *opt)
+void
+bhyve_parse_gdb_options(const char *opt)
 {
 	const char *sport;
 	char *colon;
@@ -754,157 +695,28 @@ parse_gdb_options(const char *opt)
 int
 main(int argc, char *argv[])
 {
-	int c, error;
+	int error;
 	int max_vcpus, memflags;
 	struct vcpu *bsp;
 	struct vmctx *ctx;
 	size_t memsize;
-	const char *optstr, *value, *vmname;
+	const char *value, *vmname;
 
 	bhyve_init_config();
 
-	progname = basename(argv[0]);
-
-#ifdef	__FreeBSD__
-	optstr = "aehuwxACDHIPSWYk:f:o:p:G:c:s:m:l:K:U:";
-#else
-	/* +d, +B, -p */
-	optstr = "adehuwxACDHIPSWYk:f:o:G:c:s:m:l:B:K:U:";
-#endif
-	while ((c = getopt(argc, argv, optstr)) != -1) {
-		switch (c) {
-		case 'a':
-			set_config_bool("x86.x2apic", false);
-			break;
-		case 'A':
-			set_config_bool("acpi_tables", true);
-			break;
-		case 'D':
-			set_config_bool("destroy_on_poweroff", true);
-			break;
-#ifndef	__FreeBSD__
-		case 'B':
-			if (smbios_parse(optarg) != 0) {
-				errx(EX_USAGE, "invalid SMBIOS "
-				    "configuration '%s'", optarg);
-			}
-			break;
-		case 'd':
-			set_config_bool("suspend_at_boot", true);
-			break;
-#endif
-#ifdef	__FreeBSD__
-		case 'p':
-			if (pincpu_parse(optarg) != 0) {
-				errx(EX_USAGE, "invalid vcpu pinning "
-				    "configuration '%s'", optarg);
-			}
-			break;
-#endif
-		case 'c':
-			if (topology_parse(optarg) != 0) {
-			    errx(EX_USAGE, "invalid cpu topology "
-				"'%s'", optarg);
-			}
-			break;
-		case 'C':
-			set_config_bool("memory.guest_in_core", true);
-			break;
-		case 'f':
-			if (qemu_fwcfg_parse_cmdline_arg(optarg) != 0) {
-			    errx(EX_USAGE, "invalid fwcfg item '%s'", optarg);
-			}
-			break;
-		case 'G':
-			parse_gdb_options(optarg);
-			break;
-		case 'k':
-			parse_simple_config_file(optarg);
-			break;
-		case 'K':
-			set_config_value("keyboard.layout", optarg);
-			break;
-		case 'l':
-			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
-				lpc_print_supported_devices();
-				exit(0);
-			} else if (lpc_device_parse(optarg) != 0) {
-				errx(EX_USAGE, "invalid lpc device "
-				    "configuration '%s'", optarg);
-			}
-			break;
-		case 's':
-			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
-				pci_print_supported_devices();
-				exit(0);
-			} else if (pci_parse_slot(optarg) != 0)
-				exit(4);
-			else
-				break;
-		case 'S':
-			set_config_bool("memory.wired", true);
-			break;
-		case 'm':
-			set_config_value("memory.size", optarg);
-			break;
-		case 'o':
-			if (!parse_config_option(optarg))
-				errx(EX_USAGE, "invalid configuration option '%s'", optarg);
-			break;
-		case 'H':
-			set_config_bool("x86.vmexit_on_hlt", true);
-			break;
-		case 'I':
-			/*
-			 * The "-I" option was used to add an ioapic to the
-			 * virtual machine.
-			 *
-			 * An ioapic is now provided unconditionally for each
-			 * virtual machine and this option is now deprecated.
-			 */
-			break;
-		case 'P':
-			set_config_bool("x86.vmexit_on_pause", true);
-			break;
-		case 'e':
-			set_config_bool("x86.strictio", true);
-			break;
-		case 'u':
-			set_config_bool("rtc.use_localtime", false);
-			break;
-		case 'U':
-			set_config_value("uuid", optarg);
-			break;
-		case 'w':
-			set_config_bool("x86.strictmsr", false);
-			break;
-		case 'W':
-			set_config_bool("virtio_msix", false);
-			break;
-		case 'x':
-			set_config_bool("x86.x2apic", true);
-			break;
-		case 'Y':
-			set_config_bool("x86.mptable", false);
-			break;
-		case 'h':
-			usage(0);
-		default:
-			usage(1);
-		}
-	}
+	bhyve_optparse(argc, argv);
 	argc -= optind;
 	argv += optind;
 
 	if (argc > 1)
-		usage(1);
+		bhyve_usage(1);
 
 	if (argc == 1)
 		set_config_value("name", argv[0]);
 
 	vmname = get_config_value("name");
 	if (vmname == NULL)
-		usage(1);
+		bhyve_usage(1);
 
 	if (get_config_bool_default("config.dump", false)) {
 		dump_config();

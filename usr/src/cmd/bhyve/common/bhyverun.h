@@ -72,5 +72,16 @@ void bhyve_init_vcpu(struct vcpu *vcpu);
 void bhyve_start_vcpu(struct vcpu *vcpu, bool bsp, bool suspend);
 int bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp);
 int bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp);
+void bhyve_optparse(int argc, char **argv);
+void bhyve_usage(int code);
+
+/* Interfaces used by command-line option-parsing code. */
+bool bhyve_parse_config_option(const char *option);
+void bhyve_parse_simple_config_file(const char *path);
+void bhyve_parse_gdb_options(const char *opt);
+#ifdef	__FreeBSD__
+int bhyve_pincpu_parse(const char *opt);
+#endif
+int bhyve_topology_parse(const char *opt);
 
 #endif

@@ -48,6 +48,7 @@
 #include <err.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sysexits.h>
 #include <sys/types.h>
 #include <sys/vmm.h>
 #include <vmmapi.h>
@@ -65,12 +66,208 @@
 #include "kernemu_dev.h"
 #endif
 #include "mptbl.h"
+#include "pci_emul.h"
 #include "pci_irq.h"
 #include "spinup_ap.h"
 #include "pci_lpc.h"
 #include "rtc.h"
 #include "smbiostbl.h"
 #include "xmsr.h"
+
+void
+bhyve_usage(int code)
+{
+	const char *progname = getprogname();
+
+	fprintf(stderr,
+#ifdef	__FreeBSD__
+		"Usage: %s [-AaCDeHhPSuWwxY]\n"
+#else
+		"Usage: %s [-aCDdeHhPSuWwxY]\n"
+#endif
+		"       %2$.*3$s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
+#ifdef	__FreeBSD__
+		"       %2$.*3$s [-G port] [-k config_file] [-l lpc] [-m mem] [-o var=value]\n"
+		"       %2$.*3$s [-p vcpu:hostcpu] [-r file] [-s pci] [-U uuid] vmname\n"
+
+		"       -A: create ACPI tables\n"
+#else
+		"       %2$.*3$s [-k <config_file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
+		"       %2$.*3$s [-s <pci>] [-U uuid] vmname\n"
+#endif
+		"       -a: local apic is in xAPIC mode (deprecated)\n"
+#ifndef __FreeBSD__
+		"       -B type,key=value,...: set SMBIOS information\n"
+#endif
+		"       -C: include guest memory in core file\n"
+		"       -c: number of CPUs and/or topology specification\n"
+		"       -D: destroy on power-off\n"
+#ifndef __FreeBSD__
+		"       -d: suspend cpu at boot\n"
+#endif
+		"       -e: exit on unhandled I/O access\n"
+#ifdef	__FreeBSD__
+		"       -G: start a debug server\n"
+#endif
+		"       -H: vmexit from the guest on HLT\n"
+		"       -h: help\n"
+		"       -k: key=value flat config file\n"
+		"       -K: PS2 keyboard layout\n"
+		"       -l: LPC device configuration\n"
+		"       -m: memory size\n"
+		"       -o: set config 'var' to 'value'\n"
+		"       -P: vmexit from the guest on pause\n"
+#ifdef	__FreeBSD__
+		"       -p: pin 'vcpu' to 'hostcpu'\n"
+#endif
+		"       -S: guest memory cannot be swapped\n"
+		"       -s: <slot,driver,configinfo> PCI slot config\n"
+		"       -U: UUID\n"
+		"       -u: RTC keeps UTC time\n"
+		"       -W: force virtio to use single-vector MSI\n"
+		"       -w: ignore unimplemented MSRs\n"
+		"       -x: local APIC is in x2APIC mode\n"
+		"       -Y: disable MPtable generation\n",
+		progname, "", (int)strlen(progname));
+
+	exit(code);
+}
+
+void
+bhyve_optparse(int argc, char **argv)
+{
+	const char *optstr;
+	int c;
+
+#ifdef	__FreeBSD__
+	optstr = "aehuwxACDHIPSWYk:f:o:p:G:c:s:m:l:K:U:";
+#else
+	/* +d, +B, -p */
+	optstr = "adehuwxACDHIPSWYk:f:o:G:c:s:m:l:B:K:U:";
+#endif
+	while ((c = getopt(argc, argv, optstr)) != -1) {
+		switch (c) {
+		case 'a':
+			set_config_bool("x86.x2apic", false);
+			break;
+		case 'A':
+			set_config_bool("acpi_tables", true);
+			break;
+		case 'D':
+			set_config_bool("destroy_on_poweroff", true);
+			break;
+#ifndef	__FreeBSD__
+		case 'B':
+			if (smbios_parse(optarg) != 0) {
+				errx(EX_USAGE, "invalid SMBIOS "
+				    "configuration '%s'", optarg);
+			}
+			break;
+		case 'd':
+			set_config_bool("suspend_at_boot", true);
+			break;
+#endif
+#ifdef	__FreeBSD__
+		case 'p':
+			if (pincpu_parse(optarg) != 0) {
+				errx(EX_USAGE, "invalid vcpu pinning "
+				    "configuration '%s'", optarg);
+			}
+			break;
+#endif
+		case 'c':
+			if (bhyve_topology_parse(optarg) != 0) {
+			    errx(EX_USAGE, "invalid cpu topology "
+				"'%s'", optarg);
+			}
+			break;
+		case 'C':
+			set_config_bool("memory.guest_in_core", true);
+			break;
+		case 'f':
+			if (qemu_fwcfg_parse_cmdline_arg(optarg) != 0) {
+			    errx(EX_USAGE, "invalid fwcfg item '%s'", optarg);
+			}
+			break;
+		case 'G':
+			bhyve_parse_gdb_options(optarg);
+			break;
+		case 'k':
+			bhyve_parse_simple_config_file(optarg);
+			break;
+		case 'K':
+			set_config_value("keyboard.layout", optarg);
+			break;
+		case 'l':
+			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
+				lpc_print_supported_devices();
+				exit(0);
+			} else if (lpc_device_parse(optarg) != 0) {
+				errx(EX_USAGE, "invalid lpc device "
+				    "configuration '%s'", optarg);
+			}
+			break;
+		case 's':
+			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
+				pci_print_supported_devices();
+				exit(0);
+			} else if (pci_parse_slot(optarg) != 0)
+				exit(4);
+			else
+				break;
+		case 'S':
+			set_config_bool("memory.wired", true);
+			break;
+		case 'm':
+			set_config_value("memory.size", optarg);
+			break;
+		case 'o':
+			if (!bhyve_parse_config_option(optarg))
+				errx(EX_USAGE, "invalid configuration option '%s'", optarg);
+			break;
+		case 'H':
+			set_config_bool("x86.vmexit_on_hlt", true);
+			break;
+		case 'I':
+			/*
+			 * The "-I" option was used to add an ioapic to the
+			 * virtual machine.
+			 *
+			 * An ioapic is now provided unconditionally for each
+			 * virtual machine and this option is now deprecated.
+			 */
+			break;
+		case 'P':
+			set_config_bool("x86.vmexit_on_pause", true);
+			break;
+		case 'e':
+			set_config_bool("x86.strictio", true);
+			break;
+		case 'u':
+			set_config_bool("rtc.use_localtime", false);
+			break;
+		case 'U':
+			set_config_value("uuid", optarg);
+			break;
+		case 'w':
+			set_config_bool("x86.strictmsr", false);
+			break;
+		case 'W':
+			set_config_bool("virtio_msix", false);
+			break;
+		case 'x':
+			set_config_bool("x86.x2apic", true);
+			break;
+		case 'Y':
+			set_config_bool("x86.mptable", false);
+			break;
+		case 'h':
+			bhyve_usage(0);
+		default:
+			bhyve_usage(1);
+		}
+	}
+}
 
 void
 bhyve_init_config(void)
