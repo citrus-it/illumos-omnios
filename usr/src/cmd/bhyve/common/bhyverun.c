@@ -96,7 +96,9 @@
 #include "fwctl.h"
 #include "gdb.h"
 #include "ioapic.h"
+#ifdef	__FreeBSD__
 #include "kernemu_dev.h"
+#endif
 #include "mem.h"
 #include "mevent.h"
 #include "mptbl.h"
