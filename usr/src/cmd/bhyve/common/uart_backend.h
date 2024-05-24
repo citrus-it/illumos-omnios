@@ -1,6 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
+ * Copyright (c) 2012 NetApp, Inc.
  * Copyright (c) 2013 Neel Natu <neel@freebsd.org>
  * All rights reserved.
  *
@@ -26,23 +27,29 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _UART_EMUL_H_
-#define	_UART_EMUL_H_
+#ifndef _UART_BACKEND_H_
+#define	_UART_BACKEND_H_
 
-#define	UART_NS16550_IO_BAR_SIZE	8
+#include <stdbool.h>
 
-struct uart_ns16550_softc;
+#include "mevent.h"
 
-typedef void (*uart_intr_func_t)(void *arg);
+struct uart_softc;
+struct vm_snapshot_meta;
 
-int	uart_legacy_alloc(int unit, int *ioaddr, int *irq);
+void	uart_rxfifo_drain(struct uart_softc *sc, bool loopback);
+#ifndef	__FreeBSD__
+void	uart_rxfifo_sock_drain(struct uart_softc *sc, bool loopback);
+#endif
+int	uart_rxfifo_getchar(struct uart_softc *sc);
+int	uart_rxfifo_numchars(struct uart_softc *sc);
+int	uart_rxfifo_putchar(struct uart_softc *sc, uint8_t ch, bool loopback);
+void	uart_rxfifo_reset(struct uart_softc *sc, int size);
+int	uart_rxfifo_size(struct uart_softc *sc);
 
-struct uart_ns16550_softc *uart_ns16550_init(uart_intr_func_t intr_assert,
-	    uart_intr_func_t intr_deassert, void *arg);
-uint8_t	uart_ns16550_read(struct uart_ns16550_softc *sc, int offset);
-void	uart_ns16550_write(struct uart_ns16550_softc *sc, int offset,
-	    uint8_t value);
-int	uart_ns16550_tty_open(struct uart_ns16550_softc *sc,
-	    const char *device);
-
-#endif /* _UART_EMUL_H_ */
+struct uart_softc *uart_init(void);
+int	uart_tty_open(struct uart_softc *sc, const char *path,
+	    void (*drain)(int, enum ev_type, void *), void *arg);
+void	uart_softc_lock(struct uart_softc *sc);
+void	uart_softc_unlock(struct uart_softc *sc);
+#endif /* _UART_BACKEND_H_ */

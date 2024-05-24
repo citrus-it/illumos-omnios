@@ -59,6 +59,7 @@ COMMON_OBJS = \
 	tpm_emul_passthru.o	\
 	tpm_intf_crb.o		\
 	tpm_ppi_qemu.o		\
+	uart_backend.o		\
 	uart_emul.o		\
 	usb_emul.o		\
 	usb_mouse.o		\
