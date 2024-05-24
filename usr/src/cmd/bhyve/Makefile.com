@@ -66,7 +66,6 @@ COMMON_OBJS = \
 	rfb.o			\
 	smbiostbl.o		\
 	sockstream.o		\
-	spinup_ap.o		\
 	tpm_device.o		\
 	tpm_emul_passthru.o	\
 	tpm_intf_crb.o		\
