@@ -41,6 +41,9 @@
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
+#include <sys/types.h>
+#include <machine/vmm.h>
+
 #include <assert.h>
 #include <err.h>
 #include <stdbool.h>
@@ -50,9 +53,23 @@
 #include <vmmapi.h>
 
 #include "bhyverun.h"
+#include "acpi.h"
+#include "atkbdc.h"
 #include "config.h"
+#include "e820.h"
+#include "fwctl.h"
+#include "ioapic.h"
+#include "inout.h"
+#ifndef	__FreeBSD__
+#include "kernemu_dev.h"
+#endif
+#include "mptbl.h"
+#include "pci_irq.h"
 #include "spinup_ap.h"
 #include "pci_lpc.h"
+#include "rtc.h"
+#include "smbiostbl.h"
+#include "xmsr.h"
 
 void
 bhyve_init_config(void)
@@ -165,4 +182,64 @@ bhyve_start_vcpu(struct vcpu *vcpu, bool bsp, bool suspend)
 #endif
 
 	fbsdrun_addcpu(vcpu_id(vcpu), suspend);
+}
+
+int
+bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp __unused)
+{
+	int error;
+
+	error = init_msr();
+	if (error != 0)
+		return (error);
+	init_inout();
+#ifdef	__FreeBSD__
+	kernemu_dev_init();
+#endif
+	atkbdc_init(ctx);
+	pci_irq_init(ctx);
+	ioapic_init(ctx);
+	rtc_init(ctx);
+	sci_init(ctx);
+#ifndef	__FreeBSD__
+	pmtmr_init(ctx);
+#endif
+	error = e820_init(ctx);
+	if (error != 0)
+		return (error);
+
+#ifndef	__FreeBSD__
+	if (get_config_bool_default("e820.debug", false))
+		e820_dump_table();
+#endif
+
+	return (0);
+}
+
+int
+bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp __unused)
+{
+	int error;
+
+	if (get_config_bool_default("x86.mptable", true)) {
+		error = mptable_build(ctx, guest_ncpus);
+		if (error != 0)
+			return (error);
+	}
+	error = smbios_build(ctx);
+	if (error != 0)
+		return (error);
+	error = e820_finalize();
+	if (error != 0)
+		return (error);
+
+	if (lpc_bootrom() && strcmp(lpc_fwcfg(), "bhyve") == 0)
+		fwctl_init();
+
+	if (get_config_bool("acpi_tables")) {
+		error = acpi_build(ctx, guest_ncpus);
+		assert(error == 0);
+	}
+
+	return (0);
 }

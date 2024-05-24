@@ -34,11 +34,13 @@
 #include <machine/vmm.h>
 #include <machine/specialreg.h>
 
-#include <vmmapi.h>
+#include <errno.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <vmmapi.h>
 
 #include "debug.h"
 #include "xmsr.h"
@@ -255,7 +257,7 @@ init_msr(void)
 		cpu_vendor_intel = 1;
 	} else {
 		EPRINTLN("Unknown cpu vendor \"%s\"", cpu_vendor);
-		error = -1;
+		error = ENOENT;
 	}
 	return (error);
 }
