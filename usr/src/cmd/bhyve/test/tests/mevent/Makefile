@@ -18,7 +18,7 @@
 TESTSUBDIR =	mevent
 PROG = \
 		lists_delete \
-       		mevent_test \
+		mevent_test \
 		read_disable \
 		read_pause \
 		read_requeue \

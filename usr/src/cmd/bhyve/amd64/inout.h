@@ -57,7 +57,7 @@ typedef int (*inout_func_t)(struct vmctx *ctx, int in, int port,
 			    int bytes, uint32_t *eax, void *arg);
 
 struct inout_port {
-	const char 	*name;
+	const char	*name;
 	int		port;
 	int		size;
 	int		flags;

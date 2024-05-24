@@ -72,4 +72,4 @@ void	lpc_pirq_routed(void);
 const char *lpc_bootrom(void);
 const char *lpc_fwcfg(void);
 
-#endif
+#endif /* _LPC_H_ */
