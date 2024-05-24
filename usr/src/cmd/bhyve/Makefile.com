@@ -36,7 +36,6 @@ COMMON_OBJS = \
 	gdb.o			\
 	hexdump.o		\
 	inout.o			\
-	ioapic.o		\
 	iov.o			\
 	mem.o			\
 	mevent.o		\
@@ -45,8 +44,6 @@ COMMON_OBJS = \
 	pci_emul.o		\
 	pci_fbuf.o		\
 	pci_hostbridge.o	\
-	pci_irq.o		\
-	pci_lpc.o		\
 	pci_nvme.o		\
 	pci_passthru.o		\
 	pci_virtio_9p.o		\
