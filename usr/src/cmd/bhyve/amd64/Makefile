@@ -13,18 +13,16 @@
 # Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 #
 
-include         $(SRC)/cmd/Makefile.cmd
+OBJS = $(COMMON_OBJS)
 
-SUBDIRS = $(MACH64) test
+include ../Makefile.com
 
-all :=          TARGET = all
-clean :=        TARGET = clean
-clobber :=      TARGET = clobber
-install :=      TARGET = install
+all: $(PROG)
 
-.KEEP_STATE:
+install: all $(ROOTUSRSBINPROG) $(SUBDIRS)
 
-all clean clobber install: $(SUBDIRS)
+clean:
+	$(RM) $(CLEANFILES)
 
-$(SUBDIRS):
-	@cd $@; pwd; $(MAKE) $(TARGET)
+clobber: clean
+	$(RM) $(CLOBBERFILES)
