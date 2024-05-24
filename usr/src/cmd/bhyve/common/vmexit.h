@@ -25,47 +25,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * This file and its contents are supplied under the terms of the
- * Common Development and Distribution License ("CDDL"), version 1.0.
- * You may only use this file in accordance with the terms of version
- * 1.0 of the CDDL.
- *
- * A full copy of the text of the CDDL should have accompanied this
- * source.  A copy of the CDDL is also available via the Internet at
- * http://www.illumos.org/license/CDDL.
- *
- * Copyright 2015 Pluribus Networks Inc.
- */
 
-#ifndef	_FBSDRUN_H_
-#define	_FBSDRUN_H_
+#ifndef _VMEXIT_H_
+#define	_VMEXIT_H_
 
-#define	VMEXIT_CONTINUE		(0)
-#define	VMEXIT_ABORT		(-1)
-
-extern int guest_ncpus;
-extern uint16_t cpu_cores, cpu_sockets, cpu_threads;
-
-struct vcpu;
-struct vmctx;
-struct vm_exit;
-
-extern void *paddr_guest2host(struct vmctx *ctx, uintptr_t addr, size_t len);
-
-struct vcpu *fbsdrun_vcpu(int vcpuid);
-void fbsdrun_deletecpu(int vcpuid);
-
-int  fbsdrun_virtio_msix(void);
-
-typedef int (*vmexit_handler_t)(struct vmctx *, struct vcpu *,
-    struct vm_exit *);
-
-extern int vmexit_task_switch(struct vmctx *, struct vcpu *, struct vm_exit *);
+extern const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX];
 
 #ifndef	__FreeBSD__
-struct vcpu_info;
-extern void fbsdrun_addcpu(struct vcpu_info *, bool);
+extern int vmentry_init(int);
+extern struct vm_entry *vmentry_vcpu(int);
 #endif
 
-#endif
+#endif /* !_VMEXIT_H_ */

@@ -21,7 +21,8 @@ BHYVE_OBJS = $(COMMON_OBJS)	\
 	post.o			\
 	ps2kbd.o		\
 	ps2mouse.o		\
-	task_switch.o
+	task_switch.o 		\
+	vmexit.o
 
 include ../Makefile.com
 
