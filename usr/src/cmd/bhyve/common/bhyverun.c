@@ -488,16 +488,19 @@ fbsdrun_start_thread(void *param)
 }
 
 void
-fbsdrun_addcpu(struct vcpu_info *vi, bool suspend)
+fbsdrun_addcpu(int vcpuid, bool suspend)
 {
+	struct vcpu_info *vi;
 	pthread_t thr;
 	int error;
+
+	vi = &vcpu_info[vcpuid];
 
 	error = vm_activate_cpu(vi->vcpu);
 	if (error != 0)
 		err(EX_OSERR, "could not activate CPU %d", vi->vcpuid);
 
-	CPU_SET_ATOMIC(vi->vcpuid, &cpumask);
+	CPU_SET_ATOMIC(vcpuid, &cpumask);
 
 	if (suspend)
 		(void) vm_suspend_cpu(vi->vcpu);
@@ -632,65 +635,6 @@ num_vcpus_allowed(struct vmctx *ctx, struct vcpu *vcpu)
 		return (1);
 }
 
-static void
-fbsdrun_set_capabilities(struct vcpu *vcpu)
-{
-	int err, tmp;
-
-#ifdef	__FreeBSD__
-	if (get_config_bool_default("x86.vmexit_on_hlt", false)) {
-		err = vm_get_capability(vcpu, VM_CAP_HALT_EXIT, &tmp);
-		if (err < 0) {
-			fprintf(stderr, "VM exit on HLT not supported\n");
-			exit(4);
-		}
-		vm_set_capability(vcpu, VM_CAP_HALT_EXIT, 1);
-	}
-#else
-	/*
-	 * We insist that vmexit-on-hlt is available on the host CPU, and enable
-	 * it by default.  Configuration of that feature is done with both of
-	 * those facts in mind.
-	 */
-	tmp = (int)get_config_bool_default("x86.vmexit_on_hlt", true);
-	err = vm_set_capability(vcpu, VM_CAP_HALT_EXIT, tmp);
-	if (err < 0) {
-		fprintf(stderr, "VM exit on HLT not supported\n");
-		exit(4);
-	}
-#endif /* __FreeBSD__ */
-
-	if (get_config_bool_default("x86.vmexit_on_pause", false)) {
-		/*
-		 * pause exit support required for this mode
-		 */
-		err = vm_get_capability(vcpu, VM_CAP_PAUSE_EXIT, &tmp);
-		if (err < 0) {
-			fprintf(stderr,
-			    "SMP mux requested, no pause support\n");
-			exit(4);
-		}
-		vm_set_capability(vcpu, VM_CAP_PAUSE_EXIT, 1);
-	}
-
-	if (get_config_bool_default("x86.x2apic", false))
-		err = vm_set_x2apic_state(vcpu, X2APIC_ENABLED);
-	else
-		err = vm_set_x2apic_state(vcpu, X2APIC_DISABLED);
-
-	if (err) {
-		fprintf(stderr, "Unable to set x2apic state (%d)\n", err);
-		exit(4);
-	}
-
-#ifdef	__FreeBSD__
-	vm_set_capability(vcpu, VM_CAP_ENABLE_INVPCID, 1);
-
-	err = vm_set_capability(vcpu, VM_CAP_IPI_EXIT, 1);
-	assert(err == 0);
-#endif
-}
-
 static struct vmctx *
 do_open(const char *vmname)
 {
@@ -764,47 +708,6 @@ do_open(const char *vmname)
 	return (ctx);
 }
 
-static void
-spinup_vcpu(struct vcpu_info *vi, bool bsp, bool suspend)
-{
-	int error;
-
-	if (!bsp) {
-#ifndef	__FreeBSD__
-		/*
-		 * On illumos, all APs are spun up halted and run-state
-		 * transitions (INIT, SIPI, etc) are handled in-kernel.
-		 */
-		spinup_ap(vi->vcpu, 0);
-#endif
-
-		fbsdrun_set_capabilities(vi->vcpu);
-
-#ifdef	__FreeBSD__
-		/*
-		 * Enable the 'unrestricted guest' mode for APs.
-		 *
-		 * APs startup in power-on 16-bit mode.
-		 */
-		error = vm_set_capability(vi->vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
-		assert(error == 0);
-#endif
-	}
-
-#ifndef	__FreeBSD__
-	/*
-	 * The value of 'suspend' for the BSP depends on whether the -d
-	 * (suspend_at_boot) flag was given to bhyve. Regardless of that
-	 * value we always want to set the BSP to VRS_RUN and all others to
-	 * VRS_HALT.
-	 */
-	error = vm_set_run_state(vi->vcpu, bsp ? VRS_RUN : VRS_HALT, 0);
-	assert(error == 0);
-#endif
-
-	fbsdrun_addcpu(vi, suspend);
-}
-
 static bool
 parse_config_option(const char *option)
 {
@@ -873,17 +776,6 @@ parse_gdb_options(const char *opt)
 	set_config_value("gdb.port", sport);
 }
 
-static void
-set_defaults(void)
-{
-
-	set_config_bool("acpi_tables", false);
-	set_config_bool("acpi_tables_in_memory", true);
-	set_config_value("memory.size", "256M");
-	set_config_bool("x86.strictmsr", true);
-	set_config_value("lpc.fwcfg", "bhyve");
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -894,8 +786,8 @@ main(int argc, char *argv[])
 	size_t memsize;
 	const char *optstr, *value, *vmname;
 
-	init_config();
-	set_defaults();
+	bhyve_init_config();
+
 	progname = basename(argv[0]);
 
 #ifdef	__FreeBSD__
@@ -1069,7 +961,7 @@ main(int argc, char *argv[])
 		exit(4);
 	}
 
-	fbsdrun_set_capabilities(bsp);
+	bhyve_init_vcpu(bsp);
 
        /* Allocate per-VCPU resources. */
 	vcpu_info = calloc(guest_ncpus, sizeof(*vcpu_info));
@@ -1259,7 +1151,8 @@ main(int argc, char *argv[])
 		bool suspend = vcpuid == BSP &&
 		    get_config_bool_default("suspend_at_boot", false);
 #endif
-		spinup_vcpu(&vcpu_info[vcpuid], vcpuid == BSP, suspend);
+		bhyve_start_vcpu(vcpu_info[vcpuid].vcpu, vcpuid == BSP,
+		    suspend);
 	}
 
 	/*

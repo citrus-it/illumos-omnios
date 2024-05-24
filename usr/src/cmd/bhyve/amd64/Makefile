@@ -15,6 +15,7 @@
 
 BHYVE_OBJS = $(COMMON_OBJS)	\
 	atkbdc.o		\
+	bhyverun_machdep.o	\
 	e820.o			\
 	inout.o			\
 	ioapic.o		\
