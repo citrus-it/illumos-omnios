@@ -21,6 +21,7 @@ BHYVE_OBJS = $(COMMON_OBJS)	\
 	mptbl.o			\
 	pci_ahci.o		\
 	pci_e82545.o		\
+	pci_fbuf.o		\
 	pci_irq.o		\
 	pci_lpc.o		\
 	pci_uart.o		\
@@ -30,9 +31,11 @@ BHYVE_OBJS = $(COMMON_OBJS)	\
 	pm.o			\
 	ps2kbd.o		\
 	ps2mouse.o		\
+	rfb.o			\
 	rtc.o			\
 	spinup_ap.o		\
 	task_switch.o 		\
+	vga.o			\
 	vmexit.o		\
 	xmsr.o
 

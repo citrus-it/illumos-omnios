@@ -42,7 +42,6 @@ COMMON_OBJS = \
 	net_backends.o		\
 	net_utils.o		\
 	pci_emul.o		\
-	pci_fbuf.o		\
 	pci_hostbridge.o	\
 	pci_nvme.o		\
 	pci_passthru.o		\
@@ -55,7 +54,6 @@ COMMON_OBJS = \
 	privileges.o		\
 	qemu_fwcfg.o		\
 	qemu_loader.o		\
-	rfb.o			\
 	smbiostbl.o		\
 	sockstream.o		\
 	tpm_device.o		\
@@ -65,7 +63,6 @@ COMMON_OBJS = \
 	uart_emul.o		\
 	usb_emul.o		\
 	usb_mouse.o		\
-	vga.o			\
 	virtio.o		\
 	vmgenc.o		\
 	bhyve_sol_glue.o
