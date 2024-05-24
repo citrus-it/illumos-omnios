@@ -13,16 +13,12 @@
 # Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 #
 
-OBJS = $(COMMON_OBJS)
+BHYVE_OBJS = $(COMMON_OBJS) \
+	fwctl.o \
+	task_switch.o
 
 include ../Makefile.com
 
-all: $(PROG)
+CPPFLAGS += -I.
 
-install: all $(ROOTUSRSBINPROG) $(SUBDIRS)
-
-clean:
-	$(RM) $(CLEANFILES)
-
-clobber: clean
-	$(RM) $(CLOBBERFILES)
+install: all $(ROOTUSRSBINPROG)
