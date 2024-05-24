@@ -16,6 +16,7 @@
 BHYVE_OBJS = $(COMMON_OBJS)	\
 	atkbdc.o		\
 	e820.o			\
+	inout.o			\
 	ioapic.o		\
 	fwctl.o			\
 	mptbl.o			\

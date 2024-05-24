@@ -544,7 +544,7 @@ pci_emul_mem_handler(struct vcpu *vcpu __unused, int dir,
 	struct pci_devinst *pdi = arg1;
 	struct pci_devemu *pe = pdi->pi_d;
 	uint64_t offset;
-	int bidx = (int) arg2;
+	int bidx = (int)arg2;
 
 	assert(bidx <= PCI_BARMAX);
 	assert(pdi->pi_bar[bidx].type == PCIBAR_MEM32 ||
