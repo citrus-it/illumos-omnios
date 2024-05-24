@@ -493,7 +493,7 @@ fbsdrun_deletecpu(int vcpu)
 
 	pthread_mutex_lock(&resetcpu_mtx);
 	if (!CPU_ISSET(vcpu, &cpumask)) {
-		fprintf(stderr, "Attempting to delete unknown cpu %d\n", vcpu);
+		EPRINTLN("Attempting to delete unknown cpu %d", vcpu);
 		exit(4);
 	}
 
@@ -563,7 +563,7 @@ vm_loop(struct vmctx *ctx, struct vcpu *vcpu)
 #endif
 		}
 	}
-	fprintf(stderr, "vm_run error %d, errno %d\n", error, errno);
+	EPRINTLN("vm_run error %d, errno %d", error, errno);
 #ifndef __FreeBSD__
 	rc = VMEXIT_CONTINUE;
 persist:
@@ -983,13 +983,13 @@ main(int argc, char *argv[])
 		exit(4);
 
 	if (qemu_fwcfg_init(ctx) != 0) {
-		fprintf(stderr, "qemu fwcfg initialization error");
+		fprintf(stderr, "qemu fwcfg initialization error\n");
 		exit(4);
 	}
 
 	if (qemu_fwcfg_add_file("opt/bhyve/hw.ncpu", sizeof(guest_ncpus),
 	    &guest_ncpus) != 0) {
-		fprintf(stderr, "Could not add qemu fwcfg opt/bhyve/hw.ncpu");
+		fprintf(stderr, "Could not add qemu fwcfg opt/bhyve/hw.ncpu\n");
 		exit(4);
 	}
 
@@ -997,11 +997,12 @@ main(int argc, char *argv[])
 	 * Exit if a device emulation finds an error in its initialization
 	 */
 	if (init_pci(ctx) != 0) {
-		perror("device emulation initialization error");
+		EPRINTLN("Device emulation initialization error: %s",
+		    strerror(errno));
 		exit(4);
 	}
 	if (init_tpm(ctx) != 0) {
-		fprintf(stderr, "Failed to init TPM device");
+		EPRINTLN("Failed to init TPM device");
 		exit(4);
 	}
 
