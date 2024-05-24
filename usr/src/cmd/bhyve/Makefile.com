@@ -42,8 +42,6 @@ COMMON_OBJS = \
 	mevent.o		\
 	net_backends.o		\
 	net_utils.o		\
-	pci_ahci.o		\
-	pci_e82545.o		\
 	pci_emul.o		\
 	pci_fbuf.o		\
 	pci_hostbridge.o	\
@@ -51,15 +49,12 @@ COMMON_OBJS = \
 	pci_lpc.o		\
 	pci_nvme.o		\
 	pci_passthru.o		\
-	pci_uart.o		\
 	pci_virtio_9p.o		\
 	pci_virtio_block.o	\
 	pci_virtio_console.o	\
 	pci_virtio_net.o	\
 	pci_virtio_rnd.o	\
 	pci_virtio_viona.o	\
-	pci_xhci.o		\
-	pctestdev.o		\
 	privileges.o		\
 	qemu_fwcfg.o		\
 	qemu_loader.o		\

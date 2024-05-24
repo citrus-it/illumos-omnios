@@ -18,6 +18,11 @@ BHYVE_OBJS = $(COMMON_OBJS)	\
 	e820.o			\
 	fwctl.o			\
 	mptbl.o			\
+	pci_ahci.o		\
+	pci_e82545.o		\
+	pci_uart.o		\
+	pci_xhci.o		\
+	pctestdev.o		\
 	post.o			\
 	pm.o			\
 	ps2kbd.o		\
