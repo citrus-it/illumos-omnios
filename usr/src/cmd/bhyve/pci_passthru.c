@@ -1188,15 +1188,15 @@ PCI_EMUL_SET(passthru);
  * have access to the devinfo tree.
  */
 uint32_t
-read_config(const struct pcisel *sel __unused, long reg __unused,
+pci_host_read_config(const struct pcisel *sel __unused, long reg __unused,
     int width __unused)
 {
 	return (-1);
 }
 
 void
-write_config(const struct pcisel *sel __unused, long reg __unused,
+pci_host_write_config(const struct pcisel *sel __unused, long reg __unused,
     int width __unused, uint32_t data __unused)
 {
-       errx(4, "write_config() unimplemented on illumos");
+       errx(4, "pci_host_write_config() unimplemented on illumos");
 }
