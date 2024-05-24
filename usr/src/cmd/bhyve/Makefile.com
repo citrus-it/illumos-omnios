@@ -79,7 +79,6 @@ COMMON_OBJS = \
 	vga.o			\
 	virtio.o		\
 	vmgenc.o		\
-	xmsr.o			\
 	bhyve_sol_glue.o
 
 CFLAGS +=	$(CCVERBOSE)
