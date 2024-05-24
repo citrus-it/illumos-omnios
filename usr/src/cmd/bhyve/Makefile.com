@@ -33,7 +33,6 @@ COMMON_OBJS = \
 	config.o		\
 	console.o		\
 	crc16.o			\
-	e820.o			\
 	gdb.o			\
 	hexdump.o		\
 	inout.o			\
@@ -41,7 +40,6 @@ COMMON_OBJS = \
 	iov.o			\
 	mem.o			\
 	mevent.o		\
-	mptbl.o			\
 	net_backends.o		\
 	net_utils.o		\
 	pci_ahci.o		\

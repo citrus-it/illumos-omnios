@@ -1408,7 +1408,6 @@ main(int argc, char *argv[])
 	int max_vcpus, memflags;
 	struct vcpu *bsp;
 	struct vmctx *ctx;
-	struct qemu_fwcfg_item *e820_fwcfg_item;
 	size_t memsize;
 	const char *optstr, *value, *vmname;
 
@@ -1735,17 +1734,9 @@ main(int argc, char *argv[])
 		assert(error == 0);
 	}
 
-	e820_fwcfg_item = e820_get_fwcfg_item();
-	if (e820_fwcfg_item == NULL) {
-		fprintf(stderr, "invalid e820 table");
+	error = e820_finalize();
+	if (error != 0)
 		exit(4);
-	}
-	if (qemu_fwcfg_add_file("etc/e820", e820_fwcfg_item->size,
-		e820_fwcfg_item->data) != 0) {
-		fprintf(stderr, "could not add qemu fwcfg etc/e820");
-		exit(4);
-	}
-	free(e820_fwcfg_item);
 
 	if (lpc_bootrom() && strcmp(lpc_fwcfg(), "bhyve") == 0) {
 		fwctl_init();
