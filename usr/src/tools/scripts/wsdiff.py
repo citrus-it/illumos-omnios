@@ -620,54 +620,50 @@ def flistCatalog(base, ptch, flist) :
 	files = fd.readlines()
 	fd.close()
 
-	for f in files :
-		ptch_present = True
-		base_present = True
+	def check(b, f):
+		"""
+		Check if the provided file 'f' exists under the base 'b', and
+		whether it is a plain file or symlink.
 
-		if f == '\n' :
+		The objects in the file list have paths relative to $ROOT or to
+		the directories specified on the command line.
+		If relative to $ROOT, we'll need to add back the root_<arch>
+		goo we stripped off in fnFormat()
+
+		Returns:
+			path	- the path exists and is a file
+			False	- the path exists but is a symlink
+			None	- the file does not exist.
+		"""
+		global arch
+
+		candidates = [ f, os.path.join("root_" + arch, f) ]
+		for candidate in candidates:
+			fullpath = os.path.join(b, candidate)
+			if os.path.exists(fullpath):
+				if os.path.islink(fullpath):
+					return False
+				return candidate
+		return None
+
+	for f in files:
+		if f == '\n':
 			continue
 
 		# the fileNames have a trailing '\n'
 		f = f.rstrip()
 
-		# The objects in the file list have paths relative
-		# to $ROOT or to the base/ptch directory specified on
-		# the command line.
-		# If it's relative to $ROOT, we'll need to add back the
-		# root_`uname -p` goo we stripped off in fnFormat()
-		if os.path.exists(base + f) :
-			fn = f;
-		elif os.path.exists(base + "root_" + arch + "/" + f) :
-			fn = "root_" + arch + "/" + f
-		else :
-			base_present = False
+		basefile = check(base, f)
+		ptchfile = check(ptch, f)
 
-		if base_present :
-			if not os.path.exists(ptch + fn) :
-				ptch_present = False
-		else :
-			if os.path.exists(ptch + f) :
-				fn = f
-			elif os.path.exists(ptch + "root_" + arch + "/" + f) :
-				fn = "root_" + arch + "/" + f
-			else :
-				ptch_present = False
-
-		if os.path.islink(base + fn) :	# ignore links
-			base_present = False
-		if os.path.islink(ptch + fn) :
-			ptch_present = False
-
-		if base_present and ptch_present :
-			compFiles.append(fn)
-		elif base_present :
-			deletedFiles.append(fn)
-		elif ptch_present :
-			newFiles.append(fn)
-		else :
-			if (os.path.islink(base + fn) and
-			    os.path.islink(ptch + fn)) :
-				continue
+		if basefile and ptchfile:
+			compFiles.append(basefile)
+		elif basefile:
+			deletedFiles.append(basefile)
+		elif ptchfile:
+			newFiles.append(ptchfile)
+		elif basefile is None and ptchfile is None:
+			# We don't produce errors about missing links
 			error(f + " in file list, but not in either tree. " +
 			    "Skipping...")
 
