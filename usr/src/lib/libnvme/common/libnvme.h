@@ -1149,8 +1149,15 @@ extern bool nvme_vuc_req_get_cdw0(nvme_vuc_req_t *, uint32_t *);
  * The firmware download command has to date not really changed through the NVMe
  * 1.x and 2.0 standards, which is why it is not broken into a request and
  * execution format like others at this time.
+ *
+ * Firmware must be loaded with a particular granularity and if blocks to not
+ * conform to that, nvme_fw_load() will return an error.
+ * The nvme_fw_granularity() function allows callers to determine the required
+ * granularity should they wish to pad the last block out to satisfy the
+ * constraints of the controller.
  */
 extern bool nvme_fw_load(nvme_ctrl_t *, const void *, size_t, uint64_t);
+extern bool nvme_fw_granularity(nvme_ctrl_t *, uint32_t *);
 
 extern bool nvme_fw_commit_req_init(nvme_ctrl_t *, nvme_fw_commit_req_t **);
 extern void nvme_fw_commit_req_fini(nvme_fw_commit_req_t *);

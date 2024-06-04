@@ -118,6 +118,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_fw_commit_req_init;
 	nvme_fw_commit_req_set_action;
 	nvme_fw_commit_req_set_slot;
+	nvme_fw_granularity;
 	nvme_fw_load;
 	nvme_get_feat_req_exec;
 	nvme_get_feat_req_fini;

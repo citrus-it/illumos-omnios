@@ -3046,6 +3046,7 @@ do_firmware_load(const nvme_process_arg_t *npa)
 {
 	int fw_fd;
 	uint64_t offset = 0;
+	uint32_t fwug;
 	size_t size, len;
 	char buf[FIRMWARE_READ_BLKSIZE];
 
@@ -3069,14 +3070,33 @@ do_firmware_load(const nvme_process_arg_t *npa)
 		errx(-1, "Failed to open \"%s\": %s", npa->npa_argv[0],
 		    strerror(errno));
 
+	if (!nvme_fw_granularity(npa->npa_ctrl, &fwug))
+		errx(-1, "Failed to determine firmware load granularity");
+
 	size = 0;
 	do {
-		len = read_block(npa, fw_fd, buf, sizeof (buf));
+		size_t slen;
+
+		bzero(buf, sizeof (buf));
+		slen = len = read_block(npa, fw_fd, buf, sizeof (buf));
 
 		if (len == 0)
 			break;
 
-		if (!nvme_fw_load(npa->npa_ctrl, buf, len, offset)) {
+		/*
+		 * If this is the last block and its length does not match the
+		 * firmware update load granularity reported by the controller
+		 * (or assumed prior to NVMe 1.3), pad the data out to the
+		 * required granularity. The tail of the buffer is already
+		 * zeroed.
+		 */
+		if (len < sizeof (buf) && (len % fwug) != 0) {
+			slen = roundup(slen, fwug);
+			if (slen > sizeof (buf))
+				slen = sizeof (buf);
+		}
+
+		if (!nvme_fw_load(npa->npa_ctrl, buf, slen, offset)) {
 			nvmeadm_fatal(npa, "failed to load firmware image "
 			    "\"%s\" at offset %" PRIu64, npa->npa_argv[0],
 			    offset);

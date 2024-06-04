@@ -33,6 +33,22 @@ static const nvme_field_check_t nvme_fw_load_check_offset = {
 };
 
 bool
+nvme_fw_granularity(nvme_ctrl_t *ctrl, uint32_t *granp)
+{
+	nvme_valid_ctrl_data_t data;
+
+	if (granp == NULL) {
+		return (nvme_ctrl_error(ctrl, NVME_ERR_BAD_PTR, 0,
+		    "encountered invalid data buffer pointer: %p", granp));
+	}
+
+	data.vcd_vers = &ctrl->nc_vers;
+	data.vcd_id = &ctrl->nc_info;
+	*granp = nvme_fw_load_granularity(&data);
+	return (true);
+}
+
+bool
 nvme_fw_load(nvme_ctrl_t *ctrl, const void *buf, size_t len, uint64_t off)
 {
 	nvme_ioctl_fw_load_t fw;
