@@ -11,91 +11,84 @@
 .\"
 .\" Copyright 2024 Oxide Computer Company
 .\"
-.Dd December 13, 2023
-.Dt LIBIPCC_IDENT 3IPCC
+.Dd June 26, 2024
+.Dt LIBIPCC_ROT 3IPCC
 .Os
 .Sh NAME
-.Nm libipcc_ident ,
-.Nm libipcc_ident_serial ,
-.Nm libipcc_ident_model ,
-.Nm libipcc_ident_rev ,
-.Nm libipcc_ident_free
-.Nd Retrieve VPD identity information
+.Nm libipcc_rot ,
+.Nm libipcc_rot_buf ,
+.Nm libipcc_rot_free
+.Nd Communicate with the system Root of Trust
 .Sh LIBRARY
 .Lb libipcc
 .Sh SYNOPSIS
 .In libipcc.h
 .Ft bool
-.Fo libipcc_ident
+.Fo libipcc_rot
 .Fa "libipcc_handle_t *handle"
-.Fa "libipcc_ident_t **identp"
+.Fa "uint8_t *buf"
+.Fa "size_t len"
+.Fa "libipcc_rot_t **rotp"
 .Fc
-.Ft "const uint8_t *"
-.Fo libipcc_ident_serial
-.Fa "libipcc_ident_t *ident"
-.Fc
-.Ft "const uint8_t *"
-.Fo libipcc_ident_model
-.Fa "libipcc_ident_t *ident"
-.Fc
-.Ft uint32_t
-.Fo libipcc_ident_rev
-.Fa "libipcc_ident_t *ident"
+.Ft "uint8_t *"
+.Fo libipcc_rot_buf
+.Fa "libipcc_rot_t *rot"
+.Fa "size_t *lenp"
 .Fc
 .Ft void
-.Fo libipcc_ident_free
-.Fa "libipcc_ident_t *ident"
+.Fo libipcc_rot_free
+.Fa "libipcc_rot_t *rot"
 .Fc
 .Sh DESCRIPTION
-These functions retrieve Vital Product Data
-.Pq VPD
-from the Service Processor in Oxide hardware.
+This function enables communication with the Root Of Trust
+.Pq RoT
+within Oxide hardware.
+The message format is a private contract between the consumer and the RoT and
+is opaque to libipcc.
 .Pp
-An
-.Sy ident handle
+A
+.Sy rot handle
 is retrieved via a call to
-.Fn libipcc_ident ,
+.Fn libipcc_rot ,
 passing in a libipcc
 .Fa handle
 obtained via a call to
 .Xr libipcc_init 3IPCC ,
 and then that
-.Sy ident handle
-can be interrogated to retrieve information about the system's serial number,
-model and revision.
+.Sy rot handle
+can be interrogated to retrieve the response from the RoT.
+.Fa buf
+must point to a buffer containing the message to be transmitted, with the length
+of the message being passed in via
+.Fa len .
 When finished with, the
-.Sy ident handle
+.Sy rot handle
 should be freed via a call to
-.Fn libipcc_ident_free .
+.Fn libipcc_rot_free .
 .Pp
-.Fn libipcc_ident_serial
-and
-.Fn libipcc_ident_model
-return a pointer to the serial number and model information from the VPD,
-respectfully.
-The returned data are guaranteed to be NUL-terminated.
-.Pp
-.Fn libipcc_ident_rev
-returns the revision information from the VPD.
+.Fn libipcc_rot_buf
+returns a pointer to the reply data received from the RoT, and updates its
+.Fa lenp
+parameter with the length of that data.
 .Pp
 Note that the
-.Sy ident handle
+.Sy rot handle
 lifetime is separate to that of the
 .Vt "libipcc_handle_t *" .
 That is, the
-.Sy ident handle
+.Sy rot handle
 may continue to be used after the library handle is closed via a call to
 .Xr libipcc_fini 3IPCC
 as shown in the example below.
 .Sh RETURN VALUES
 Upon successful completion,
-.Fn libipcc_ident
+.Fn libipcc_rot
 returns
 .Dv true
 and
-.Fa identp
+.Fa rotp
 is updated to point to a newly allocated
-.Sy ident handle .
+.Sy rot handle .
 Otherwise,
 .Dv false
 is returned and the libipcc handle will contain details of the reason for the
@@ -103,16 +96,13 @@ failure which can be retrieved by interrogating the handle using the functions
 described in
 .Xr libipcc_err 3IPCC .
 .Pp
-.Fn libipcc_ident_serial ,
-.Fn libipcc_ident_model
-and
-.Fn libipcc_rev
-always succeed and return the requested data as described above.
+.Fn libipcc_rot_buf
+always succeeds and returns the data received from the RoT.
 .Sh EXAMPLES
 .Sy Example 1
-Retrieve and display vital product data.
+Send a message to the RoT and print the response length
 .Pp
-The following example shows how to retrieve and display the VPD information.
+The following example shows how to send a message to the RoT.
 .Bd -literal -offset 2
 #include <inttypes.h>
 #include <err.h>
@@ -123,7 +113,10 @@ main(void)
 {
 	char errmsg[LIBIPCC_ERR_LEN];
 	libipcc_handle_t *lih;
+	libipcc_rot_t *rot;
 	libipcc_err_t lerr;
+	uint8_t *buf;
+	size_t len;
 	int32_t serr;
 
 	if (!libipcc_init(&lih, &lerr, &serr, errmsg, sizeof (errmsg))) {
@@ -131,9 +124,10 @@ main(void)
 		    errmsg, libipcc_strerror(lerr), strerror(serr));
 	}
 
-	libipcc_ident_t *ident;
+	buf = "test message";
+	len = strlen(buf) + 1;
 
-	if (!libipcc_ident(lih, &ident)) {
+	if (!libipcc_rot(lih, buf, len, &rot)) {
 		libipcc_err_t lerr = libipcc_err(lih);
 
 		errx(EXIT_FAILURE, "libipcc error: '%s' (0x%x %s / %s)",
@@ -142,22 +136,15 @@ main(void)
 		    strerror(libipcc_syserr(lih)));
 	}
 
-	/*
-	 * Note that it is safe to close the library handle here as the
-	 * ident handle lifetime is independent.
-	 */
 	libipcc_fini(lih);
 
-	(void) printf("Serial: %s\en",libipcc_ident_serial(ident));
-	(void) printf("Model: %s\en", libipcc_ident_model(ident));
-	(void) printf("Rev: %" PRId32 "\en", libipcc_ident_rev(ident));
-	libipcc_ident_free(ident);
+	buf = libipcc_rot_buf(rot, &len);
+	(void) printf("RoT replied with 0x%zx bytes", len);
+	libipcc_rot_free(rot);
 }
 .Ed
 .Sh ERRORS
-When
-.Fn libipcc_ident
-returns
+When the functions defined in this page return
 .Dv false ,
 the reason for the failure can be determined from the library handle
 via the functions defined in
@@ -172,6 +159,5 @@ in
 .Xr libipcc 3IPCC .
 .Sh SEE ALSO
 .Xr libipcc_err 3IPCC ,
-.Xr libipcc_fini 3IPCC ,
 .Xr libipcc_init 3IPCC ,
 .Xr libipcc 3LIB

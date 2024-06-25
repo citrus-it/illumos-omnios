@@ -55,6 +55,9 @@ link path=usr/share/man/man3ipcc/libipcc_mac_nic.3ipcc \
     target=libipcc_mac_all.3ipcc
 link path=usr/share/man/man3ipcc/libipcc_mac_stride.3ipcc \
     target=libipcc_mac_all.3ipcc
+file path=usr/share/man/man3ipcc/libipcc_rot.3ipcc
+link path=usr/share/man/man3ipcc/libipcc_rot_buf.3ipcc target=libipcc_rot.3ipcc
+link path=usr/share/man/man3ipcc/libipcc_rot_free.3ipcc target=libipcc_rot.3ipcc
 link path=usr/share/man/man3ipcc/libipcc_startup_options.3ipcc \
     target=libipcc_status.3ipcc
 file path=usr/share/man/man3ipcc/libipcc_status.3ipcc
