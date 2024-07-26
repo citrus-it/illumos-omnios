@@ -43,7 +43,6 @@ SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
 CPPFLAGS +=	-I$(CMDINETCOMMONDIR)
 LDLIBS +=       -lofmt -linetutil -lipadm -lnvpair -lipmp -lcmdutils
-LINTFLAGS +=	-m
 
 ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)
 
@@ -56,8 +55,6 @@ LDLIBS +=	-lxnet
 _D_UNIX98_EXTN= -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 
 $(OBJS)		:= CPPFLAGS +=	$(_D_UNIX98_EXTN)
-
-LINTFLAGS +=	$(_D_UNIX98_EXTN)
 
 $(ROOTCFGDIR)/ipadm.conf := FILEMODE= 644
 
@@ -83,8 +80,6 @@ $(ROOTUSRSBINLINKS):
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 $(ROOTCFGDIR):
 	$(INS.dir)
