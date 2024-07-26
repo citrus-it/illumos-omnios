@@ -916,7 +916,7 @@ i_ipadm_plumb_if(ipadm_handle_t iph, char *ifname, sa_family_t af,
 	boolean_t	is_persistent =
 	    ((ipadm_flags & IPADM_OPT_PERSIST) != 0);
 	uint32_t	dlflags;
-	dladm_status_t	dlstatus;
+	dladm_status_t	dlstatus = DLADM_STATUS_OK;
 
 	if (iph->iph_dlh != NULL) {
 		dlstatus = dladm_name2info(iph->iph_dlh, ifname, &linkid,

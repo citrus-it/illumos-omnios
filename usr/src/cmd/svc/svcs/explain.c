@@ -1846,7 +1846,7 @@ print_reasons(const inst_t *svcp, int verbose)
 		} else if (strcmp(svcp->aux_state, "service_request") == 0) {
 			if (svcp->aux_fmri) {
 				(void) printf(gettext(
-				    "Reason: Degraded by "\"%s\"\n"),
+				    "Reason: Degraded by \"%s\"\n"),
 				    svcp->aux_fmri);
 				print_aux_fmri_logs(svcp->aux_fmri);
 			} else {

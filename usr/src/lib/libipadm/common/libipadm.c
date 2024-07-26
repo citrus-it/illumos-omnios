@@ -601,7 +601,7 @@ ipadm_status_t
 i_ipadm_init_addrobj(ipadm_handle_t iph, nvlist_t *nvl)
 {
 	nvpair_t	*nvp;
-	char		*name;
+	char		*name = NULL;
 	char		*aobjname = NULL, *pval = NULL, *ifname = NULL;
 	sa_family_t	af = AF_UNSPEC;
 	ipadm_addr_type_t atype = IPADM_ADDR_NONE;
@@ -808,7 +808,7 @@ i_ipadm_init_ifs(ipadm_handle_t iph, const char *ifs, nvlist_t **allifs)
 	}
 
 	/* populate the door_call argument structure */
-	iargp = (void *)buf;
+	iargp = (ipmgmt_initif_arg_t *)buf;
 	iargp->ia_cmd = IPMGMT_CMD_INITIF;
 	iargp->ia_flags = 0;
 	iargp->ia_family = AF_UNSPEC;

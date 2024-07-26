@@ -42,16 +42,10 @@ LDLIBS +=	-lc -linetutil -lsocket -ldlpi -lnvpair -ldhcpagent \
 SRCDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
-CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	$(CNOWARN_UNINIT)
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
-
-# not linted
-SMATCH=off
 
 .KEEP_STATE:
 
 all:		$(LIBS)
-
 
 include $(SRC)/lib/Makefile.targ

@@ -683,7 +683,7 @@ do_enable_if(int argc, char *argv[], const char *use)
 		die("persistent operation not supported for enable-if");
 	status = ipadm_enable_if(iph, argv[index], flags);
 	if (status == IPADM_ALL_ADDRS_NOT_ENABLED) {
-		warn_ipadmerr(status, "");
+		warn_ipadmerr(status, "%s", "");
 	} else if (status != IPADM_SUCCESS) {
 		die("Could not enable %s : %s",
 		    argv[optind], ipadm_status2str(status));
@@ -1248,8 +1248,7 @@ do_reset_prop(int argc, char **argv, const char *use)
 	set_prop(argc, argv,  _B_TRUE, use);
 }
 
-/* PRINTFLIKE1 */
-static void
+static void __PRINTFLIKE(1)
 warn(const char *format, ...)
 {
 	va_list alist;
@@ -1264,8 +1263,7 @@ warn(const char *format, ...)
 	(void) fprintf(stderr, "\n");
 }
 
-/* PRINTFLIKE1 */
-static void
+static void __PRINTFLIKE(1) __NORETURN
 die(const char *format, ...)
 {
 	va_list alist;
@@ -1286,7 +1284,7 @@ die(const char *format, ...)
 	exit(EXIT_FAILURE);
 }
 
-static void
+static void __NORETURN
 die_opterr(int opt, int opterr, const char *usage)
 {
 	switch (opterr) {
@@ -1302,8 +1300,7 @@ die_opterr(int opt, int opterr, const char *usage)
 	}
 }
 
-/* PRINTFLIKE2 */
-static void
+static void __PRINTFLIKE(2)
 warn_ipadmerr(ipadm_status_t err, const char *format, ...)
 {
 	va_list alist;
@@ -1614,7 +1611,7 @@ do_create_addr(int argc, char *argv[], const char *use)
 
 	status = ipadm_create_addr(iph, ipaddr, flags);
 	if (status == IPADM_DHCP_IPC_TIMEOUT)
-		warn_ipadmerr(status, "");
+		warn_ipadmerr(status, "%s", "");
 	else if (status != IPADM_SUCCESS)
 		die("Could not create address: %s", ipadm_status2str(status));
 }
@@ -1779,7 +1776,7 @@ do_refresh_addr(int argc, char *argv[], const char *use)
 
 	status = ipadm_refresh_addr(iph, argv[optind], flags);
 	if (status == IPADM_DHCP_IPC_TIMEOUT)
-		warn_ipadmerr(status, "");
+		warn_ipadmerr(status, "%s", "");
 	else if (status != IPADM_SUCCESS)
 		die("could not refresh address %s", ipadm_status2str(status));
 }
