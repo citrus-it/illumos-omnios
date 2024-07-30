@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2017 RackTop Systems.
 .\" Copyright 2020 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SVCADM 8 "May 11, 2020"
+.TH SVCADM 8 "July 30, 2024"
 .SH NAME
 svcadm \- manipulate service instances
 .SH SYNOPSIS
@@ -247,7 +248,7 @@ assigned to the services move them into the \fBdegraded\fR state.
 .sp
 If the \fB-I\fR option is specified, the request is flagged as immediate.
 .sp
-The \fB-t\fR option is only valid for maintenance requests. When this option is
+The \fB-t\fR option is mandatory for degrade requests. When this option is
 specified, the request is flagged as temporary, and its effect will only last
 until the next reboot.
 .RE

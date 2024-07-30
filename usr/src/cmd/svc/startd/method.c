@@ -1178,7 +1178,8 @@ retry:
 	r = method_run(&inst, info->sf_method_type, &exit_code);
 
 	if (r == 0 &&
-	    (exit_code == SMF_EXIT_OK || exit_code == SMF_EXIT_NODAEMON)) {
+	    (exit_code == SMF_EXIT_OK || exit_code == SMF_EXIT_NODAEMON ||
+	    exit_code == SMF_EXIT_MON_DEGRADE)) {
 		/* Success! */
 		assert(inst->ri_i.i_next_state != RESTARTER_STATE_NONE);
 
@@ -1201,6 +1202,17 @@ retry:
 		 * For methods that exit with SMF_EXIT_NODAEMON, we already
 		 * called method_remove_contract in method_run.
 		 */
+
+		/*
+		 * When a start method returns with SMF_EXIT_MON_DEGRADE we
+		 * transition the service into degraded.
+		 */
+		if (info->sf_method_type == METHOD_START &&
+		    exit_code == SMF_EXIT_MON_DEGRADE) {
+			inst->ri_i.i_next_state = RESTARTER_STATE_DEGRADED;
+			info->sf_reason = restarter_str_method_failed;
+			log_transition(inst, START_FAILED_DEGRADED);
+		}
 
 		/*
 		 * We don't care whether the handle was rebound because this is
