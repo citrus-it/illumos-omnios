@@ -239,7 +239,8 @@ gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
 	 * moving to OFFLINE unless the instance is part of a subtree
 	 * (non root) and in this case the result is unpredictable.
 	 */
-	if (v->gv_flags & GV_ENABLED) {
+	if ((v->gv_flags & GV_ENABLED) &&
+	   old_state != RESTARTER_STATE_OFFLINE) {
 		vertex_send_event(v, RESTARTER_EVENT_TYPE_ENABLE);
 	} else if (gt_running(old_state) && v->gv_post_disable_f) {
 		v->gv_post_disable_f();

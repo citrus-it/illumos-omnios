@@ -189,7 +189,7 @@ static const struct restarter_state_transition_reason restarter_str[] = {
 	{
 	    restarter_str_bad_repo_state,
 	    "bad_repo_state",
-	    "an SMF repository inconsistecy exists"
+	    "an SMF repository inconsistency exists"
 	},
 
 	/*
@@ -2762,28 +2762,28 @@ out:
  * on what to do next.
  *
  * Error Types :
- * 	E2BIG		Too many values or entry is too big
- * 	EINVAL		Invalid value
- * 	EIO		an I/O error has occured
- * 	ENOENT		no entry for value
- * 	ENOMEM		out of memory
- * 	ENOTSUP		Version mismatch
- * 	ERANGE		value is out of range
- * 	EMFILE/ENFILE	out of file descriptors
+ *	E2BIG		Too many values or entry is too big
+ *	EINVAL		Invalid value
+ *	EIO		an I/O error has occured
+ *	ENOENT		no entry for value
+ *	ENOMEM		out of memory
+ *	ENOTSUP		Version mismatch
+ *	ERANGE		value is out of range
+ *	EMFILE/ENFILE	out of file descriptors
  *
- * 	SCF_ERROR_BACKEND_ACCESS
- * 	SCF_ERROR_CONNECTION_BROKEN
- * 	SCF_ERROR_DELETED
- * 	SCF_ERROR_CONSTRAINT_VIOLATED
- * 	SCF_ERROR_HANDLE_DESTROYED
- * 	SCF_ERROR_INTERNAL
- * 	SCF_ERROR_INVALID_ARGUMENT
- * 	SCF_ERROR_NO_MEMORY
- * 	SCF_ERROR_NO_RESOURCES
- * 	SCF_ERROR_NOT_BOUND
- * 	SCF_ERROR_NOT_FOUND
- * 	SCF_ERROR_NOT_SET
- * 	SCF_ERROR_TYPE_MISMATCH
+ *	SCF_ERROR_BACKEND_ACCESS
+ *	SCF_ERROR_CONNECTION_BROKEN
+ *	SCF_ERROR_DELETED
+ *	SCF_ERROR_CONSTRAINT_VIOLATED
+ *	SCF_ERROR_HANDLE_DESTROYED
+ *	SCF_ERROR_INTERNAL
+ *	SCF_ERROR_INVALID_ARGUMENT
+ *	SCF_ERROR_NO_MEMORY
+ *	SCF_ERROR_NO_RESOURCES
+ *	SCF_ERROR_NOT_BOUND
+ *	SCF_ERROR_NOT_FOUND
+ *	SCF_ERROR_NOT_SET
+ *	SCF_ERROR_TYPE_MISMATCH
  *
  */
 mc_error_t *

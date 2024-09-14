@@ -1020,7 +1020,8 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		*exit_code = WEXITSTATUS(ret_status);
 		if (*exit_code != SMF_EXIT_OK &&
 		    *exit_code != SMF_EXIT_NODAEMON &&
-		    *exit_code != SMF_EXIT_MON_DEGRADE) {
+		    *exit_code != SMF_EXIT_MON_DEGRADE &&
+		    *exit_code != SMF_EXIT_TEMP_DISABLE) {
 			log_error(LOG_WARNING,
 			    "%s: Method \"%s\" failed with exit status %d.\n",
 			    inst->ri_i.i_fmri, method, WEXITSTATUS(ret_status));
@@ -1029,7 +1030,10 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		log_instance(inst, B_TRUE, "Method \"%s\" exited with status "
 		    "%d.", mname, *exit_code);
 
-		/* Note: we will take this path for SMF_EXIT_NODAEMON */
+		/*
+		 * Note: we will take this path for SMF_EXIT_NODAEMON and
+		 * SMF_EXIT_TEMP_DISABLE.
+		 */
 		if (*exit_code != SMF_EXIT_OK &&
 		    *exit_code != SMF_EXIT_MON_DEGRADE) {
 			goto contract_out;
@@ -1080,7 +1084,7 @@ assured_kill:
 contract_out:
 	/*
 	 * Abandon contracts for transient methods, methods that exit with
-	 * SMF_EXIT_NODAEMON and methods that fail.
+	 * SMF_EXIT_NODAEMON/SMF_EXIT_TEMP_DISABLE and methods that fail.
 	 * Non-transient degraded services are left alone here. If their
 	 * contract is or later becomes empty, then that will be handled in the
 	 * same way as for any other non-transient service.
@@ -1187,7 +1191,8 @@ retry:
 
 	if (r == 0 &&
 	    (exit_code == SMF_EXIT_OK || exit_code == SMF_EXIT_NODAEMON ||
-	    exit_code == SMF_EXIT_MON_DEGRADE)) {
+	    exit_code == SMF_EXIT_MON_DEGRADE ||
+	    exit_code == SMF_EXIT_TEMP_DISABLE)) {
 		/* Success! */
 		assert(inst->ri_i.i_next_state != RESTARTER_STATE_NONE);
 
@@ -1220,6 +1225,17 @@ retry:
 			inst->ri_i.i_next_state = RESTARTER_STATE_DEGRADED;
 			info->sf_reason = restarter_str_method_failed;
 			log_transition(inst, START_FAILED_DEGRADED);
+		}
+
+		/*
+		 * When a start method returns with SMF_EXIT_TEMP_DISABLE we
+		 * transition the service into disabled.
+		 */
+		if (info->sf_method_type == METHOD_START &&
+		    exit_code == SMF_EXIT_TEMP_DISABLE) {
+			inst->ri_i.i_next_state = RESTARTER_STATE_DISABLED;
+			info->sf_reason = restarter_str_disable_request;
+			log_transition(inst, START_FAILED_DISABLED);
 		}
 
 		/*

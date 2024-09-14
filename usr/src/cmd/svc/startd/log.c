@@ -504,6 +504,10 @@ log_transition(const restarter_inst_t *inst, start_outcome_t outcome)
 			action = gettext("transitioned to degraded "
 			    "(see 'svcs -xv' for details)");
 			break;
+		case START_FAILED_DISABLED:
+			action = gettext("transitioned to disabled "
+			    "(see 'svcs -xv' for details)");
+			break;
 		case START_FAILED_OTHER:
 			action = gettext("failed: transitioned to "
 			    "maintenance (see 'svcs -xv' for details)");

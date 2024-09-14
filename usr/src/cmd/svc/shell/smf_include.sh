@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2012 Joyent, Inc.  All rights reserved.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2024 Oxide Computer Company
 #
 
 smf_present () {
@@ -241,6 +241,26 @@ smf_kill_contract() {
 	return 0
 }
 
+# Can be used as a wrapper around exit codes such as SMF_EXIT_NODAEMON,
+# SMF_EXIT_MON_DEGRADED and SMF_EXIT_TEMP_DISABLE to provide additional context
+# for the action being taken, which is stored in the service as a comment
+# displayed by `svcs -xv` and `svcs -l`.
+#
+# smf_method_exit EXITCODE MESSAGE
+#
+
+# This can be unset by smf_clean_env() so keep a copy
+__smf_method_exit_fmri="$SMF_FMRI"
+smf_method_exit() {
+	typeset exitcode=${1:?exit code}; shift
+	typeset msg="$@"
+
+	svccfg -s $__smf_method_exit_fmri \
+		setprop general/comment = astring: "$msg" 2>/dev/null
+
+	exit $exitcode
+}
+
 #
 # smf(7) method and monitor exit status definitions
 #   SMF_EXIT_ERR_OTHER, although not defined, encompasses all non-zero
@@ -250,6 +270,10 @@ smf_kill_contract() {
 # need to run any persistent process. This indicates success, abandons the
 # contract, and allows dependencies to be met.
 #
+# The SMF_EXIT_TEMP_DISABLE exit status should be used when a method wishes
+# to disable the service temporarily (i.e. until the next system restart or
+# administrator intervention).
+#
 SMF_EXIT_OK=0
 SMF_EXIT_NODAEMON=94
 SMF_EXIT_ERR_FATAL=95
@@ -258,3 +282,4 @@ SMF_EXIT_MON_DEGRADE=97
 SMF_EXIT_MON_OFFLINE=98
 SMF_EXIT_ERR_NOSMF=99
 SMF_EXIT_ERR_PERM=100
+SMF_EXIT_TEMP_DISABLE=101

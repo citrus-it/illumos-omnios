@@ -863,7 +863,6 @@ static struct special_vertex_info {
 	{ NULL },
 };
 
-
 void
 vertex_send_event(graph_vertex_t *v, restarter_event_type_t e)
 {
