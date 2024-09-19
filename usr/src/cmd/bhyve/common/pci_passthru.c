@@ -616,13 +616,15 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 {
 	int error;
 	struct pci_devinst *pi = sc->psc_pi;
+	uint16_t cmd;
 	uint8_t intline, intpin;
 
 	/*
-	 * Copy physical PCI header to virtual config space. INTLINE and INTPIN
-	 * shouldn't be aligned with their physical value and they are already
-	 * set by pci_emul_init().
+	 * Copy physical PCI header to virtual config space.  COMMAND,
+	 * INTLINE and INTPIN shouldn't be aligned with their physical value
+	 * and they are already set by pci_emul_init().
 	 */
+	cmd = pci_get_cfgdata16(pi, PCIR_COMMAND);
 	intline = pci_get_cfgdata8(pi, PCIR_INTLINE);
 	intpin = pci_get_cfgdata8(pi, PCIR_INTPIN);
 	for (int i = 0; i <= PCIR_MAXLAT; i += 4) {
@@ -633,6 +635,7 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 #endif
 	}
 
+	pci_set_cfgdata16(pi, PCIR_COMMAND, cmd);
 	pci_set_cfgdata8(pi, PCIR_INTLINE, intline);
 	pci_set_cfgdata8(pi, PCIR_INTPIN, intpin);
 
@@ -646,13 +649,6 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 		return (-1);
 	}
 
-	passthru_write_config(sc, PCIR_COMMAND, 2,
-	    pci_get_cfgdata16(pi, PCIR_COMMAND));
-
-	/*
-	* We need to do this after PCIR_COMMAND got possibly updated, e.g.,
-	* a BAR was enabled.
-	*/
 	if (pci_msix_table_bar(pi) >= 0) {
 		error = init_msix_table(ctx, sc);
 		if (error != 0) {
@@ -667,7 +663,7 @@ cfginit(struct vmctx *ctx, struct passthru_softc *sc)
 	    passthru_cfgread_emulate, passthru_cfgwrite_emulate)) != 0)
 		goto done;
 
-	/* Allow access to the physical command and status register. */
+	/* Allow access to the physical status register. */
 	if ((error = set_pcir_handler(sc, PCIR_COMMAND, 0x04, NULL, NULL)) != 0)
 		goto done;
 
@@ -968,27 +964,25 @@ passthru_cfgwrite_default(struct passthru_softc *sc, struct pci_devinst *pi,
 		return (0);
 	}
 
-#ifdef LEGACY_SUPPORT
 	/*
-	 * If this device does not support MSI natively then we cannot let
-	 * the guest disable legacy interrupts from the device. It is the
-	 * legacy interrupt that is triggering the virtual MSI to the guest.
+	 * The command register is emulated, but the status register
+	 * is passed through.
 	 */
-	if (sc->psc_msi.emulated && pci_msi_enabled(pi)) {
-		if (coff == PCIR_COMMAND && bytes == 2)
-			val &= ~PCIM_CMD_INTxDIS;
+	if (coff == PCIR_COMMAND) {
+		if (bytes <= 2)
+			return (-1);
+
+		/* Update the physical status register. */
+		passthru_write_config(sc, PCIR_STATUS, 2, val >> 16);
+
+		/* Update the virtual command register. */
+		cmd_old = pci_get_cfgdata16(pi, PCIR_COMMAND);
+		pci_set_cfgdata16(pi, PCIR_COMMAND, val & 0xffff);
+		pci_emul_cmd_changed(pi, cmd_old);
+		return (0);
 	}
-#endif
 
 	passthru_write_config(sc, coff, bytes, val);
-	if (coff == PCIR_COMMAND) {
-		cmd_old = pci_get_cfgdata16(pi, PCIR_COMMAND);
-		if (bytes == 1)
-			pci_set_cfgdata8(pi, PCIR_COMMAND, val);
-		else if (bytes == 2)
-			pci_set_cfgdata16(pi, PCIR_COMMAND, val);
-		pci_emul_cmd_changed(pi, cmd_old);
-	}
 
 	return (0);
 }
