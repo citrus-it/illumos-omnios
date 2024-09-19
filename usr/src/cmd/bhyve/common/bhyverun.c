@@ -562,8 +562,8 @@ do_open(const char *vmname)
 
 	reinit = romboot = false;
 
-	if (lpc_bootrom())
-		romboot = true;
+	romboot = bootrom_boot();
+
 #ifndef __FreeBSD__
 	uint64_t create_flags = 0;
 	if (get_config_bool_default("memory.use_reservoir", false)) {
@@ -840,7 +840,7 @@ main(int argc, char *argv[])
 	}
 #endif
 
-	if (lpc_bootrom()) {
+	if (bootrom_boot()) {
 #ifdef __FreeBSD__
 		if (vm_set_capability(bsp, VM_CAP_UNRESTRICTED_GUEST, 1)) {
 			fprintf(stderr, "ROM boot failed: unrestricted guest "
