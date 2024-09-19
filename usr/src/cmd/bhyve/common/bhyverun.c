@@ -418,8 +418,10 @@ fbsdrun_addcpu(int vcpuid, bool suspend)
 
 	CPU_SET_ATOMIC(vcpuid, &cpumask);
 
-	if (suspend)
-		(void) vm_suspend_cpu(vi->vcpu);
+	if (suspend) {
+		error = vm_suspend_cpu(vi->vcpu);
+		assert(error == 0);
+	}
 
 	error = pthread_create(&thr, NULL, fbsdrun_start_thread, vi);
 	assert(error == 0);
