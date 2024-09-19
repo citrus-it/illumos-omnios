@@ -25,7 +25,7 @@
 #include "tpm_ppi.h"
 
 #define TPM_PPI_ADDRESS 0xFED45000
-#define TPM_PPI_SIZE 0x1000
+#define TPM_PPI_SIZE 0x400
 
 #define TPM_PPI_FWCFG_FILE "etc/tpm/config"
 
@@ -100,7 +100,13 @@ tpm_ppi_init(void **sc)
 	struct tpm_ppi_fwcfg *fwcfg = NULL;
 	int error;
 
-	ppi = calloc(1, sizeof(*ppi));
+#ifdef	__FreeBSD__
+	ppi = calloc(1, TPM_PPI_SIZE);
+#else
+	// SMATCH: double check that we're allocating correct size: 346 vs 1024
+	void *ptr = calloc(1, TPM_PPI_SIZE);
+	ppi = (struct tpm_ppi_qemu *)ptr;
+#endif
 	if (ppi == NULL) {
 		warnx("%s: failed to allocate acpi region for ppi", __func__);
 		error = ENOMEM;
