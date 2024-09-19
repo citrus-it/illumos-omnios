@@ -146,10 +146,12 @@ static struct vcpu **vcpus;
 static int cur_vcpu, stopped_vcpu;
 static bool gdb_active = false;
 
-static const struct gdb_reg {
+struct gdb_reg {
 	enum vm_reg_name id;
 	int size;
-} gdb_regset[] = {
+};
+
+static const struct gdb_reg gdb_regset[] = {
 	{ .id = VM_REG_GUEST_RAX, .size = 8 },
 	{ .id = VM_REG_GUEST_RBX, .size = 8 },
 	{ .id = VM_REG_GUEST_RCX, .size = 8 },
