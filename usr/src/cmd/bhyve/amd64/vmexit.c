@@ -556,8 +556,12 @@ static int
 vmexit_debug(struct vmctx *ctx __unused, struct vcpu *vcpu,
     struct vm_exit *vme __unused)
 {
-
 	gdb_cpu_suspend(vcpu);
+	/*
+	 * Sleep for a short period to avoid chewing up the CPU in the
+	 * window between activation of the vCPU thread and the STARTUP IPI.
+	 */
+	usleep(1000);
 	return (VMEXIT_CONTINUE);
 }
 
