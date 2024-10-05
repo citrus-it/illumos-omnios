@@ -77,9 +77,9 @@ static const zen_fabric_ops_t genoa_fabric_ops = {
 	.zfo_iohc_bus_num = genoa_fabric_iohc_bus_num,
 	.zfo_iohc_fch_link = genoa_fabric_iohc_fch_link,
 	.zfo_iohc_arbitration = genoa_fabric_iohc_arbitration,
-	.zfo_nbif_arbitration = zen_null_fabric_nbif_arbitration,    /* XXX */
-	.zfo_sdp_control = zen_null_fabric_sdp_control,		     /* XXX */
-	.zfo_nbif_syshub_dma = zen_null_fabric_nbif_syshub_dma,	     /* XXX */
+	.zfo_nbif_arbitration = genoa_fabric_nbif_arbitration,
+	.zfo_sdp_control = zen_null_fabric_sdp_control,
+	.zfo_nbif_syshub_dma = genoa_fabric_nbif_syshub_dma,
 	.zfo_ioapic = genoa_fabric_ioapic,
 	.zfo_pcie = genoa_fabric_pcie,
 

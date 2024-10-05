@@ -86,9 +86,9 @@ static const zen_fabric_ops_t turin_fabric_ops = {
 	.zfo_iohc_bus_num = turin_fabric_iohc_bus_num,
 	.zfo_iohc_fch_link = turin_fabric_iohc_fch_link,
 	.zfo_iohc_arbitration = turin_fabric_iohc_arbitration,
-	.zfo_nbif_arbitration = zen_null_fabric_nbif_arbitration,    /* XXX */
-	.zfo_sdp_control = zen_null_fabric_sdp_control,		     /* XXX */
-	.zfo_nbif_syshub_dma = zen_null_fabric_nbif_syshub_dma,	     /* XXX */
+	.zfo_nbif_arbitration = turin_fabric_nbif_arbitration,
+	.zfo_sdp_control = zen_null_fabric_sdp_control,
+	.zfo_nbif_syshub_dma = turin_fabric_nbif_syshub_dma,
 	.zfo_ioapic = turin_fabric_ioapic,
 	.zfo_pcie = turin_fabric_pcie,
 
