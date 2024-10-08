@@ -64,12 +64,12 @@ extern "C" {
 
 /*
  * Each NBIO has 4 x16 PCIe Gen5 cores, one on each of four IOHUBs.
- * Additionally, NBIO0/IOHUB2 (IOMS2) has a bonus x8 PCIe Gen3 core.
+ * Additionally, NBIO0/IOHUB2 (IOMS1) has a bonus x8 PCIe Gen3 core.
  * This all means that the most IOHUBs across both NBIOs has one core, while
  * NBIO0/IOHUB2 has two.
  */
 #define	TURIN_IOMS_MAX_PCIE_CORES	2
-#define	TURIN_NBIO_BONUS_IOMS		2
+#define	TURIN_NBIO_BONUS_IOMS		1
 #define	TURIN_IOMS_BONUS_PCIE_CORENO	1
 
 /*
@@ -134,6 +134,10 @@ extern smn_reg_t turin_pcie_port_reg(const zen_pcie_port_t *const,
     const smn_reg_def_t);
 extern smn_reg_t turin_pcie_core_reg(const zen_pcie_core_t *const,
     const smn_reg_def_t);
+extern const zen_pcie_core_info_t *turin_pcie_core_info(const uint8_t, const
+    uint8_t);
+extern const zen_pcie_port_info_t *turin_pcie_port_info(const uint8_t, const
+    uint8_t);
 
 #ifdef __cplusplus
 }
