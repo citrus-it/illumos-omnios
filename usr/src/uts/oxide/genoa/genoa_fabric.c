@@ -24,6 +24,7 @@
 #include <sys/pci.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_cfgspace_impl.h>
+#include <sys/spl.h>
 
 #include <sys/io/zen/df_utils.h>
 #include <sys/io/zen/fabric_impl.h>
@@ -38,6 +39,67 @@
 #include <sys/io/genoa/iommu.h>
 #include <sys/io/genoa/nbif_impl.h>
 #include <sys/io/genoa/ioapic.h>
+
+/*
+ * This table encodes knowledge about how the SoC assigns devices and functions
+ * to root ports.
+ */
+static const zen_pcie_port_info_t genoa_pcie[][GENOA_PCIE_CORE_MAX_PORTS] = {
+	[0] = {
+		{  .zppi_dev = 0x1, .zppi_func = 0x1 },
+		{  .zppi_dev = 0x1, .zppi_func = 0x2 },
+		{  .zppi_dev = 0x1, .zppi_func = 0x3 },
+		{  .zppi_dev = 0x1, .zppi_func = 0x4 },
+		{  .zppi_dev = 0x1, .zppi_func = 0x5 },
+		{  .zppi_dev = 0x1, .zppi_func = 0x6 },
+		{  .zppi_dev = 0x1, .zppi_func = 0x7 },
+		{  .zppi_dev = 0x2, .zppi_func = 0x1 },
+		{  .zppi_dev = 0x2, .zppi_func = 0x2 }
+	},
+	[1] = {
+		{  .zppi_dev = 0x3, .zppi_func = 0x1 },
+		{  .zppi_dev = 0x3, .zppi_func = 0x2 },
+		{  .zppi_dev = 0x3, .zppi_func = 0x3 },
+		{  .zppi_dev = 0x3, .zppi_func = 0x4 },
+		{  .zppi_dev = 0x3, .zppi_func = 0x5 },
+		{  .zppi_dev = 0x3, .zppi_func = 0x6 },
+		{  .zppi_dev = 0x3, .zppi_func = 0x7 },
+		{  .zppi_dev = 0x4, .zppi_func = 0x1 },
+		{  .zppi_dev = 0x4, .zppi_func = 0x2 }
+	},
+	[2] = {
+		{  .zppi_dev = 0x5, .zppi_func = 0x1 },
+		{  .zppi_dev = 0x5, .zppi_func = 0x2 },
+		{  .zppi_dev = 0x5, .zppi_func = 0x3 },
+		{  .zppi_dev = 0x5, .zppi_func = 0x4 }
+	}
+};
+
+/*
+ * This table encodes the mapping of the set of dxio lanes to a given PCIe core
+ * on an IOMS. The dxio engine uses different lane numbers than the phys. Note,
+ * that all lanes here are inclusive. e.g. [start, end].
+ * The subsequent tables encode mappings for the bonus cores.
+ */
+static const zen_pcie_core_info_t genoa_lane_maps[8] = {
+	/* name, DXIO start, DXIO end, PHY start, PHY end */
+	{ "P0", 0x00, 0x0f, 0x00, 0x0f },	/* IOMS0, core 0 */
+	{ "G0", 0x60, 0x6f, 0x60, 0x6f },	/* IOMS0, core 1 */
+	{ "G1", 0x40, 0x4f, 0x40, 0x4f },	/* IOMS1, core 0 */
+	{ "P1", 0x20, 0x2f, 0x20, 0x2f },	/* IOMS1, core 1 */
+	{ "P2", 0x30, 0x3f, 0x30, 0x3f },	/* IOMS2, core 0 */
+	{ "G2", 0x70, 0x7f, 0x70, 0x7f },	/* IOMS2, core 1 */
+	{ "G3", 0x50, 0x5f, 0x50, 0x5f },	/* IOMS3, core 0 */
+	{ "P3", 0x10, 0x1f, 0x10, 0x1f } 	/* IOMS3, core 1 */
+};
+
+static const zen_pcie_core_info_t genoa_p4_map = {
+	"P4", 0x80, 0x83, 0x80, 0x83		/* IOMS 2, core 2 */
+};
+
+static const zen_pcie_core_info_t genoa_p5_map = {
+	"P5", 0x84, 0x87, 0x84, 0x87		/* IOMS 0, core 2 */
+};
 
 /*
  * The following table encodes the per-bridge IOAPIC initialization routing. We
@@ -130,29 +192,6 @@ const zen_nbif_info_t genoa_nbif_data[ZEN_IOMS_MAX_NBIF][ZEN_NBIF_MAX_FUNCS] = {
 };
 
 /*
- * This is called from the common code, via an entry in the Genoa version of
- * Zen fabric ops vector. The common code is responsible for the bulk of
- * initialization; we merely fill in those bits that are microarchitecture
- * specific.
- */
-void
-genoa_fabric_ioms_init(zen_ioms_t *ioms)
-{
-	const uint8_t iomsno = ioms->zio_num;
-
-	ioms->zio_npcie_cores = genoa_ioms_n_pcie_cores(iomsno);
-	ioms->zio_nbionum = GENOA_NBIO_NUM(iomsno);
-
-	/*
-	 * nBIFs are actually associated with the NBIO instance but we have no
-	 * representation in the fabric for NBIOs yet. Mark the first IOMS in
-	 * each NBIO as holding the nBIFs.
-	 */
-	if (GENOA_IOMS_IOHUB_NUM(iomsno) == 0)
-		ioms->zio_flags |= ZEN_IOMS_F_HAS_NBIF;
-}
-
-/*
  * How many PCIe cores does this IOMS instance have?
  * If it's an IOHUB that has a bonus core then it will have the maximum
  * number, otherwise one fewer.
@@ -179,6 +218,44 @@ genoa_pcie_core_n_ports(const uint8_t pcno)
 		return (GENOA_PCIE_CORE_BONUS_PORTS);
 	return (GENOA_PCIE_CORE_MAX_PORTS);
 }
+
+const zen_pcie_core_info_t *
+genoa_pcie_core_info(const uint8_t iomsno, const uint8_t coreno)
+{
+	if (coreno == GENOA_IOMS_BONUS_PCIE_CORENO)
+		return (iomsno ? &genoa_p5_map : &genoa_p4_map);
+
+	return (&genoa_lane_maps[iomsno * 2 + coreno]);
+}
+
+const zen_pcie_port_info_t *
+genoa_pcie_port_info(const uint8_t coreno, const uint8_t portno)
+{
+	return (&genoa_pcie[coreno][portno]);
+}
+
+/*
+ * This is called from the common code, via an entry in the Genoa version of
+ * Zen fabric ops vector. The common code is responsible for the bulk of
+ * initialization; we merely fill in those bits that are microarchitecture
+ * specific.
+ */
+void
+genoa_fabric_ioms_init(zen_ioms_t *ioms)
+{
+	const uint8_t iomsno = ioms->zio_num;
+
+	ioms->zio_nbionum = GENOA_NBIO_NUM(iomsno);
+
+	/*
+	 * nBIFs are actually associated with the NBIO instance but we have no
+	 * representation in the fabric for NBIOs yet. Mark the first IOMS in
+	 * each NBIO as holding the nBIFs.
+	 */
+	if (GENOA_IOMS_IOHUB_NUM(iomsno) == 0)
+		ioms->zio_flags |= ZEN_IOMS_F_HAS_NBIF;
+}
+
 
 typedef enum genoa_iommul1_subunit {
 	GIL1SU_IOAGR

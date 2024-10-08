@@ -139,6 +139,10 @@ extern smn_reg_t milan_pcie_port_reg(const zen_pcie_port_t *const,
     const smn_reg_def_t);
 extern smn_reg_t milan_pcie_core_reg(const zen_pcie_core_t *const,
     const smn_reg_def_t);
+extern const zen_pcie_core_info_t *milan_pcie_core_info(const uint8_t, const
+    uint8_t);
+extern const zen_pcie_port_info_t *milan_pcie_port_info(const uint8_t, const
+    uint8_t);
 extern void milan_pcie_dbg_signal(void);
 
 #ifdef __cplusplus

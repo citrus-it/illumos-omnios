@@ -89,6 +89,10 @@ static const zen_fabric_ops_t milan_fabric_ops = {
 	.zfo_get_dxio_fw_version = milan_get_dxio_fw_version,
 	.zfo_report_dxio_fw_version = milan_report_dxio_fw_version,
 
+	.zfo_ioms_n_pcie_cores = milan_ioms_n_pcie_cores,
+	.zfo_pcie_core_n_ports = milan_pcie_core_n_ports,
+	.zfo_pcie_core_info = milan_pcie_core_info,
+	.zfo_pcie_port_info = milan_pcie_port_info,
 	.zfo_pcie_core_reg = milan_pcie_core_reg,
 	.zfo_pcie_port_reg = milan_pcie_port_reg,
 	.zfo_pcie_dbg_signal = milan_pcie_dbg_signal,
@@ -124,6 +128,7 @@ const zen_platform_t milan_platform = {
 		.zpc_nnbif = MILAN_IOMS_MAX_NBIF,
 		.zpc_nbif_nfunc = milan_nbif_nfunc,
 		.zpc_nbif_data = milan_nbif_data,
+		.zpc_pcie_core0_unitid = MILAN_PCIE_CORE0_UNITID,
 #ifdef DEBUG
 		.zpc_pcie_core_dbg_regs = milan_pcie_core_dbg_regs,
 		.zpc_pcie_core_dbg_nregs = ARRAY_SIZE(milan_pcie_core_dbg_regs),
