@@ -194,13 +194,22 @@ static smn_reg_t
 turin_ioms_reg(const zen_ioms_t *const ioms, const smn_reg_def_t def,
     const uint16_t reginst)
 {
+	const uint8_t iomsno = ioms->zio_num;
 	smn_reg_t reg;
+
+	/*
+	 * Most of these registers number their instances across the even IOMS
+	 * first, then across the odd ones. For these, the IOMS number needs to
+	 * be translated to the corresponding unit number.
+	 */
+	const uint8_t iunit = iomsno / 2 + (iomsno % 2) * 4;
+
 	switch (def.srd_unit) {
 	case SMN_UNIT_IOHC:
-		reg = turin_iohc_smn_reg(ioms->zio_num, def, reginst);
+		reg = turin_iohc_smn_reg(iunit, def, reginst);
 		break;
 	case SMN_UNIT_IOAGR:
-		reg = turin_ioagr_smn_reg(ioms->zio_num, def, reginst);
+		reg = turin_ioagr_smn_reg(iunit, def, reginst);
 		break;
 	case SMN_UNIT_IOMMUL1: {
 		/*
@@ -215,8 +224,7 @@ turin_ioms_reg(const zen_ioms_t *const ioms, const smn_reg_def_t def,
 		    (const turin_iommul1_subunit_t)reginst;
 		switch (su) {
 		case TIL1SU_IOAGR:
-			reg = turin_iommul1_ioagr_smn_reg(ioms->zio_num, def,
-			    0);
+			reg = turin_iommul1_ioagr_smn_reg(iomsno, def, 0);
 			break;
 		default:
 			cmn_err(CE_PANIC, "invalid IOMMUL1 subunit %d", su);
@@ -224,9 +232,20 @@ turin_ioms_reg(const zen_ioms_t *const ioms, const smn_reg_def_t def,
 		}
 		break;
 	}
-	case SMN_UNIT_IOMMUL2:
-		reg = turin_iommul2_smn_reg(ioms->zio_num, def, reginst);
+	case SMN_UNIT_IOMMUL2: {
+		/*
+		 * There are only instances of this register on the first two
+		 * IOMS in each NBIO.
+		 */
+		ASSERT3U(TURIN_IOMS_IOHUB_NUM(iomsno), <, 2);
+
+		const uint8_t unit =
+		    TURIN_IOMS_IOHUB_NUM(iomsno) +
+		    2 * TURIN_NBIO_NUM(iomsno);
+
+		reg = turin_iommul2_smn_reg(unit, def, reginst);
 		break;
+	}
 	default:
 		cmn_err(CE_PANIC, "invalid SMN register type %d for IOMS",
 		    def.srd_unit);
@@ -375,8 +394,16 @@ turin_fabric_iohc_fch_link(zen_ioms_t *ioms, bool has_fch)
 		iommureg = turin_ioms_reg(ioms, D_IOMMUL1_SB_LOCATION,
 		    TIL1SU_IOAGR);
 		zen_ioms_write(ioms, iommureg, val);
-		iommureg = turin_ioms_reg(ioms, D_IOMMUL2_SB_LOCATION, 0);
-		zen_ioms_write(ioms, iommureg, val);
+
+		/*
+		 * IOMMUL2::L2_SB_LOCATION is only instanced on the first two
+		 * IOMS within each NBIO.
+		 */
+		if (TURIN_IOMS_IOHUB_NUM(ioms->zio_num) < 2) {
+			iommureg = turin_ioms_reg(ioms,
+			    D_IOMMUL2_SB_LOCATION, 0);
+			zen_ioms_write(ioms, iommureg, val);
+		}
 	} else {
 		zen_ioms_write(ioms, reg, 0);
 	}
