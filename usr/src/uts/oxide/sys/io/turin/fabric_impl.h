@@ -98,6 +98,10 @@ typedef enum {
 } turin_iohc_sz_t;
 #define	TURIN_IOHC_SZ(num)	((num) % 2 == 0 ? IOHC_SZ_L : IOHC_SZ_S)
 
+/* Calculate the IOHC unit given an IOMS number */
+#define	TURIN_IOMS_IOHC_NUM(iomsno) \
+	((iomsno) / 2 + (TURIN_IOHC_SZ(iomsno) == IOHC_SZ_L ? 0 : 4))
+
 /*
  * The Turin uarch-specific hooks for initial fabric topology initialization.
  */
@@ -125,6 +129,8 @@ extern void turin_fabric_iohc_arbitration(zen_ioms_t *);
 extern void turin_fabric_nbif_arbitration(zen_nbif_t *);
 extern void turin_fabric_nbif_syshub_dma(zen_nbif_t *);
 extern void turin_fabric_ioapic(zen_ioms_t *);
+extern void turin_fabric_nbif_dev_straps(zen_nbif_t *);
+extern void turin_fabric_nbif_bridges(zen_ioms_t *);
 extern void turin_fabric_pcie(zen_fabric_t *);
 
 extern void turin_iohc_enable_nmi(zen_ioms_t *);
