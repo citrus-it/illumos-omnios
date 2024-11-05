@@ -255,6 +255,7 @@ static oxide_board_def_t oxide_board_defs[] = {
 		.obdef_board_data = {
 			.obd_board = OXIDE_BOARD_RUBYRED,
 			.obd_rootnexus = "Oxide,RubyRed",
+			//.obd_ipccmode = IPCC_MODE_ESPI_C,
 			.obd_ipccmode = IPCC_MODE_DISABLED,
 			.obd_startupopts = IPCC_STARTUP_KMDB_BOOT |
 			    IPCC_STARTUP_VERBOSE | IPCC_STARTUP_PROM,

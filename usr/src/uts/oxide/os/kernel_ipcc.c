@@ -30,10 +30,12 @@
 #include <sys/sunldi.h>
 #include <sys/systm.h>
 #include <sys/uart.h>
+#include <sys/espi.h>
 #include <vm/kboot_mmu.h>
 #include <sys/amdzen/fch/gpio.h>
 #include <sys/amdzen/fch/iomux.h>
 #include <sys/io/fch/uart.h>
+#include <sys/io/fch/espi.h>
 #include <sys/archsystm.h>
 #include <sys/platform_detect.h>
 #include <sys/cpu.h>
@@ -70,33 +72,47 @@ static ipcc_panic_data_t ipcc_panic_buf;
 static uint8_t ipcc_panic_scratch[0x100];
 
 /*
- * Functions for using IPCC from the kernel, driving the UART directly using the
- * polling functions in dw_apb_uart.c
+ * Functions for using IPCC from the kernel.
  */
 
 typedef struct {
-	dw_apb_uart_t		kid_uart;
-	uint32_t		kid_agpio;
-	mmio_reg_block_t	kid_gpio_block;
-	mmio_reg_t		kid_gpio_reg;
+	union {
+		struct {
+			dw_apb_uart_t		kid_uart;
+			uint32_t		kid_agpio;
+			mmio_reg_block_t	kid_gpio_block;
+			mmio_reg_t		kid_gpio_reg;
+		};
+		struct {
+			uint8_t			kid_espi_tag;
+			mmio_reg_block_t	kid_espi_block;
+		};
+	};
 } kernel_ipcc_data_t;
 
 static kernel_ipcc_data_t kernel_ipcc_data;
 
-static bool
-eb_ipcc_readable(void *arg)
+static void
+eb_ipcc_pause(uint64_t delay_ms)
 {
-	kernel_ipcc_data_t *data = arg;
+	const hrtime_t delay_ns = MSEC2NSEC(delay_ms);
+	extern int gethrtime_hires;
 
-	return (dw_apb_uart_readable(&data->kid_uart));
-}
-
-static bool
-eb_ipcc_writable(void *arg)
-{
-	kernel_ipcc_data_t *data = arg;
-
-	return (dw_apb_uart_writable(&data->kid_uart));
+	if (gethrtime_hires != 0) {
+		/* The TSC is calibrated, we can use drv_usecwait() */
+		drv_usecwait(NSEC2USEC(delay_ns));
+	} else {
+		/*
+		 * The TSC has not yet been calibrated so assume its frequency
+		 * is 2GHz (2 ticks per nanosecond). This is approximately
+		 * correct for Gimlet and should be the right order of magnitude
+		 * for future platforms. This delay does not have be accurate
+		 * and is only used very early in boot.
+		 */
+		const hrtime_t start = tsc_read();
+		while (tsc_read() < start + (delay_ns << 1))
+			SMT_PAUSE();
+	}
 }
 
 static bool
@@ -108,31 +124,26 @@ eb_ipcc_readintr(void *arg)
 	return (FCH_GPIO_GPIO_GET_INPUT(gpio) == FCH_GPIO_GPIO_INPUT_LOW);
 }
 
-static void
-eb_ipcc_pause(uint64_t delay_ms)
-{
-	hrtime_t delay_ns = MSEC2NSEC(delay_ms);
-	extern int gethrtime_hires;
+/* Drive the UART directly using the polling functions in dw_apb_uart.c */
 
-	if (gethrtime_hires) {
-		/* The TSC is calibrated, we can use drv_usecwait() */
-		drv_usecwait(NSEC2USEC(delay_ns));
-	} else {
-		/*
-		 * The TSC has not yet been calibrated so assume its frequency
-		 * is 2GHz (2 ticks per nanosecond). This is approximately
-		 * correct for Gimlet and should be the right order of magnitude
-		 * for future platforms. This delay does not have be accurate
-		 * and is only used very early in boot.
-		 */
-		hrtime_t start = tsc_read();
-		while (tsc_read() < start + (delay_ns << 1))
-			SMT_PAUSE();
-	}
+static bool
+eb_ipcc_uart_readable(void *arg)
+{
+	kernel_ipcc_data_t *data = arg;
+
+	return (dw_apb_uart_readable(&data->kid_uart));
+}
+
+static bool
+eb_ipcc_uart_writable(void *arg)
+{
+	kernel_ipcc_data_t *data = arg;
+
+	return (dw_apb_uart_writable(&data->kid_uart));
 }
 
 static int
-eb_ipcc_poll(void *arg, ipcc_pollevent_t ev, ipcc_pollevent_t *revp,
+eb_ipcc_uart_poll(void *arg, ipcc_pollevent_t ev, ipcc_pollevent_t *revp,
     uint64_t timeout_ms)
 {
 	uint64_t elapsed = 0, uselapsed = 0;
@@ -141,9 +152,9 @@ eb_ipcc_poll(void *arg, ipcc_pollevent_t ev, ipcc_pollevent_t *revp,
 	for (;;) {
 		if ((ev & IPCC_INTR) != 0 && eb_ipcc_readintr(arg))
 			rev |= IPCC_INTR;
-		if ((ev & IPCC_POLLIN) != 0 && eb_ipcc_readable(arg))
+		if ((ev & IPCC_POLLIN) != 0 && eb_ipcc_uart_readable(arg))
 			rev |= IPCC_POLLIN;
-		if ((ev & IPCC_POLLOUT) != 0 && eb_ipcc_writable(arg))
+		if ((ev & IPCC_POLLOUT) != 0 && eb_ipcc_uart_writable(arg))
 			rev |= IPCC_POLLOUT;
 		if (rev != 0)
 			break;
@@ -165,7 +176,7 @@ eb_ipcc_poll(void *arg, ipcc_pollevent_t ev, ipcc_pollevent_t *revp,
 }
 
 static void
-eb_ipcc_flush(void *arg)
+eb_ipcc_uart_flush(void *arg)
 {
 	kernel_ipcc_data_t *data = arg;
 
@@ -173,7 +184,7 @@ eb_ipcc_flush(void *arg)
 }
 
 static int
-eb_ipcc_read(void *arg, uint8_t *buf, size_t *len)
+eb_ipcc_uart_read(void *arg, uint8_t *buf, size_t *len)
 {
 	kernel_ipcc_data_t *data = arg;
 
@@ -184,12 +195,106 @@ eb_ipcc_read(void *arg, uint8_t *buf, size_t *len)
 }
 
 static int
-eb_ipcc_write(void *arg, uint8_t *buf, size_t *len)
+eb_ipcc_uart_write(void *arg, uint8_t *buf, size_t *len)
 {
 	kernel_ipcc_data_t *data = arg;
 
 	dw_apb_uart_tx(&data->kid_uart, buf, *len);
 	return (0);
+}
+
+/* Communicate with an eSPI downstream peripheral */
+
+static bool
+eb_ipcc_espi_readable(void *arg)
+{
+	kernel_ipcc_data_t *data = arg;
+
+	return (espi_readable(data->kid_espi_block));
+}
+
+static bool
+eb_ipcc_espi_writable(void *arg)
+{
+	kernel_ipcc_data_t *data = arg;
+
+	return (espi_writable(data->kid_espi_block));
+}
+
+static int
+eb_ipcc_espi_poll(void *arg, ipcc_pollevent_t ev, ipcc_pollevent_t *revp,
+    uint64_t timeout_ms)
+{
+	uint64_t elapsed = 0, uselapsed = 0;
+	ipcc_pollevent_t rev = 0;
+
+	for (;;) {
+		if ((ev & IPCC_INTR) != 0 && eb_ipcc_readintr(arg))
+			rev |= IPCC_INTR;
+		if ((ev & IPCC_POLLIN) != 0 && eb_ipcc_espi_readable(arg))
+			rev |= IPCC_POLLIN;
+		if ((ev & IPCC_POLLOUT) != 0 && eb_ipcc_espi_writable(arg))
+			rev |= IPCC_POLLOUT;
+		if (rev != 0)
+			break;
+
+		if (ipcc_fastpoll) {
+			tenmicrosec();
+			if (++uselapsed % 100 == 0)
+				elapsed++;
+		} else {
+			eb_ipcc_pause(10);
+			elapsed += 10;
+		}
+		if (timeout_ms > 0 && elapsed >= timeout_ms)
+			return (ETIMEDOUT);
+	}
+
+	*revp = rev;
+	return (0);
+}
+
+static void
+eb_ipcc_espi_flush(void *arg __unused)
+{
+	kernel_ipcc_data_t *data = arg;
+
+	espi_flush(data->kid_espi_block);
+}
+
+static int
+eb_ipcc_espi_read(void *arg, uint8_t *buf, size_t *len)
+{
+	kernel_ipcc_data_t *data = arg;
+
+	ASSERT3U(*len, >, 0);
+
+	return (espi_rx(data->kid_espi_block, data->kid_espi_tag,
+	    buf, len));
+}
+
+static int
+eb_ipcc_espi_write(void *arg, uint8_t *buf, size_t *len)
+{
+	kernel_ipcc_data_t *data = arg;
+
+	return (espi_tx(data->kid_espi_block, data->kid_espi_tag, buf, len));
+}
+
+static int
+eb_ipcc_espi_open(void *arg)
+{
+	kernel_ipcc_data_t *data = arg;
+
+	return (espi_acquire(data->kid_espi_block));
+}
+
+static void
+eb_ipcc_espi_close(void *arg)
+{
+	kernel_ipcc_data_t *data = arg;
+
+	espi_release(data->kid_espi_block);
 }
 
 static void
@@ -265,6 +370,8 @@ eb_ipcc_init(void)
 
 	eb_ipcc_init_gpio(data);
 
+	bzero(&kernel_ipcc_ops, sizeof (kernel_ipcc_ops));
+
 	switch ((mode = oxide_board_data->obd_ipccmode)) {
 	case IPCC_MODE_UART1:
 		if (dw_apb_uart_init(&data->kid_uart, DAP_1, 3000000,
@@ -272,11 +379,25 @@ eb_ipcc_init(void)
 			bop_panic("Could not initialize SP/Host UART");
 		}
 
-		bzero(&kernel_ipcc_ops, sizeof (kernel_ipcc_ops));
-		kernel_ipcc_ops.io_poll = eb_ipcc_poll;
-		kernel_ipcc_ops.io_flush = eb_ipcc_flush;
-		kernel_ipcc_ops.io_read = eb_ipcc_read;
-		kernel_ipcc_ops.io_write = eb_ipcc_write;
+		kernel_ipcc_ops.io_poll = eb_ipcc_uart_poll;
+		kernel_ipcc_ops.io_flush = eb_ipcc_uart_flush;
+		kernel_ipcc_ops.io_read = eb_ipcc_uart_read;
+		kernel_ipcc_ops.io_write = eb_ipcc_uart_write;
+		kernel_ipcc_ops.io_log = eb_ipcc_log;
+		break;
+	case IPCC_MODE_ESPI_C:
+		data->kid_espi_block = fch_espi_mmio_block();
+		data->kid_espi_tag = 0x3; // XXX
+
+		// XXX
+		(void) espi_get_configuration(data->kid_espi_block);
+
+		kernel_ipcc_ops.io_open = eb_ipcc_espi_open;
+		kernel_ipcc_ops.io_close = eb_ipcc_espi_close;
+		kernel_ipcc_ops.io_poll = eb_ipcc_espi_poll;
+		kernel_ipcc_ops.io_flush = eb_ipcc_espi_flush;
+		kernel_ipcc_ops.io_read = eb_ipcc_espi_read;
+		kernel_ipcc_ops.io_write = eb_ipcc_espi_write;
 		kernel_ipcc_ops.io_log = eb_ipcc_log;
 		break;
 	default:
@@ -334,6 +455,14 @@ mb_ipcc_init(void)
 		 */
 		if (dw_apb_uart_reinit(&data->kid_uart) != 0)
 			bop_panic("Could not re-initialize SP/Host UART");
+		break;
+	case IPCC_MODE_ESPI_C:
+		/*
+		 * The eSPI register block needs to be re-initialised to move
+		 * the MMIO mappings out of the boot pages.
+		 */
+		mmio_reg_block_unmap(&data->kid_espi_block);
+		data->kid_espi_block = fch_espi_mmio_block();
 		break;
 	default:
 		bop_panic("Unknown IPCC mode: 0x%x", mode);

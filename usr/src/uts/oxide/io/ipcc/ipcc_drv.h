@@ -34,6 +34,7 @@ extern "C" {
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
 #include <sys/ipcc.h>
+#include <sys/io/fch/espi.h>
 
 #define	IPCC_DRIVER_NAME	"ipcc"
 #define	IPCC_NODE_NAME		"ipcc"
@@ -47,10 +48,14 @@ typedef struct ipcc_state {
 	cred_t		*is_cred;
 
 	bool		is_open;
+	bool		is_uart;
 
 	ldi_ident_t	is_ldiid;
 
-	ldi_handle_t	is_ldih;
+	union {
+		ldi_handle_t		is_ldih;
+		mmio_reg_block_t	is_espi_block;
+	};
 
 	bool		is_sp_intr;
 	ldi_handle_t	is_sp_intr_ldih;
