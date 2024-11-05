@@ -277,7 +277,7 @@ SYS_KMODS	+=
 #
 #	'Misc' Modules (/kernel/misc):
 #
-MISC_KMODS	+= pcie pci_prd boot_image
+MISC_KMODS	+= pcie pci_prd boot_image espi_test
 
 #
 #	'Dacf' modules (/kernel/dacf)

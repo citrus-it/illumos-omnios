@@ -654,6 +654,57 @@ ipcc_decode_bytes(uint8_t *val, size_t cnt, const uint8_t *buf, size_t *off)
 	*off += cnt;
 }
 
+#define	LOG(...) if (ops->io_log != NULL) \
+	ops->io_log(arg, IPCC_LOG_DEBUG, __VA_ARGS__)
+#define	LOGHEX(tag, buf, len) \
+	if (ops->io_log != NULL) ipcc_loghex((tag), (buf), (len), ops, arg)
+
+
+typedef struct {
+	const ipcc_ops_t	*lhcb_ops;
+	const char		*lhcb_tag;
+	void			*lhcb_arg;
+} loghex_cb_t;
+
+static int
+ipcc_loghex_cb(void *arg, uint64_t addr, const char *str,
+    size_t len __unused)
+{
+	const loghex_cb_t *cb = arg;
+
+	cb->lhcb_ops->io_log(cb->lhcb_arg, IPCC_LOG_HEX, "%s  %s\n",
+	    cb->lhcb_tag, str);
+	return (0);
+}
+
+static void
+ipcc_loghex(const char *tag, const uint8_t *buf, size_t bufl,
+    const ipcc_ops_t *ops, void *arg)
+{
+	loghex_cb_t cb = {
+		.lhcb_ops = ops,
+		.lhcb_tag = tag,
+		.lhcb_arg = arg
+	};
+	/*
+	 * A line of hexdump output with the default width of 16 bytes per line
+	 * and a grouping of 4, in conjunction with the address and ascii
+	 * options will not exceed 80 characters, even if the address becomes
+	 * large enough to use additional columns.
+	 */
+	uint8_t scratchbuf[80];
+	hexdump_t h;
+
+	hexdump_init(&h);
+	hexdump_set_grouping(&h, 4);
+	hexdump_set_buf(&h, scratchbuf, sizeof (scratchbuf));
+
+	(void) hexdumph(&h, buf, bufl, HDF_ADDRESS | HDF_ASCII,
+	    ipcc_loghex_cb, (void *)&cb);
+
+	hexdump_fini(&h);
+}
+
 static const char *
 ipcc_failure_str(uint8_t reason)
 {
@@ -753,6 +804,7 @@ ipcc_pkt_recv(uint8_t *pkt, size_t len, uint8_t **endp,
     const ipcc_ops_t *ops, void *arg)
 {
 	ipcc_pollevent_t ev;
+	uint8_t *frame = pkt;
 
 	*endp = NULL;
 
@@ -781,77 +833,27 @@ ipcc_pkt_recv(uint8_t *pkt, size_t len, uint8_t **endp,
 			return (ESPINTR);
 		ASSERT((rev & IPCC_POLLIN) != 0);
 
-		n = 1;
-		err = ops->io_read(arg, pkt, &n);
+		n = len;
+		err = ops->io_read(arg, frame, &n);
 		if (err != 0)
 			return (err);
 
 		if (n == 0)
 			continue;
 
-		VERIFY3U(n, ==, 1);
+		LOGHEX("RX IN", frame, n);
 
-		if (*pkt == 0) {
-			*endp = pkt;
+		if (frame[n - 1] == '\0') {
+			*endp = frame + n - 1;
 			return (0);
 		}
 
-		pkt += n;
+		frame += n;
 		len -= n;
 	} while (len > 0);
 
 	return (ENOBUFS);
 }
-
-typedef struct {
-	const ipcc_ops_t	*lhcb_ops;
-	const char		*lhcb_tag;
-	void			*lhcb_arg;
-} loghex_cb_t;
-
-static int
-ipcc_loghex_cb(void *arg, uint64_t addr, const char *str,
-    size_t len __unused)
-{
-	const loghex_cb_t *cb = arg;
-
-	cb->lhcb_ops->io_log(cb->lhcb_arg, IPCC_LOG_HEX, "%s  %s\n",
-	    cb->lhcb_tag, str);
-	return (0);
-}
-
-static void
-ipcc_loghex(const char *tag, const uint8_t *buf, size_t bufl,
-    const ipcc_ops_t *ops, void *arg)
-{
-	loghex_cb_t cb = {
-		.lhcb_ops = ops,
-		.lhcb_tag = tag,
-		.lhcb_arg = arg
-	};
-	/*
-	 * A line of hexdump output with the default width of 16 bytes per line
-	 * and a grouping of 4, in conjunction with the address and ascii
-	 * options will not exceed 80 characters, even if the address becomes
-	 * large enough to use additional columns.
-	 */
-	uint8_t scratchbuf[80];
-	hexdump_t h;
-
-	hexdump_init(&h);
-	hexdump_set_grouping(&h, 4);
-	hexdump_set_buf(&h, scratchbuf, sizeof (scratchbuf));
-
-	(void) hexdumph(&h, buf, bufl, HDF_ADDRESS | HDF_ASCII,
-	    ipcc_loghex_cb, (void *)&cb);
-
-	hexdump_fini(&h);
-}
-
-#define	LOG(...) if (ops->io_log != NULL) \
-	ops->io_log(arg, IPCC_LOG_DEBUG, __VA_ARGS__)
-#define	LOGHEX(tag, buf, len) \
-	if (ops->io_log != NULL) ipcc_loghex((tag), (buf), (len), ops, arg)
 
 /*
  * This is the main interface for sending a command to the SP via the IPCC.
@@ -918,7 +920,7 @@ ipcc_command_locked(const ipcc_ops_t *ops, void *arg,
 	uint64_t send_seq, rcvd_seq;
 	uint32_t rcvd_magic, rcvd_version;
 	uint16_t rcvd_crc, crc;
-	uint8_t rcvd_cmd, *end;
+	uint8_t rcvd_cmd, *frame, *end;
 	uint8_t attempt = 0;
 	int err = 0;
 
@@ -1013,14 +1015,20 @@ reread:
 	if (err != 0)
 		return (err);
 
-	if (end == ipcc_pkt) {
+	frame = ipcc_pkt;
+
+	/* Skip leading frame terminators */
+	while (*frame == '\0' && end > frame)
+		frame++;
+
+	if (end == frame) {
 		LOG("Received empty frame\n");
 		goto reread;
 	}
 
 	/* Decode the frame */
-	LOGHEX(" COBS IN", ipcc_pkt, end - ipcc_pkt);
-	if (!ipcc_cobs_decode(ipcc_pkt, end - ipcc_pkt,
+	LOGHEX(" COBS IN", frame, end - frame);
+	if (!ipcc_cobs_decode(frame, end - frame,
 	    ipcc_msg, sizeof (ipcc_msg), &pktl)) {
 		LOG("Error decoding COBS frame\n");
 		goto resend;

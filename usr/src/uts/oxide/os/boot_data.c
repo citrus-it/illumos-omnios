@@ -387,10 +387,12 @@ void
 eb_create_properties(uint64_t ramdisk_paddr, size_t ramdisk_len)
 {
 
-	if (oxide_board_data->obd_ipccmode == IPCC_MODE_DISABLED) {
+	if (1 || oxide_board_data->obd_ipccmode == IPCC_MODE_DISABLED) {
 		eb_create_common_properties(ramdisk_paddr, ramdisk_len,
 		    oxide_board_data->obd_startupopts);
 		eb_fake_ipcc_properties();
+		//XXX
+		kernel_ipcc_init(IPCC_INIT_ENABLE_INTERRUPT);
 	} else {
 		uint64_t spstatus, spstartup;
 		int err;
