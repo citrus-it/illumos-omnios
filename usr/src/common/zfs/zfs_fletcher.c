@@ -200,6 +200,9 @@ static const fletcher_4_ops_t *fletcher_4_impls[] = {
 	&fletcher_4_avx512f_ops,
 	&fletcher_4_avx512bw_ops,
 #endif
+#ifdef __aarch64__
+	&fletcher_4_aarch64_neon_ops,
+#endif
 };
 
 /* Hold all supported implementations */

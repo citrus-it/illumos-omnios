@@ -209,8 +209,9 @@ zfs_avx512bw_available(void)
 
 #endif	/* _KERNEL */
 
+#else /* __amd64__ || __i386__ */
 
-#else
+#ifdef _KERNEL
 
 /* Non-x86 CPUs currently always disallow kernel FPU support */
 #define	kfpu_allowed()		0
@@ -219,6 +220,38 @@ zfs_avx512bw_available(void)
 #define	kfpu_end()		do {} while (0)
 #define	kfpu_init()		(0)
 #define	kfpu_fini()		do {} while (0)
+
+#ifdef __aarch64__
+#include <sys/arm_features.h>
+
+static inline boolean_t
+zfs_aarch64_advsimd_available(void)
+{
+	return (B_FALSE);
+	//return (has_arm_feature(arm_features, ARM_FEAT_AdvSIMD));
+}
+#endif /* __aarch64__ */
+
+#else /* _KERNEL */
+
+#ifdef __aarch64__
+#include <sys/auxv.h>
+#include <sys/auxv_aarch64.h>
+
+#define	kfpu_allowed()		1
+#define	kfpu_begin()		do {} while (0)
+#define	kfpu_end()		do {} while (0)
+static inline boolean_t
+zfs_aarch64_advsimd_available(void)
+{
+	uint32_t u = 0;
+
+	(void) getisax(&u, 1);
+	return ((u & AV_AARCH64_ADVSIMD) != 0);
+}
+#endif /* __aarch64__ */
+#endif /* _KERNEL */
+
 #endif
 
 #endif /* _SIMD_H */

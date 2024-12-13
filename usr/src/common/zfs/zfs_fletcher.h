@@ -82,6 +82,12 @@ typedef struct zfs_fletcher_avx512 {
 	uint64_t v[8];
 } zfs_fletcher_avx512_t;
 
+#ifdef __aarch64__
+typedef struct zfs_fletcher_aarch64_neon {
+	uint64_t v[2];
+} zfs_fletcher_aarch64_neon_t;
+#endif
+
 typedef union fletcher_4_ctx {
 	zio_cksum_t scalar;
 	zfs_fletcher_superscalar_t superscalar[4];
@@ -89,6 +95,9 @@ typedef union fletcher_4_ctx {
 	zfs_fletcher_sse_t sse[4];
 	zfs_fletcher_avx_t avx[4];
 	zfs_fletcher_avx512_t avx512[4];
+#endif
+#ifdef __aarch64__
+	zfs_fletcher_aarch64_neon_t aarch64_neon[4];
 #endif
 } fletcher_4_ctx_t;
 
@@ -121,6 +130,9 @@ extern const fletcher_4_ops_t fletcher_4_sse2_ops;
 extern const fletcher_4_ops_t fletcher_4_ssse3_ops;
 extern const fletcher_4_ops_t fletcher_4_avx512f_ops;
 extern const fletcher_4_ops_t fletcher_4_avx512bw_ops;
+#endif
+#ifdef __aarch64__
+extern const fletcher_4_ops_t fletcher_4_aarch64_neon_ops;
 #endif
 
 #ifdef	__cplusplus
