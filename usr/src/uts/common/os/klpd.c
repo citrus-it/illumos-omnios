@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/atomic.h>
@@ -37,6 +38,9 @@
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <sys/pathname.h>
+#include <sys/file.h>
+#include <sys/vnode.h>
+#include <sys/session.h>
 #include <sys/varargs.h>
 #include <sys/zone.h>
 #include <sys/cmn_err.h>
@@ -48,9 +52,9 @@
 static kmutex_t klpd_mutex;
 
 typedef struct klpd_reg {
-	struct klpd_reg *klpd_next;
-	struct klpd_reg **klpd_refp;
-	door_handle_t 	klpd_door;
+	struct klpd_reg	*klpd_next;
+	struct klpd_reg	**klpd_refp;
+	door_handle_t	klpd_door;
 	pid_t		klpd_door_pid;
 	priv_set_t	klpd_pset;
 	cred_t		*klpd_cred;
@@ -835,10 +839,62 @@ get_path(char *buf, const char *path, int len)
 }
 
 /*
+ * Open the calling process's controlling terminal in the same way as an
+ * open of /dev/tty; see syopen(). As with /dev/tty, no access check is
+ * made against the underlying terminal device. A terminal which is a
+ * controlling terminal cannot be cloned by this open, so the vnode is
+ * not changed by VOP_OPEN(). Returns a file pointer which is not
+ * associated with any file descriptor, or NULL on failure.
+ */
+static file_t *
+pfexec_ctty_open(const cred_t *cr)
+{
+	sess_t *sp;
+	vnode_t *vp;
+	file_t *fp;
+
+	if ((sp = tty_hold()) == NULL)
+		return (NULL);
+
+	if (sp->s_dev == NODEV) {
+		tty_rele(sp);
+		return (NULL);
+	}
+
+	vp = sp->s_vp;
+	VN_HOLD(vp);
+	if (VOP_OPEN(&vp, FREAD|FWRITE|FNOCTTY, (cred_t *)cr, NULL) != 0) {
+		VN_RELE(vp);
+		tty_rele(sp);
+		return (NULL);
+	}
+	tty_rele(sp);
+
+	if (falloc(vp, FREAD|FWRITE, &fp, NULL) != 0) {
+		(void) VOP_CLOSE(vp, FREAD|FWRITE|FNOCTTY, 1, (offset_t)0,
+		    (cred_t *)cr, NULL);
+		VN_RELE(vp);
+		return (NULL);
+	}
+	mutex_exit(&fp->f_tlock);
+
+	return (fp);
+}
+
+/*
  * Perform the pfexec upcall.
  *
  * The pfexec upcall is different from the klpd_upcall in that a failure
  * will lead to a denial of execution.
+ *
+ * When pfexecd determines that the command matches one of the user's
+ * authenticated profiles, it requests, via the pfr_authreq member of the
+ * reply, that the user be authenticated. The upcall is then repeated with
+ * a descriptor for the caller's controlling terminal attached. pfexecd
+ * conducts an authentication conversation on that terminal, through a
+ * child process which is unrelated to the process being authenticated,
+ * and its final reply indicates whether execution may proceed, and the
+ * attributes to apply if so.
  */
 int
 pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
@@ -848,8 +904,11 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	pfexec_arg_t *pap;
 	pfexec_reply_t pr, *prp;
 	door_arg_t da;
+	door_desc_t ddesc;
 	int dres;
 	cred_t *ncr = NULL;
+	file_t *ttyfp = NULL;
+	boolean_t retried = B_FALSE;
 	int err = EACCES;
 	priv_set_t *iset;
 	priv_set_t *lset;
@@ -884,7 +943,13 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	pap->pfa_call = PFEXEC_EXEC_ATTRS;
 	pap->pfa_len = pasize;
 	pap->pfa_uid = crgetruid(cr);
+	pap->pfa_pid = curproc->p_pid;
+	if ((CR_FLAGS(cr) & PRIV_PFEXEC_AUTH) != 0)
+		pap->pfa_flags |= PFA_AUTHENTICATED;
+	if (cttydev(curproc) != NODEV)
+		pap->pfa_flags |= PFA_HASTTY;
 
+again:
 	da.data_ptr = (char *)pap;
 	da.data_size = pap->pfa_len;
 	da.desc_ptr = NULL;
@@ -892,7 +957,23 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	da.rbuf = (char *)&pr;
 	da.rsize = sizeof (pr);
 
-	while ((dres = door_ki_upcall(pfd->klpd_door, &da)) != 0) {
+	if (ttyfp != NULL) {
+		/*
+		 * Attach the controlling terminal to the repeated upcall.
+		 * The descriptor is passed without DOOR_RELEASE so that the
+		 * reference held here is unaffected by the fate of the
+		 * upcall; it is always released below.
+		 */
+		ddesc.d_attributes = DOOR_HANDLE;
+		ddesc.d_data.d_handle = FTODH(ttyfp);
+		da.desc_ptr = &ddesc;
+		da.desc_num = 1;
+		pap->pfa_flags |= PFA_TTYFD;
+	}
+
+	/* No descriptors are accepted in the reply. */
+	while ((dres = door_ki_upcall_limited(pfd->klpd_door, &da, NULL,
+	    SIZE_MAX, 0)) != 0) {
 		switch (dres) {
 		case EAGAIN:
 			delay(1);
@@ -915,9 +996,9 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	 * Check the size of the result and the alignment of the
 	 * privilege sets.
 	 */
-	if (da.rsize < sizeof (pr) ||
-	    prp->pfr_ioff > da.rsize - sizeof (priv_set_t) ||
-	    prp->pfr_loff > da.rsize - sizeof (priv_set_t) ||
+	if (da.data_size < sizeof (pr) ||
+	    prp->pfr_ioff > da.data_size - sizeof (priv_set_t) ||
+	    prp->pfr_loff > da.data_size - sizeof (priv_set_t) ||
 	    (prp->pfr_loff & (sizeof (priv_chunk_t) - 1)) != 0 ||
 	    (prp->pfr_ioff & (sizeof (priv_chunk_t) - 1)) != 0)
 		goto out;
@@ -937,10 +1018,30 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 		err = EACCES;
 		goto out;
 	}
+
+	if (prp->pfr_authreq) {
+		/*
+		 * pfexecd requires the user to authenticate before this
+		 * command can be executed. Repeat the upcall with a
+		 * descriptor for the controlling terminal attached, over
+		 * which pfexecd will conduct the authentication
+		 * conversation.
+		 */
+		if (retried || (pap->pfa_flags & PFA_HASTTY) == 0)
+			goto out;
+		if ((ttyfp = pfexec_ctty_open(cr)) == NULL)
+			goto out;
+		retried = B_TRUE;
+		if (da.rbuf != (char *)&pr)
+			kmem_free(da.rbuf, da.rsize);
+		goto again;
+	}
+
 	if (!prp->pfr_setcred) {
 		err = 0;
 		goto out;
 	}
+
 	ncr = crdup((cred_t *)cr);
 
 	/*
@@ -957,7 +1058,9 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	*scrub = prp->pfr_scrubenv;
 
 	if (prp->pfr_clearflag)
-		CR_FLAGS(ncr) &= ~PRIV_PFEXEC;
+		CR_FLAGS(ncr) &= ~(PRIV_PFEXEC|PRIV_PFEXEC_AUTH);
+	else if (prp->pfr_setauth)
+		CR_FLAGS(ncr) |= PRIV_PFEXEC_AUTH;
 
 	/* We cannot exceed our Limit set, no matter what */
 	iset = PFEXEC_REPLY_IPRIV(prp);
@@ -968,7 +1071,7 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 		priv_union(iset, &CR_IPRIV(ncr));
 	}
 
-	/* Nor can we increate our Limit set itself */
+	/* Nor can we increase our Limit set itself */
 	lset = PFEXEC_REPLY_LPRIV(prp);
 
 	if (lset != NULL) {
@@ -981,6 +1084,8 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 
 	err = 0;
 out:
+	if (ttyfp != NULL)
+		(void) closef(ttyfp);
 	if (da.rbuf != (char *)&pr)
 		kmem_free(da.rbuf, da.rsize);
 out1:
@@ -992,6 +1097,91 @@ out1:
 		else
 			crfree(ncr);
 	}
+	return (err);
+}
+
+/*
+ * Ask pfexecd to discard any cached authentication state, such as
+ * pam_timestamp(7) stamps, held for the calling process's user and
+ * controlling terminal; this implements pfexec -k. The terminal is passed
+ * as a descriptor in the same way as for the repeated upcall in
+ * pfexec_call(). A process without a controlling terminal has no cached
+ * state to discard, and no privilege is required since the caller can
+ * only ever discard state for its own user and terminal.
+ */
+int
+pfexec_auth_drop(void)
+{
+	klpd_reg_t *pfd;
+	pfexec_arg_t *pap;
+	uint32_t res;
+	door_arg_t da;
+	door_desc_t ddesc;
+	file_t *ttyfp;
+	int dres;
+	int err = 0;
+	const cred_t *cr = CRED();
+	zone_t *myzone = crgetzone(cr);
+	size_t pasize = sizeof (pfexec_arg_t);
+
+	if ((ttyfp = pfexec_ctty_open(cr)) == NULL)
+		return (0);
+
+	mutex_enter(&myzone->zone_lock);
+	if ((pfd = myzone->zone_pfexecd) != NULL)
+		klpd_hold(pfd);
+	mutex_exit(&myzone->zone_lock);
+
+	if (pfd == NULL) {
+		(void) closef(ttyfp);
+		return (0);
+	}
+
+	pap = kmem_zalloc(pasize, KM_SLEEP);
+
+	pap->pfa_vers = PFEXEC_ARG_VERS;
+	pap->pfa_call = PFEXEC_AUTH_DROP;
+	pap->pfa_len = pasize;
+	pap->pfa_uid = crgetruid(cr);
+	pap->pfa_pid = curproc->p_pid;
+	pap->pfa_flags = PFA_HASTTY | PFA_TTYFD;
+
+	/* See pfexec_call() for the descriptor handling. */
+	ddesc.d_attributes = DOOR_HANDLE;
+	ddesc.d_data.d_handle = FTODH(ttyfp);
+
+	da.data_ptr = (char *)pap;
+	da.data_size = pap->pfa_len;
+	da.desc_ptr = &ddesc;
+	da.desc_num = 1;
+	da.rbuf = (char *)&res;
+	da.rsize = sizeof (res);
+
+	while ((dres = door_ki_upcall_limited(pfd->klpd_door, &da, NULL,
+	    SIZE_MAX, 0)) != 0) {
+		switch (dres) {
+		case EAGAIN:
+			delay(1);
+			continue;
+		case EINVAL:
+		case EBADF:
+		case EINTR:
+		default:
+			err = EIO;
+			goto out;
+		}
+	}
+
+	if (da.data_size != sizeof (res) || *(uint32_t *)da.rbuf != 1)
+		err = EIO;
+
+out:
+	(void) closef(ttyfp);
+	if (da.rbuf != (char *)&res)
+		kmem_free(da.rbuf, da.rsize);
+	kmem_free(pap, pasize);
+	klpd_rele(pfd);
+
 	return (err);
 }
 
@@ -1038,7 +1228,8 @@ get_forced_privs(const cred_t *cr, const char *respn, priv_set_t *set)
 	da.rbuf = (char *)&pmem;
 	da.rsize = sizeof (pmem);
 
-	while ((dres = door_ki_upcall(pfd->klpd_door, &da)) != 0) {
+	while ((dres = door_ki_upcall_limited(pfd->klpd_door, &da, NULL,
+	    SIZE_MAX, 0)) != 0) {
 		switch (dres) {
 		case EAGAIN:
 			delay(1);
@@ -1054,7 +1245,7 @@ get_forced_privs(const cred_t *cr, const char *respn, priv_set_t *set)
 	/*
 	 * Check the size of the result, it's a privilege set.
 	 */
-	if (da.rsize != sizeof (priv_set_t))
+	if (da.data_size != sizeof (priv_set_t))
 		goto out;
 
 	fset = (priv_set_t *)da.rbuf;
@@ -1118,6 +1309,9 @@ check_user_privs(const cred_t *cr, const priv_set_t *set)
 	pap->pfa_call = PFEXEC_USER_PRIVS;
 	pap->pfa_len = pasize;
 	pap->pfa_uid = crgetruid(cr);
+	pap->pfa_pid = curproc->p_pid;
+	if ((CR_FLAGS(cr) & PRIV_PFEXEC_AUTH) != 0)
+		pap->pfa_flags |= PFA_AUTHENTICATED;
 
 	da.data_ptr = (char *)pap;
 	da.data_size = pap->pfa_len;
@@ -1126,7 +1320,8 @@ check_user_privs(const cred_t *cr, const priv_set_t *set)
 	da.rbuf = (char *)&res;
 	da.rsize = sizeof (res);
 
-	while ((dres = door_ki_upcall(pfd->klpd_door, &da)) != 0) {
+	while ((dres = door_ki_upcall_limited(pfd->klpd_door, &da, NULL,
+	    SIZE_MAX, 0)) != 0) {
 		switch (dres) {
 		case EAGAIN:
 			delay(1);
@@ -1142,7 +1337,7 @@ check_user_privs(const cred_t *cr, const priv_set_t *set)
 	/*
 	 * Check the size of the result.
 	 */
-	if (da.rsize != sizeof (res))
+	if (da.data_size != sizeof (res))
 		goto out;
 
 	if (*(uint32_t *)da.rbuf == 1)

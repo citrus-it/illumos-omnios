@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <alloca.h>
@@ -28,12 +29,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <priv.h>
 #include <pwd.h>
 #include <nss_dbdefs.h>
 #include <deflt.h>
 #include <auth_attr.h>
 #include <prof_attr.h>
 #include <user_attr.h>
+
 
 #define	COPYTOSTACK(dst, csrc)		{	\
 		size_t len = strlen(csrc) + 1;	\
@@ -71,6 +75,7 @@ static struct dfltplcy {
 	{ CONSUSER_PROFILE_KW,			DEF_CONSUSER},
 	{ PROFATTR_AUTHS_KW,			DEF_AUTH},
 	{ PROFATTR_PROFS_KW,			DEF_PROF},
+	{ USERATTR_AUTHPROFILES_KW,		DEF_AUTHPROF},
 	{ USERATTR_LIMPRIV_KW,			DEF_LIMITPRIV},
 	{ USERATTR_DFLTPRIV_KW,			DEF_DFLTPRIV},
 	{ USERATTR_LOCK_AFTER_RETRIES_KW,	DEF_LOCK_AFTER_RETRIES}
@@ -79,6 +84,10 @@ static struct dfltplcy {
 #define	NDFLTPLY	(sizeof (dfltply)/sizeof (struct dfltplcy))
 #define	GETCONSPROF(a)	(kva_match((a), CONSUSER_PROFILE_KW))
 #define	GETPROF(a)	(kva_match((a), PROFATTR_PROFS_KW))
+#define	GETAUTHPROF(a)	(kva_match((a), USERATTR_AUTHPROFILES_KW))
+
+#define	WANTPROF(a)	((a) == 0 || ((a) & _ENUM_PROFS_PROFILES))
+#define	WANTAUTHPROF(a)	((a) == 0 || ((a) & _ENUM_PROFS_AUTHPROFILES))
 
 /*
  * Enumerate profiles from listed profiles.
@@ -152,7 +161,7 @@ cont:
 static int
 _enum_common(const char *username,
     int (*cb)(const char *, kva_t *, void *, void *),
-    void *ctxt, void *pres, boolean_t wantattr)
+    void *ctxt, void *pres, boolean_t wantattr, uint_t pflags)
 {
 	userattr_t *ua;
 	int res = 0;
@@ -169,9 +178,32 @@ _enum_common(const char *username,
 		if (ua->attr != NULL) {
 			if (wantattr)
 				res = cb(NULL, ua->attr, ctxt, pres);
-			if (res == 0) {
+			if (res == 0 && WANTAUTHPROF(pflags)) {
+				res = _enum_common_p(GETAUTHPROF(ua->attr),
+				    cb, ctxt, pres, wantattr, &cnt, profs);
+			}
+			if (res == 0 && WANTPROF(pflags)) {
 				res = _enum_common_p(GETPROF(ua->attr),
 				    cb, ctxt, pres, wantattr, &cnt, profs);
+			}
+
+			/*
+			 * Any list which was not enumerated above is now
+			 * walked without a callback, so that a PROFILE_STOP
+			 * entry within it is still recorded. Whether the
+			 * policy.conf(5) default profiles are applied below
+			 * must not depend on which sets the caller asked
+			 * for. These walks run last so that they cannot
+			 * suppress the reporting of a profile which appears
+			 * in both sets.
+			 */
+			if (res == 0 && !WANTAUTHPROF(pflags)) {
+				res = _enum_common_p(GETAUTHPROF(ua->attr),
+				    NULL, ctxt, pres, wantattr, &cnt, profs);
+			}
+			if (res == 0 && !WANTPROF(pflags)) {
+				res = _enum_common_p(GETPROF(ua->attr),
+				    NULL, ctxt, pres, wantattr, &cnt, profs);
 			}
 		}
 		free_userattr(ua);
@@ -184,14 +216,19 @@ _enum_common(const char *username,
 	if ((cnt == 0 || strcmp(profs[cnt-1], PROFILE_STOP) != 0) &&
 	    (kattrs = get_default_attrs(username)) != NULL) {
 
-		res = _enum_common_p(GETCONSPROF(kattrs), cb, ctxt, pres,
-		    wantattr, &cnt, profs);
-
-		if (res == 0) {
-			res = _enum_common_p(GETPROF(kattrs), cb, ctxt, pres,
-			    wantattr, &cnt, profs);
+		/* The authenticated defaults take precedence. */
+		if (WANTAUTHPROF(pflags)) {
+			res = _enum_common_p(GETAUTHPROF(kattrs),
+			    cb, ctxt, pres, wantattr, &cnt, profs);
 		}
-
+		if (res == 0 && WANTPROF(pflags)) {
+			res = _enum_common_p(GETCONSPROF(kattrs), cb, ctxt,
+			    pres, wantattr, &cnt, profs);
+			if (res == 0) {
+				res = _enum_common_p(GETPROF(kattrs),
+				    cb, ctxt, pres, wantattr, &cnt, profs);
+			}
+		}
 		if (res == 0 && wantattr)
 			res = cb(NULL, kattrs, ctxt, pres);
 
@@ -209,20 +246,47 @@ _enum_common(const char *username,
 int
 _enum_profs(const char *username,
     int (*cb)(const char *, kva_t *, void *, void *),
-    void *ctxt, void *pres)
+    void *ctxt, void *pres, uint_t flags)
 {
-	return (_enum_common(username, cb, ctxt, pres, B_FALSE));
+	return (_enum_common(username, cb, ctxt, pres, B_FALSE, flags));
 }
 
 /*
- * Enumerate attributes with a username argument.
+ * Enumerate attributes with a username or ucred argument.
  */
 int
-_enum_attrs(const char *username,
+_enum_attrs(const char *username, const ucred_t *uc,
     int (*cb)(const char *, kva_t *, void *, void *),
     void *ctxt, void *pres)
 {
-	return (_enum_common(username, cb, ctxt, pres, B_TRUE));
+	char pwdb[NSS_BUFLEN_PASSWD];
+	struct passwd pwd;
+	int flags;
+
+	flags = _ENUM_PROFS_PROFILES;
+
+	/*
+	 * The authenticated profiles are considered when the subject holds
+	 * the PRIV_PFEXEC_AUTH flag and is the user whose attributes are
+	 * being checked. A caller which has authenticated the user through
+	 * some other means should use chkauthattr_flags() to request that
+	 * the authenticated profiles be included. Note that getpflags() and
+	 * ucred_getpflags() return (uint_t)-1 for a flag which the running
+	 * kernel does not support, so the results are compared with 1.
+	 */
+	if (uc != NULL) {
+		if (ucred_getpflags(uc, PRIV_PFEXEC_AUTH) == 1 &&
+		    getpwnam_r(username, &pwd, pwdb, sizeof (pwdb)) != NULL &&
+		    ucred_getruid(uc) == pwd.pw_uid) {
+			flags |= _ENUM_PROFS_AUTHPROFILES;
+		}
+	} else if (getpflags(PRIV_PFEXEC_AUTH) == 1 &&
+	    getpwnam_r(username, &pwd, pwdb, sizeof (pwdb)) != NULL &&
+	    getuid() == pwd.pw_uid) {
+		flags |= _ENUM_PROFS_AUTHPROFILES;
+	}
+
+	return (_enum_common(username, cb, ctxt, pres, B_TRUE, flags));
 }
 
 
@@ -274,10 +338,10 @@ comm2auth(const char *name, kva_t *attr, void *ctxt, void *pres)
 }
 
 /*
- * Enumerate authorizations for username.
+ * Enumerate authorizations for username or ucred.
  */
 int
-_enum_auths(const char *username,
+_enum_auths(const char *username, const ucred_t *uc,
     int (*cb)(const char *, void *, void *),
     void *ctxt, void *pres)
 {
@@ -289,7 +353,7 @@ _enum_auths(const char *username,
 	c2a.cb = cb;
 	c2a.ctxt = ctxt;
 
-	return (_enum_common(username, comm2auth, &c2a, pres, B_TRUE));
+	return (_enum_attrs(username, uc, comm2auth, &c2a, pres));
 }
 
 int
@@ -390,8 +454,55 @@ chkauthattr(const char *authname, const char *username)
 	if (authname == NULL || username == NULL)
 		return (0);
 
-	(void) _enum_auths(username, _is_authorized, (char *)authname,
+	(void) _enum_auths(username, NULL, _is_authorized, (char *)authname,
 	    &auth_granted);
+
+	return (auth_granted);
+}
+
+int
+chkauthattr_ucred(const char *authname, const char *username, const ucred_t *cr)
+{
+	int		auth_granted = 0;
+
+	if (authname == NULL || username == NULL)
+		return (0);
+
+	(void) _enum_auths(username, cr, _is_authorized, (char *)authname,
+	    &auth_granted);
+
+	return (auth_granted);
+}
+
+/*
+ * A variant of chkauthattr() which consults only its arguments: the
+ * profile sets specified by CHKAUTHATTR_* flags are searched, and the
+ * credentials of the calling process play no part. This is for callers
+ * which check authorizations of users other than the process owner, and
+ * either have authenticated the user themselves (include
+ * CHKAUTHATTR_AUTHPROFILES) or must not have the authenticated set
+ * considered at all (omit it).
+ */
+int
+chkauthattr_flags(const char *authname, const char *username, uint_t flags)
+{
+	ccomm2auth c2a;
+	int auth_granted = 0;
+	uint_t pflags = 0;
+
+	if (authname == NULL || username == NULL)
+		return (0);
+
+	if (flags & CHKAUTHATTR_PROFILES)
+		pflags |= _ENUM_PROFS_PROFILES;
+	if (flags & CHKAUTHATTR_AUTHPROFILES)
+		pflags |= _ENUM_PROFS_AUTHPROFILES;
+
+	c2a.cb = _is_authorized;
+	c2a.ctxt = (char *)authname;
+
+	(void) _enum_common(username, comm2auth, &c2a, &auth_granted,
+	    B_TRUE, pflags);
 
 	return (auth_granted);
 }

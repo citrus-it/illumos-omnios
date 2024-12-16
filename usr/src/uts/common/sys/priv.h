@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -80,6 +81,7 @@ typedef enum priv_op {
 #define	PRIVSYS_KLPD_UNREG	7
 #define	PRIVSYS_PFEXEC_REG	8
 #define	PRIVSYS_PFEXEC_UNREG	9
+#define	PRIVSYS_PFEXEC_AUTH_DROP	10
 
 
 /*
@@ -137,10 +139,12 @@ typedef struct priv_impl_info {
 #define	PRIV_AWARE_RESET		0x0040		/* Reset on setuid() */
 #define	PRIV_XPOLICY			0x0080		/* Extended policy */
 #define	PRIV_PFEXEC			0x0100		/* As if pfexec'ed */
+#define	PRIV_PFEXEC_AUTH		0x0200		/* pfexec authed */
 
 /* user-settable flags: */
-#define	PRIV_USER	(PRIV_DEBUG | NET_MAC_AWARE | NET_MAC_AWARE_INHERIT |\
-			    PRIV_XPOLICY | PRIV_AWARE_RESET | PRIV_PFEXEC)
+#define	PRIV_USER	(PRIV_DEBUG | NET_MAC_AWARE | NET_MAC_AWARE_INHERIT | \
+			    PRIV_XPOLICY | PRIV_AWARE_RESET | PRIV_PFEXEC | \
+			    PRIV_PFEXEC_AUTH)
 
 /*
  * Header of the privilege info data structure; multiple structures can

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -77,6 +78,8 @@ extern "C" {
 #define	GET_ONE			0
 #define	GET_ALL			1
 #define	__SEARCH_ALL_POLS	2
+#define	GET_PROF		4
+#define	GET_AUTHPROF		8
 
 /* get only one exec_attr from list */
 #define	IS_GET_ONE(f) (((f) & GET_ALL) == 0)
@@ -84,6 +87,8 @@ extern "C" {
 #define	IS_GET_ALL(f) (((f) & GET_ALL) == 1)
 /* search all existing policies */
 #define	IS_SEARCH_ALL(f) (((f) & __SEARCH_ALL_POLS) == __SEARCH_ALL_POLS)
+#define	IS_GET_PROF(f) (((f) & GET_PROF) == GET_PROF)
+#define	IS_GET_AUTHPROF(f) (((f) & GET_AUTHPROF) == GET_AUTHPROF)
 
 /*
  * Key words used in the exec_attr database

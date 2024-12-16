@@ -23,8 +23,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -56,7 +60,8 @@ sess_t session0 = {
 	0,		/* s_cnt_cv */
 	NODEV,		/* s_dev */
 	NULL,		/* s_vp */
-	NULL		/* s_cred */
+	NULL,		/* s_cred */
+	B_FALSE		/* s_graft */
 };
 
 void
@@ -260,6 +265,16 @@ sess_ctty_clear(sess_t *sp, stdata_t *stp)
 	sp->s_vp = NULL;
 	sp->s_cred = NULL;
 
+	/*
+	 * A grafted controlling terminal (TIOCGRAFT) is bound only to the
+	 * session; the stream's session and group pointers belong to the
+	 * session which owns the terminal and must be left alone.
+	 */
+	if (sp->s_graft) {
+		sp->s_graft = B_FALSE;
+		return;
+	}
+
 	/* reset the stream session and group pointers */
 	stp->sd_pgidp = NULL;
 	stp->sd_sidp = NULL;
@@ -358,6 +373,108 @@ strctty(stdata_t *stp)
 
 	/* set the session ctty bindings */
 	sess_ctty_set(p, sp, stp);
+
+	mutex_exit(&sp->s_lock);
+	mutex_exit(&p->p_splock);
+	mutex_exit(&pidlock);
+	mutex_exit(&stp->sd_lock);
+	return (0);
+}
+
+/*
+ * Make the terminal referenced by stp the controlling terminal of the
+ * calling process's session, even though the terminal is typically already
+ * the controlling terminal of another session (TIOCGRAFT).
+ *
+ * The graft is one-way. The caller's session is updated so that operations
+ * which resolve the controlling terminal through the session, such as
+ * opening /dev/tty, reach this terminal. The stream's own session and
+ * foreground process group bindings are not changed, so job control and
+ * signal delivery for the owning session are unaffected. The grafting
+ * session is marked so that the stream side is also left alone when the
+ * graft is later released through freectty(), and so that the grafted
+ * terminal is exempt from job control checks in straccess().
+ */
+int
+strgraftctty(stdata_t *stp, int flag)
+{
+	sess_t		*sp;
+	proc_t		*p = curproc;
+	boolean_t	got_sig = B_FALSE;
+	cred_t		*crp;
+
+	/*
+	 * The graft confers the full read/write access to the terminal
+	 * that a controlling terminal provides through /dev/tty, so it
+	 * may only be requested through a descriptor which was itself
+	 * opened for both reading and writing.
+	 */
+	if ((flag & (FREAD|FWRITE)) != (FREAD|FWRITE))
+		return (EBADF);
+
+	if (secpolicy_ctty_graft(CRED()) != 0)
+		return (EPERM);
+
+	/* See the comment in strctty() above for how this loop works. */
+	for (;;) {
+		mutex_enter(&stp->sd_lock);	/* protects sd_flag */
+		mutex_enter(&pidlock);		/* protects p_pidp */
+		mutex_enter(&p->p_splock);	/* protects p_sessp */
+		sp = p->p_sessp;
+		mutex_enter(&sp->s_lock);	/* protects sp->* */
+
+		if (((stp->sd_flag & (STRHUP|STRDERR|STWRERR|STPLEX)) != 0) ||
+		    ((stp->sd_flag & STRISTTY) == 0) ||	/* not a tty? */
+		    (p->p_pidp != sp->s_sidp) ||	/* we're not leader? */
+		    (sp->s_vp != NULL)) {		/* session has ctty? */
+			mutex_exit(&sp->s_lock);
+			mutex_exit(&p->p_splock);
+			mutex_exit(&pidlock);
+			mutex_exit(&stp->sd_lock);
+			return (ENOTTY);
+		}
+
+		/* the session leader cannot be exiting right now */
+		ASSERT(!sp->s_exit);
+
+		/*
+		 * If no one else has a hold on this session structure
+		 * then we now have exclusive access to it, so break out
+		 * of this loop and update the session structure.
+		 */
+		if (sp->s_cnt == 0)
+			break;
+
+		/* need to hold the session so it can't be freed */
+		sp->s_ref++;
+
+		/* ain't locking order fun? */
+		mutex_exit(&p->p_splock);
+		mutex_exit(&pidlock);
+		mutex_exit(&stp->sd_lock);
+
+		if (!cv_wait_sig(&sp->s_cnt_cv, &sp->s_lock))
+			got_sig = B_TRUE;
+		mutex_exit(&sp->s_lock);
+		sess_rele(sp, B_FALSE);
+
+		if (got_sig)
+			return (EINTR);
+	}
+
+	/*
+	 * Bind the terminal to the session without updating the stream;
+	 * cf. sess_ctty_set(). No process group holds are taken since the
+	 * stream's sd_sidp and sd_pgidp members are not being changed.
+	 */
+	mutex_enter(&p->p_crlock);
+	crhold(crp = p->p_cred);
+	mutex_exit(&p->p_crlock);
+
+	sp->s_vp = makectty(stp->sd_vnode);
+	sp->s_dev = sp->s_vp->v_rdev;
+	sp->s_cred = crp;
+	sp->s_graft = B_TRUE;
 
 	mutex_exit(&sp->s_lock);
 	mutex_exit(&p->p_splock);
@@ -489,6 +606,19 @@ freectty_signal(proc_t *p, sess_t *sp, stdata_t *stp, boolean_t at_exit)
 	ASSERT(MUTEX_HELD(&stp->sd_lock) && MUTEX_HELD(&pidlock) &&
 	    MUTEX_HELD(&p->p_splock) && MUTEX_HELD(&sp->s_lock));
 
+	/*
+	 * A grafted controlling terminal (TIOCGRAFT) is not bound to this
+	 * stream, so no signal is sent and the stream is not hung up; the
+	 * terminal's owning session is unaffected by the graft going away.
+	 * The cost is that a process in the grafting session which is
+	 * blocked reading from the terminal is not woken, and the exiting
+	 * leader will wait for it in freectty(), as happens for a normal
+	 * controlling terminal when a process survives the SIGHUP sent
+	 * below.
+	 */
+	if (sp->s_graft)
+		return (B_FALSE);
+
 	/* check if we already signaled this group */
 	if (sp->s_sighuped)
 		return (B_FALSE);
@@ -534,8 +664,9 @@ freectty(boolean_t at_exit)
 	vnode_t		*vp;
 	cred_t		*cred;
 	sess_t		*sp;
-	struct pid	*pgidp, *sidp;
+	struct pid	*pgidp = NULL, *sidp = NULL;
 	boolean_t	got_sig = B_FALSE;
+	boolean_t	graft;
 
 	/*
 	 * If the current process is a session leader we are going to
@@ -619,9 +750,13 @@ freectty(boolean_t at_exit)
 	ASSERT(sp->s_cnt == 0);
 
 	/* save some pointers for later */
+	graft = sp->s_graft;
 	cred = sp->s_cred;
-	pgidp = stp->sd_pgidp;
-	sidp = stp->sd_sidp;
+	if (!graft) {
+		/* the stream's pid holds are only released for a real ctty */
+		pgidp = stp->sd_pgidp;
+		sidp = stp->sd_sidp;
+	}
 
 	/* clear the session ctty bindings */
 	sess_ctty_clear(sp, stp);
@@ -645,10 +780,12 @@ freectty(boolean_t at_exit)
 	crfree(cred);
 
 	/* release our holds on assorted structures and return */
-	mutex_enter(&pidlock);
-	PID_RELE(pgidp);
-	PID_RELE(sidp);
-	mutex_exit(&pidlock);
+	if (!graft) {
+		mutex_enter(&pidlock);
+		PID_RELE(pgidp);
+		PID_RELE(sidp);
+		mutex_exit(&pidlock);
+	}
 
 	return (1);
 }

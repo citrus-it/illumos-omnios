@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PFEXEC 1 "Jul 8, 2016"
+.TH PFEXEC 1 "Aug 8, 2026"
 .SH NAME
 pfexec, pfsh, pfcsh, pfksh \- execute a command in a profile
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/pfexec\fR \fIcommand\fR
 .fi
@@ -15,6 +15,11 @@ pfexec, pfsh, pfcsh, pfksh \- execute a command in a profile
 .LP
 .nf
 \fB/usr/bin/pfexec\fR \fB-P\fR \fIprivspec\fR \fIcommand\fR [ \fIarg\fR ]...
+.fi
+
+.LP
+.nf
+\fB/usr/bin/pfexec\fR \fB-k\fR
 .fi
 
 .LP
@@ -33,7 +38,6 @@ pfexec, pfsh, pfcsh, pfksh \- execute a command in a profile
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBpfexec\fR program is used to execute commands with the attributes
 specified by the user's profiles in the \fBexec_attr\fR(5) database. It is
 invoked by the profile shells, \fBpfsh\fR, \fBpfcsh\fR, and \fBpfksh\fR which
@@ -54,11 +58,27 @@ union of the privileges specified using the "\fBprivs\fR" keyword in
 before executing the command.
 .sp
 .LP
+If the command matches an entry in a profile assigned to the user's
+authenticated profile list (the "\fBauth_profiles\fR" keyword in
+\fBuser_attr\fR(5)), the user is first required to authenticate on the
+controlling terminal, by default with their own password. A process
+without a controlling terminal cannot use the authenticated profile list.
+Successful authentication is recorded in the new process and is inherited
+until the real user ID changes, so authenticating once for a command which
+is itself a profile shell provides an authenticated session. The
+authentication conversation may additionally be cached for a limited time
+if the "\fBpfexec\fR" PAM service is configured with a caching module such
+as \fBpam_timestamp\fR(7).
+.sp
+.LP
+The third form, \fBpfexec\fR \fB-k\fR, discards any cached authentication
+state held for the invoking user and controlling terminal.
+.sp
+.LP
 For \fBpfexec\fR to function correctly, the \fBpfexecd\fR daemon must be running
 in the current zone. This is normally managed by the
 "\fBsvc:/system/pfexec:default\fR" SMF service (see \fBsmf\fR(7)).
 .SH USAGE
-.LP
 \fBpfexec\fR is used to execute commands with predefined process attributes,
 such as specific user or group \fBID\fRs.
 .sp
@@ -66,7 +86,6 @@ such as specific user or group \fBID\fRs.
 Refer to the \fBsh\fR(1), \fBcsh\fR(1), and \fBksh\fR(1) man pages for complete
 usage descriptions of the profile shells.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRObtaining additional user privileges
 .sp
 .in +2
@@ -82,7 +101,6 @@ This command runs \fBchown user file\fR with all privileges assigned to the
 current user, not necessarily all privileges.
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -103,7 +121,6 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.LP
 .BR csh (1),
 .BR ksh (1),
 .BR profiles (1),
@@ -112,4 +129,5 @@ An error occurred.
 .BR prof_attr (5),
 .BR user_attr (5),
 .BR attributes (7),
+.BR pam_timestamp (7),
 .BR smf (7)

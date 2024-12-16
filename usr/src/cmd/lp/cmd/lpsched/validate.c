@@ -22,10 +22,11 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /* SVr4.0 1.11.1.10	*/
@@ -39,6 +40,7 @@
 #include <errno.h>
 #include <deflt.h>
 #include <tsol/label.h>
+#include <auth_attr.h>
 #include <auth_list.h>
 
 #define register auto
@@ -1035,17 +1037,21 @@ tsol_lpauth(char *auth, char *in_name)
 	char *cp;
 	int res;
 
+	/*
+	 * The name being checked belongs to the job, not to this process,
+	 * so the authenticated profile set is never considered.
+	 */
 	if ((cp = strchr(in_name, '@')) != NULL) {
 		/* user@system */
 		*cp = '\0';
-		res = chkauthattr(auth, in_name);
+		res = chkauthattr_flags(auth, in_name, CHKAUTHATTR_PROFILES);
 		*cp = '@';
 	} else if ((cp = strchr(in_name, '!')) != NULL)
 		/* system!user */
-		res = chkauthattr(auth, cp+1);
+		res = chkauthattr_flags(auth, cp+1, CHKAUTHATTR_PROFILES);
 	else
 		/* user */
-		res = chkauthattr(auth, in_name);
+		res = chkauthattr_flags(auth, in_name, CHKAUTHATTR_PROFILES);
 
 	return (res);
 }

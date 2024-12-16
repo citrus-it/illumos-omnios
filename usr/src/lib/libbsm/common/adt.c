@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -331,17 +331,13 @@ adt_get_unique_id(au_id_t uid)
 static void
 adt_cpy_tid(au_tid_addr_t *dest, const au_tid64_addr_t *src)
 {
-#ifdef _LP64
-	(void) memcpy(dest, src, sizeof (au_tid_addr_t));
-#else	/* _LP64 */
 	dest->at_type = src->at_type;
 
-	dest->at_port  = src->at_port.at_minor & MAXMIN32;
-	dest->at_port |= (src->at_port.at_major & MAXMAJ32) <<
-	    NBITSMINOR32;
+	dest->at_port  = src->at_port.at_minor & MAXMIN;
+	dest->at_port |= ((dev_t)src->at_port.at_major & MAXMAJ) <<
+	    NBITSMINOR;
 
 	(void) memcpy(dest->at_addr, src->at_addr, 4 * sizeof (uint32_t));
-#endif	/* _LP64 */
 }
 
 /*

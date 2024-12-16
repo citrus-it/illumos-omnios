@@ -24,6 +24,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2022 Oxide Computer Company
  * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -2358,6 +2359,23 @@ int
 secpolicy_sti(const cred_t *cr)
 {
 	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL, KLPDARG_NONE));
+}
+
+/*
+ * Graft another session's controlling terminal onto the caller's own
+ * session (TIOCGRAFT), bypassing the usual exclusivity of a controlling
+ * terminal. This is a cross-session operation, so it is controlled by
+ * PRIV_PROC_SESSION; the caller must also, of course, hold an open
+ * descriptor for the terminal. PRIV_PROC_SESSION is in the basic set by
+ * default but, unlike stronger candidates such as PRIV_SYS_DEVICES, it
+ * is available within non-global zones, where this interface is needed
+ * by pfexecd. Sites which remove it from the basic set restrict grafting
+ * along with the other cross-session operations.
+ */
+int
+secpolicy_ctty_graft(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_PROC_SESSION, B_FALSE, EPERM, NULL));
 }
 
 boolean_t
