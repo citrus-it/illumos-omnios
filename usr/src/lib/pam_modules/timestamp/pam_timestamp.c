@@ -10,7 +10,7 @@
  */
 /*
  * Copyright 2014 Nexenta Systems, Inc.
- * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdio.h>
@@ -20,8 +20,10 @@
 #include <security/pam_appl.h>
 #include <security/pam_modules.h>
 #include <security/pam_impl.h>
+#include <sys/ioctl.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <sys/termios.h>
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -44,6 +46,32 @@ struct user_info {
 };
 
 int debug = 0;
+
+/*
+ * The timestamp is bound to the terminal's owning session, so that every
+ * process authenticating on the terminal within one login session shares
+ * it, regardless of the session of the process performing the
+ * authentication; in particular, the pfexec authentication helper runs as
+ * a session leader of its own new session. Fall back to the caller's own
+ * session for a terminal which is not currently a controlling terminal.
+ */
+static pid_t
+timestamp_sid(const char *user_tty)
+{
+	pid_t sid = -1;
+	int fd;
+
+	if ((fd = open(user_tty, O_RDONLY | O_NOCTTY)) >= 0) {
+		if (ioctl(fd, TIOCGSID, &sid) != 0)
+			sid = -1;
+		(void) close(fd);
+	}
+
+	if (sid == -1)
+		sid = getsid(getpid());
+
+	return (sid);
+}
 
 int
 validate_basic(pam_handle_t *pamh, char *user_tty, char *timestampfile)
@@ -281,7 +309,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	if (info.dev != tty.st_dev || info.ino != tty.st_ino ||
-	    info.rdev != tty.st_rdev || info.sid != getsid(getpid()) ||
+	    info.rdev != tty.st_rdev || info.sid != timestamp_sid(user_tty) ||
 	    info.uid != getuid() || info.ts.tv_sec != tty.st_ctim.tv_sec ||
 	    info.ts.tv_nsec != tty.st_ctim.tv_nsec) {
 		(void) close(fd);
@@ -375,7 +403,7 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	info.dev = tty.st_dev;
 	info.ino = tty.st_ino;
 	info.rdev = tty.st_rdev;
-	info.sid = getsid(getpid());
+	info.sid = timestamp_sid(user_tty);
 	info.uid = getuid();
 	info.ts = tty.st_ctim;
 

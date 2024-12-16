@@ -172,6 +172,7 @@ priv_pr_spriv(proc_t *p, prpriv_t *prpriv, const cred_t *cr)
 	int err = EPERM;
 	cred_priv_t *cp, *ocp;
 	priv_set_t eset;
+	uint_t oldflags;
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
 
@@ -202,7 +203,6 @@ priv_pr_spriv(proc_t *p, prpriv_t *prpriv, const cred_t *cr)
 	eset = CR_OEPRIV(cr);
 
 	priv_intersect(&CR_LPRIV(oldcred), &eset);
-
 	/*
 	 * Verify the constraints laid out:
 	 * for the limit set, we require that the new set is a subset
@@ -216,6 +216,7 @@ priv_pr_spriv(proc_t *p, prpriv_t *prpriv, const cred_t *cr)
 		    (i == PRIV_LIMIT || !priv_issubset(&cp->crprivs[i], &eset)))
 			break;
 
+	oldflags = CR_FLAGS(oldcred);
 	crfree(oldcred);
 
 	if (i < PRIV_NSET || !priv_valid(newcred))
@@ -239,6 +240,21 @@ priv_pr_spriv(proc_t *p, prpriv_t *prpriv, const cred_t *cr)
 				}
 				CR_FLAGS(newcred) &= ~PRIV_USER;
 				CR_FLAGS(newcred) |= (pii->val & PRIV_USER);
+
+				/*
+				 * Setting the PRIV_PFEXEC_AUTH flag is a
+				 * restricted operation since it marks the
+				 * process as having completed authentication
+				 * in order to access a profile in the
+				 * authenticated set.
+				 */
+				if ((CR_FLAGS(newcred) & PRIV_PFEXEC_AUTH) &&
+				    !(oldflags & PRIV_PFEXEC_AUTH) &&
+				    secpolicy_allow_setid(cr, 0, B_TRUE) != 0) {
+					err = EPERM;
+					goto err;
+				}
+
 				break;
 			default:
 				err = EINVAL;

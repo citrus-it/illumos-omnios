@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 # include	<unistd.h>
 # include	<stdlib.h>
@@ -34,9 +34,11 @@
 # include	<fcntl.h>
 # include	<errno.h>
 #include	<syslog.h>
+#include <auth_attr.h>
 #include <user_attr.h>
 #include <secdb.h>
 #include <pwd.h>
+#include <ucred.h>
 
 # include	"lp.h"
 # include	"msgs.h"
@@ -337,9 +339,19 @@ mlisten()
 		if (md->admin == 0) {
 			struct passwd *pw = NULL;
 
-			if ((pw = getpwuid(md->uid)) != NULL)
-				md->admin = chkauthattr("solaris.print.admin",
-							pw->pw_name);
+			if ((pw = getpwuid(md->uid)) != NULL) {
+				ucred_t *ucred = NULL;
+
+				if (getpeerucred(md->readfd, &ucred) == 0) {
+					md->admin = chkauthattr_ucred(
+					    "solaris.print.admin", pw->pw_name,
+					    ucred);
+					ucred_free(ucred);
+				} else {
+					md->admin = chkauthattr(
+					    "solaris.print.admin", pw->pw_name);
+				}
+			}
 		}
 
 		get_peer_label(md->readfd, &md->slabel);

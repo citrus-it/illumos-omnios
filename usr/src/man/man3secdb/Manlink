@@ -15,6 +15,8 @@
 
 getauthattr.3secdb
 	chkauthattr.3secdb
+	chkauthattr_flags.3secdb
+	chkauthattr_ucred.3secdb
 	endauthattr.3secdb
 	free_authattr.3secdb
 	getauthnam.3secdb

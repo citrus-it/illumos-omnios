@@ -389,6 +389,7 @@ MANFILES=	acctcom.1			\
 		units.1				\
 		unix2dos.1			\
 		uptime.1			\
+		userattr.1			\
 		uuidgen.1			\
 		vacation.1			\
 		vgrind.1			\

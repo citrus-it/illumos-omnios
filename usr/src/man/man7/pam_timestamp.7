@@ -9,8 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\" Copyright 2014 Nexenta Systems, Inc.
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd Nov 26, 2017
+.Dd August 7, 2026
 .Dt PAM_TIMESTAMP 7
 .Os
 .Sh NAME
@@ -100,11 +101,28 @@ su  auth sufficient	pam_timestamp.so.1	timeout=10
 su  auth requisite	pam_authtok_get.so.1
 su  auth required	pam_unix_auth.so.1
 .Ed
+.Ss Example 3 Caching pfexec authentication
+.
+The following fragment caches successful authentication for the
+authenticated rights profiles of
+.Xr pfexec 1 ;
+see the
+.Sy auth_profiles
+keyword in
+.Xr user_attr 5 .
+Cached state for the current user and terminal can be discarded with
+.Nm pfexec Fl k .
+.Bd -literal -offset indent
+pfexec  auth sufficient	pam_timestamp.so.1
+pfexec  auth requisite	pam_authtok_get.so.1
+pfexec  auth required	pam_unix_auth.so.1
+.Ed
 .Sh INTERFACE STABILITY
 .Sy Uncommitted .
 .Sh MT LEVEL
 .Sy MT-Safe .
 .Sh SEE ALSO
+.Xr pfexec 1 ,
 .Xr syslog 3C ,
 .Xr pam 3PAM ,
 .Xr pam_sm_authenticate 3PAM ,

@@ -26,7 +26,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2022 Garrett D'Amore
  * Copyright 2025 Oxide Computer Company
@@ -3192,9 +3192,12 @@ straccess(struct stdata *stp, enum jcaccess mode)
 		/*
 		 * If this is not the calling process's controlling terminal
 		 * or if the calling process is already in the foreground
-		 * then allow access.
+		 * then allow access. A controlling terminal which has been
+		 * grafted onto the session (TIOCGRAFT) is always allowed
+		 * access; the stream's job control state belongs to the
+		 * terminal's owning session, not to the grafting one.
 		 */
-		if (sp->s_dev != stp->sd_vnode->v_rdev ||
+		if (sp->s_dev != stp->sd_vnode->v_rdev || sp->s_graft ||
 		    p->p_pgidp == stp->sd_pgidp) {
 			mutex_exit(&sp->s_lock);
 			mutex_exit(&p->p_splock);

@@ -374,7 +374,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 				VN_RELE(dir);
 			pn_free(&resolvepn);
 			VN_RELE(vp);
-			goto out;
+			goto fail;
 		}
 
 		/* Don't change the credentials when using old ptrace. */

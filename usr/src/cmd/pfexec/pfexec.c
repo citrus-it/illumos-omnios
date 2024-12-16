@@ -21,23 +21,26 @@
 /*
  * Copyright 2014 Gary Mills
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
  * New implementation of pfexec(1) and all of the profile shells.
  *
  * The algorithm is as follows:
- * 	first try to derive the shell's path from getexecname();
+ *	first try to derive the shell's path from getexecname();
  *	note that this requires a *hard* link to the program, so
  *	if we find that we are actually executing pfexec, we start
  *	looking at argv[0].
  *	argv[0] is also our fallback in case getexecname doesn't find it.
  */
 #include <sys/param.h>
+#include <sys/syscall.h>
 #include <alloca.h>
 #include <errno.h>
 #include <locale.h>
 #include <priv.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -87,7 +90,9 @@ shellname(const char *name, char buf[MAXPATHLEN])
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("pfexec [-P privset] cmd [arg ..]\n"));
+	(void) fprintf(stderr, gettext(
+	    "pfexec [-P privset] cmd [arg ..]\n"
+	    "pfexec -k\n"));
 	exit(EXIT_FAILURE);
 }
 
@@ -100,6 +105,7 @@ main(int argc, char **argv)
 	int c;
 	priv_set_t *wanted;
 	int oflag;
+	bool kflag = false;
 
 	oflag = getpflags(PRIV_PFEXEC);
 	if (setpflags(PRIV_PFEXEC, 1) != 0) {
@@ -135,8 +141,11 @@ main(int argc, char **argv)
 		return (1);
 	case RES_PFEXEC:
 	case RES_FAILURE:
-		while ((c = getopt(argc, argv, "P:")) != EOF) {
+		while ((c = getopt(argc, argv, "kP:")) != EOF) {
 			switch (c) {
+			case 'k':
+				kflag = true;
+				break;
 			case 'P':
 				if (pset == NULL) {
 					pset = optarg;
@@ -149,6 +158,26 @@ main(int argc, char **argv)
 		}
 		argc -= optind;
 		argv += optind;
+
+		if (kflag) {
+			/*
+			 * Discard any cached authentication state for this
+			 * user and terminal; see pfauth's -k mode. This
+			 * does not combine with executing a command.
+			 */
+			if (argc != 0 || pset != NULL)
+				usage();
+			if (syscall(SYS_privsys,
+			    PRIVSYS_PFEXEC_AUTH_DROP) != 0) {
+				(void) fprintf(stderr, gettext(
+				    "pfexec: unable to discard cached "
+				    "authentication: %s\n"),
+				    strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+			exit(0);
+		}
+
 		if (argc < 1)
 			usage();
 

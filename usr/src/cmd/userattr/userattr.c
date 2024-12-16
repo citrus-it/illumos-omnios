@@ -49,7 +49,7 @@ char		*attr_name = NULL;
 static int
 attr(const char *name, kva_t *kva, void *ctxt, void *pres)
 {
-	char 	*val;
+	char	*val;
 
 	if ((val = kva_match(kva, attr_name)) != NULL) {
 		if (verbose) {
@@ -114,7 +114,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	(void) _enum_attrs(user, attr, NULL, NULL);
+	(void) _enum_attrs(user, NULL, attr, NULL, NULL);
 
 	if (verbose) {
 		(void) fprintf(stderr,

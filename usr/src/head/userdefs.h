@@ -60,6 +60,7 @@ extern "C" {
 #define	DEFEXPIRE	""
 #define	DEFAUTH		""
 #define	DEFPROF		""
+#define	DEFAUTHPROF	""
 #define	DEFROLEPROF	"All"
 #define	DEFROLE		""
 #define	DEFLIMPRIV	""
@@ -79,6 +80,7 @@ extern "C" {
 #define	EXPIRESTR	"defexpire="
 #define	AUTHSTR		"defauthorization="
 #define	PROFSTR		"defprofile="
+#define	AUTHPROFSTR	"defauthprofile="
 #define	ROLESTR		"defrole="
 #define	PROJSTR		"defproj="
 #define	PROJNMSTR	"defprojname="
@@ -107,9 +109,10 @@ struct userdefs {
 	char *defskel;		/* default skel directory */
 	char *defshell;		/* default shell */
 	int definact;		/* default inactive */
-	char *defexpire;		/* default expire date */
+	char *defexpire;	/* default expire date */
 	char *defauth;		/* default authorization */
 	char *defprof;		/* default profile */
+	char *defauthprof;	/* default authenticated profile */
 	char *defrole;		/* default role */
 	projid_t defproj;	/* default project id */
 	char *defprojname;	/* default project name */

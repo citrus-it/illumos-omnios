@@ -496,6 +496,8 @@ main_loop(char *devname, boolean_t cttyflag)
 	sanitize_tty(fileno(stdin));
 
 	for (;;) {
+		uint_t aflags = CHKAUTHATTR_PROFILES;
+
 		do {
 			(void) printf("\nEnter user name for system "
 			    "maintenance (control-d to bypass): ");
@@ -552,6 +554,15 @@ main_loop(char *devname, boolean_t cttyflag)
 			goto sorry;
 		}
 
+		/*
+		 * The password has been verified, so the user's
+		 * authenticated rights profiles are also taken into account
+		 * when checking for the maintenance authorisation. This is
+		 * deliberately not done on the bypass path above, which
+		 * skips password verification entirely.
+		 */
+		aflags |= CHKAUTHATTR_AUTHPROFILES;
+
 checkauth:
 		/*
 		 * There is a special case error here as well.
@@ -562,7 +573,7 @@ checkauth:
 		 */
 
 		if ((getusernam("root") != NULL) &&
-		    (chkauthattr(MAINTENANCE_AUTH, user) != 1)) {
+		    (chkauthattr_flags(MAINTENANCE_AUTH, user, aflags) != 1)) {
 			goto sorry;
 		}
 		(void) fprintf(sysmsgfd, "\nsingle-user privilege "
