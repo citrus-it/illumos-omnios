@@ -29,6 +29,7 @@
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2019 Joyent, Inc.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -374,7 +375,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 				VN_RELE(dir);
 			pn_free(&resolvepn);
 			VN_RELE(vp);
-			goto out;
+			goto fail;
 		}
 
 		/* Don't change the credentials when using old ptrace. */

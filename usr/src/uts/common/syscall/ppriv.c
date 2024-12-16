@@ -22,6 +22,10 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -252,7 +256,8 @@ setpflags(uint_t flag, uint_t val, cred_t *tcr)
 	if (val > 1 || (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
 	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT &&
 	    flag != __PROC_PROTECT && flag != PRIV_XPOLICY &&
-	    flag != PRIV_AWARE_RESET && flag != PRIV_PFEXEC)) {
+	    flag != PRIV_AWARE_RESET && flag != PRIV_PFEXEC &&
+	    flag != PRIV_PFEXEC_AUTH)) {
 		return (EINVAL);
 	}
 
@@ -314,6 +319,19 @@ setpflags(uint_t flag, uint_t val, cred_t *tcr)
 		}
 	}
 
+	/*
+	 * Setting the PRIV_PFEXEC_AUTH flag is a restricted operation
+	 * since it marks the process as having completed authentication in
+	 * order to access a profile in the authenticated set.
+	 */
+	if (flag == PRIV_PFEXEC_AUTH && val == 1 && use_curcred) {
+		if (secpolicy_allow_setid(pcr, 0, B_FALSE) != 0) {
+			mutex_exit(&p->p_crlock);
+			crfree(cr);
+			return (EPERM);
+		}
+	}
+
 	/* Trying to unset PA; if we can't, return an error */
 	if (flag == PRIV_AWARE && val == 0 && !priv_can_clear_PA(pcr)) {
 		if (use_curcred) {
@@ -360,8 +378,9 @@ getpflags(uint_t flag, const cred_t *cr)
 	if (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
 	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT &&
 	    flag != PRIV_XPOLICY && flag != PRIV_PFEXEC &&
-	    flag != PRIV_AWARE_RESET)
+	    flag != PRIV_PFEXEC_AUTH && flag != PRIV_AWARE_RESET) {
 		return ((uint_t)-1);
+	}
 
 	return ((CR_FLAGS(cr) & flag) != 0);
 }
@@ -406,6 +425,9 @@ privsys(int code, priv_op_t op, priv_ptype_t type, void *buf, size_t bufsize,
 		return ((int)pfexec_reg((int)op));
 	case PRIVSYS_PFEXEC_UNREG:
 		return ((int)pfexec_unreg((int)op));
+	case PRIVSYS_PFEXEC_AUTH_DROP:
+		retv = pfexec_auth_drop();
+		return (retv != 0 ? set_errno(retv) : 0);
 	}
 	return (set_errno(EINVAL));
 }
