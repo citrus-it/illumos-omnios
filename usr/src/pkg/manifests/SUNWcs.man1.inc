@@ -267,6 +267,7 @@ link path=usr/share/man/man1/unset.1 target=set.1
 link path=usr/share/man/man1/unsetenv.1 target=set.1
 link path=usr/share/man/man1/until.1 target=shell_builtins.1
 file path=usr/share/man/man1/uptime.1
+file path=usr/share/man/man1/userattr.1
 file path=usr/share/man/man1/uuidgen.1
 link path=usr/share/man/man1/valdate.1 target=ckdate.1
 link path=usr/share/man/man1/valgid.1 target=ckgid.1

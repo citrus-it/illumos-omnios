@@ -20,10 +20,14 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_SECDB_H
 #define	_SECDB_H
+
+#include <sys/types.h>
+#include <ucred.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -89,11 +93,14 @@ extern void _kva_free(kva_t *);
 extern void _kva_free_value(kva_t *, char *);
 extern kva_t *_new_kva(int size);
 extern kva_t *_str2kva(char *, char *, char *);
-extern int _enum_auths(const char *, int (*)(const char *, void *, void *),
-    void *ctxt, void *pres);
+extern int _enum_auths(const char *, const ucred_t *,
+    int (*)(const char *, void *, void *), void *ctxt, void *pres);
+#define	_ENUM_PROFS_AUTHPROFILES	0x1
+#define	_ENUM_PROFS_PROFILES		0x2
 extern int _enum_profs(const char *,
-    int (*)(const char *, kva_t *, void *, void *), void *ctxt, void *pres);
-extern int _enum_attrs(const char *,
+    int (*)(const char *, kva_t *, void *, void *),
+    void *ctxt, void *pres, uint_t flags);
+extern int _enum_attrs(const char *, const ucred_t *,
     int (*)(const char *, kva_t *, void *, void *), void *ctxt, void *pres);
 
 #ifdef	__cplusplus

@@ -1254,7 +1254,8 @@ vrrp_auth_check(int connfd, vrrp_cmd_info_t *cinfo)
 		goto done;
 	}
 
-	success = (chkauthattr("solaris.network.vrrp", pw->pw_name) == 1);
+	success = (chkauthattr_ucred("solaris.network.vrrp", pw->pw_name,
+	    cred) == 1);
 
 done:
 	ucred_free(cred);

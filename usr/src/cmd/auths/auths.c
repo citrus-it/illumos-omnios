@@ -109,7 +109,7 @@ show_auths(char *username, int print_name)
 		return (status);
 	}
 
-	(void) _enum_auths(username, add_auth, NULL, &cbs);
+	(void) _enum_auths(username, NULL, add_auth, NULL, &cbs);
 
 	if (cbs.auth_cnt == 0)
 		status = EXIT_NON_FATAL;

@@ -834,9 +834,9 @@ i_ilbd_rule_action(const char *rule_name, const struct passwd *ps,
 
 	if (ps != NULL) {
 		if ((cmd == ILBD_ENABLE_RULE) || (cmd == ILBD_DISABLE_RULE))
-			rc = ilbd_check_client_enable_auth(ps);
+			rc = ilbd_check_client_enable_auth(ps, ucredp);
 		else
-			rc = ilbd_check_client_config_auth(ps);
+			rc = ilbd_check_client_config_auth(ps, ucredp);
 		/* generate the audit record before bailing out */
 		if (rc != ILB_STATUS_OK) {
 			if (*rule_name != '\0') {
@@ -1110,8 +1110,10 @@ ilbd_create_rule(ilb_rule_info_t *rl, int ev_port,
 	ilb_rule_cmd_t	*kcmd = NULL;
 
 	if (ps != NULL) {
-		if ((rc = ilbd_check_client_config_auth(ps)) != ILB_STATUS_OK)
+		if ((rc = ilbd_check_client_config_auth(ps, ucredp)) !=
+		    ILB_STATUS_OK) {
 			goto out;
+		}
 	}
 
 	if (i_find_rule_byname(rl->rl_name) != NULL) {

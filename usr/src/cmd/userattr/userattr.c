@@ -114,7 +114,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	(void) _enum_attrs(user, attr, NULL, NULL);
+	(void) _enum_attrs(user, NULL, attr, NULL, NULL);
 
 	if (verbose) {
 		(void) fprintf(stderr,

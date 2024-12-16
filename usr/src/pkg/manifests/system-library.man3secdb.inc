@@ -12,9 +12,11 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 #
 
 link path=usr/share/man/man3secdb/chkauthattr.3secdb target=getauthattr.3secdb
+link path=usr/share/man/man3secdb/chkauthattr_ucred.3secdb target=getauthattr.3secdb
 link path=usr/share/man/man3secdb/endauthattr.3secdb target=getauthattr.3secdb
 link path=usr/share/man/man3secdb/endexecattr.3secdb target=getexecattr.3secdb
 link path=usr/share/man/man3secdb/endprofattr.3secdb target=getprofattr.3secdb

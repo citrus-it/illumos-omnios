@@ -48,9 +48,9 @@
 static kmutex_t klpd_mutex;
 
 typedef struct klpd_reg {
-	struct klpd_reg *klpd_next;
-	struct klpd_reg **klpd_refp;
-	door_handle_t 	klpd_door;
+	struct klpd_reg	*klpd_next;
+	struct klpd_reg	**klpd_refp;
+	door_handle_t	klpd_door;
 	pid_t		klpd_door_pid;
 	priv_set_t	klpd_pset;
 	cred_t		*klpd_cred;
@@ -842,7 +842,7 @@ get_path(char *buf, const char *path, int len)
  */
 int
 pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
-    boolean_t *scrub)
+    boolean_t *scrub, boolean_t *authreq)
 {
 	klpd_reg_t *pfd;
 	pfexec_arg_t *pap;
@@ -884,6 +884,7 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	pap->pfa_call = PFEXEC_EXEC_ATTRS;
 	pap->pfa_len = pasize;
 	pap->pfa_uid = crgetruid(cr);
+	pap->pfa_authd = (CR_FLAGS(cr) & PRIV_PFEXEC_AUTH) != 0;
 
 	da.data_ptr = (char *)pap;
 	da.data_size = pap->pfa_len;
@@ -941,6 +942,9 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 		err = 0;
 		goto out;
 	}
+	if (prp->pfr_authreq)
+		*authreq = B_TRUE;
+
 	ncr = crdup((cred_t *)cr);
 
 	/*
@@ -957,7 +961,7 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	*scrub = prp->pfr_scrubenv;
 
 	if (prp->pfr_clearflag)
-		CR_FLAGS(ncr) &= ~PRIV_PFEXEC;
+		CR_FLAGS(ncr) &= ~(PRIV_PFEXEC|PRIV_PFEXEC_AUTH);
 
 	/* We cannot exceed our Limit set, no matter what */
 	iset = PFEXEC_REPLY_IPRIV(prp);
@@ -968,7 +972,7 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 		priv_union(iset, &CR_IPRIV(ncr));
 	}
 
-	/* Nor can we increate our Limit set itself */
+	/* Nor can we increase our Limit set itself */
 	lset = PFEXEC_REPLY_LPRIV(prp);
 
 	if (lset != NULL) {
@@ -1116,6 +1120,7 @@ check_user_privs(const cred_t *cr, const priv_set_t *set)
 
 	pap->pfa_vers = PFEXEC_ARG_VERS;
 	pap->pfa_call = PFEXEC_USER_PRIVS;
+	pap->pfa_authd = (CR_FLAGS(cr) & PRIV_PFEXEC_AUTH) != 0;
 	pap->pfa_len = pasize;
 	pap->pfa_uid = crgetruid(cr);
 
