@@ -309,6 +309,7 @@ COMMON_SUBDIRS=		\
 	pcieadm		\
 	pcieb		\
 	pcitool		\
+	pfauth		\
 	pfexec		\
 	pfexecd		\
 	pginfo		\

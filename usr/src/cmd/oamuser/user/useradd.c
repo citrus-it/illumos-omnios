@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 2013 RackTop Systems.
@@ -135,9 +135,7 @@ typedef enum {
 static void valid_input(path_opt_t, const char *);
 
 int
-main(argc, argv)
-int argc;
-char *argv[];
+main(int argc, char *argv[])
 {
 	int ch, ret, mflag = 0, oflag = 0, Dflag = 0;
 	int zflag = 0, Zflag = 0, **gidlist = NULL;
@@ -166,7 +164,7 @@ char *argv[];
 	change_key(USERATTR_TYPE_KW, usertype);
 
 	while ((ch = getopt(argc, argv,
-		    "b:c:Dd:e:f:G:g:k:mzZop:s:u:A:P:R:K:")) != EOF)
+	    "b:c:Dd:e:f:G:g:k:mzZop:s:u:A:P:R:K:X:")) != EOF)
 		switch (ch) {
 		case 'b':
 			base_dir = optarg;
@@ -238,6 +236,10 @@ char *argv[];
 
 		case 'P':
 			change_key(USERATTR_PROFILES_KW, optarg);
+			break;
+
+		case 'X':
+			change_key(USERATTR_AUTHPROFILES_KW, optarg);
 			break;
 
 		case 'R':
@@ -729,8 +731,7 @@ char *argv[];
 }
 
 static void
-cleanup(logname)
-char *logname;
+cleanup(char *logname)
 {
 	char *nargv[4];
 

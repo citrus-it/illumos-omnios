@@ -38,6 +38,11 @@
 
 $mapfile_version 2
 
+SYMBOL_VERSION ILLUMOS_0.1 {
+    protected:
+	chkauthattr_ucred;
+} SUNW_1.1;
+
 SYMBOL_VERSION SUNW_1.1 {
     global:
 	chkauthattr;

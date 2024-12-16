@@ -20,12 +20,15 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <pwd.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <libintl.h>
 #include <locale.h>
@@ -34,25 +37,31 @@
 #include <prof_attr.h>
 #include <exec_attr.h>
 #include <auth_attr.h>
-
-
-#define	EXIT_OK		0
-#define	EXIT_FATAL	1
-#define	EXIT_NON_FATAL	2
+#include <sys/ccompile.h>
 
 #define	TMP_BUF_LEN	2048		/* size of temp string buffer */
 
 #define	PRINT_DEFAULT	0x0000
 #define	PRINT_NAME	0x0010
 #define	PRINT_LONG	0x0020
+#define	PRINT_VERBOSE	0x0040
 
 #ifndef TEXT_DOMAIN			/* Should be defined by cc -D */
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 
-static void usage();
-static int show_profs(char *, int);
-static void print_profs_long(execattr_t *);
+#define	AUTH_REQUIRED	"Authentication required"
+
+typedef struct {
+	uint_t cnt;
+	int print_flag;
+	bool auth;
+} callback_t;
+
+static void usage(int) __NORETURN;
+static void show_profs(const char *, const char *, int, int);
+static void print_profs_long(execattr_t *, callback_t *);
+static void print_profs_short(execattr_t *, callback_t *);
 static void print_profile_privs(kva_t *);
 
 static char *progname = "profiles";
@@ -61,113 +70,158 @@ int
 main(int argc, char *argv[])
 {
 	extern int	optind;
+	char		*cmd = NULL;
 	int		c;
-	int		status = EXIT_OK;
 	int		print_flag = PRINT_DEFAULT;
+	int		search_flag = GET_ALL;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "l")) != EOF) {
+	while ((c = getopt(argc, argv, "c:hlvxX")) != EOF) {
 		switch (c) {
+		case 'c':
+			cmd = optarg;
+			break;
+		case 'h':
+			usage(EXIT_SUCCESS);
 		case 'l':
 			print_flag |= PRINT_LONG;
 			break;
+		case 'v':
+			print_flag |= PRINT_VERBOSE;
+			break;
+		case 'x':
+			search_flag |= GET_AUTHPROF;
+			break;
+		case 'X':
+			search_flag |= GET_PROF;
+			break;
 		default:
-			usage();
-			return (EXIT_FATAL);
+			usage(EXIT_FAILURE);
 		}
 	}
 	argc -= optind;
 	argv += optind;
 
+	if (IS_GET_PROF(search_flag) && IS_GET_AUTHPROF(search_flag)) {
+		(void) fprintf(stderr, gettext(
+		    "-x and -X may not be used together.\n"));
+		usage(EXIT_FAILURE);
+	}
+
 	if (*argv == NULL) {
-		status = show_profs(NULL, print_flag);
+		show_profs(NULL, cmd, print_flag, search_flag);
 	} else {
+		print_flag |= PRINT_NAME;
 		do {
-			(void) printf("%s:\n", *argv);
-			status = show_profs((char *)*argv,
-			    (print_flag | PRINT_NAME));
-			if (status == EXIT_FATAL) {
-				break;
-			}
+			(void) printf("%s:", *argv);
+			(void) printf("\n");
+			show_profs(*argv, cmd, print_flag, search_flag);
 			if (argv[1] != NULL) {
 				/* seperate users with empty line */
 				(void) printf("\n");
 			}
-		} while (*++argv);
+		} while (*(++argv) != NULL);
 	}
-	status = (status == EXIT_OK) ? status : EXIT_FATAL;
 
-	return (status);
+	return (EXIT_SUCCESS);
 }
 
 static int
-show_profs_callback(const char *prof, kva_t *pa, void *pflag, void *vcnt)
+show_profs_callback(const char *prof, kva_t *pa, void *callbackp,
+    void *arg __unused)
 {
 	char *indent = "";
-	const int *print_flag = pflag;
-	int *pcnt = vcnt;
+	callback_t *call = callbackp;
 
-	(*pcnt)++;
+	call->cnt++;
 
-	if ((*print_flag) & PRINT_NAME) {
+	if ((call->print_flag & PRINT_NAME))
 		indent = "          ";
-	}
 
-	(void) printf("%s%s", indent, prof);
+	if (call->auth && (call->print_flag & PRINT_VERBOSE)) {
+		(void) printf("%s%s (%s)", indent, prof,
+		    gettext(AUTH_REQUIRED));
+	} else {
+		(void) printf("%s%s", indent, prof);
+	}
 	print_profile_privs(pa);
 	(void) printf("\n");
 
 	return (0);
 }
 
-static int
-show_profs(char *username, int print_flag)
+static void
+show_profs(const char *username, const char *cmd, int print_flag,
+    int search_flag)
 {
-	int		status = EXIT_OK;
-	struct passwd	*pw;
-	execattr_t	*exec;
+	struct passwd *pw;
+	execattr_t *exec;
+	callback_t call = {
+		.print_flag = print_flag,
+		.cnt = 0
+	};
 
 	if (username == NULL) {
 		if ((pw = getpwuid(getuid())) == NULL) {
-			status = EXIT_NON_FATAL;
 			(void) fprintf(stderr, "%s: ", progname);
 			(void) fprintf(stderr, gettext("No passwd entry\n"));
-			return (status);
+			return;
 		}
 		username = pw->pw_name;
 	} else if (getpwnam(username) == NULL) {
-		status = EXIT_NON_FATAL;
 		(void) fprintf(stderr, "%s: %s: ", progname, username);
 		(void) fprintf(stderr, gettext("No such user\n"));
-		return (status);
+		return;
 	}
 
-	if (print_flag & PRINT_LONG) {
-		exec = getexecuser(username, KV_COMMAND, NULL,
-		    GET_ALL|__SEARCH_ALL_POLS);
-		if (exec != NULL) {
-			print_profs_long(exec);
-			free_execattr(exec);
-		} else {
-			status = EXIT_NON_FATAL;
+	if ((print_flag & PRINT_LONG) || cmd != NULL) {
+		if (!IS_GET_PROF(search_flag)) {
+			call.auth = true;
+			exec = getexecuser(username, KV_COMMAND, cmd,
+			    GET_AUTHPROF | GET_ALL | __SEARCH_ALL_POLS);
+
+			if (exec != NULL) {
+				if (print_flag & PRINT_LONG)
+					print_profs_long(exec, &call);
+				else
+					print_profs_short(exec, &call);
+
+				free_execattr(exec);
+			}
+		}
+		if (!IS_GET_AUTHPROF(search_flag)) {
+			call.auth = false;
+			exec = getexecuser(username, KV_COMMAND, cmd,
+			    GET_PROF | GET_ALL | __SEARCH_ALL_POLS);
+
+			if (exec != NULL) {
+				if (print_flag & PRINT_LONG)
+					print_profs_long(exec, &call);
+				else
+					print_profs_short(exec, &call);
+
+				free_execattr(exec);
+			}
 		}
 	} else {
-		int cnt = 0;
-		(void) _enum_profs(username, show_profs_callback, &print_flag,
-		    &cnt);
-
-		if (cnt == 0)
-			status = EXIT_NON_FATAL;
+		if (!IS_GET_PROF(search_flag)) {
+			call.auth = true;
+			(void) _enum_profs(username, show_profs_callback,
+			    &call, NULL, _ENUM_PROFS_AUTHPROFILES);
+		}
+		if (!IS_GET_AUTHPROF(search_flag)) {
+			call.auth = false;
+			(void) _enum_profs(username, show_profs_callback,
+			    &call, NULL, _ENUM_PROFS_PROFILES);
+		}
 	}
 
-	if (status == EXIT_NON_FATAL) {
+	if (call.cnt == 0) {
 		(void) fprintf(stderr, "%s: %s: ", progname, username);
 		(void) fprintf(stderr, gettext("No profiles\n"));
 	}
-
-	return (status);
 }
 
 /*
@@ -195,7 +249,7 @@ show_profs(char *username, int print_flag)
 #define	ATTR_COL	37
 
 static void
-print_profs_long(execattr_t *exec)
+print_profs_long(execattr_t *exec, callback_t *call)
 {
 	char	*curprofile;
 	int	len;
@@ -205,12 +259,18 @@ print_profs_long(execattr_t *exec)
 	int	i;
 
 	for (curprofile = ""; exec != NULL; exec = exec->next) {
+		call->cnt++;
 		/* print profile name if it is a new one */
 		if (strcmp(curprofile, exec->name) != 0) {
 			profattr_t *pa;
 			curprofile = exec->name;
 
-			(void) printf("      %s", curprofile);
+			if (call->auth) {
+				(void) printf("      %s (%s)", curprofile,
+				    gettext(AUTH_REQUIRED));
+			} else {
+				(void) printf("      %s", curprofile);
+			}
 
 			pa = getprofnam(curprofile);
 			if (pa != NULL) {
@@ -229,7 +289,7 @@ print_profs_long(execattr_t *exec)
 		/*
 		 * if printing the name of the executable got us past the
 		 * ATTR_COLth column, skip to ATTR_COL on a new line to
-		 * print the attribues.
+		 * print the attributes.
 		 * else, just skip to ATTR_COL column.
 		 */
 		if (len >= ATTR_COL)
@@ -254,10 +314,31 @@ print_profs_long(execattr_t *exec)
 }
 
 static void
-usage()
+print_profs_short(execattr_t *exec, callback_t *call)
 {
-	(void) fprintf(stderr,
-	    gettext("  usage: profiles [-l] [user1 user2 ...]\n"));
+	char	*curprofile;
+
+	for (curprofile = ""; exec != NULL; exec = exec->next) {
+		call->cnt++;
+		/* print profile name if it is a new one */
+		if (strcmp(curprofile, exec->name) != 0) {
+			curprofile = exec->name;
+			if ((call->print_flag & PRINT_VERBOSE) && call->auth) {
+				(void) printf("      %s (%s)\n", curprofile,
+				    gettext(AUTH_REQUIRED));
+			} else {
+				(void) printf("      %s\n", curprofile);
+			}
+		}
+	}
+}
+
+static void __NORETURN
+usage(int status)
+{
+	(void) fprintf(stderr, gettext(
+	    "  usage: profiles [-hlv] [-x | -X] [-c command] [user...]\n"));
+	exit(status);
 }
 
 static void

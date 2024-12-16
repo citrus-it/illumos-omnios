@@ -273,7 +273,7 @@ check_auth(ucred_t *ucred, const char *auth)
 	euid = ucred_geteuid(ucred);
 
 	if ((getpwuid_r(euid, &pwd, buf, sizeof (buf)) == NULL) ||
-	    (chkauthattr(auth, pwd.pw_name) == 0)) {
+	    (chkauthattr_ucred(auth, pwd.pw_name, ucred) == 0)) {
 		log_info("Unauthorized door call.\n");
 		return (-1);
 	}

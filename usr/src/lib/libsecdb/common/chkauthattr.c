@@ -27,12 +27,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <priv.h>
 #include <pwd.h>
 #include <nss_dbdefs.h>
 #include <deflt.h>
 #include <auth_attr.h>
 #include <prof_attr.h>
 #include <user_attr.h>
+
 
 #define	COPYTOSTACK(dst, csrc)		{	\
 		size_t len = strlen(csrc) + 1;	\
@@ -70,6 +73,7 @@ static struct dfltplcy {
 	{ CONSUSER_PROFILE_KW,			DEF_CONSUSER},
 	{ PROFATTR_AUTHS_KW,			DEF_AUTH},
 	{ PROFATTR_PROFS_KW,			DEF_PROF},
+	{ USERATTR_AUTHPROFILES_KW,		DEF_AUTHPROF},
 	{ USERATTR_LIMPRIV_KW,			DEF_LIMITPRIV},
 	{ USERATTR_DFLTPRIV_KW,			DEF_DFLTPRIV},
 	{ USERATTR_LOCK_AFTER_RETRIES_KW,	DEF_LOCK_AFTER_RETRIES}
@@ -78,6 +82,10 @@ static struct dfltplcy {
 #define	NDFLTPLY	(sizeof (dfltply)/sizeof (struct dfltplcy))
 #define	GETCONSPROF(a)	(kva_match((a), CONSUSER_PROFILE_KW))
 #define	GETPROF(a)	(kva_match((a), PROFATTR_PROFS_KW))
+#define	GETAUTHPROF(a)	(kva_match((a), USERATTR_AUTHPROFILES_KW))
+
+#define	WANTPROF(a)	((a) == 0 || ((a) & _ENUM_PROFS_PROFILES))
+#define	WANTAUTHPROF(a)	((a) == 0 || ((a) & _ENUM_PROFS_AUTHPROFILES))
 
 /*
  * Enumerate profiles from listed profiles.
@@ -149,7 +157,7 @@ cont:
 static int
 _enum_common(const char *username,
     int (*cb)(const char *, kva_t *, void *, void *),
-    void *ctxt, void *pres, boolean_t wantattr)
+    void *ctxt, void *pres, boolean_t wantattr, uint_t pflags)
 {
 	userattr_t *ua;
 	int res = 0;
@@ -166,7 +174,11 @@ _enum_common(const char *username,
 		if (ua->attr != NULL) {
 			if (wantattr)
 				res = cb(NULL, ua->attr, ctxt, pres);
-			if (res == 0) {
+			if (res == 0 && WANTAUTHPROF(pflags)) {
+				res = _enum_common_p(GETAUTHPROF(ua->attr),
+				    cb, ctxt, pres, wantattr, &cnt, profs);
+			}
+			if (res == 0 && WANTPROF(pflags)) {
 				res = _enum_common_p(GETPROF(ua->attr),
 				    cb, ctxt, pres, wantattr, &cnt, profs);
 			}
@@ -184,11 +196,14 @@ _enum_common(const char *username,
 		res = _enum_common_p(GETCONSPROF(kattrs), cb, ctxt, pres,
 		    wantattr, &cnt, profs);
 
-		if (res == 0) {
-			res = _enum_common_p(GETPROF(kattrs), cb, ctxt, pres,
-			    wantattr, &cnt, profs);
+		if (res == 0 && WANTAUTHPROF(pflags)) {
+			res = _enum_common_p(GETAUTHPROF(kattrs),
+			    cb, ctxt, pres, wantattr, &cnt, profs);
 		}
-
+		if (res == 0 && WANTPROF(pflags)) {
+			res = _enum_common_p(GETPROF(kattrs),
+			    cb, ctxt, pres, wantattr, &cnt, profs);
+		}
 		if (res == 0 && wantattr)
 			res = cb(NULL, kattrs, ctxt, pres);
 
@@ -206,20 +221,35 @@ _enum_common(const char *username,
 int
 _enum_profs(const char *username,
     int (*cb)(const char *, kva_t *, void *, void *),
-    void *ctxt, void *pres)
+    void *ctxt, void *pres, uint_t flags)
 {
-	return (_enum_common(username, cb, ctxt, pres, B_FALSE));
+	return (_enum_common(username, cb, ctxt, pres, B_FALSE, flags));
 }
 
 /*
- * Enumerate attributes with a username argument.
+ * Enumerate attributes with a username or ucred argument.
  */
 int
-_enum_attrs(const char *username,
+_enum_attrs(const char *username, const ucred_t *uc,
     int (*cb)(const char *, kva_t *, void *, void *),
     void *ctxt, void *pres)
 {
-	return (_enum_common(username, cb, ctxt, pres, B_TRUE));
+	char pwdb[NSS_BUFLEN_PASSWD];
+	struct passwd pwd;
+	int flags;
+
+	flags = _ENUM_PROFS_PROFILES;
+
+	if (uc != NULL) {
+		if (ucred_getpflags(uc, PRIV_PFEXEC_AUTH) > 0)
+			flags |= _ENUM_PROFS_AUTHPROFILES;
+	} else if (getpwnam_r(username, &pwd, pwdb, sizeof (pwdb)) != NULL &&
+	    getuid() == pwd.pw_uid &&
+	    getpflags(PRIV_PFEXEC_AUTH) > 0) {
+		flags |= _ENUM_PROFS_AUTHPROFILES;
+	}
+
+	return (_enum_common(username, cb, ctxt, pres, B_TRUE, flags));
 }
 
 
@@ -271,10 +301,10 @@ comm2auth(const char *name, kva_t *attr, void *ctxt, void *pres)
 }
 
 /*
- * Enumerate authorizations for username.
+ * Enumerate authorizations for username or ucred.
  */
 int
-_enum_auths(const char *username,
+_enum_auths(const char *username, const ucred_t *uc,
     int (*cb)(const char *, void *, void *),
     void *ctxt, void *pres)
 {
@@ -286,7 +316,7 @@ _enum_auths(const char *username,
 	c2a.cb = cb;
 	c2a.ctxt = ctxt;
 
-	return (_enum_common(username, comm2auth, &c2a, pres, B_TRUE));
+	return (_enum_attrs(username, uc, comm2auth, &c2a, pres));
 }
 
 int
@@ -387,7 +417,21 @@ chkauthattr(const char *authname, const char *username)
 	if (authname == NULL || username == NULL)
 		return (0);
 
-	(void) _enum_auths(username, _is_authorized, (char *)authname,
+	(void) _enum_auths(username, NULL, _is_authorized, (char *)authname,
+	    &auth_granted);
+
+	return (auth_granted);
+}
+
+int
+chkauthattr_ucred(const char *authname, const char *username, const ucred_t *cr)
+{
+	int		auth_granted = 0;
+
+	if (authname == NULL || username == NULL)
+		return (0);
+
+	(void) _enum_auths(username, cr, _is_authorized, (char *)authname,
 	    &auth_granted);
 
 	return (auth_granted);

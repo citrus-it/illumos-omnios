@@ -60,7 +60,7 @@ static char *dup_to_nl(char *);
 
 static struct userdefs defaults = {
 	DEFRID, DEFGROUP, DEFGNAME, DEFPARENT, DEFSKL,
-	DEFSHL, DEFINACT, DEFEXPIRE, DEFAUTH, DEFPROF,
+	DEFSHL, DEFINACT, DEFEXPIRE, DEFAUTH, DEFPROF, DEFAUTHPROF,
 	DEFROLE, DEFPROJ, DEFPROJNAME, DEFLIMPRIV,
 	DEFDFLTPRIV, DEFLOCK_AFTER_RETRIES, DEFROLEAUTH
 };
@@ -94,6 +94,8 @@ static const parsent_t tab[] = {
 		USERATTR_ROLES_KW },
 	{ PROFSTR,	sizeof (PROFSTR) - 1,	STR,	DEFOFF(defprof),
 		USERATTR_PROFILES_KW },
+	{ AUTHPROFSTR,	sizeof (AUTHPROFSTR) - 1, STR,	DEFOFF(defauthprof),
+		USERATTR_AUTHPROFILES_KW },
 	{ PROJSTR,	sizeof (PROJSTR) - 1,	PROJID,	DEFOFF(defproj) },
 	{ PROJNMSTR,	sizeof (PROJNMSTR) - 1,	STR,	DEFOFF(defprojname) },
 	{ LIMPRSTR,	sizeof (LIMPRSTR) - 1,	STR,	DEFOFF(deflimpriv),
@@ -152,6 +154,7 @@ scan(char **start_p)
  *		defexpire = 0
  *		defauth = 0
  *		defprof = 0
+ *		defauthprof = 0
  *		defrole = 0
  *		defroleauth = role
  *
@@ -281,6 +284,12 @@ dispusrdef(FILE *fptr, unsigned flags, char *usertype)
 
 	if (flags & D_PROF) {
 		outcount += fprintf(fptr, "profiles=%s  ", deflts->defprof);
+		PRINTNL();
+	}
+
+	if (flags & D_AUTHPROF) {
+		outcount += fprintf(fptr, "auth_profiles=%s  ",
+		    deflts->defauthprof);
 		PRINTNL();
 	}
 

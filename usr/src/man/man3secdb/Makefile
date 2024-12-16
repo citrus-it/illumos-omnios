@@ -16,15 +16,16 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3secdb
+MANSECT=	3secdb
 
-MANFILES= 	getauthattr.3secdb	\
+MANFILES=	getauthattr.3secdb	\
 		getexecattr.3secdb	\
 		getprofattr.3secdb	\
 		getuserattr.3secdb	\
 		kva_match.3secdb
 
 MANLINKS=	chkauthattr.3secdb	\
+		chkauthattr_ucred.3secdb	\
 		endauthattr.3secdb	\
 		endexecattr.3secdb	\
 		endprofattr.3secdb	\
@@ -49,6 +50,7 @@ MANLINKS=	chkauthattr.3secdb	\
 		setuserattr.3secdb
 
 chkauthattr.3secdb	:= LINKSRC = getauthattr.3secdb
+chkauthattr_ucred.3secdb	:= LINKSRC = getauthattr.3secdb
 endauthattr.3secdb	:= LINKSRC = getauthattr.3secdb
 free_authattr.3secdb	:= LINKSRC = getauthattr.3secdb
 getauthnam.3secdb	:= LINKSRC = getauthattr.3secdb

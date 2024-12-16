@@ -111,11 +111,10 @@ logperror(const char *str)
 		syslog(LOG_ERR, "%s: %m", str);
 }
 
-
 ilb_status_t
-ilbd_check_client_config_auth(const struct passwd *pwd)
+ilbd_check_client_config_auth(const struct passwd *pwd, ucred_t *ucred)
 {
-	if (chkauthattr(NET_ILB_CONFIG_AUTH, pwd->pw_name) == 0) {
+	if (chkauthattr_ucred(NET_ILB_CONFIG_AUTH, pwd->pw_name, ucred) == 0) {
 		logdebug("user %s is not authorized for"
 		    " configuration operation", pwd->pw_name);
 		return (ILB_STATUS_CFGAUTH);
@@ -125,9 +124,9 @@ ilbd_check_client_config_auth(const struct passwd *pwd)
 }
 
 ilb_status_t
-ilbd_check_client_enable_auth(const struct passwd *pwd)
+ilbd_check_client_enable_auth(const struct passwd *pwd, ucred_t *ucred)
 {
-	if (chkauthattr(NET_ILB_ENABLE_AUTH, pwd->pw_name) == 0) {
+	if (chkauthattr_ucred(NET_ILB_ENABLE_AUTH, pwd->pw_name, ucred) == 0) {
 		logdebug("user %s is not authorized for"
 		    " enable/disable operation", pwd->pw_name);
 		return (ILB_STATUS_CFGAUTH);

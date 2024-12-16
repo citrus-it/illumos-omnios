@@ -137,14 +137,13 @@ ipmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 			ipmgmt_log(LOG_ERR, "Could not get user id.");
 			goto fail;
 		}
-		if (getpwuid_r(uid, &pwd, buf, sizeof (buf)) ==
-		    NULL) {
+		if (getpwuid_r(uid, &pwd, buf, sizeof (buf)) == NULL) {
 			err = errno;
 			ipmgmt_log(LOG_ERR, "Could not get password entry.");
 			goto fail;
 		}
-		if (chkauthattr(NETWORK_INTERFACE_CONFIG_AUTH,
-		    pwd.pw_name) != 1) {
+		if (chkauthattr_ucred(NETWORK_INTERFACE_CONFIG_AUTH,
+		    pwd.pw_name, cred) != 1) {
 			err = EPERM;
 			ipmgmt_log(LOG_ERR, "Not authorized for operation.");
 			goto fail;
