@@ -379,22 +379,31 @@ ebi_ipcc_init(void)
  */
 
 static void
-mb_ipcc_log(void *arg __unused, ipcc_log_type_t type __maybe_unused,
-    const char *fmt, ...)
+mb_ipcc_log(void *arg __unused, ipcc_log_type_t type, const char *fmt, ...)
 {
 	va_list ap;
 
+	if (type == IPCC_LOG_HEX) {
+		/*
+		 * Hexdump messages are never logged when we're in fast poll
+		 * mode. If that's set then we are expecting a lot of IPCC
+		 * traffic.
+		 */
+		if (ipcc_fastpoll)
+			return;
 #ifndef DEBUG
-	/*
-	 * In a non-DEBUG kernel the hexdump messages are not logged to the
-	 * console.
-	 */
-	if (type == IPCC_LOG_HEX)
+		/*
+		 * In a non-DEBUG kernel the hexdump messages are not logged to
+		 * the console.
+		 */
 		return;
 #endif
+	}
+
+	int level = (type == IPCC_LOG_WARNING) ? CE_WARN : CE_CONT;
 
 	va_start(ap, fmt);
-	vcmn_err(CE_CONT, fmt, ap);
+	vcmn_err(level, fmt, ap);
 	va_end(ap);
 }
 
@@ -681,6 +690,55 @@ kernel_ipcc_keylookup(uint8_t key, uint8_t *buf, size_t *bufl)
 	*bufl = kl.ik_datalen;
 
 	return (0);
+}
+
+int
+kernel_ipcc_apobwrite(const uint8_t *buf, size_t bufl)
+{
+	ipcc_apob_t *apob;
+	int ret = 0;
+
+	apob = kmem_zalloc(sizeof (*apob), KM_SLEEP);
+
+	kernel_ipcc_acquire();
+	ipcc_fastpoll = true;
+
+	apob->ia_offset = 0;
+	while (bufl > 0) {
+		size_t sendlen = MIN(bufl, sizeof (apob->ia_data));
+
+		bcopy(buf + apob->ia_offset, apob->ia_data, sendlen);
+		apob->ia_datalen = sendlen;
+
+		ret = ipcc_apobwrite(&kernel_ipcc_ops, &kernel_ipcc_data, apob);
+		if (ret != 0) {
+			kernel_ipcc_ops.io_log(&kernel_ipcc_data,
+			    IPCC_LOG_WARNING,
+			    "Attempt to send APOB offset 0x%zx length 0x%zx "
+			    "failed with error %d",
+			    apob->ia_offset, sendlen, ret);
+			break;
+		}
+
+		if (apob->ia_result != IPCC_APOB_SUCCESS) {
+			kernel_ipcc_ops.io_log(&kernel_ipcc_data,
+			    IPCC_LOG_WARNING,
+			    "Attempt to send APOB offset 0x%zx length 0x%zx "
+			    "was met with SP status 0x%x",
+			    apob->ia_offset, sendlen, apob->ia_result);
+			ret = EIO;
+			break;
+		}
+
+		bufl -= sendlen;
+		apob->ia_offset += sendlen;
+	}
+
+	ipcc_fastpoll = false;
+	kernel_ipcc_release();
+
+	kmem_free(apob, sizeof (*apob));
+	return (ret);
 }
 
 int

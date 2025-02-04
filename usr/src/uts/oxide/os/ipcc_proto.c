@@ -855,6 +855,11 @@ ipcc_loghex(const char *tag, const uint8_t *buf, size_t bufl,
 	hexdump_init(&h);
 	hexdump_set_grouping(&h, 4);
 	hexdump_set_buf(&h, scratchbuf, sizeof (scratchbuf));
+	/*
+	 * Limit the amount of hex shown for large messages to the initial
+	 * portion.
+	 */
+	bufl = MIN(bufl, 0x100);
 
 	(void) hexdumph(&h, buf, bufl, HDF_ADDRESS | HDF_ASCII,
 	    ipcc_loghex_cb, (void *)&cb);
@@ -903,6 +908,10 @@ ipcc_cmd_str(ipcc_hss_cmd_t cmd)
 		return ("INVENTORY");
 	case IPCC_HSS_KEYSET:
 		return ("KEYSET");
+	case IPCC_HSS_APOBWRITE:
+		return ("APOBWRITE");
+	case IPCC_HSS_APOBREAD:
+		return ("APOBREAD");
 	default:
 		break;
 	}
@@ -1607,6 +1616,38 @@ ipcc_rot(const ipcc_ops_t *ops, void *arg, ipcc_rot_t *rot)
 
 out:
 	ipcc_release_channel(ops, arg, true);
+	return (err);
+}
+
+int
+ipcc_apobwrite(const ipcc_ops_t *ops, void *arg, ipcc_apob_t *apob)
+{
+	size_t inputl, outputl, off;
+	uint8_t *input, *output;
+	int err = 0;
+
+	VERIFY(ipcc_channel_held());
+
+	inputl = sizeof (apob->ia_offset) + apob->ia_datalen;
+	if (inputl > IPCC_MAX_DATA_SIZE)
+		return (EINVAL);
+
+	input = kmem_alloc(inputl, KM_SLEEP);
+	off = 0;
+	ipcc_encode_bytes((uint8_t *)&apob->ia_offset,
+	    sizeof (apob->ia_offset), input, &off);
+	ipcc_encode_bytes(apob->ia_data, apob->ia_datalen, input, &off);
+
+	outputl = IPCC_APOBRESULT_DATALEN;
+	err = ipcc_command_locked(ops, arg, IPCC_HSS_APOBWRITE,
+	    IPCC_SP_APOBRESULT, input, off, &output, &outputl);
+	if (err == 0) {
+		off = 0;
+		ipcc_decode_bytes(&apob->ia_result, sizeof (apob->ia_result),
+		    output, &off);
+	}
+
+	kmem_free(input, inputl);
 	return (err);
 }
 

@@ -349,6 +349,7 @@ typedef struct zen_fabric_ops {
 typedef struct zen_hack_ops {
 	void	(*zho_check_furtive_reset)(void);
 	bool	(*zho_cgpll_set_ssc)(bool);
+	void	(*zho_apob_emcr_save)(void);
 } zen_hack_ops_t;
 
 /*
@@ -357,6 +358,7 @@ typedef struct zen_hack_ops {
  */
 extern void zen_null_check_furtive_reset(void);
 extern bool zen_null_cgpll_set_ssc(bool);
+extern void zen_null_apob_emcr_save(void);
 extern void zen_null_fabric_iohc_pci_ids(zen_ioms_t *);
 extern void zen_null_fabric_sdp_control(zen_ioms_t *);
 extern void zen_null_fabric_nbio_sdp_control(zen_nbio_t *);
