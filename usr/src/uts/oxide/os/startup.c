@@ -656,6 +656,38 @@ startup(void)
 	startup_tsc();
 
 	/*
+	 * On some platforms we send the APOB data down to the SP so that it
+	 * can be cached for the PMU Enhanced Memory Context Restore (eMCR)
+	 * firmware to use. This allows portions of memory training to be
+	 * skipped on subsequent boots, as long as things like the APCB or DIMM
+	 * configuration have not changed.
+	 * This is purposefully done after TSC calibration so that we can use
+	 * IPCC's fast poll mode which relies on tenmicrosec().
+	 */
+	if (oxide_board_data->obd_ipccapob) {
+		apob_hdl_t *apob_hdl;
+
+		apob_hdl = kmem_zalloc(apob_handle_size(), KM_SLEEP);
+		if (kapob_clone_handle(apob_hdl, NULL)) {
+			int ret;
+
+			ret = kernel_ipcc_apob(
+			    apob_get_raw(apob_hdl), apob_get_len(apob_hdl));
+			if (ret == 0) {
+				cmn_err(CE_NOTE, "eMCR: Successfully "
+				    "transmitted APOB data to SP");
+			} else {
+				cmn_err(CE_WARN, "eMCR: Failed to send APOB "
+				    "data to SP, error %d", ret);
+			}
+		} else {
+			cmn_err(CE_WARN,
+			    "eMCR: Failed to acquire clone of KAPOB handle");
+		}
+		kmem_free(apob_hdl, apob_handle_size());
+	}
+
+	/*
 	 * At this point in time, go through and initialize the SoC's I/O
 	 * fabric. This includes the SMU, DXIO, NBIO, etc.
 	 */
