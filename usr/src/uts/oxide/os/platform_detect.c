@@ -271,6 +271,7 @@ static oxide_board_def_t oxide_board_defs[] = {
 			 * onward routing.
 			 */
 			.obd_ipccspintr = IPCC_SPINTR_DISABLED,
+			.obd_ipccapob = true,
 			.obd_startupopts = IPCC_STARTUP_KMDB_BOOT |
 			    IPCC_STARTUP_VERBOSE | IPCC_STARTUP_PROM,
 			.obd_engines = { oxio_ruby },

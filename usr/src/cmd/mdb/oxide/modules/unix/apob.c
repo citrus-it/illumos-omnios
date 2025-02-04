@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -146,12 +146,12 @@ apob_walk_step(mdb_walk_state_t *wsp)
 }
 
 static const char *apobhelp =
-"Walk the APOB and print all entries that match the specified group and\n"
-"type IDs. Both of these are required and will print all instances that\n"
-"match right now. The following options are supported:\n"
+"Walk the APOB and print all entries. The entries can be filtered by\n"
+"group and type IDs.\n"
+"The following options are supported:\n"
 "\n"
-"  -g group	Search for items that match the specified group\n"
-"  -t type	Search for items that match the specified type\n";
+"  -g group	Filter the output to items that match the specified group\n"
+"  -t type	Filter the output to items that match the specified type\n";
 
 void
 apob_dcmd_help(void)
@@ -170,8 +170,8 @@ apob_dcmd_cb(uintptr_t addr, const void *apob, void *arg)
 	const apob_entry_t *ent = apob;
 	const apob_dcmd_data_t *data = arg;
 
-	if (ent->ae_group == data->add_group &&
-	    ent->ae_type == data->add_type) {
+	if ((data->add_group == 0 || ent->ae_group == data->add_group) &&
+	    (data->add_type == 0 || ent->ae_type == data->add_type)) {
 		mdb_printf("0x%lx\n", addr);
 	}
 
@@ -188,11 +188,6 @@ apob_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'g', MDB_OPT_UINTPTR_SET, &group_set, &data.add_group,
 	    't', MDB_OPT_UINTPTR_SET, &type_set, &data.add_type, NULL) !=
 	    argc) {
-		return (DCMD_USAGE);
-	}
-
-	if (!group_set || !type_set) {
-		mdb_warn("both -g and -t must be specified\n");
 		return (DCMD_USAGE);
 	}
 
