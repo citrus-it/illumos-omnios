@@ -401,6 +401,24 @@ turin_pcie_port_info(const uint8_t coreno, const uint8_t portno)
 	return (&turin_pcie[coreno][portno]);
 }
 
+/*
+ * Returns true IFF the given IOHC number corresponds to a P link,
+ * and not a G link.
+ */
+static bool
+turin_iohc_is_p_link(const uint8_t iohcno)
+{
+	switch (iohcno) {
+	case 0:
+	case 2:
+	case 5:
+	case 7:
+		return (true);
+	default:
+		return (false);
+	}
+}
+
 bool
 turin_fabric_smu_pptable_init(zen_fabric_t *fabric, void *pptable, size_t *len)
 {
@@ -1102,12 +1120,22 @@ turin_fabric_iohc_clock_gating(zen_ioms_t *ioms)
 void
 turin_fabric_nbif_clock_gating(zen_nbif_t *nbif)
 {
+	const zen_iohc_type_t iohctype = nbif->zn_ioms->zio_iohctype;
 	smn_reg_t reg;
 	uint32_t val;
 
 	reg = turin_nbif_reg(nbif, D_NBIF_MGCG_CTL_LCLK, 0);
 	val = zen_nbif_read(nbif, reg);
 	val = NBIF_MGCG_CTL_LCLK_SET_EN(val, 1);
+	zen_nbif_write(nbif, reg, val);
+
+	/*
+	 * LCLK deep sleep must be enabled in order for IOAGR to go idle,
+	 * apparently.
+	 */
+	reg = turin_nbif_reg(nbif, D_NBIF_DS_CTL_LCLK, 0);
+	val = zen_nbif_read(nbif, reg);
+	val = NBIF_DS_CTL_LCLK_SET_EN(val, 1);
 	zen_nbif_write(nbif, reg, val);
 
 	/*
@@ -1209,6 +1237,29 @@ turin_fabric_nbif_clock_gating(zen_nbif_t *nbif)
 		reg = turin_nbif_reg(nbif, D_NBIF_ALT_MGCG_CTL_SCLK, 0);
 		val = zen_nbif_read(nbif, reg);
 		val = NBIF_ALT_MGCG_CTL_SCLK_SET_EN(val, 1);
+		zen_nbif_write(nbif, reg, val);
+
+		/*
+		 * Enable SOCCLK and SHUBCLK deep sleep on large IOHCs.
+		 */
+		if (iohctype == ZEN_IOHCT_LARGE) {
+			reg = turin_nbif_reg(nbif, D_NBIF_ALT_DS_CTL_SOCCLK, 0);
+			val = zen_nbif_read(nbif, reg);
+			val = NBIF_ALT_DS_CTL_SOCCLK_SET_EN(val, 1);
+			zen_nbif_write(nbif, reg, val);
+
+			reg = turin_nbif_reg(nbif,
+			    D_NBIF_ALT_DS_CTL_SHUBCLK, 0);
+			val = zen_nbif_read(nbif, reg);
+			val = NBIF_ALT_DS_CTL_SHUBCLK_SET_EN(val, 1);
+			zen_nbif_write(nbif, reg, val);
+		}
+	}
+
+	if (nbif->zn_num == 2) {
+		reg = turin_nbif_reg(nbif, D_NBIF_PG_MISC_CTL0, 0);
+		val = zen_nbif_read(nbif, reg);
+		val = NBIF_PG_MISC_CTL0_SET_LDMASK(val, 0);
 		zen_nbif_write(nbif, reg, val);
 	}
 }
@@ -1323,39 +1374,63 @@ turin_fabric_ioapic(zen_ioms_t *ioms)
  *  o Enabling the interrupts of corresponding functions
  *  o Setting up specific PCI device straps around multi-function, FLR, poison
  *    control, TPH settings, etc.
- *
- * XXX For getting to PCIe faster and since we're not going to use these, and
- * they're all disabled, for the moment we just ignore the straps that aren't
- * related to interrupts, enables, and cfg comps.
  */
 void
 turin_fabric_nbif_dev_straps(zen_nbif_t *nbif)
 {
 	const zen_iohc_type_t iohctype = nbif->zn_ioms->zio_iohctype;
-	smn_reg_t reg;
-	uint32_t intr;
+	const uint8_t iohcno = nbif->zn_ioms->zio_iohcnum;
+	smn_reg_t intrreg, reg;
+	uint32_t intr, val;
 
-	reg = turin_nbif_reg(nbif, D_NBIF_INTR_LINE_EN, 0);
-	intr = zen_nbif_read(nbif, reg);
+	intrreg = turin_nbif_reg(nbif, D_NBIF_INTR_LINE_EN, 0);
+	intr = zen_nbif_read(nbif, intrreg);
 	for (uint8_t funcno = 0; funcno < nbif->zn_nfuncs; funcno++) {
 		smn_reg_t strapreg;
 		uint32_t strap;
 		zen_nbif_func_t *func = &nbif->zn_funcs[funcno];
 
-		/*
-		 * This indicates that we have a dummy function or similar. In
-		 * which case there's not much to do here, the system defaults
-		 * are generally what we want. XXX Kind of sort of. Not true
-		 * over time.
-		 */
-		if ((func->znf_flags & ZEN_NBIF_F_NO_CONFIG) != 0) {
-			continue;
-		}
-
 		strapreg = turin_nbif_func_reg(func, D_NBIF_FUNC_STRAP0);
 		strap = zen_nbif_func_read(func, strapreg);
 
-		if ((func->znf_flags & ZEN_NBIF_F_ENABLED) != 0) {
+		if (func->znf_type == ZEN_NBIF_T_DUMMY) {
+/*
+ * XXX
+ *
+ * PPR says reset values are 0x1556 (nBIF0) and 0x1559 (nBIF2)
+ *
+ *    1022  1556  Advanced Micro Devices, Inc. [AMD] Turin PCIe Dummy Function
+ *
+ * but AGESA changes it to 0x14dc (along with a comment saying it's changing it
+ * from 0x14C8)
+ *
+ *    1022  14dc  Advanced Micro Devices, Inc. [AMD] SDXI
+ *
+ * It does not, however, appear to stick/take.
+ *
+ * sapphire (without this change) and gilgamesh have the same values:
+ *
+ *	0x10134000: 0x10001556	<- nBIF0
+ *	0x10134200: 0x14dc
+ *	0x10134400: 0x14c0
+ *	0x10134600: 0x14c1
+ *	0x10134800: 0x10ad1557
+ *	0x10134a00: 0x156e
+ *	0x10134c00: 0xe614cb
+ *	0x10134e00: 0x14cc
+ *
+ *	0x10234000: 0x10001556	<- nBIF1
+ *
+ *	0x10534000: 0x1559	<- nBIF2
+ *
+ *	and the same for NBIO1
+ *	0x10334000: 0x10001556
+ *	0x10434000: 0x10001556
+ *	0x10734000: 0x1559
+ */
+			strap = NBIF_FUNC_STRAP0_SET_DEV_ID(strap,
+			    NBIF_STRAP_DUMMY_DEVICE_ID);
+		} else if ((func->znf_flags & ZEN_NBIF_F_ENABLED) != 0) {
 			strap = NBIF_FUNC_STRAP0_SET_EXIST(strap, 1);
 			intr = NBIF_INTR_LINE_EN_SET_I(intr,
 			    func->znf_dev, func->znf_func, 1);
@@ -1377,9 +1452,84 @@ turin_fabric_nbif_dev_straps(zen_nbif_t *nbif)
 		}
 
 		zen_nbif_func_write(func, strapreg, strap);
+
+		enum {
+			FLR_EN		= 1 << 0,
+			AER_EN		= 1 << 1,
+			PM_STATUS_EN	= 1 << 2,
+			PM_STATUS_DIS	= 1 << 3,
+			TPH_CPLR_EN	= 1 << 4,
+		} act = 0;
+
+		switch (func->znf_type) {
+		case ZEN_NBIF_T_MPDMATF:
+			act |= PM_STATUS_DIS;
+			act |= FLR_EN;
+			act |= TPH_CPLR_EN;
+			break;
+		case ZEN_NBIF_T_USB:
+			act |= PM_STATUS_EN;
+			act |= AER_EN;
+			act |= FLR_EN;
+			break;
+		case ZEN_NBIF_T_SATA:
+			act |= PM_STATUS_EN;
+			act |= AER_EN;
+			if (funcno == 0)
+				act |= FLR_EN;	// XXX - check
+			break;
+		case ZEN_NBIF_T_PSPCCP:
+		case ZEN_NBIF_T_ACP:
+			act |= FLR_EN;
+			break;
+		case ZEN_NBIF_T_NTB:
+		case ZEN_NBIF_T_SVNTB:
+			act |= FLR_EN;
+			act |= TPH_CPLR_EN;
+			break;
+		default:
+			break;
+		}
+
+		if (act & AER_EN) {
+			strapreg = turin_nbif_func_reg(func,
+			    D_NBIF_FUNC_STRAP2);
+			strap = zen_nbif_func_read(func, strapreg);
+			strap = NBIF_FUNC_STRAP2_SET_AER_EN(strap, 1);
+			zen_nbif_func_write(func, strapreg, strap);
+		}
+
+		if (act & (PM_STATUS_EN | PM_STATUS_DIS)) {
+			strapreg = turin_nbif_func_reg(func,
+			    D_NBIF_FUNC_STRAP3);
+			strap = zen_nbif_func_read(func, strapreg);
+			strap = NBIF_FUNC_STRAP3_SET_PM_STATUS_EN(strap,
+			    act & PM_STATUS_EN ? 1 : 0);
+			zen_nbif_func_write(func, strapreg, strap);
+		}
+
+		if (act & FLR_EN) {
+			strapreg = turin_nbif_func_reg(func,
+			    D_NBIF_FUNC_STRAP4);
+			strap = zen_nbif_func_read(func, strapreg);
+			strap = NBIF_FUNC_STRAP4_SET_FLR_EN(strap, 1);
+			zen_nbif_func_write(func, strapreg, strap);
+		}
+
+		if (act & TPH_CPLR_EN) {
+			/* STRAP7 is not present for function 0 */
+			VERIFY3U(funcno, !=, 0);
+
+			strapreg = turin_nbif_func_reg(func,
+			    D_NBIF_FUNC_STRAP7);
+			strap = zen_nbif_func_read(func, strapreg);
+			strap = NBIF_FUNC_STRAP7_SET_TPH_EN(strap, 1);
+			strap = NBIF_FUNC_STRAP7_SET_TPH_CPLR_EN(strap, 1);
+			zen_nbif_func_write(func, strapreg, strap);
+		}
 	}
 
-	zen_nbif_write(nbif, reg, intr);
+	zen_nbif_write(nbif, intrreg, intr);
 
 	/*
 	 * Each nBIF has up to three ports on it, though not all of them seem to
@@ -1390,14 +1540,65 @@ turin_fabric_nbif_dev_straps(zen_nbif_t *nbif)
 	if (nbif->zn_num == 0 ||
 	    (iohctype == ZEN_IOHCT_LARGE && nbif->zn_num == 2)) {
 		for (uint8_t devno = 0; devno < TURIN_NBIF_MAX_PORTS; devno++) {
-			smn_reg_t reg;
-			uint32_t val;
-
 			reg = turin_nbif_reg(nbif, D_NBIF_PORT_STRAP3, devno);
 			val = zen_nbif_read(nbif, reg);
 			val = NBIF_PORT_STRAP3_SET_COMP_TO(val, 1);
 			zen_nbif_write(nbif, reg, val);
 		}
+	}
+
+	/*
+	 * Configure TLP processing hints completer support strap.
+	 */
+	for (uint8_t devno = 0; devno < TURIN_NBIF_MAX_PORTS; devno++) {
+		/* This is only done for the first two ports */
+		if (devno >= 2)
+			break;
+
+		reg = turin_nbif_reg(nbif, D_NBIF_PORT_STRAP6, devno);
+		val = zen_nbif_read(nbif, reg);
+		val = NBIF_PORT_STRAP6_SET_TPH_CPLR_EN(val,
+		    NBIF_PORT_STRAP6_TPH_CPLR_SUP);
+		zen_nbif_write(nbif, reg, val);
+	}
+
+	/*
+	 * For the root port functions within nBIF, program the B/D/F values
+	 * and port number.
+	 */
+	ASSERT3U(iohcno, <, ARRAY_SIZE(turin_pcie_int_ports));
+	const zen_iohc_nbif_ports_t *ports = &turin_pcie_int_ports[iohcno];
+	for (uint8_t i = 0; i < ports->zinp_count; i++) {
+		const zen_pcie_port_info_t *port = &ports->zinp_ports[i];
+
+		reg = turin_nbif_reg(nbif, D_NBIF_PORT_STRAP7, i);
+		val = zen_nbif_read(nbif, reg);
+		val = NBIF_PORT_STRAP7_SET_BUS(val, 0);
+		val = NBIF_PORT_STRAP7_SET_DEV(val, port->zppi_dev);
+		val = NBIF_PORT_STRAP7_SET_FUNC(val, port->zppi_func);
+		val = NBIF_PORT_STRAP7_SET_PORT(val,
+		    (port->zppi_dev << 4) | port->zppi_func);
+		zen_nbif_write(nbif, reg, val);
+	}
+
+	if (iohctype == ZEN_IOHCT_LARGE) {
+		reg = turin_nbif_reg(nbif, D_NBIF_BIFC_GMI_SDP_REQ_PCRED, 0);
+		val = zen_nbif_read(nbif, reg);
+		val = NBIF_BIFC_GMI_SDP_REQ_PCRED_SET_VC5(val, 1);
+		// XXX odd-numbered large IOHCs get VC4 too. What's the
+		// abstraction for this? It's IOHUB2 in each NBIO but we don't
+		// have that to hand.
+		// They are the two large IOHCs with a G link...
+		if (!turin_iohc_is_p_link(iohcno))
+			val = NBIF_BIFC_GMI_SDP_REQ_PCRED_SET_VC4(val, 1);
+		zen_nbif_write(nbif, reg, val);
+
+		reg = turin_nbif_reg(nbif, D_NBIF_BIFC_GMI_SDP_DAT_PCRED, 0);
+		val = zen_nbif_read(nbif, reg);
+		val = NBIF_BIFC_GMI_SDP_DAT_PCRED_SET_VC5(val, 1);
+		if (!turin_iohc_is_p_link(iohcno))
+			val = NBIF_BIFC_GMI_SDP_DAT_PCRED_SET_VC4(val, 1);
+		zen_nbif_write(nbif, reg, val);
 	}
 }
 
@@ -1882,24 +2083,6 @@ turin_fabric_write_pcie_strap(zen_pcie_core_t *pc,
 		inst = 8;
 
 	zen_mpio_write_pcie_strap(pc, reg + (inst << 16), data);
-}
-
-/*
- * Returns true IFF the given IOHC number corresponds to a P link,
- * and not a G link.
- */
-static bool
-turin_iohc_is_p_link(const uint8_t iohcno)
-{
-	switch (iohcno) {
-	case 0:
-	case 2:
-	case 5:
-	case 7:
-		return (true);
-	default:
-		return (false);
-	}
 }
 
 /*

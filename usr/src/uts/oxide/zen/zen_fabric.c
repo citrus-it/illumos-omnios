@@ -1108,15 +1108,14 @@ zen_fabric_nbif_func_init(zen_nbif_t *nbif, uint8_t funcno)
 
 	func->znf_num = funcno;
 	func->znf_type = ninfo[funcno].zni_type;
-	func->znf_uarch_nbif_func = NULL;
 	func->znf_nbif = nbif;
 	func->znf_dev = ninfo[funcno].zni_dev;
 	func->znf_func = ninfo[funcno].zni_func;
+	func->znf_flags = 0;
+	if (ninfo[funcno].zni_enabled)
+		func->znf_flags |= ZEN_NBIF_F_ENABLED;
 
-	/*
-	 * Dummy devices in theory need no explicit
-	 * configuration.
-	 */
+	/* Dummy devices in theory need no explicit configuration */
 	if (func->znf_type == ZEN_NBIF_T_DUMMY)
 		func->znf_flags |= ZEN_NBIF_F_NO_CONFIG;
 }
@@ -2597,22 +2596,15 @@ zen_fabric_init(void)
 
 	/*
 	 * Go through and configure all of the straps for NBIF devices before
-	 * they end up starting up.
-	 *
-	 * XXX There's a bunch we're punting on here and we'll want to make sure
-	 * that we actually have the platform's config for this. But this
-	 * includes doing things like:
+	 * they end up starting up. This includes doing things like:
 	 *
 	 *  o Enabling and Disabling devices visibility through straps and their
-	 *    interrupt lines.
-	 *  o Device multi-function enable, related PCI config space straps.
-	 *  o Lots of clock gating
-	 *  o Subsystem IDs
-	 *  o GMI round robin
-	 *  o BIFC stuff
+	 *    interrupt lines;
+	 *  o Device multi-function enable, related PCI config space straps;
+	 *  o Subsystem IDs;
+	 *  o GMI round robin;
+	 *  o BIFC.
 	 */
-
-	/* XXX Need a way to know which devs to enable on the board */
 	zen_fabric_walk_nbif(fabric, zen_fabric_nbif_op,
 	    fabric_ops->zfo_nbif_dev_straps);
 

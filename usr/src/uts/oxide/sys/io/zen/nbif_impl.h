@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Co.
+ * Copyright 2025 Oxide Computer Co.
  */
 
 #ifndef	_SYS_IO_ZEN_NBIF_IMPL_H
@@ -63,6 +63,7 @@ typedef enum zen_nbif_func_type {
 
 typedef struct zen_nbif_info {
 	zen_nbif_func_type_t	zni_type;
+	bool			zni_enabled;
 	uint8_t			zni_dev;
 	uint8_t			zni_func;
 } zen_nbif_info_t;
@@ -87,7 +88,6 @@ struct zen_nbif_func {
 	uint8_t			znf_func;
 
 	zen_nbif_t		*znf_nbif;
-	void			*znf_uarch_nbif_func;
 };
 
 struct zen_nbif {
