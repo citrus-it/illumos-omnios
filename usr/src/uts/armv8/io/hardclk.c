@@ -21,6 +21,8 @@
 
 /*
  * Copyright 2017 Hayashi Naoyuki
+ * Copyright 2023 Oxide Computer Co.
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -36,9 +38,11 @@
 #include <sys/lockstat.h>
 
 #include <sys/clock.h>
+#include <sys/door.h>
 #include <sys/debug.h>
 #include <sys/smp_impldefs.h>
 #include <sys/rtc.h>
+#include <sys/zone.h>
 
 /*
  * This file contains all generic part of clock and timer handling.
@@ -59,6 +63,67 @@ tod_set(timestruc_t ts)
 		tod_set_prev(ts);		/* for tod_validate() */
 		TODOP_SET(tod_ops, ts);
 		tod_status_set(TOD_SET_DONE);	/* TOD was modified */
+	} else {
+		/*
+		 * There is no TOD unit, so there's nothing to do regarding
+		 * that.
+		 *
+		 * However we take this opportunity to spot when the clock is
+		 * stepped significantly forward, and use that as a cue that
+		 * the system clock has been set initially after time
+		 * synchronisation. When this happens we go through and update
+		 * the global `boot_time` variable, and the `zone_boot_time`
+		 * stored in each active zone (including the GZ) to correct the
+		 * kstats and so that userland software can use this to obtain
+		 * a more correct notion of the time that the system, and each
+		 * zone, booted.
+		 */
+		time_t adj = ts.tv_sec - hrestime.tv_sec;
+		extern time_t boot_time;
+
+		if (adj < 86400)
+			return;
+
+		if (boot_time < INT64_MAX - adj)
+			boot_time += adj;
+
+		zone_boottime_adjust(adj);
+
+		/*
+		 * Call up to the utmpd process and ask it to go through and
+		 * rewrite the utmpx and wtmpx databases for all zones since
+		 * the time has stepped forward. We drop tod_lock for this as
+		 * it can take a while.
+		 */
+		char *door_path = "/var/run/utmpd_door";
+		door_handle_t door;
+		time_t boot_ts;
+		int ret;
+
+		boot_ts = boot_time;
+		mutex_exit(&tod_lock);
+		ret = door_ki_open(door_path, &door);
+		if (ret == 0) {
+			door_arg_t arg = {
+				.data_ptr = (void *)&boot_ts,
+				.data_size = sizeof (boot_ts)
+			};
+
+			ret = door_ki_upcall_limited(door, &arg, NULL, 0, 0);
+			if (ret == 0) {
+				cmn_err(CE_NOTE, "Time has stepped forwards; "
+				    "successfully notified utmpd.");
+			} else {
+				cmn_err(CE_WARN, "Time has stepped forwards; "
+				    "failed upcall to utmpd, err %d", ret);
+			}
+			door_ki_rele(door);
+		} else {
+			cmn_err(CE_WARN, "Time has stepped forwards; "
+			    "failed to open door to utmpd, err %d", ret);
+		}
+
+		mutex_enter(&tod_lock);
 	}
 }
 

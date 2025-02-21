@@ -39,4 +39,4 @@ if [ -p /var/run/utmppipe ]; then
 fi
 
 /usr/bin/rm -f /var/run/utmppipe
-/usr/lib/utmpd &
+/usr/lib/utmpd -d &
