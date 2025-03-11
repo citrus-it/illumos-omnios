@@ -30,7 +30,7 @@
 # Copyright 2018 Gary Mills
 # Copyright 2019 Peter Tribble
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
 include ../Makefile.master
@@ -527,7 +527,7 @@ sparc_SUBDIRS=		\
 # dedicated DPIO management service.
 # The services could be delivered regardless and its state controlled by
 # a platform-specific profile (cf. cmd/prtdscp)
-i386_SUBDIRS +=		ipcc t6init tmpx dtrace_ipcc
+i386_SUBDIRS +=		ipcc t6init dtrace_ipcc
 
 #
 # Commands that are messaged.  Note that 'lp' comes first

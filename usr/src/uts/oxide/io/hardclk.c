@@ -23,7 +23,8 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2023 Oxide Computer Co.
+ * Copyright 2025 Oxide Computer Company
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -35,12 +36,18 @@
 #include <sys/systm.h>
 #include <sys/archsystm.h>
 #include <sys/lockstat.h>
+#include <sys/stdbool.h>
+#include <sys/stddef.h>
+#include <sys/types.h>
+#include <sys/brand.h>
+#include <sys/conf.h>
+#include <sys/door.h>
+#include <sys/list.h>
+#include <sys/zone.h>
+#include <sys/debug.h>
 
 #include <sys/clock.h>
-#include <sys/debug.h>
 #include <sys/smp_impldefs.h>
-#include <sys/stdbool.h>
-#include <sys/zone.h>
 
 /*
  * This file contains all generic part of clock and timer handling.
@@ -48,6 +55,93 @@
  * clock (distinct from the POSIX notion of CLOCK_REALTIME), on this
  * architecture so some of this is stubbed out.
  */
+
+#define	DOOR_PATH	"var/run/utmpd_door"
+
+typedef struct {
+	list_node_t	dp_link;
+	size_t		dp_size;
+	char		dp_path[];
+} door_path_t;
+
+static int
+process_zone_cb(zone_t *zone, void *door_paths)
+{
+	door_path_t *door_path;
+	size_t dplen;
+
+	/* Ignore non-native zone brands */
+	if (ZONE_IS_BRANDED(zone))
+		return (0);
+
+	dplen = zone->zone_rootpathlen + sizeof (DOOR_PATH) - 1;
+
+	/*
+	 * Note that we return 0 even in the event of failures as this is
+	 * best-effort; we keep going to notify as many zones as possible.
+	 */
+	door_path = kmem_alloc(sizeof (door_path_t) + dplen, KM_NOSLEEP);
+	if (door_path == NULL)
+		return (0);
+
+	door_path->dp_size = sizeof (door_path_t) + dplen;
+	if (snprintf(door_path->dp_path, dplen, "%s%s", zone->zone_rootpath,
+	    DOOR_PATH) >= dplen) {
+		kmem_free(door_path, door_path->dp_size);
+		return (0);
+	}
+
+	list_insert_tail(door_paths, door_path);
+	return (0);
+}
+
+static void
+tod_set_cb(void *arg)
+{
+	list_t door_paths;
+	time_t boot_ts;
+	door_path_t *door_path;
+
+	list_create(&door_paths, sizeof (door_path_t),
+	    offsetof(door_path_t, dp_link));
+
+	(void) zone_walk(process_zone_cb, &door_paths);
+
+	boot_ts = (time_t)(uintptr_t)arg;
+
+	while ((door_path = list_remove_head(&door_paths)) != NULL) {
+		door_handle_t door;
+		int ret = door_ki_open(door_path->dp_path, &door);
+
+		if (ret == 0) {
+			door_arg_t darg = {
+				.data_ptr = (void *)&boot_ts,
+				.data_size = sizeof (boot_ts),
+			};
+
+			ret = door_ki_upcall_limited(door, &darg, NULL, 0, 0);
+			if (ret == 0) {
+				cmn_err(CE_CONT, "?Time has stepped forwards; "
+				    "successfully notified utmpd at %s.\n",
+				    door_path->dp_path);
+			} else {
+				cmn_err(CE_WARN, "Time has stepped forwards; "
+				    "failed upcall to utmpd at %s, err %d",
+				    door_path->dp_path, ret);
+			}
+
+			door_ki_rele(door);
+		} else {
+			cmn_err(CE_WARN, "Time has stepped forwards; "
+			    "failed to open door to utmpd at %s, err %d",
+			    door_path->dp_path, ret);
+		}
+
+		kmem_free(door_path, door_path->dp_size);
+	}
+
+	list_destroy(&door_paths);
+}
 
 void
 tod_set(timestruc_t ts)
@@ -72,7 +166,7 @@ tod_set(timestruc_t ts)
 	 *
 	 * To protect somewhat against a system clock being stepped multiple
 	 * times forwards and backwards, either by hand or as a result of
-	 * an upstream NTP server being authoratatively stuck in the past, we
+	 * an upstream NTP server being authoritatively stuck in the past, we
 	 * are only prepared to do this once per boot.
 	 */
 	if (already_stepped)
@@ -88,6 +182,14 @@ tod_set(timestruc_t ts)
 		boot_time += adj;
 
 	zone_boottime_adjust(adj);
+
+	/*
+	 * Call up to each zone's utmpd process and ask it to rewrite
+	 * the utmpx and wtmpx databases since the time has stepped
+	 * forwards. Since this can take a while we set-up a callback
+	 * to avoid holding tod_lock or blocking stime(2).
+	 */
+	(void) timeout(tod_set_cb, (void *)(uintptr_t)boot_time, 1);
 }
 
 timestruc_t
