@@ -95,6 +95,8 @@
 #include <mdb/mdb_conf.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_types.h>
+#include <mdb/mdb_isautil.h>
+
 #include <mdb/mdb.h>
 
 #include <sys/utsname.h>
@@ -1090,6 +1092,9 @@ pt_stack_common(uintptr_t addr, uint_t flags, int argc,
 		return (DCMD_ERR);
 	}
 
+#if defined(__i386) || defined(__amd64)
+	mdb_stack_frame_callcheck_set(hdl, mdb_isa_prev_callcheck);
+#endif
 	(void) mdb_tgt_stack_iter(t, &gregs, func, (void *)hdl);
 	mdb_stack_frame_fini(hdl);
 	return (DCMD_OK);

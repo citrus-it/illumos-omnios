@@ -37,6 +37,8 @@ extern void mdb_stack_frame_fini(mdb_stack_frame_hdl_t *);
 extern void mdb_stack_frame(mdb_stack_frame_hdl_t *, uintptr_t, uintptr_t,
     uint_t, const long *);
 extern uint_t mdb_stack_frame_arglim(mdb_stack_frame_hdl_t *);
+extern void mdb_stack_frame_callcheck_set(mdb_stack_frame_hdl_t *,
+    boolean_t (*)(uintptr_t));
 extern void mdb_stack_frame_flags_set(mdb_stack_frame_hdl_t *,
     mdb_stack_frame_flags_t);
 

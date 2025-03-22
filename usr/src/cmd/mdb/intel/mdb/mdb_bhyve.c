@@ -361,7 +361,6 @@ bhyve_stack_common(uintptr_t addr, uint_t flags, int argc,
 	int i;
 
 	mdb_tgt_gregset_t gregs;
-	mdb_tgt_stack_f *func;
 
 	if (vcpu == -1)
 		vcpu = bd->bd_curcpu;
@@ -387,15 +386,11 @@ bhyve_stack_common(uintptr_t addr, uint_t flags, int argc,
 	}
 
 	switch (vmm_vcpu_isa(bd->bd_vmm, vcpu)) {
-	case VMM_ISA_64:
-		func = mdb_amd64_kvm_frame;
-		(void) mdb_amd64_kvm_stack_iter(mdb.m_target, &gregs, func,
-		    (void *)hdl);
-		break;
 	case VMM_ISA_32:
-		func = mdb_ia32_kvm_frame;
-		(void) mdb_ia32_kvm_stack_iter(mdb.m_target, &gregs, func,
-		    (void *)hdl);
+	case VMM_ISA_64:
+		mdb_stack_frame_callcheck_set(hdl, mdb_isa_prev_callcheck);
+		(void) mdb_isa_kvm_stack_iter(mdb.m_target, &gregs,
+		    mdb_isa_kvm_frame, (void *)hdl);
 		break;
 	case VMM_ISA_16:
 		mdb_warn("IA16 stack tracing not implemented\n");

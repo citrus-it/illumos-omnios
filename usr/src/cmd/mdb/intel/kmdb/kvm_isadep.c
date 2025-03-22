@@ -166,6 +166,7 @@ kmt_stack_common(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 		return (DCMD_ERR);
 	}
 
+	mdb_stack_frame_callcheck_set(hdl, mdb_isa_prev_callcheck);
 	(void) mdb_isa_kvm_stack_iter(t, grp, func, (void *)hdl);
 	mdb_stack_frame_fini(hdl);
 

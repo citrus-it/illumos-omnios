@@ -142,6 +142,7 @@ SYMBOL_SCOPE {
 		mdb_snprintfrac			{ FLAGS = EXTERN };
 		mdb_stack_frame			{ FLAGS = EXTERN };
 		mdb_stack_frame_arglim		{ FLAGS = EXTERN };
+		mdb_stack_frame_callcheck_set	{ FLAGS = EXTERN };
 		mdb_stack_frame_fini		{ FLAGS = EXTERN };
 		mdb_stack_frame_init		{ FLAGS = EXTERN };
 		mdb_stack_frame_flags_set	{ FLAGS = EXTERN };
