@@ -361,7 +361,6 @@ bhyve_stack_common(uintptr_t addr, uint_t flags, int argc,
 	int i;
 
 	mdb_tgt_gregset_t gregs;
-	mdb_tgt_stack_f *func;
 
 	if (vcpu == -1)
 		vcpu = bd->bd_curcpu;
@@ -373,6 +372,7 @@ bhyve_stack_common(uintptr_t addr, uint_t flags, int argc,
 		return (DCMD_ERR);
 
 	i = mdb_getopts(argc, argv,
+	    'n', MDB_OPT_SETBITS, MSF_ADDR, &sflags,
 	    's', MDB_OPT_SETBITS, MSF_SIZES, &sflags,
 	    't', MDB_OPT_SETBITS, MSF_TYPES, &sflags,
 	    'v', MDB_OPT_SETBITS, MSF_VERBOSE, &sflags,
@@ -387,15 +387,11 @@ bhyve_stack_common(uintptr_t addr, uint_t flags, int argc,
 	}
 
 	switch (vmm_vcpu_isa(bd->bd_vmm, vcpu)) {
-	case VMM_ISA_64:
-		func = mdb_amd64_kvm_frame;
-		(void) mdb_amd64_kvm_stack_iter(mdb.m_target, &gregs, func,
-		    (void *)hdl);
-		break;
 	case VMM_ISA_32:
-		func = mdb_ia32_kvm_frame;
-		(void) mdb_ia32_kvm_stack_iter(mdb.m_target, &gregs, func,
-		    (void *)hdl);
+	case VMM_ISA_64:
+		mdb_stack_frame_callcheck_set(hdl, mdb_isa_prev_callcheck);
+		(void) mdb_isa_kvm_stack_iter(mdb.m_target, &gregs,
+		    mdb_isa_kvm_frame, (void *)hdl);
 		break;
 	case VMM_ISA_16:
 		mdb_warn("IA16 stack tracing not implemented\n");
@@ -882,6 +878,7 @@ bhyve_stack_help(void)
 {
 	mdb_printf(
 	    "Switches:\n"
+	    "  -n   do not resolve addresses to names\n"
 	    "  -s   show the size of each stack frame to the left\n"
 	    "  -t   where CTF is present, show types for functions and "
 	    "arguments\n"
@@ -893,9 +890,9 @@ bhyve_stack_help(void)
 }
 
 static const mdb_dcmd_t bhyve_dcmds[] = {
-	{ "$c", "[-stv]", "print stack backtrace", bhyve_stack_dcmd,
+	{ "$c", "[-nstv]", "print stack backtrace", bhyve_stack_dcmd,
 	    bhyve_stack_help },
-	{ "$C", "[-stv]", "print stack backtrace", bhyve_stackv_dcmd,
+	{ "$C", "[-nstv]", "print stack backtrace", bhyve_stackv_dcmd,
 	    bhyve_stack_help },
 	{ "$r", NULL, "print general-purpose registers", bhyve_regs_dcmd },
 	{ "$?", NULL, "print status and registers", bhyve_regs_dcmd },
@@ -909,9 +906,9 @@ static const mdb_dcmd_t bhyve_dcmds[] = {
 	{ "defseg", "?[-s segment]", "change the default segment used to "
 	    "translate addresses", bhyve_defseg_dcmd },
 	{ "regs", NULL, "print general-purpose registers", bhyve_regs_dcmd },
-	{ "stack", "[-stv]", "print stack backtrace", bhyve_stack_dcmd,
+	{ "stack", "[-nstv]", "print stack backtrace", bhyve_stack_dcmd,
 	    bhyve_stack_help },
-	{ "stackregs", "[-stv]", "print stack backtrace and registers",
+	{ "stackregs", "[-nstv]", "print stack backtrace and registers",
 	    bhyve_stackr_dcmd, bhyve_stack_help },
 	{ "status", NULL, "print summary of current target",
 	    bhyve_status_dcmd },

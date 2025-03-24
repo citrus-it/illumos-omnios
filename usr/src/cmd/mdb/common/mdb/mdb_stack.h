@@ -28,7 +28,8 @@ typedef void mdb_stack_frame_hdl_t;
 typedef enum {
 	MSF_VERBOSE		= 1 << 0,
 	MSF_TYPES		= 1 << 1,
-	MSF_SIZES		= 1 << 2
+	MSF_SIZES		= 1 << 2,
+	MSF_ADDR		= 1 << 3
 } mdb_stack_frame_flags_t;
 
 extern mdb_stack_frame_hdl_t *mdb_stack_frame_init(mdb_tgt_t *, uint_t,
@@ -37,6 +38,8 @@ extern void mdb_stack_frame_fini(mdb_stack_frame_hdl_t *);
 extern void mdb_stack_frame(mdb_stack_frame_hdl_t *, uintptr_t, uintptr_t,
     uint_t, const long *);
 extern uint_t mdb_stack_frame_arglim(mdb_stack_frame_hdl_t *);
+extern void mdb_stack_frame_callcheck_set(mdb_stack_frame_hdl_t *,
+    boolean_t (*)(uintptr_t));
 extern void mdb_stack_frame_flags_set(mdb_stack_frame_hdl_t *,
     mdb_stack_frame_flags_t);
 

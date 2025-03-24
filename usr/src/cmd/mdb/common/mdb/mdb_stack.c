@@ -33,6 +33,7 @@ typedef struct {
 	uint_t			msfd_arglim;
 	mdb_stack_frame_flags_t	msfd_flags;
 	uintptr_t		msfd_lastbp;
+	boolean_t		(*msfd_callcheck)(uintptr_t);
 	char			*msfd_buf;
 	size_t			msfd_buflen;
 } mdb_stack_frame_data_t;
@@ -50,6 +51,7 @@ mdb_stack_frame_init(mdb_tgt_t *tgt, uint_t arglim,
 	data->msfd_arglim = arglim;
 	data->msfd_flags = flags;
 	data->msfd_lastbp = 0;
+	data->msfd_callcheck = NULL;
 	data->msfd_buf = NULL;
 	data->msfd_buflen = 0;
 
@@ -72,6 +74,15 @@ mdb_stack_frame_arglim(mdb_stack_frame_hdl_t *datap)
 	mdb_stack_frame_data_t *data = datap;
 
 	return (data->msfd_arglim);
+}
+
+void
+mdb_stack_frame_callcheck_set(mdb_stack_frame_hdl_t *datap,
+    boolean_t (*cb)(uintptr_t))
+{
+	mdb_stack_frame_data_t *data = datap;
+
+	data->msfd_callcheck = cb;
 }
 
 void
@@ -121,10 +132,59 @@ mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
     uint_t argc, const long *argv)
 {
 	mdb_stack_frame_data_t *data = datap;
-	boolean_t types = B_FALSE;
 	uint_t nargc = MIN(argc, data->msfd_arglim);
 	mdb_ctf_id_t argtypes[nargc];
+	mdb_ctf_funcinfo_t mcfi;
+	boolean_t ctf;
+	mdb_syminfo_t msi;
+	uintptr_t npc;
+	GElf_Sym sym;
 	uint_t i;
+	int ret;
+
+	ctf = B_FALSE;
+	npc = pc;
+
+	ret = mdb_tgt_lookup_by_addr(data->msfd_tgt, pc, MDB_TGT_SYM_FUZZY,
+	    NULL, 0, &sym, &msi);
+
+	if (ret != 0 || sym.st_value == pc) {
+		/*
+		 * One of two things is going on here. Either:
+		 *
+		 * - this address is not covered by a symbol, or
+		 * - there is a symbol but our address points directly to the
+		 *   start of it.
+		 *
+		 * Both of these can occur when the address is the return from
+		 * a call to a function that the compiler knows will never
+		 * actually return. In that case it often opts to elide the
+		 * calling function's epilogue which can leave the return
+		 * address pointing to just after that function's end - either
+		 * into the next function or into padding space if the compiler
+		 * has added some.
+		 *
+		 * If the previous address is covered by a symbol, we'll use
+		 * that instead and indicate that it's approximated in the
+		 * output with a tilde (~) character. A target can provide a
+		 * callback function for further validation, for example to
+		 * confirm that the previous instruction is indeed some kind of
+		 * call.
+		 */
+		if (pc > 0) {
+			ret = mdb_tgt_lookup_by_addr(data->msfd_tgt, pc - 1,
+			    MDB_TGT_SYM_FUZZY, NULL, 0, &sym, &msi);
+			if (ret == 0 && (data->msfd_callcheck == NULL ||
+			    data->msfd_callcheck(pc))) {
+				npc = pc - 1;
+			}
+		}
+	}
+
+	if (ret == 0 && (data->msfd_flags & MSF_TYPES)) {
+		if (mdb_ctf_func_info(&sym, &msi, &mcfi) == 0)
+			ctf = B_TRUE;
+	}
 
 	if (data->msfd_flags & MSF_SIZES) {
 		if (data->msfd_lastbp != 0)
@@ -136,28 +196,30 @@ mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
 
 	if (data->msfd_flags & MSF_VERBOSE)
 		mdb_printf("%0?lr ", bp);
-	if (data->msfd_flags & MSF_TYPES) {
-		mdb_ctf_funcinfo_t mcfi;
-		mdb_syminfo_t msi;
-		GElf_Sym s;
 
-		if (mdb_tgt_lookup_by_addr(data->msfd_tgt, pc,
-		    MDB_TGT_SYM_FUZZY, NULL, 0, &s, &msi) == 0 &&
-		    mdb_ctf_func_info(&s, &msi, &mcfi) == 0 &&
-		    mdb_stack_typename(mcfi.mtf_return,
+	if (ctf) {
+		if (mdb_stack_typename(mcfi.mtf_return,
 		    &data->msfd_buf, &data->msfd_buflen) != NULL) {
 			mdb_printf("%s ", data->msfd_buf);
-			if (mdb_ctf_func_args(&mcfi, nargc, argtypes) == 0)
-				types = B_TRUE;
 		}
 	}
-	mdb_printf("%a(", pc);
+
+	if (data->msfd_flags & MSF_ADDR) {
+		mdb_printf("%0?lr(", pc);
+	} else {
+		if (npc != pc)
+			mdb_printf("~");
+		mdb_printf("%a(", npc);
+	}
+
+	if (ctf && mdb_ctf_func_args(&mcfi, nargc, argtypes) != 0)
+		ctf = B_FALSE;
 
 	for (i = 0; i < nargc; i++) {
 		if (i > 0)
 			mdb_printf(", ");
-		if (types && mdb_stack_typename(argtypes[i],
-		    &data->msfd_buflen, &data->msfd_buflen) != NULL) {
+		if (ctf && mdb_stack_typename(argtypes[i],
+		    &data->msfd_buf, &data->msfd_buflen) != NULL) {
 			const char *type = data->msfd_buf;
 
 			switch (mdb_ctf_type_kind(argtypes[i])) {

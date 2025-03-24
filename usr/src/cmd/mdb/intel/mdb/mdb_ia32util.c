@@ -437,3 +437,30 @@ mdb_ia32_kvm_frame(void *argp, uintptr_t pc, uint_t argc, const long *argv,
 	mdb_stack_frame(hdl, pc, bp, argc, argv);
 	return (0);
 }
+
+boolean_t
+mdb_ia32_prev_callcheck(uintptr_t pcp)
+{
+	uint8_t buf[8];
+
+	if (pcp < 8 || mdb_vread(buf, sizeof (buf), pcp - 8) != 8)
+		return (B_FALSE);
+
+	/* Call rel32 */
+	if (buf[3] == 0xe8)
+		return (B_TRUE);
+
+	/* Call r/m32 */
+	if (buf[5] == 0xff && buf[6] == 0x14)
+		return (B_TRUE);
+
+	/* Call DWORD PTR */
+	if (buf[2] == 0xff && buf[3] == 0x15)
+		return (B_TRUE);
+
+	/* Call far ptr */
+	if (buf[0] == 0x9a)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
