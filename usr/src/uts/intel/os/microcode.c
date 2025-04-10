@@ -26,7 +26,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 #include <sys/bootconf.h>
@@ -355,6 +355,7 @@ void
 ucode_locate(cpu_t *cp)
 {
 	cpu_ucode_info_t *uinfop;
+	ucode_errno_t rc;
 	size_t sz;
 
 	ASSERT3P(cp, !=, NULL);
@@ -390,9 +391,9 @@ ucode_locate(cpu_t *cp)
 	 * don't need to cache the data as we do during boot when starting the
 	 * APs.
 	 */
-	if ((ucode->us_locate(cp, uinfop) != EM_OK) || ucode_cleanup_done) {
+	rc = ucode->us_locate(cp, uinfop);
+	if ((rc != EM_OK && rc != EM_HIGHERREV) || ucode_cleanup_done)
 		ucode->us_file_reset();
-	}
 
 out:
 	mutex_exit(&ucode_lock);
