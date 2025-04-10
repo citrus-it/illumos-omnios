@@ -106,6 +106,31 @@ MAKE_MMIO_FCH_REG_FN(MISC_B, misc_b, 4);
 #define	FCH_MISC_A_CGPLLCFG3_SET_FRACN_EN_OVR(r, v)	bitset32(r, 29, 29, v)
 
 /*
+ * FCH::MISC::CGPLLCONFIG4.
+ */
+#define	D_FCH_MISC_A_CGPLLCFG4	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_FCH_MISC_A,	\
+	.srd_reg = 0x14				\
+}
+#define	FCH_MISC_A_CGPLLCFG4_MMIO(b)	\
+    fch_misc_a_mmio_reg((b), D_FCH_MISC_A_CGPLLCFG4, 0)
+
+#define	FCH_MISC_A_CGPLLCFG4_SET_FRACN_OVR(r, v)	bitset32(r, 23, 8, v)
+
+/*
+ * FCH::MISC::CGPLLCONFIG5.
+ */
+#define	D_FCH_MISC_A_CGPLLCFG5	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_FCH_MISC_A,	\
+	.srd_reg = 0x18				\
+}
+#define	FCH_MISC_A_CGPLLCFG5_MMIO(b)	\
+    fch_misc_a_mmio_reg((b), D_FCH_MISC_A_CGPLLCFG5, 0)
+
+#define	FCH_MISC_A_CGPLLCFG4_SET_SLEWFRACN_OVR(r, v)	bitset32(r, 31, 16, v)
+
+
+/*
  * FCH::MISC::MISCCLKCNTRL0.  This register, along with subsequent ones, is a
  * different kind of garbage barge from the CGPLLCONFIG set; it contains bits
  * that affect both CG1 and CG2.  The only bit we care about here is one used to
@@ -126,8 +151,21 @@ MAKE_MMIO_FCH_REG_FN(MISC_B, misc_b, 4);
 #define	FCH_MISC_A_CLKCTL0_MMIO(b)	\
     fch_misc_a_mmio_reg((b), D_FCH_MISC_A_CLKCTL0, 0)
 
-#define	FCH_MISC_A_CLKCTL0_GET_UPDATE_REQ(r)	bitx32(r, 30, 30)
-#define	FCH_MISC_A_CLKCTL0_SET_UPDATE_REQ(r, v)	bitset32(r, 30, 30, v)
+#define	FCH_MISC_A_CLKCTL0_GET_UPDATE_REQ(r)		bitx32(r, 30, 30)
+#define	FCH_MISC_A_CLKCTL0_SET_UPDATE_REQ(r, v)		bitset32(r, 30, 30, v)
+#define	FCH_MISC_A_CLKCTL0_SET_FBDIV_LOADEN(r, v)	bitset32(r, 25, 25, v)
+
+/*
+ * FCH::MISC::MISCCLKCNTRL2.
+ */
+/*CSTYLED*/
+#define	D_FCH_MISC_A_CLKCTL2		(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_FCH_MISC_A,	\
+	.srd_reg = 0x48				\
+}
+#define	FCH_MISC_A_CLKCTL2_MMIO(b)	\
+    fch_misc_a_mmio_reg((b), D_FCH_MISC_A_CLKCTL2, 0)
+#define	FCH_MISC_A_CLKCTL2_SET_FCH_400M_MASKOFF(r, v)	bitset32(r, 11, 11, v)
 
 /*
  * FCH::MISC::STRAPSTATUS.  Provides bits showing the state of the FCH's straps

@@ -32,6 +32,7 @@
 #include <sys/io/genoa/ccx_impl.h>
 #include <sys/io/genoa/mpio_impl.h>
 #include <sys/io/genoa/ras_impl.h>
+#include <sys/io/genoa/hacks.h>
 #include <sys/io/genoa/smu.h>
 #include <sys/io/zen/mpio.h>
 
@@ -136,7 +137,7 @@ static const zen_fabric_ops_t genoa_fabric_ops = {
 
 static const zen_hack_ops_t genoa_hack_ops = {
 	.zho_check_furtive_reset = zen_null_check_furtive_reset,
-	.zho_cgpll_set_ssc = zen_null_cgpll_set_ssc,
+	.zho_cgpll_set_ssc = genoa_cgpll_set_ssc,
 };
 
 const zen_platform_t genoa_platform = {
