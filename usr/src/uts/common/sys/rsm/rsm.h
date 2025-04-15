@@ -22,6 +22,8 @@
 /*
  * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2025 Oxide Computer Company
  */
 
 #ifndef _SYS_RSM_RSM_H
@@ -153,6 +155,15 @@ typedef struct {
 } rsmka_int_controller_attr_t;
 
 #ifdef _SYSCALL32
+/*
+ * Use #pragma pack() construct to force 32-bit alignment on amd64.
+ * This is needed to keep the structure size and offsets consistent
+ * between a 32-bit app and the 64-bit amd64 kernel in structures
+ * where 64-bit alignment would create gaps.
+ */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
 typedef struct {
 	/* following fields should be identical to rsmapi_controller_attr_t */
 	uint32_t	attr_direct_access_sizes;
@@ -167,6 +178,9 @@ typedef struct {
 	/* the following fields are for internal use */
 	rsm_addr_t	attr_controller_addr;
 } rsmka_int_controller_attr32_t;
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 #endif
 
 /* kernel agent equivalents of rsm_iovec_t and rsm_scat_gath_t */
@@ -270,6 +284,15 @@ typedef struct {
 } rsm_ioctlmsg_t;
 
 #ifdef _SYSCALL32
+/*
+ * Use #pragma pack() construct to force 32-bit alignment on amd64.
+ * This is needed to keep the structure size and offsets consistent
+ * between a 32-bit app and the 64-bit amd64 kernel in structures
+ * where 64-bit alignment would create gaps.
+ */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
 typedef struct {
 	int32_t			cnum;
 	caddr32_t		cname;
@@ -288,6 +311,9 @@ typedef struct {
 	rsm_gnum_t		gnum; /* segment generation number */
 	minor_t			rnum; /* segment resource number */
 } rsm_ioctlmsg32_t;
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 #endif
 
 /*
