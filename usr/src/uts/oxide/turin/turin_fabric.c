@@ -1221,6 +1221,15 @@ turin_fabric_iohc_clock_gating(zen_ioms_t *ioms)
 	val = IOAGR_GCG_LCLK_CTL_SET_SOCLK1(val, 0);
 	val = IOAGR_GCG_LCLK_CTL_SET_SOCLK0(val, 0);
 	zen_ioms_write(ioms, reg, val);
+
+	/*
+	 * Mask IOHC LCLK deep sleep for IOHUB2 since PCIE6 is not utilized on
+	 * Turin. XXX - AGESA does this on both NBIOs, does that seem right?
+	 */
+	if (ioms->zio_iohubnum == 2) {
+		reg = turin_ioms_reg(ioms, D_IOHC_NBIO_LCLK_DS_MASK, 0);
+		zen_ioms_write(ioms, reg, 2);
+	}
 }
 
 void
