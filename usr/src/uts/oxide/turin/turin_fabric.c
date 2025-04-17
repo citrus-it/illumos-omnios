@@ -1054,6 +1054,7 @@ void
 turin_fabric_nbio_arbitration(zen_nbio_t *nbio)
 {
 	smn_reg_t reg;
+	uint32_t val;
 
 	const uint_t sdpmux = nbio->zn_num;
 
@@ -1067,6 +1068,55 @@ turin_fabric_nbio_arbitration(zen_nbio_t *nbio)
 		zen_nbio_write(nbio, reg, SDPMUX_SION_CLIREQ_BURST_VAL);
 		reg = SDPMUX_SION_S1_CLIREQ_BURST_HI(sdpmux, i);
 		zen_nbio_write(nbio, reg, SDPMUX_SION_CLIREQ_BURST_VAL);
+
+		/*
+		 * We set a number of values related to IOHC SDPMUX performance.
+		 * These bits enable sending and receiving early ClkReq for
+		 * various clients. The documented init values from the PPR do
+		 * not match those used in AMD sources; we are using the
+		 * latter.
+		 */
+		reg = turin_nbio_reg(nbio, D_SDPMUX_DMA_OEWAKE_EN, 0);
+		val = SDPMUX_DMA_OEWAKE_EN_SET_EGR(0,
+		    SDPMUX_DMA_OEWAKE_EN_EGR_VAL);
+		val = SDPMUX_DMA_OEWAKE_EN_SET_INGR(val,
+		    SDPMUX_DMA_OEWAKE_EN_INGR_VAL);
+		zen_nbio_write(nbio, reg, val);
+
+		reg = turin_nbio_reg(nbio, D_SDPMUX_HST_OEWAKE_EN, 0);
+		val = SDPMUX_HST_OEWAKE_EN_SET_EGR(0,
+		    SDPMUX_HST_OEWAKE_EN_EGR_VAL);
+		val = SDPMUX_HST_OEWAKE_EN_SET_INGR(val,
+		    SDPMUX_HST_OEWAKE_EN_INGR_VAL);
+		zen_nbio_write(nbio, reg, val);
+
+		reg = turin_nbio_reg(nbio, D_SDPMUX_NTB_OEWAKE_EN, 0);
+		val = SDPMUX_NTB_OEWAKE_EN_SET_EGR(0,
+		    SDPMUX_NTB_OEWAKE_EN_EGR_VAL);
+		val = SDPMUX_NTB_OEWAKE_EN_SET_INGR(val,
+		    SDPMUX_NTB_OEWAKE_EN_INGR_VAL);
+		zen_nbio_write(nbio, reg, val);
+
+		reg = turin_nbio_reg(nbio, D_SDPMUX_DMA_CEWAKE_EN, 0);
+		val = SDPMUX_DMA_CEWAKE_EN_SET_EGR(0,
+		    SDPMUX_DMA_CEWAKE_EN_EGR_VAL);
+		val = SDPMUX_DMA_CEWAKE_EN_SET_INGR(val,
+		    SDPMUX_DMA_CEWAKE_EN_INGR_VAL);
+		zen_nbio_write(nbio, reg, val);
+
+		reg = turin_nbio_reg(nbio, D_SDPMUX_HST_CEWAKE_EN, 0);
+		val = SDPMUX_HST_CEWAKE_EN_SET_EGR(0,
+		    SDPMUX_HST_CEWAKE_EN_EGR_VAL);
+		val = SDPMUX_HST_CEWAKE_EN_SET_INGR(val,
+		    SDPMUX_HST_CEWAKE_EN_INGR_VAL);
+		zen_nbio_write(nbio, reg, val);
+
+		reg = turin_nbio_reg(nbio, D_SDPMUX_NTB_CEWAKE_EN, 0);
+		val = SDPMUX_NTB_CEWAKE_EN_SET_EGR(0,
+		    SDPMUX_NTB_CEWAKE_EN_EGR_VAL);
+		val = SDPMUX_NTB_CEWAKE_EN_SET_INGR(val,
+		    SDPMUX_NTB_CEWAKE_EN_INGR_VAL);
+		zen_nbio_write(nbio, reg, val);
 	}
 }
 
