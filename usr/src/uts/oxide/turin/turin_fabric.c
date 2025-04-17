@@ -963,6 +963,35 @@ turin_fabric_iohc_arbitration(zen_ioms_t *ioms)
 			reg = SDPMUX_SION_S1_CLIREQ_BURST_HI(sdpmux, i);
 			zen_ioms_write(ioms, reg, SDPMUX_SION_CLIREQ_BURST_VAL);
 		}
+
+		/*
+		 * We set a number of values related to IOHC SDPMUX performance.
+		 * These are the BIOS init values specified in the PPR.
+		 */
+		reg = turin_ioms_reg(ioms, D_SDPMUX_DMA_OEWAKE_EN, 0);
+		val = SDPMUX_DMA_OEWAKE_EN_SET_EGR(0, 1);
+		val = SDPMUX_DMA_OEWAKE_EN_SET_INGR(val, 2);
+		zen_ioms_write(ioms, reg, val);
+
+		reg = turin_ioms_reg(ioms, D_SDPMUX_HST_OEWAKE_EN, 0);
+		val = SDPMUX_HST_OEWAKE_EN_SET_EGR(0, 2);
+		val = SDPMUX_HST_OEWAKE_EN_SET_INGR(val, 1);
+		zen_ioms_write(ioms, reg, val);
+
+		reg = turin_ioms_reg(ioms, D_SDPMUX_NTB_OEWAKE_EN, 0);
+		val = SDPMUX_NTB_OEWAKE_EN_SET_EGR(0, 2);
+		val = SDPMUX_NTB_OEWAKE_EN_SET_INGR(val, 4);
+		zen_ioms_write(ioms, reg, val);
+
+		reg = turin_ioms_reg(ioms, D_SDPMUX_DMA_CEWAKE_EN, 0);
+		val = SDPMUX_DMA_CEWAKE_EN_SET_EGR(0, 2);
+		val = SDPMUX_DMA_CEWAKE_EN_SET_INGR(val, 1);
+		zen_ioms_write(ioms, reg, val);
+
+		reg = turin_ioms_reg(ioms, D_SDPMUX_HST_CEWAKE_EN, 0);
+		val = SDPMUX_HST_CEWAKE_EN_SET_EGR(0, 1);
+		val = SDPMUX_HST_CEWAKE_EN_SET_INGR(val, 2);
+		zen_ioms_write(ioms, reg, val);
 	}
 
 	/*
