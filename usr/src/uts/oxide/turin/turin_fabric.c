@@ -796,6 +796,43 @@ turin_fabric_iohc_features(zen_ioms_t *ioms)
 	/* XXX Wants to be IOHC_FCTL_P2P_DISABLE? */
 	val = IOHC_FCTL_SET_P2P(val, IOHC_FCTL_P2P_DROP_NMATCH);
 	zen_ioms_write(ioms, reg, val);
+
+	/*
+	 * Set some miscellaneous bits.
+	 */
+
+	/*
+	 * There are SST register instances on NBIO0 and NBIO1. Since NBIOs are
+	 * not currently represented in the fabric we choose to set these while
+	 * processing the first IOMS in each NBIO.
+	 */
+	if (TURIN_NBIO_IOMS_NUM(ioms->zio_num) == 0) {
+		for (uint16_t i = 0; i < TURIN_NBIO_SST_COUNT; i++) {
+			/* There is no SST instance 0 on NBIO1 */
+			if (ioms->zio_nbionum == 1 && i == 0)
+				continue;
+
+			reg = turin_ioms_reg(ioms, D_SST_DBG0, i);
+			val = zen_ioms_read(ioms, reg);
+			val = SST_DBG0_SET_RW5(val, 1);
+			zen_ioms_write(ioms, reg, val);
+
+			reg = turin_ioms_reg(ioms,
+			    D_SST_RDRSPPOOLCREDIT_ALLOC_LO, i);
+			val = zen_ioms_read(ioms, reg);
+			val = SST_RDRSPPOOLCREDIT_ALLOC_LO_SET(val, 1);
+			zen_ioms_write(ioms, reg, val);
+		}
+	}
+
+	/*
+	 * This register is not documented in the PPR but AMD sources set a
+	 * bit in it.
+	 */
+	reg = turin_ioms_reg(ioms, D_IOHC_DBG0, 0);
+	val = zen_ioms_read(ioms, reg);
+	val = IOHC_DBG0_SET_RW21(val, 1);
+	zen_ioms_write(ioms, reg, val);
 }
 
 void
@@ -1078,21 +1115,29 @@ turin_fabric_iohc_clock_gating(zen_ioms_t *ioms)
 	val = IOAGR_GCG_LCLK_CTL_SET_SOCLK0(val, 0);
 	zen_ioms_write(ioms, reg, val);
 
-	for (uint16_t i = 0; i < 2; i++) {
-		/* There is no SST instance 0 on NBIO1 */
-		if (ioms->zio_nbionum == 1 && i == 0)
-			continue;
+	/*
+	 * There are SST register instances on NBIO0 and NBIO1. Since NBIOs are
+	 * not currently represented in the fabric we choose to set these while
+	 * processing the first IOMS in each NBIO.
+	 */
+	if (TURIN_NBIO_IOMS_NUM(ioms->zio_num) == 0) {
+		for (uint16_t i = 0; i < TURIN_NBIO_SST_COUNT; i++) {
+			/* There is no SST instance 0 on NBIO1 */
+			if (ioms->zio_nbionum == 1 && i == 0)
+				continue;
 
-		reg = turin_ioms_reg(ioms, D_SST_CLOCK_CTL, i);
-		val = zen_ioms_read(ioms, reg);
-		val = SST_CLOCK_CTL_SET_RXCLKGATE_EN(val, 1);
-		val = SST_CLOCK_CTL_SET_TXCLKGATE_EN(val, 1);
-		zen_ioms_write(ioms, reg, val);
+			reg = turin_ioms_reg(ioms, D_SST_CLOCK_CTL, i);
+			val = zen_ioms_read(ioms, reg);
+			val = SST_CLOCK_CTL_SET_RXCLKGATE_EN(val, 1);
+			val = SST_CLOCK_CTL_SET_TXCLKGATE_EN(val, 1);
+			zen_ioms_write(ioms, reg, val);
 
-		reg = turin_ioms_reg(ioms, D_SST_SION_WRAP_CFG_GCG_LCLK_CTL, i);
-		val = zen_ioms_read(ioms, reg);
-		val = SST_SION_WRAP_CFG_GCG_LCLK_CTL_SET_SOCLK4(val, 1);
-		zen_ioms_write(ioms, reg, val);
+			reg = turin_ioms_reg(ioms,
+			    D_SST_SION_WRAP_CFG_GCG_LCLK_CTL, i);
+			val = zen_ioms_read(ioms, reg);
+			val = SST_SION_WRAP_CFG_GCG_LCLK_CTL_SET_SOCLK4(val, 1);
+			zen_ioms_write(ioms, reg, val);
+		}
 	}
 }
 
