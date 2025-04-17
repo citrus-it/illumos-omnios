@@ -671,6 +671,12 @@ genoa_fabric_iohc_features(zen_ioms_t *ioms)
 }
 
 void
+genoa_fabric_nbio_features(zen_nbio_t *nbio)
+{
+	// XXX
+}
+
+void
 genoa_fabric_iohc_bus_num(zen_ioms_t *ioms, uint8_t busno)
 {
 	smn_reg_t reg;
