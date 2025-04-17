@@ -1145,6 +1145,15 @@ turin_fabric_iohc_clock_gating(zen_ioms_t *ioms)
 	zen_ioms_write(ioms, reg, val);
 
 	/*
+	 * Mask IOHC LCLK deep sleep for IOHUB2 since PCIE6 is not utilized on
+	 * Turin. XXX - AGESA does this on both NBIOs, does that seem right?
+	 */
+	if (TURIN_IOHC_IOHUB_NUM(ioms->zio_iohcnum) == 2) {
+		reg = turin_ioms_reg(ioms, D_IOHC_NBIO_LCLK_DS_MASK, 0);
+		zen_ioms_write(ioms, reg, 2);
+	}
+
+	/*
 	 * There are SST register instances on NBIO0 and NBIO1. Since NBIOs are
 	 * not currently represented in the fabric we choose to set these while
 	 * processing the first IOMS in each NBIO.
