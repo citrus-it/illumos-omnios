@@ -2055,6 +2055,12 @@ milan_fabric_iohc_features(zen_ioms_t *ioms)
 }
 
 void
+milan_fabric_nbio_features(zen_nbio_t *nbio)
+{
+	// XXX
+}
+
+void
 milan_fabric_iohc_arbitration(zen_ioms_t *ioms)
 {
 	smn_reg_t reg;

@@ -345,6 +345,16 @@ turin_iohcdev_nbif_smn_reg(const uint8_t iohcno, const smn_reg_def_t def,
 #define	IOHC_TOM_SET_BIT32(r, v)	bitset32(r, 0, 0, v)
 
 /*
+ * IOHC::DEBUG0.
+ */
+/*CSTYLED*/
+#define	D_IOHC_DBG0	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_IOHC,	\
+	.srd_reg = 0x10004	\
+}
+#define	IOHC_DBG0_SET_RW21(r, v)	bitset32(r, 21, 21, v)
+
+/*
  * IOHC::IOHC_REFCLK_MODE. Seemingly controls the speed of the reference clock
  * that is presumably used by PCIe.
  */
@@ -1722,6 +1732,17 @@ turin_iohcdev_nbif_smn_reg(const uint8_t iohcno, const smn_reg_def_t def,
 #define	SST_CLOCK_CTL_SET_TXCLKGATE_EN(r, v)		bitset32(r, 0, 0, v)
 
 /*
+ * SST::SST_DEBUG0.
+ */
+/*CSTYLED*/
+#define	D_SST_DBG0	(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_SST,	\
+	.srd_reg = 0x18,		\
+	.srd_nents = 2			\
+}
+#define	SST_DBG0_SET_RW5(r, v)			bitset32(r, 5, 5, v)
+
+/*
  * SST::SION_WRAPPER_CFG_SSTSION_GLUE_CG_LCLK_CTRL_SOFT_OVERRIDE_CLK
  */
 /*CSTYLED*/
@@ -1740,6 +1761,17 @@ turin_iohcdev_nbif_smn_reg(const uint8_t iohcno, const smn_reg_def_t def,
 #define	SST_SION_WRAP_CFG_GCG_LCLK_CTL_SET_SOCLK2(r, v)	bitset32(r, 2, 2, v)
 #define	SST_SION_WRAP_CFG_GCG_LCLK_CTL_SET_SOCLK1(r, v)	bitset32(r, 1, 1, v)
 #define	SST_SION_WRAP_CFG_GCG_LCLK_CTL_SET_SOCLK0(r, v)	bitset32(r, 0, 0, v)
+
+/*
+ * SST::CFG_SST_RdRspPoolCredit_Alloc_LO
+ */
+/*CSTYLED*/
+#define	D_SST_RDRSPPOOLCREDIT_ALLOC_LO (const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_SST,	\
+	.srd_reg = 0x418,		\
+	.srd_nents = 2			\
+}
+#define	SST_RDRSPPOOLCREDIT_ALLOC_LO_SET(r, v)	bitset32(r, 31, 0, v)
 
 #ifdef __cplusplus
 }
