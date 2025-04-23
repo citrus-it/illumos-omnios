@@ -53,12 +53,12 @@
  * Critically, this IO die is the major device that we are concerned with here,
  * as it bridges the cores to the outside world through a combination of
  * different devices and IO paths.  The part of the IO die that we will spend
- * most of our time dealing with is the "northbridge IO unit", or NBIO.  In DF
- * (data fabric) terms, NBIOs are a class of device called an IOMS (IO
- * master-slave).  These are represented in our fabric data structures as
- * subordinate to an IO die.
+ * most of our time dealing with is a class of device called an IOMS (IO
+ * master-slave). These are subordinate to a "northbridge IO unit", or NBIO.
+ * IOMS are represented in our fabric data structures as subordinate to an
+ * NBIO, which are in turn subordinate to an IO die.
  *
- * Each NBIO instance implements, among other things, a PCIe root complex (RC),
+ * Each IOMS instance implements, among other things, a PCIe root complex (RC),
  * consisting of two major components: an IO hub core (IOHC) that implements the
  * host side of the RC, and some number of PCIe cores that implement the PCIe
  * side.  The IOHC appears in PCI configuration space as a root complex and is
@@ -70,7 +70,7 @@
  * link status and control.  Specific quantities of these vary, depending on the
  * microarchitecture.
  *
- * Again, depending on microarchitecture, some of the NBIO instances are
+ * Again, depending on microarchitecture, some of the IOMS instances are
  * somewhat special and merit brief additional discussion.  Some instances may
  * contain additional PCIe core(s) associated with the lanes that would
  * otherwise be used for WAFL.  An instance will have the Fusion Controller Hub
@@ -95,13 +95,15 @@
  *     |
  *     \-- zen_iodie_t
  *         |
- *         +-- zen_ioms_t
+ *         +-- zen_nbio_t
  *         |   |
- *         |   +-- zen_pcie_core_t
- *         |   |   |
- *         |   |   \-- zen_pcie_port_t
- *         |   |
- *         |   \-- zen_nbif_t
+ *         |   \-- zen_ioms_t
+ *         |       |
+ *         |       +-- zen_pcie_core_t
+ *         |       |   |
+ *         |       |   \-- zen_pcie_port_t
+ *         |       |
+ *         |       \-- zen_nbif_t
  *         |
  *         \-- zen_ccd_t
  *             |
@@ -606,9 +608,9 @@ zen_fabric_discover_iodie_components(zen_iodie_t *iodie)
 static uint16_t
 zen_ios_fabric_id(zen_ioms_t *ioms)
 {
-	const df_rev_t df_rev = ioms->zio_iodie->zi_df_rev;
-	uint32_t finfo3 = zen_df_read32(ioms->zio_iodie, ioms->zio_ios_inst_id,
-	    DF_FBIINFO3);
+	const df_rev_t df_rev = ioms->zio_nbio->zn_iodie->zi_df_rev;
+	uint32_t finfo3 = zen_df_read32(ioms->zio_nbio->zn_iodie,
+	    ioms->zio_ios_inst_id, DF_FBIINFO3);
 
 	switch (df_rev) {
 	case DF_REV_3:
@@ -646,7 +648,7 @@ zen_ioms_flags(const zen_ioms_t *const ioms)
 zen_iodie_t *
 zen_ioms_iodie(const zen_ioms_t *const ioms)
 {
-	return (ioms->zio_iodie);
+	return (ioms->zio_nbio->zn_iodie);
 }
 
 /*
@@ -1194,7 +1196,7 @@ zen_fabric_ioms_pcie_init(zen_ioms_t *ioms)
 	const zen_fabric_ops_t *fops = oxide_zen_fabric_ops();
 	const zen_platform_consts_t *consts = oxide_zen_platform_consts();
 
-	ioms->zio_npcie_cores = fops->zfo_ioms_n_pcie_cores(ioms->zio_num);
+	ioms->zio_npcie_cores = fops->zfo_iohc_n_pcie_cores(ioms->zio_iohcnum);
 
 	for (uint8_t coreno = 0; coreno < ioms->zio_npcie_cores; coreno++) {
 		zen_pcie_core_t *zpc = &ioms->zio_pcie_cores[coreno];
@@ -1221,7 +1223,7 @@ zen_fabric_ioms_pcie_init(zen_ioms_t *ioms)
 			uid += fops->zfo_pcie_core_n_ports(i);
 		zpc->zpc_sdp_unit = uid;
 
-		cinfop = fops->zfo_pcie_core_info(ioms->zio_num, coreno);
+		cinfop = fops->zfo_pcie_core_info(ioms->zio_iohcnum, coreno);
 		zpc->zpc_dxio_lane_start = cinfop->zpci_dxio_start;
 		zpc->zpc_dxio_lane_end = cinfop->zpci_dxio_end;
 		zpc->zpc_phys_lane_start = cinfop->zpci_phy_start;
@@ -1241,17 +1243,31 @@ zen_fabric_ioms_pcie_init(zen_ioms_t *ioms)
 }
 
 void
-zen_fabric_topo_init_ioms(zen_iodie_t *iodie, uint8_t iomsno)
+zen_fabric_topo_init_nbio(zen_iodie_t *iodie, uint8_t nbiono)
+{
+	zen_nbio_t *nbio = &iodie->zi_nbio[nbiono];
+
+	if (nbio->zn_iodie != NULL)
+		return;
+
+	nbio->zn_num = nbiono;
+	nbio->zn_iodie = iodie;
+}
+
+void
+zen_fabric_topo_init_ioms(zen_iodie_t *iodie, uint8_t nbiono, uint8_t iomsno)
 {
 	const zen_platform_consts_t *consts = oxide_zen_platform_consts();
 	const zen_fabric_ops_t *fops = oxide_zen_fabric_ops();
 	const df_rev_t df_rev = consts->zpc_df_rev;
 	const uint32_t fch_ios_fid = zen_fch_ios_fabric_id(df_rev);
 
-	zen_ioms_t *ioms = &iodie->zi_ioms[iomsno];
+	zen_nbio_t *nbio = &iodie->zi_nbio[nbiono];
+	VERIFY3U(nbio->zn_nioms, <, ZEN_NBIO_MAX_IOMS);
+	zen_ioms_t *ioms = &nbio->zn_ioms[nbio->zn_nioms++];
 
 	ioms->zio_num = iomsno;
-	ioms->zio_iodie = iodie;
+	ioms->zio_nbio = nbio;
 
 	ioms->zio_iom_inst_id = iodie->zi_base_iom_id + iomsno;
 	ioms->zio_ios_inst_id = iodie->zi_base_ios_id + iomsno;
@@ -1328,8 +1344,13 @@ zen_fabric_topo_init_iodie(zen_soc_t *soc, uint8_t dieno)
 	zen_fabric_discover_iodie_components(iodie);
 
 	fabric->zf_total_ioms += iodie->zi_nioms;
-	for (uint8_t iomsno = 0; iomsno < iodie->zi_nioms; iomsno++)
-		zen_fabric_topo_init_ioms(iodie, iomsno);
+	for (uint8_t iomsno = 0; iomsno < iodie->zi_nioms; iomsno++) {
+		const uint8_t nbiono = fops->zfo_ioms_nbio_num(iomsno);
+
+		iodie->zi_nnbio = MAX(iodie->zi_nnbio, nbiono + 1);
+		zen_fabric_topo_init_nbio(iodie, nbiono);
+		zen_fabric_topo_init_ioms(iodie, nbiono, iomsno);
+	}
 
 	/*
 	 * In order to guarantee that we can safely perform SMU and DXIO
@@ -1598,7 +1619,8 @@ zen_pcie_populate_core_dbg(zen_pcie_core_t *pc, void *arg)
 		return (0);
 
 	if (iodie_match != ZEN_IODIE_MATCH_ANY &&
-	    iodie_match != zen_iodie_node_id(pc->zpc_ioms->zio_iodie)) {
+	    iodie_match !=
+	    zen_iodie_node_id(pc->zpc_ioms->zio_nbio->zn_iodie)) {
 		return (0);
 	}
 
@@ -1630,7 +1652,7 @@ zen_pcie_populate_port_dbg(zen_pcie_port_t *port, void *arg)
 
 	if (iodie_match != ZEN_IODIE_MATCH_ANY &&
 	    iodie_match !=
-	    zen_iodie_node_id(port->zpp_core->zpc_ioms->zio_iodie)) {
+	    zen_iodie_node_id(port->zpp_core->zpc_ioms->zio_nbio->zn_iodie)) {
 		return (0);
 	}
 
@@ -1692,7 +1714,7 @@ static void
 zen_route_pci_bus(zen_fabric_t *fabric)
 {
 	zen_iodie_t *iodie = &fabric->zf_socs[0].zs_iodies[0];
-	uint_t inst = iodie->zi_ioms[0].zio_iom_inst_id;
+	uint_t inst = iodie->zi_nbio[0].zn_ioms[0].zio_iom_inst_id;
 	const zen_platform_consts_t *platform_consts =
 	    oxide_zen_platform_consts();
 	const df_rev_t df_rev = platform_consts->zpc_df_rev;
@@ -1801,7 +1823,7 @@ zen_io_ports_allocate(zen_ioms_t *ioms, void *arg)
 	 * is not available for PCI allocation, however.
 	 */
 	if ((ioms->zio_flags & ZEN_IOMS_F_HAS_FCH) != 0 &&
-	    (ioms->zio_iodie->zi_flags & ZEN_IODIE_F_PRIMARY) != 0) {
+	    (ioms->zio_nbio->zn_iodie->zi_flags & ZEN_IODIE_F_PRIMARY) != 0) {
 		zri->zri_bases[zri->zri_cur] = 0;
 		pci_base = ZEN_IOPORT_COMPAT_SIZE;
 	} else if (zri->zri_per_ioms > 2 * ZEN_SEC_IOMS_GEN_IO_SPACE) {
@@ -2003,7 +2025,7 @@ zen_mmio_allocate(zen_ioms_t *ioms, void *arg)
 	 * can allocate from it.
 	 */
 	if ((ioms->zio_flags & ZEN_IOMS_F_HAS_FCH) != 0 &&
-	    (ioms->zio_iodie->zi_flags & ZEN_IODIE_F_PRIMARY) != 0) {
+	    (ioms->zio_nbio->zn_iodie->zi_flags & ZEN_IODIE_F_PRIMARY) != 0) {
 		zrm->zrm_bases[zrm->zrm_cur] = zrm->zrm_fch_base;
 		zrm->zrm_limits[zrm->zrm_cur] = zrm->zrm_fch_base;
 		zrm->zrm_limits[zrm->zrm_cur] += zrm->zrm_fch_chunks *
@@ -2235,7 +2257,7 @@ zen_fabric_init_tom(zen_ioms_t *ioms, void *arg __unused)
 {
 	const zen_fabric_ops_t *fabric_ops = oxide_zen_fabric_ops();
 	uint64_t tom, tom2, tom3;
-	zen_fabric_t *fabric = ioms->zio_iodie->zi_soc->zs_fabric;
+	zen_fabric_t *fabric = ioms->zio_nbio->zn_iodie->zi_soc->zs_fabric;
 
 	tom = fabric->zf_tom;
 
@@ -2311,7 +2333,7 @@ zen_fabric_pcie_strap_matches(const zen_pcie_core_t *pc, uint8_t portno,
     const zen_pcie_strap_setting_t *strap)
 {
 	const zen_ioms_t *ioms = pc->zpc_ioms;
-	const zen_iodie_t *iodie = ioms->zio_iodie;
+	const zen_iodie_t *iodie = ioms->zio_nbio->zn_iodie;
 	const oxide_board_t board = oxide_board_data->obd_board;
 
 	if (strap->strap_boardmatch != 0 &&
@@ -2324,8 +2346,8 @@ zen_fabric_pcie_strap_matches(const zen_pcie_core_t *pc, uint8_t portno,
 		return (false);
 	}
 
-	if (strap->strap_iomsmatch != PCIE_IOMSMATCH_ANY &&
-	    strap->strap_iomsmatch != ioms->zio_num) {
+	if (strap->strap_iohcmatch != PCIE_IOHCMATCH_ANY &&
+	    strap->strap_iohcmatch != ioms->zio_iohcnum) {
 		return (false);
 	}
 
@@ -3213,21 +3235,55 @@ zen_fabric_walk_iodie(zen_fabric_t *fabric, zen_iodie_cb_f func, void *arg)
 	return (0);
 }
 
+typedef struct zen_fabric_nbio_cb {
+	zen_nbio_cb_f	zfnc_func;
+	void		*zfnc_arg;
+} zen_fabric_nbio_cb_t;
+
+static int
+zen_fabric_walk_nbio_iodie_cb(zen_iodie_t *iodie, void *arg)
+{
+	const zen_fabric_nbio_cb_t *cb = arg;
+
+	for (uint_t nbiono = 0; nbiono < iodie->zi_nnbio; nbiono++) {
+		zen_nbio_t *nbio = &iodie->zi_nbio[nbiono];
+		int ret = cb->zfnc_func(nbio, cb->zfnc_arg);
+
+		if (ret != 0)
+			return (ret);
+	}
+
+	return (0);
+}
+
+int
+zen_fabric_walk_nbio(zen_fabric_t *fabric, zen_nbio_cb_f func, void *arg)
+{
+	zen_fabric_nbio_cb_t cb = {
+	    .zfnc_func = func,
+	    .zfnc_arg = arg,
+	};
+
+	return (zen_fabric_walk_iodie(fabric, zen_fabric_walk_nbio_iodie_cb,
+	    &cb));
+}
+
 typedef struct zen_fabric_ioms_cb {
 	zen_ioms_cb_f	zfic_func;
 	void		*zfic_arg;
 } zen_fabric_ioms_cb_t;
 
 static int
-zen_fabric_walk_ioms_iodie_cb(zen_iodie_t *iodie, void *arg)
+zen_fabric_walk_ioms_nbio_cb(zen_nbio_t *nbio, void *arg)
 {
 	const zen_fabric_ioms_cb_t *cb = arg;
-	for (uint_t iomsno = 0; iomsno < iodie->zi_nioms; iomsno++) {
-		zen_ioms_t *ioms = &iodie->zi_ioms[iomsno];
+
+	for (uint_t iomsno = 0; iomsno < nbio->zn_nioms; iomsno++) {
+		zen_ioms_t *ioms = &nbio->zn_ioms[iomsno];
 		int ret = cb->zfic_func(ioms, cb->zfic_arg);
-		if (ret != 0) {
+
+		if (ret != 0)
 			return (ret);
-		}
 	}
 
 	return (0);
@@ -3241,7 +3297,7 @@ zen_fabric_walk_ioms(zen_fabric_t *fabric, zen_ioms_cb_f func, void *arg)
 	    .zfic_arg = arg,
 	};
 
-	return (zen_fabric_walk_iodie(fabric, zen_fabric_walk_ioms_iodie_cb,
+	return (zen_fabric_walk_nbio(fabric, zen_fabric_walk_ioms_nbio_cb,
 	    &cb));
 }
 
@@ -3557,7 +3613,7 @@ zen_fabric_find_pcie_core_by_lanes_cb(zen_pcie_core_t *pc, void *arg)
 {
 	zen_fabric_find_pcie_core_t *zffpc = arg;
 
-	if (zffpc->zffpc_iodie == pc->zpc_ioms->zio_iodie &&
+	if (zffpc->zffpc_iodie == pc->zpc_ioms->zio_nbio->zn_iodie &&
 	    zffpc->zffpc_start >= pc->zpc_dxio_lane_start &&
 	    zffpc->zffpc_start <= pc->zpc_dxio_lane_end &&
 	    zffpc->zffpc_end >= pc->zpc_dxio_lane_start &&
@@ -3871,7 +3927,7 @@ uint32_t
 zen_pcie_core_read(zen_pcie_core_t *pc, const smn_reg_t reg)
 {
 	const zen_fabric_ops_t *ops = oxide_zen_fabric_ops();
-	zen_iodie_t *iodie = pc->zpc_ioms->zio_iodie;
+	zen_iodie_t *iodie = pc->zpc_ioms->zio_nbio->zn_iodie;
 
 	if (SMN_REG_UNIT(reg) != SMN_UNIT_PCIE_CORE ||
 	    ops->zfo_pcie_core_read == NULL) {
@@ -3885,7 +3941,7 @@ zen_pcie_core_write(zen_pcie_core_t *pc, const smn_reg_t reg,
     const uint32_t val)
 {
 	const zen_fabric_ops_t *ops = oxide_zen_fabric_ops();
-	zen_iodie_t *iodie = pc->zpc_ioms->zio_iodie;
+	zen_iodie_t *iodie = pc->zpc_ioms->zio_nbio->zn_iodie;
 
 	if (SMN_REG_UNIT(reg) != SMN_UNIT_PCIE_CORE ||
 	    ops->zfo_pcie_core_write == NULL) {
@@ -3898,7 +3954,7 @@ uint32_t
 zen_pcie_port_read(zen_pcie_port_t *port, const smn_reg_t reg)
 {
 	const zen_fabric_ops_t *ops = oxide_zen_fabric_ops();
-	zen_iodie_t *iodie = port->zpp_core->zpc_ioms->zio_iodie;
+	zen_iodie_t *iodie = port->zpp_core->zpc_ioms->zio_nbio->zn_iodie;
 
 	if (SMN_REG_UNIT(reg) != SMN_UNIT_PCIE_PORT ||
 	    ops->zfo_pcie_port_read == NULL) {
@@ -3912,7 +3968,7 @@ zen_pcie_port_write(zen_pcie_port_t *port, const smn_reg_t reg,
     const uint32_t val)
 {
 	const zen_fabric_ops_t *ops = oxide_zen_fabric_ops();
-	zen_iodie_t *iodie = port->zpp_core->zpc_ioms->zio_iodie;
+	zen_iodie_t *iodie = port->zpp_core->zpc_ioms->zio_nbio->zn_iodie;
 
 	if (SMN_REG_UNIT(reg) != SMN_UNIT_PCIE_PORT ||
 	    ops->zfo_pcie_port_write == NULL) {
