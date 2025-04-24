@@ -1245,6 +1245,7 @@ zen_fabric_ioms_pcie_init(zen_ioms_t *ioms)
 void
 zen_fabric_topo_init_nbio(zen_iodie_t *iodie, uint8_t nbiono)
 {
+	const zen_fabric_ops_t *fops = oxide_zen_fabric_ops();
 	zen_nbio_t *nbio = &iodie->zi_nbio[nbiono];
 
 	if (nbio->zn_iodie != NULL)
@@ -1252,6 +1253,12 @@ zen_fabric_topo_init_nbio(zen_iodie_t *iodie, uint8_t nbiono)
 
 	nbio->zn_num = nbiono;
 	nbio->zn_iodie = iodie;
+
+	/*
+	 * uarch-specific NBIO init hook.
+	 */
+	if (fops->zfo_nbio_init != NULL)
+		fops->zfo_nbio_init(nbio);
 }
 
 void
@@ -2410,7 +2417,12 @@ zen_null_fabric_iohc_pci_ids(zen_ioms_t *ioms __unused)
 }
 
 void
-zen_null_fabric_sdp_control(zen_ioms_t *nbif __unused)
+zen_null_fabric_sdp_control(zen_ioms_t *ioms __unused)
+{
+}
+
+void
+zen_null_fabric_nbio_sdp_control(zen_nbio_t *nbio __unused)
 {
 }
 
@@ -3064,6 +3076,8 @@ zen_fabric_init(void)
 	zen_fabric_walk_ioms(fabric, zen_fabric_iohc_fch_link, NULL);
 	zen_fabric_walk_ioms(fabric, zen_fabric_ioms_op,
 	    fabric_ops->zfo_iohc_arbitration);
+	zen_fabric_walk_nbio(fabric, zen_fabric_nbio_op,
+	    fabric_ops->zfo_nbio_arbitration);
 
 	zen_fabric_walk_nbif(fabric, zen_fabric_nbif_op,
 	    fabric_ops->zfo_nbif_arbitration);
@@ -3075,6 +3089,8 @@ zen_fabric_init(void)
 	 */
 	zen_fabric_walk_ioms(fabric, zen_fabric_ioms_op,
 	    fabric_ops->zfo_sdp_control);
+	zen_fabric_walk_nbio(fabric, zen_fabric_nbio_op,
+	    fabric_ops->zfo_nbio_sdp_control);
 
 	zen_fabric_walk_nbif(fabric, zen_fabric_nbif_op,
 	    fabric_ops->zfo_nbif_syshub_dma);
@@ -3084,6 +3100,8 @@ zen_fabric_init(void)
 	 */
 	zen_fabric_walk_ioms(fabric, zen_fabric_ioms_op,
 	    fabric_ops->zfo_iohc_clock_gating);
+	zen_fabric_walk_nbio(fabric, zen_fabric_nbio_op,
+	    fabric_ops->zfo_nbio_clock_gating);
 
 	/*
 	 * nBIF clock gating.
@@ -3725,6 +3743,17 @@ zen_fabric_ioms_op(zen_ioms_t *ioms, void *arg)
 
 	VERIFY3P(callback, !=, NULL);
 	(callback)(ioms);
+
+	return (0);
+}
+
+int
+zen_fabric_nbio_op(zen_nbio_t *nbio, void *arg)
+{
+	void (*callback)(zen_nbio_t *) = arg;
+
+	VERIFY3P(callback, !=, NULL);
+	(callback)(nbio);
 
 	return (0);
 }
