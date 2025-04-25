@@ -1938,6 +1938,9 @@ post_startup(void)
 {
 	extern void cpupm_init(cpu_t *);
 	extern void cpu_event_init_cpu(cpu_t *);
+	extern void zen_hsmp_get(void);
+
+	zen_hsmp_get();
 
 	oxide_report_boot_stage(BOOT_STAGE_STARTUP_POST);
 
@@ -1991,6 +1994,8 @@ post_startup(void)
 	(void) mach_cpu_create_device_node(CPU, NULL);
 
 	pg_init();
+
+	zen_hsmp_get();
 }
 
 static int
