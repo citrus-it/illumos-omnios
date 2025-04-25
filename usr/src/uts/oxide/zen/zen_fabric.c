@@ -1394,8 +1394,10 @@ zen_fabric_topo_init_iodie(zen_soc_t *soc, uint8_t dieno)
 	/*
 	 * Invoke miscellaneous uarch-specific SMU initialization.
 	 */
+#if 0
 	if (fops->zfo_smu_misc_init != NULL)
 		fops->zfo_smu_misc_init(iodie);
+#endif
 }
 
 uint32_t
@@ -2519,6 +2521,8 @@ zen_fabric_init_oxio(zen_iodie_t *iodie, void *arg __unused)
 	VERIFY3U(*oxide_board_data->obd_nengines[idx], >, 0);
 	iodie->zi_engines = oxide_board_data->obd_engines[idx];
 	iodie->zi_nengines = *oxide_board_data->obd_nengines[idx];
+
+	zen_hsmp_test(iodie);
 
 	return (0);
 }
@@ -4006,4 +4010,37 @@ zen_pcie_port_write(zen_pcie_port_t *port, const smn_reg_t reg,
 		return (zen_smn_write(iodie, reg, val));
 	}
 	return (ops->zfo_pcie_port_write(port, reg, val));
+}
+
+static int
+zen_hsmp_cb(zen_iodie_t *iodie, void *arg)
+{
+	zen_hsmp_test(iodie);
+
+	return (0);
+}
+
+void
+zen_hsmp_get(void)
+{
+	(void) zen_fabric_walk_iodie(&zen_fabric, zen_hsmp_cb, NULL);
+}
+
+static int
+zen_fabric_late_cb(zen_iodie_t *iodie, void *arg)
+{
+	const zen_fabric_ops_t *fops = oxide_zen_fabric_ops();
+
+	if (fops->zfo_smu_misc_init != NULL)
+		fops->zfo_smu_misc_init(iodie);
+
+	return (0);
+}
+
+void
+zen_fabric_late(void)
+{
+	zen_fabric_t *fabric = &zen_fabric;
+
+	(void) zen_fabric_walk_iodie(fabric, zen_fabric_late_cb, NULL);
 }

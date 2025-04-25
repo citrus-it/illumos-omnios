@@ -1632,6 +1632,9 @@ done:
 		    "Use \"boot-ncpus\" parameter to enable more CPU(s). "
 		    "See eeprom(1M).");
 	}
+
+	extern void zen_fabric_late(void);
+	zen_fabric_late();
 }
 
 int

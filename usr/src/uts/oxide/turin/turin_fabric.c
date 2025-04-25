@@ -23,6 +23,7 @@
 #include <sys/ddi.h>
 #include <sys/pci.h>
 #include <sys/pcie.h>
+#include <sys/clock.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_cfgspace_impl.h>
 #include <sys/pci_ident.h>
@@ -1964,34 +1965,46 @@ turin_smu_features_init(zen_iodie_t *iodie)
 	 * CPPC is optional, but is explicitly set by AGESA, so we do that here
 	 * as well.
 	 */
-	const uint32_t features =
-	    TURIN_SMU_FEATURE_DATA_CALCULATION |
-	    TURIN_SMU_FEATURE_PPT |
-	    TURIN_SMU_FEATURE_THERMAL_DESIGN_CURRENT |
-	    TURIN_SMU_FEATURE_THERMAL |
-	    TURIN_SMU_FEATURE_FIT |
-	    TURIN_SMU_FEATURE_ELECTRICAL_DESIGN_CURRENT |
-	    TURIN_SMU_FEATURE_CSTATE_BOOST |
-	    TURIN_SMU_FEATURE_PROCESSOR_THROTTLING_TEMPERATURE |
-	    TURIN_SMU_FEATURE_CORE_CLOCK_DPM |
-	    TURIN_SMU_FEATURE_FABRIC_CLOCK_DPM |
-	    TURIN_SMU_FEATURE_LCLK_DPM |
-	    TURIN_SMU_FEATURE_PSI7 |
-	    TURIN_SMU_FEATURE_LCLK_DEEP_SLEEP |
-	    TURIN_SMU_FEATURE_DYNAMIC_VID_OPTIMIZER |
-	    TURIN_SMU_FEATURE_CORE_C6 |
-	    TURIN_SMU_FEATURE_DF_CSTATES |
-	    TURIN_SMU_FEATURE_CLOCK_GATING |
-	    TURIN_SMU_FEATURE_CPPC |
-	    TURIN_SMU_FEATURE_GMI_FOLDING |
-	    TURIN_SMU_FEATURE_XGMI_DLWM |
-	    TURIN_SMU_FEATURE_PCC |
-	    TURIN_SMU_FEATURE_FP_DIDT |
-	    TURIN_SMU_FEATURE_MPDMA_TF_CLK_DEEP_SLEEP |
-	    TURIN_SMU_FEATURE_MPDMA_PM_CLK_DEEP_SLEEP;
+	const uint32_t features[] = {
+	    TURIN_SMU_FEATURE_DATA_CALCULATION,
+	    TURIN_SMU_FEATURE_PPT,
+	    TURIN_SMU_FEATURE_THERMAL_DESIGN_CURRENT,
+	    TURIN_SMU_FEATURE_THERMAL,
+	    TURIN_SMU_FEATURE_FIT,
+	    TURIN_SMU_FEATURE_ELECTRICAL_DESIGN_CURRENT,
+	    TURIN_SMU_FEATURE_CSTATE_BOOST,
+	    TURIN_SMU_FEATURE_PROCESSOR_THROTTLING_TEMPERATURE,
+	    TURIN_SMU_FEATURE_CORE_CLOCK_DPM,
+	    TURIN_SMU_FEATURE_FABRIC_CLOCK_DPM,
+	    TURIN_SMU_FEATURE_LCLK_DPM,
+	    TURIN_SMU_FEATURE_PSI7,
+	    TURIN_SMU_FEATURE_LCLK_DEEP_SLEEP,
+	    TURIN_SMU_FEATURE_DYNAMIC_VID_OPTIMIZER,
+	    TURIN_SMU_FEATURE_CORE_C6,
+	    TURIN_SMU_FEATURE_DF_CSTATES,
+	    TURIN_SMU_FEATURE_CLOCK_GATING,
+	    TURIN_SMU_FEATURE_CPPC,
+	    TURIN_SMU_FEATURE_GMI_FOLDING,
+	    TURIN_SMU_FEATURE_XGMI_DLWM,
+	    TURIN_SMU_FEATURE_PCC,
+	    TURIN_SMU_FEATURE_FP_DIDT,
+	    TURIN_SMU_FEATURE_MPDMA_TF_CLK_DEEP_SLEEP,
+	    TURIN_SMU_FEATURE_MPDMA_PM_CLK_DEEP_SLEEP
+	};
 	const uint32_t features_ext = TURIN_SMU_EXT_FEATURE_SOC_XVMIN;
 
-	VERIFY(zen_smu_set_features(iodie, features, features_ext));
+	uint32_t f = 0;
+
+	for (uint_t i = 0; i < ARRAY_SIZE(features); i++) {
+		f |= features[i];
+		cmn_err(CE_NOTE, "Features %x", f);
+		VERIFY(zen_smu_set_features(iodie, f, 0));
+		eb_pausems(1000);
+		zen_hsmp_test(iodie);
+	}
+	VERIFY(zen_smu_set_features(iodie, f, features_ext));
+	eb_pausems(1000);
+	zen_hsmp_test(iodie);
 }
 
 /*
