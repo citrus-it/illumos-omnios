@@ -740,7 +740,7 @@ DRV_KMODS	+= smntemp
 #
 DRV_KMODS	+= amdzen
 DRV_KMODS	+= amdzen_stub
-DRV_KMODS	+= usmn zen_udf zen_umc
+DRV_KMODS	+= usmn zen_udf zen_umc uhsmp
 MISC_KMODS	+= zen_data
 
 #

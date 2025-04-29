@@ -400,7 +400,8 @@ typedef enum smn_unit {
 	SMN_UNIT_FCH_RMTMUX,
 	SMN_UNIT_FCH_RMTGPIO_AGG,
 	SMN_UNIT_FCH_I3C,
-	SMN_UNIT_FCH_ESPI
+	SMN_UNIT_FCH_ESPI,
+	SMN_UNIT_HSMP
 } smn_unit_t;
 
 /*

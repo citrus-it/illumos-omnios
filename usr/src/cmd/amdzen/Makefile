@@ -10,10 +10,10 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2025 Oxide Computer Company
 #
 
-PROG= usmn udf apobdump
+PROG= usmn udf apobdump uhsmp
 
 include ../Makefile.cmd
 
