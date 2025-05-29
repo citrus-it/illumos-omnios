@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1420,6 +1421,7 @@ build_delete_xml_doc(int operandLen, char **operand, object_type obj,
 {
 	xmlTextWriterPtr writer;
 	xmlBufferPtr xbuf;
+	const xmlChar *content;
 	int i, len;
 
 	if ((xbuf = xmlBufferCreate()) == NULL) {
@@ -1565,9 +1567,10 @@ build_delete_xml_doc(int operandLen, char **operand, object_type obj,
 
 	xmlFreeTextWriter(writer);
 
-	len = xmlStrlen(xbuf->content) + 1;
+	len = xmlBufferLength(xbuf) + 1;
+	content = xmlBufferContent(xbuf);
 	/* XXX - copy NULL at the end by having one more extra byte */
-	if ((*doc = xmlStrndup(xbuf->content, len)) == NULL) {
+	if ((*doc = xmlStrndup(content, len)) == NULL) {
 	    return (ERROR_XML_STRDUP_FAILED);
 	}
 
@@ -1596,6 +1599,7 @@ build_modify_xml_doc(int operandLen, char **operand, object_type obj,
 {
 	xmlTextWriterPtr writer;
 	xmlBufferPtr xbuf;
+	const xmlChar *content;
 	int i, len;
 
 	if ((xbuf = xmlBufferCreate()) == NULL) {
@@ -1703,9 +1707,10 @@ build_modify_xml_doc(int operandLen, char **operand, object_type obj,
 
 	xmlFreeTextWriter(writer);
 
-	len = xmlStrlen(xbuf->content) + 1;
+	len = xmlBufferLength(xbuf) + 1;
+	content = xmlBufferContent(xbuf);
 	/* XXX - copy NULL at the end by having one more extra byte */
-	if ((*doc = xmlStrndup(xbuf->content, len)) == NULL) {
+	if ((*doc = xmlStrndup(content, len)) == NULL) {
 	    return (ERROR_XML_STRDUP_FAILED);
 	}
 
@@ -1732,6 +1737,7 @@ build_rename_xml_doc(char *name, object_type obj, uint32_t id, xmlChar **doc)
 {
 	xmlTextWriterPtr writer;
 	xmlBufferPtr xbuf;
+	const xmlChar *content;
 	int len;
 	char namebuf[32];
 
@@ -1836,9 +1842,10 @@ build_rename_xml_doc(char *name, object_type obj, uint32_t id, xmlChar **doc)
 
 	xmlFreeTextWriter(writer);
 
-	len = xmlStrlen(xbuf->content) + 1;
+	len = xmlBufferLength(xbuf) + 1;
+	content = xmlBufferContent(xbuf);
 	/* XXX - copy NULL at the end by having one more extra byte */
-	if ((*doc = xmlStrndup(xbuf->content, len)) == NULL) {
+	if ((*doc = xmlStrndup(content, len)) == NULL) {
 	    return (ERROR_XML_STRDUP_FAILED);
 	}
 
@@ -1866,6 +1873,7 @@ build_create_xml_doc(int operandLen, char **operand, object_type obj,
 {
 	xmlTextWriterPtr writer;
 	xmlBufferPtr xbuf;
+	const xmlChar *content;
 	int i, len;
 
 	if ((xbuf = xmlBufferCreate()) == NULL) {
@@ -2006,9 +2014,10 @@ build_create_xml_doc(int operandLen, char **operand, object_type obj,
 
 	xmlFreeTextWriter(writer);
 
-	len = xmlStrlen(xbuf->content) + 1;
+	len = xmlBufferLength(xbuf) + 1;
+	content = xmlBufferContent(xbuf);
 	/* XXX - copy NULL at the end by having one more extra byte */
-	if ((*doc = xmlStrndup(xbuf->content, len)) == NULL) {
+	if ((*doc = xmlStrndup(content, len)) == NULL) {
 	    return (ERROR_XML_STRDUP_FAILED);
 	}
 
@@ -2035,6 +2044,7 @@ build_assoc_xml_doc(xmlChar *name, association_t assoc, xmlChar **doc)
 {
 	xmlTextWriterPtr writer;
 	xmlBufferPtr xbuf;
+	const xmlChar *content;
 	int len;
 
 	if ((xbuf = xmlBufferCreate()) == NULL) {
@@ -2229,9 +2239,10 @@ build_assoc_xml_doc(xmlChar *name, association_t assoc, xmlChar **doc)
 
 	xmlFreeTextWriter(writer);
 
-	len = xmlStrlen(xbuf->content) + 1;
+	len = xmlBufferLength(xbuf) + 1;
+	content = xmlBufferContent(xbuf);
 	/* XXX - copy NULL at the end by having one more extra byte */
-	if ((*doc = xmlStrndup(xbuf->content, len)) == NULL) {
+	if ((*doc = xmlStrndup(content, len)) == NULL) {
 	    return (ERROR_XML_STRDUP_FAILED);
 	}
 
@@ -2256,6 +2267,7 @@ build_enumerate_xml_doc(object_type obj, xmlChar **doc)
 {
 	xmlTextWriterPtr writer;
 	xmlBufferPtr xbuf;
+	const xmlChar *content;
 	int len;
 
 	if ((xbuf = xmlBufferCreate()) == NULL) {
@@ -2327,9 +2339,10 @@ build_enumerate_xml_doc(object_type obj, xmlChar **doc)
 
 	xmlFreeTextWriter(writer);
 
-	len = xmlStrlen(xbuf->content) + 1;
+	len = xmlBufferLength(xbuf) + 1;
+	content = xmlBufferContent(xbuf);
 	/* XXX - copy NULL at the end by having one more extra byte */
-	if ((*doc = xmlStrndup(xbuf->content, len)) == NULL) {
+	if ((*doc = xmlStrndup(content, len)) == NULL) {
 	    return (ERROR_XML_STRDUP_FAILED);
 	}
 
@@ -2356,6 +2369,7 @@ build_get_xml_doc(int operandLen, char **operand, object_type obj,
 {
 	xmlTextWriterPtr writer;
 	xmlBufferPtr xbuf;
+	const xmlChar *content;
 	int i, len;
 
 	if ((xbuf = xmlBufferCreate()) == NULL) {
@@ -2514,9 +2528,10 @@ build_get_xml_doc(int operandLen, char **operand, object_type obj,
 
 	xmlFreeTextWriter(writer);
 
-	len = xmlStrlen(xbuf->content) + 1;
+	len = xmlBufferLength(xbuf) + 1;
+	content = xmlBufferContent(xbuf);
 	/* XXX - copy NULL at the end by having one more extra byte */
-	if ((*doc = xmlStrndup(xbuf->content, len)) == NULL) {
+	if ((*doc = xmlStrndup(content, len)) == NULL) {
 	    return (ERROR_XML_STRDUP_FAILED);
 	}
 
