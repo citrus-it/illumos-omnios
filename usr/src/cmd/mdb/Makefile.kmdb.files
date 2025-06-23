@@ -34,6 +34,7 @@ KMDBSRCS += \
 	bitext.o \
 	kaif_start.c \
 	mdb.c \
+	mdb_addrtype.c \
 	mdb_addrvec.c \
 	mdb_argvec.c \
 	mdb_callb.c \

@@ -66,6 +66,7 @@
 #include <mdb/mdb_print.h>
 #include <mdb/mdb_nm.h>
 #include <mdb/mdb_set.h>
+#include <mdb/mdb_addrtype.h>
 #include <mdb/mdb_demangle.h>
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_whatis.h>
@@ -3335,6 +3336,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ ":S", NULL, NULL, cmd_step },
 	{ ":w", ":[cmd...]", "set write access watchpoint", cmd_oldwpw },
 	{ ":z", NULL, "delete all traced software events", cmd_zapall },
+	{ "addrtype", ":[-d | type]", "tag addresses with a type",
+	    cmd_addrtype, cmd_addrtype_help },
 	{ "array", ":[type count] [variable]", "print each array element's "
 	    "address", cmd_array },
 	{ "bitx", ":<high bit> <low bit> [new value]",

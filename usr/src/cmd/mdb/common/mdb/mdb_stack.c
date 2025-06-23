@@ -24,6 +24,7 @@
 #include <mdb/mdb_string.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_debug.h>
+#include <mdb/mdb_addrtype.h>
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_isautil.h>
 #include <mdb/mdb_stack.h>
@@ -197,23 +198,39 @@ mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
 		ctf = B_FALSE;
 
 	for (i = 0; i < nargc; i++) {
+		mdb_ctf_id_t id = argtypes[i];
+
 		if (i > 0)
 			mdb_printf(", ");
-		if (ctf && mdb_stack_typename(argtypes[i],
-		    &data->msfd_buf, &data->msfd_buflen) != NULL) {
+
+		if (ctf && mdb_stack_typename(id, &data->msfd_buf,
+		    &data->msfd_buflen) != NULL) {
 			const char *type = data->msfd_buf;
 
-			switch (mdb_ctf_type_kind(argtypes[i])) {
-			case CTF_K_POINTER:
+			switch (mdb_ctf_type_kind(id)) {
+			case CTF_K_POINTER: {
+				mdb_ctf_id_t pid;
+
 				if (argv[i] == 0)
 					mdb_printf("(%s)NULL", type);
 				else
 					mdb_printf("(%s)%lr", type, argv[i]);
+
+				if (mdb_ctf_type_reference(id, &pid) != 0)
+					break;
+
+				if (mdb_stack_typename(pid, &data->msfd_buf,
+				    &data->msfd_buflen) != NULL &&
+				    strcmp(data->msfd_buf, "void") != 0) {
+					mdb_addrtype_addid(argv[i], pid,
+					    ADDRTYPE_AUTO);
+				}
 				break;
+			}
 			case CTF_K_ENUM: {
 				const char *cp;
 
-				cp = mdb_ctf_enum_name(argtypes[i], argv[i]);
+				cp = mdb_ctf_enum_name(id, argv[i]);
 				if (cp != NULL)
 					mdb_printf("(%s)%s", type, cp);
 				else

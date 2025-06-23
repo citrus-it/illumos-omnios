@@ -53,6 +53,8 @@ extern int cmd_printf(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_printf_tab(mdb_tab_cookie_t *, uint_t, int, const mdb_arg_t *);
 extern void printf_help(void);
 
+extern int args_to_typename(int *, const mdb_arg_t **, char *, size_t);
+
 #endif	/* _MDB */
 
 #ifdef	__cplusplus

@@ -120,6 +120,7 @@ MAPFILE_SOURCES_COMMON = \
 	../../../common/kmdb/kmdb_kctl.h \
 	../../../common/kmdb/kmdb_kdi.h \
 	../../../common/kmdb/kmdb_wr.h \
+	../../../common/mdb/mdb_addrtype.h \
 	../../../common/mdb/mdb_ctf.h \
 	../../../common/mdb/mdb_ks.h \
 	../../../common/mdb/mdb_modapi.h \
