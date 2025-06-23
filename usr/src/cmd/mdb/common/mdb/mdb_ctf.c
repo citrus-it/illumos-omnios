@@ -28,6 +28,7 @@
  * Copyright 2025 Oxide Computer Company
  */
 
+#include <mdb/mdb_addrtype.h>
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_ctf_impl.h>
 #include <mdb/mdb_err.h>
@@ -384,6 +385,8 @@ mdb_ctf_lookup_by_addr(uintptr_t addr, mdb_ctf_id_t *p)
 
 	if (mdb_tgt_lookup_by_addr(t, addr, MDB_TGT_SYM_EXACT, name,
 	    sizeof (name), NULL, NULL) == -1) {
+		if (mdb_addrtype_lookup(addr, p) == 0)
+			return (0);
 		mdb_ctf_type_invalidate(p);
 		return (-1); /* errno is set for us */
 	}

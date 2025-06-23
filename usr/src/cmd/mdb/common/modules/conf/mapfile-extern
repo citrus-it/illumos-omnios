@@ -56,6 +56,9 @@ SYMBOL_SCOPE {
 
 		mdb				{ FLAGS = EXTERN };
 		mdb_add_walker			{ FLAGS = EXTERN };
+		mdb_addrtype_add		{ FLAGS = EXTERN };
+		mdb_addrtype_addid		{ FLAGS = EXTERN };
+		mdb_addrtype_lookup		{ FLAGS = EXTERN };
 		mdb_alloc			{ FLAGS = EXTERN };
 		mdb_aread			{ FLAGS = EXTERN };
 		mdb_argtoull			{ FLAGS = EXTERN };

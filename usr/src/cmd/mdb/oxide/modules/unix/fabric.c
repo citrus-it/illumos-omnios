@@ -25,6 +25,7 @@
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_target.h>
 #include <mdb/mdb_ctf.h>
+#include <mdb/mdb_addrtype.h>
 
 #define	_SYS_MACHPARAM_H
 #define	_SYS_MACHCPUVAR_H
@@ -73,6 +74,7 @@ fabric_print_port(uintptr_t addr, zen_pcie_port_t *port, fabric_data_t *cbd)
 {
 	oxio_engine_t oxio;
 
+	mdb_addrtype_add(addr, "zen_pcie_port_t", ADDRTYPE_AUTO);
 	if (!cbd->fd_verbose &&
 	    (port->zpp_flags & ZEN_PCIE_PORT_F_BRIDGE_HIDDEN)) {
 		return;
@@ -115,6 +117,7 @@ static const mdb_bitmask_t fabric_core_flags[] = {
 static void
 fabric_print_core(uintptr_t addr, zen_pcie_core_t *core, fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_pcie_core_t", ADDRTYPE_AUTO);
 	if (!cbd->fd_verbose && !(core->zpc_flags & ZEN_PCIE_CORE_F_USED))
 		return;
 	if (cbd->fd_saddr == addr)
@@ -169,6 +172,7 @@ static void
 fabric_print_nbif_func(uintptr_t addr, zen_nbif_func_t *func,
     fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_nbif_func_t", ADDRTYPE_AUTO);
 	if (!cbd->fd_verbose && func->znf_type == ZEN_NBIF_T_ABSENT)
 		return;
 	if (cbd->fd_saddr == addr)
@@ -193,6 +197,7 @@ fabric_print_nbif_func(uintptr_t addr, zen_nbif_func_t *func,
 static void
 fabric_print_nbif(uintptr_t addr, zen_nbif_t *nbif, fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_nbif_t", ADDRTYPE_AUTO);
 	if (!cbd->fd_verbose && nbif->zn_nfuncs == 0)
 		return;
 	if (cbd->fd_saddr == addr)
@@ -222,6 +227,7 @@ static const mdb_bitmask_t fabric_ioms_flags[] = {
 static void
 fabric_print_ioms(uintptr_t addr, zen_ioms_t *ioms, fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_ioms_t", ADDRTYPE_AUTO);
 	if (cbd->fd_saddr == addr)
 		cbd->fd_printing = true;
 	if (cbd->fd_printing) {
@@ -255,6 +261,7 @@ fabric_print_ioms(uintptr_t addr, zen_ioms_t *ioms, fabric_data_t *cbd)
 static void
 fabric_print_nbio(uintptr_t addr, zen_nbio_t *nbio, fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_nbio_t", ADDRTYPE_AUTO);
 	if (cbd->fd_saddr == addr)
 		cbd->fd_printing = true;
 	if (cbd->fd_printing) {
@@ -276,6 +283,7 @@ static void
 fabric_print_cpu_thread(uintptr_t addr, zen_thread_t *thread,
     fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_thread_t", ADDRTYPE_AUTO);
 	if (cbd->fd_saddr == addr)
 		cbd->fd_printing = true;
 	if (cbd->fd_printing) {
@@ -290,6 +298,7 @@ fabric_print_cpu_thread(uintptr_t addr, zen_thread_t *thread,
 static void
 fabric_print_cpu_core(uintptr_t addr, zen_core_t *core, fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_core_t", ADDRTYPE_AUTO);
 	if (cbd->fd_saddr == addr)
 		cbd->fd_printing = true;
 	if (cbd->fd_printing) {
@@ -311,6 +320,7 @@ fabric_print_cpu_core(uintptr_t addr, zen_core_t *core, fabric_data_t *cbd)
 static void
 fabric_print_ccx(uintptr_t addr, zen_ccx_t *ccx, fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_ccx_t", ADDRTYPE_AUTO);
 	if (cbd->fd_saddr == addr)
 		cbd->fd_printing = true;
 	if (cbd->fd_printing) {
@@ -332,6 +342,7 @@ fabric_print_ccx(uintptr_t addr, zen_ccx_t *ccx, fabric_data_t *cbd)
 static void
 fabric_print_ccd(uintptr_t addr, zen_ccd_t *ccd, fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_ccd_t", ADDRTYPE_AUTO);
 	if (cbd->fd_saddr == addr)
 		cbd->fd_printing = true;
 	if (cbd->fd_printing) {
@@ -353,6 +364,7 @@ fabric_print_ccd(uintptr_t addr, zen_ccd_t *ccd, fabric_data_t *cbd)
 static void
 fabric_print_iodie(uintptr_t addr, zen_iodie_t *iodie, fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_iodie_t", ADDRTYPE_AUTO);
 	if (cbd->fd_saddr == addr)
 		cbd->fd_printing = true;
 	if (cbd->fd_printing) {
@@ -379,6 +391,7 @@ fabric_print_iodie(uintptr_t addr, zen_iodie_t *iodie, fabric_data_t *cbd)
 static void
 fabric_print_soc(uintptr_t addr, zen_soc_t *soc, fabric_data_t *cbd)
 {
+	mdb_addrtype_add(addr, "zen_soc_t", ADDRTYPE_AUTO);
 	if (cbd->fd_saddr == addr)
 		cbd->fd_printing = true;
 	if (cbd->fd_printing) {

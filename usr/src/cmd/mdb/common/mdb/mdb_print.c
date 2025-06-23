@@ -38,6 +38,7 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_fmt.h>
+#include <mdb/mdb_addrtype.h>
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_ctf_impl.h>
 #include <mdb/mdb.h>
@@ -2392,14 +2393,19 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			argv++;
 		}
 
+		if (flags & DCMD_ADDRSPEC)
+			mdb_addrtype_addid(addr, id, ADDRTYPE_AUTO);
+
 	} else if (!(flags & DCMD_ADDRSPEC) || opt_i) {
 		return (DCMD_USAGE);
+	}
 
-	} else if (addr_to_sym(t, addr, s_name, sizeof (s_name),
+	if (addr_to_sym(t, addr, s_name, sizeof (s_name),
 	    &sym, &s_info) == NULL) {
-		mdb_warn("no symbol information for %a", addr);
-		return (DCMD_ERR);
-
+		if (mdb_addrtype_lookup(addr, &id) != 0) {
+			mdb_warn("no symbol information for %a", addr);
+			return (DCMD_ERR);
+		}
 	} else if (mdb_ctf_lookup_by_symbol(&sym, &s_info, &id) != 0) {
 		mdb_warn("no type data available for %a [%u]", addr,
 		    s_info.sym_id);

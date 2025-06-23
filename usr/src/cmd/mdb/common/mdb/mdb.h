@@ -184,6 +184,7 @@ typedef struct mdb {
 	mdb_list_t m_cblist;	/* List of callbacks */
 	mdb_nv_t m_macaliases;	/* Name/value hash of ADB macro aliases */
 	ctf_file_t *m_synth;	/* Container for synthetic types */
+	mdb_list_t m_addrtype;	/* List of tagged address types */
 	int m_lastret;		/* Result of running the last command */
 #ifdef _KMDB
 	struct dpi_ops *m_dpi;	/* DPI ops vector */
