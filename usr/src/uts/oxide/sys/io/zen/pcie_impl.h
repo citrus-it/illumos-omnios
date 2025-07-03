@@ -48,6 +48,7 @@ typedef struct zen_dxio_fw_engine zen_dxio_fw_engine_t;
 typedef struct zen_mpio_ask_port zen_mpio_ask_port_t;
 typedef struct zen_ubm_hfc zen_ubm_hfc_t;
 typedef struct zen_ubm_dfc zen_ubm_dfc_t;
+typedef struct zen_deli zen_deli_t;
 
 /*
  * The current maximum number of ports that can be attached to any
@@ -214,6 +215,13 @@ struct zen_pcie_port {
 	 * The following represents the synthesized slot information for this.
 	 */
 	uint16_t		zpp_slotno;
+
+	/*
+	 * XXX
+	 */
+	zen_deli_t		*zpp_deli;
+	uint64_t		zpp_deli_pa;
+	uint32_t		zpp_deli_alloc_len;
 
 	/*
 	 * PCIe port registers captured at various stages.

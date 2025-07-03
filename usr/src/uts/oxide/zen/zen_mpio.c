@@ -730,7 +730,41 @@ zen_mpio_recv_ask(zen_iodie_t *iodie)
 	res = zen_mpio_rpc(iodie, &rpc);
 	if (res != ZEN_MPIO_RPC_OK) {
 		cmn_err(CE_WARN,
-		    "MPIO recveive ASK RPC Failed: %s (MPIO: 0x%x)",
+		    "MPIO receive ASK RPC Failed: %s (MPIO: 0x%x)",
+		    zen_mpio_rpc_res_str(res), rpc.zmr_resp);
+		return (false);
+	}
+
+	return (true);
+}
+
+static bool
+zen_mpio_recv_deli(zen_iodie_t *iodie, zen_pcie_port_t *port)
+{
+	zen_mpio_recv_deli_args_t *args;
+	zen_mpio_rpc_t rpc = { 0 };
+	zen_mpio_rpc_res_t res;
+
+	ASSERT3P(iodie, !=, NULL);
+	ASSERT3P(port, !=, NULL);
+	ASSERT3P(port->zpp_deli, !=, NULL);
+	ASSERT3U(port->zpp_deli_pa, !=, 0);
+
+	if (!zen_mpio_wait_ready(iodie)) {
+		cmn_err(CE_WARN, "MPIO wait for ready to receive DELI failed");
+		return (false);
+	}
+
+	rpc.zmr_req = ZEN_MPIO_OP_GET_DELI_INFO;
+	args = (zen_mpio_recv_deli_args_t *)rpc.zmr_args;
+	args->zmrda_paddr_hi = port->zpp_deli_pa >> 32;
+	args->zmrda_paddr_lo = port->zpp_deli_pa & 0xFFFFFFFFU;
+	args->zmrda_start_lane = port->zpp_ask_port->zma_link.zml_lane_start;
+
+	res = zen_mpio_rpc(iodie, &rpc);
+	if (res != ZEN_MPIO_RPC_OK) {
+		cmn_err(CE_WARN,
+		    "MPIO receive DELI RPC Failed: %s (MPIO: 0x%x)",
 		    zen_mpio_rpc_res_str(res), rpc.zmr_resp);
 		return (false);
 	}
@@ -1120,7 +1154,7 @@ zen_mpio_map_engines(zen_fabric_t *fabric, zen_iodie_t *iodie)
 			zen_mpio_link_t *l = &port->zpp_ask_port->zma_link;
 			cmn_err(CE_WARN, "engine %u [%u, %u] mapped to "
 			    "port %u, which already has an engine [%u, %u]",
-			    i, start_lane, end_lane, pc->zpc_nports,
+			    i, start_lane, end_lane, portno,
 			    l->zml_lane_start,
 			    l->zml_lane_start + l->zml_num_lanes - 1);
 			ret = false;
@@ -1162,6 +1196,27 @@ zen_mpio_init_mapping(zen_iodie_t *iodie, void *arg)
 	}
 
 	zen_pcie_populate_dbg(fabric, ZPCS_SM_MAPPED_POST, iodie->zi_node_id);
+
+	return (0);
+}
+
+int
+zen_mpio_port_deli(zen_pcie_port_t *port, void *arg)
+{
+	zen_iodie_t *iodie = port->zpp_core->zpc_ioms->zio_nbio->zn_iodie;
+	ddi_dma_attr_t *attr = arg;
+	pfn_t pfn;
+
+	if ((port->zpp_flags & ZEN_PCIE_PORT_F_MAPPED) == 0)
+		return (0);
+
+	CTASSERT(sizeof (zen_deli_t) <= MMU_PAGESIZE);
+	port->zpp_deli_alloc_len = MMU_PAGESIZE;
+	port->zpp_deli = contig_alloc(MMU_PAGESIZE, attr, MMU_PAGESIZE, 1);
+	bzero(port->zpp_deli, MMU_PAGESIZE);
+	pfn = hat_getpfnum(kas.a_hat, (caddr_t)port->zpp_deli);
+	port->zpp_deli_pa = mmu_ptob((uint64_t)pfn);
+	(void) zen_mpio_recv_deli(iodie, port);
 
 	return (0);
 }
@@ -1223,6 +1278,11 @@ zen_mpio_more_conf(zen_iodie_t *iodie, void *arg __unused)
 		cmn_err(CE_WARN, "MPIO train and enumerate request failed");
 		return (1);
 	}
+
+	ddi_dma_attr_t attr;
+	zen_fabric_dma_attr(&attr);
+	(void) zen_fabric_walk_pcie_port(iodie->zi_soc->zs_fabric,
+	    zen_mpio_port_deli, &attr);
 
 	zen_pcie_populate_dbg(fabric, ZPCS_SM_DONE, iodie->zi_node_id);
 

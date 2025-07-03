@@ -572,6 +572,60 @@ typedef struct zen_mpio_hotplug_table {
 	zen_mpio_hotplug_reset_t	zmht_reset[ZEN_HOTPLUG_MAX_PCIE_PORTS];
 } zen_mpio_hotplug_table_t;
 
+
+/*
+ * XXX - DELI
+ */
+
+typedef struct zen_mpio_recv_deli_args {
+	uint32_t		zmrda_paddr_hi;
+	uint32_t		zmrda_paddr_lo;
+	uint32_t		zmrda_start_lane;
+} zen_mpio_recv_deli_args_t;
+
+#define	ZEN_DELI_NUM_LGS		4
+#define	ZEN_DELI_ENGINE_TYPE_PCIE	1
+
+typedef	struct zen_deli_header {
+	uint8_t			zdh_engine_type;
+	uint8_t			zdh_dwords;
+	uint8_t			zdh_version;
+	uint8_t			zdh_rsvd0;
+} zen_deli_header_t;
+
+/* Lane groups */
+typedef	struct zen_deli_lgs {
+	uint32_t		zdl_start_lane;
+	uint32_t		zdl_end_lane;
+	uint32_t		zdl_lane_req_status;
+	uint32_t		zdl_hwdebug;
+} zen_deli_lgs_t;
+
+typedef	struct zen_deli_dxio {
+	uint8_t			zdd_num_lgroups;
+	uint8_t			zdd_version;
+	uint8_t			zdd_rsvd0[2];
+	zen_deli_lgs_t		zdd_lgs[ZEN_DELI_NUM_LGS];
+} zen_deli_dxio_t;
+
+typedef	struct zen_deli_pcie {
+	uint8_t			zdp_version;
+	uint8_t			zdp_rsvd0[3];
+	uint32_t		zdp_link_state;
+	uint8_t			zdp_link_speed;
+	uint8_t			zdp_link_width;
+	uint8_t			zdp_link_active;
+	uint8_t			zdp_port_num;
+	uint32_t		zdp_software_reset_control;
+	uint32_t		zdp_rsvd1;
+} zen_deli_pcie_t;
+
+typedef	struct zen_deli {
+	zen_deli_header_t	zd_header;
+	zen_deli_dxio_t		zd_dxio;
+	zen_deli_pcie_t	zd_pcie;
+} zen_deli_t;
+
 #pragma	pack()	/* pragma pack(1) */
 
 /*
