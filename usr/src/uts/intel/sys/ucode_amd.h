@@ -38,6 +38,22 @@ extern "C" {
 #endif
 
 /*
+ * AMD microcode is generally distributed in container files which start with a
+ * magic number and then contain multiple sections using TLV encoding.
+ * Typically such a file will contain an equivalence table section followed by
+ * one or more patches.
+ */
+#define	UCODE_AMD_CONTAINER_MAGIC	0x00414d44	/* "AMD\0" */
+#define	UCODE_AMD_CONTAINER_TYPE_EQUIV	0
+#define	UCODE_AMD_CONTAINER_TYPE_PATCH	1
+
+typedef struct ucode_section_amd {
+	uint32_t	usa_type;
+	uint32_t	usa_size;
+	uint8_t		usa_data[];
+} ucode_section_amd_t;
+
+/*
  * AMD Microcode file information
  */
 typedef struct ucode_header_amd {
