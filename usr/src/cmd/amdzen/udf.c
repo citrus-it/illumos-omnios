@@ -28,6 +28,8 @@
 #include <strings.h>
 #include <zen_udf.h>
 
+#include "common.h"
+
 static void
 udf_readone(int fd, uint8_t inst, uint8_t func, uint16_t reg,
     zen_udf_flags_t flags)
@@ -59,7 +61,7 @@ int
 main(int argc, char *argv[])
 {
 	int c, fd;
-	const char *device = NULL;
+	char *device = NULL;
 	const char *funcstr = NULL;
 	const char *inststr = NULL;
 	const char *regstr = NULL;
@@ -72,7 +74,7 @@ main(int argc, char *argv[])
 	while ((c = getopt(argc, argv, "d:f:bi:r:l")) != -1) {
 		switch (c) {
 		case 'd':
-			device = optarg;
+			device = amdzen_parse_path("udf", optarg);
 			break;
 		case 'f':
 			funcstr = optarg;
@@ -130,5 +132,6 @@ main(int argc, char *argv[])
 
 	udf_readone(fd, inst, func, reg, flags);
 	(void) close(fd);
+	free(device);
 	return (0);
 }

@@ -14,6 +14,7 @@
 #
 
 PROG= usmn udf apobdump uhsmp
+DEVINFOPROG = usmn udf uhsmp
 
 include ../Makefile.cmd
 
@@ -21,9 +22,11 @@ ROOTCMDDIR = $(ROOTLIB)
 CPPFLAGS += -I$(SRC)/uts/intel/io/amdzen
 CFLAGS += $(CCVERBOSE)
 CSTD = $(CSTD_GNU99)
-COMMON_OBJS = apob_common.o
+COMMON_OBJS = apob_common.o common.o
 
 apobdump := EXTRA_OBJS += apob_common.o
+$(DEVINFOPROG) := EXTRA_OBJS += common.o
+$(DEVINFOPROG) := LDLIBS += -ldevinfo
 uhsmp := CPPFLAGS += -I$(SRC)/uts/intel
 
 .KEEP_STATE:

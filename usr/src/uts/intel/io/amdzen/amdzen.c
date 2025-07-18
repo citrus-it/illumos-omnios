@@ -761,12 +761,8 @@ amdzen_create_child(amdzen_t *azn, const amdzen_child_data_t *acd)
 	int ret;
 	dev_info_t *child;
 
-	if (ndi_devi_alloc(azn->azn_dip, acd->acd_name,
-	    (pnode_t)DEVI_SID_NODEID, &child) != NDI_SUCCESS) {
-		dev_err(azn->azn_dip, CE_WARN, "!failed to allocate child "
-		    "dip for %s", acd->acd_name);
-		return (B_FALSE);
-	}
+	child = ddi_add_child(azn->azn_dip, acd->acd_name,
+	    (pnode_t)DEVI_SID_NODEID, 0);
 
 	ddi_set_parent_data(child, (void *)acd);
 	if ((ret = ndi_devi_online(child, 0)) != NDI_SUCCESS) {

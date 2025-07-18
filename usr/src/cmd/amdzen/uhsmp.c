@@ -31,6 +31,8 @@
 #include <uhsmp.h>
 #include <sys/amdzen/hsmp.h>
 
+#include "common.h"
+
 #define	EXIT_USAGE	2
 
 static const char *
@@ -83,13 +85,13 @@ int
 main(int argc, char **argv)
 {
 	int c, fd, ret;
-	const char *device = NULL;
+	char *device = NULL;
 	uhsmp_cmd_t cmd = { 0 };
 
 	while ((c = getopt(argc, argv, "d:")) != -1) {
 		switch (c) {
 		case 'd':
-			device = optarg;
+			device = amdzen_parse_path("uhsmp", optarg);
 			break;
 		default:
 			usage(NULL);
@@ -130,5 +132,6 @@ main(int argc, char **argv)
 	}
 
 	(void) close(fd);
+	free(device);
 	return (ret);
 }

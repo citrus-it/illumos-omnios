@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2025 Oxide Computer Company
  */
 
 /*
@@ -26,6 +26,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <usmn.h>
+
+#include "common.h"
 
 static boolean_t
 usmn_parse_uint32(const char *str, uint32_t *valp)
@@ -77,7 +79,7 @@ int
 main(int argc, char *argv[])
 {
 	int i, c, fd, ret;
-	const char *device = NULL;
+	char *device = NULL;
 	boolean_t do_write = B_FALSE;
 	uint32_t wval = 0;
 	uint32_t length = 4;
@@ -85,7 +87,7 @@ main(int argc, char *argv[])
 	while ((c = getopt(argc, argv, "d:L:w:")) != -1) {
 		switch (c) {
 		case 'd':
-			device = optarg;
+			device = amdzen_parse_path("usmn", optarg);
 			break;
 		case 'L':
 			if (!usmn_parse_uint32(optarg, &length)) {
@@ -138,5 +140,6 @@ main(int argc, char *argv[])
 	}
 
 	(void) close(fd);
+	free(device);
 	return (ret);
 }
