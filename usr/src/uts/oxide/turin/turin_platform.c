@@ -91,12 +91,7 @@ static const zen_fabric_ops_t turin_fabric_ops = {
 	.zfo_smu_pptable_post = turin_fabric_smu_pptable_post,
 	.zfo_smu_pm_set_dram_addr = turin_smu_pm_set_dram_addr,
 	.zfo_smu_pm_get_version = turin_smu_pm_get_version,
-	/*
-	 * We currently initialize SMU features late on Turin, after APs are
-	 * running. Doing it earlier can cause a fault state where the CPU
-	 * frequency collapses to Fmin and stays there.
-	 */
-	.zfo_smu_misc_late_init = turin_smu_features_init,
+	.zfo_smu_misc_init = turin_smu_features_init,
 	.zfo_nbio_init = turin_fabric_nbio_init,
 	.zfo_ioms_init = turin_fabric_ioms_init,
 
