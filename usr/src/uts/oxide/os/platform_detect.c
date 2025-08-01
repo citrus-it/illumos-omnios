@@ -388,8 +388,9 @@ static oxide_board_def_t oxide_board_defs[] = {
 		.obdef_board_data = {
 			.obd_board = OXIDE_BOARD_RUBY,
 			.obd_rootnexus = "Oxide,Ruby",
+			.obd_bsu_slot = { 17, 18 },
 			.obd_ipccmode = IPCC_MODE_DISABLED,
-			.obd_startupopts = IPCC_STARTUP_KMDB_BOOT |
+			.obd_startupopts = IPCC_STARTUP_KMDB |
 			    IPCC_STARTUP_VERBOSE | IPCC_STARTUP_PROM,
 			.obd_engines = { oxio_ruby },
 			.obd_nengines = { &oxio_ruby_nengines },
@@ -418,8 +419,9 @@ static oxide_board_def_t oxide_board_defs[] = {
 		.obdef_board_data = {
 			.obd_board = OXIDE_BOARD_RUBY,
 			.obd_rootnexus = "Oxide,Ruby",
+			.obd_bsu_slot = { 17, 18 },
 			.obd_ipccmode = IPCC_MODE_DISABLED,
-			.obd_startupopts = IPCC_STARTUP_KMDB_BOOT |
+			.obd_startupopts = IPCC_STARTUP_KMDB |
 			    IPCC_STARTUP_VERBOSE | IPCC_STARTUP_PROM,
 			.obd_engines = { oxio_ruby },
 			.obd_nengines = { &oxio_ruby_nengines },
