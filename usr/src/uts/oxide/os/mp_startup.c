@@ -1673,7 +1673,10 @@ done:
 
 	oxide_report_boot_stage(BOOT_STAGE_COMPLETE_AP);
 
-	zen_hsmp_get();
+	for (;;) {
+		zen_hsmp_get();
+		eb_pausems(1000);
+	}
 }
 
 int
