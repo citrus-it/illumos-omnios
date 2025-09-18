@@ -12,6 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Hans Rosenfeld
  */
 
 /*
@@ -37,6 +38,7 @@
 #include <sys/bootsvcs.h>
 #include <sys/sysmacros.h>
 #include <sys/pci.h>
+#include <sys/stdbit.h>
 
 #include "virtio.h"
 #include "virtio_impl.h"
@@ -384,9 +386,15 @@ virtio_init_complete(virtio_t *vio, int allowed_interrupt_types)
 }
 
 boolean_t
-virtio_feature_present(virtio_t *vio, uint64_t feature_mask)
+virtio_features_present(virtio_t *vio, uint64_t feature_mask)
 {
-	return ((vio->vio_features & feature_mask) != 0);
+	return ((vio->vio_features & feature_mask) == feature_mask);
+}
+
+uint32_t
+virtio_features(virtio_t *vio)
+{
+	return (vio->vio_features);
 }
 
 void *
@@ -677,7 +685,7 @@ virtio_queue_alloc(virtio_t *vio, uint16_t qidx, const char *name,
 	 */
 	mutex_init(&viq->viq_mutex, NULL, MUTEX_DRIVER, NULL);
 
-	if (virtio_feature_present(vio, VIRTIO_F_RING_INDIRECT_DESC) &&
+	if (virtio_features_present(vio, VIRTIO_F_RING_INDIRECT_DESC) &&
 	    !force_direct) {
 		/*
 		 * If we were able to negotiate the indirect descriptor
