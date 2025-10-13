@@ -55,7 +55,7 @@ typedef struct adapter adapter_t;
 #define	CTRL_EQ_QSIZE	128
 
 #define	TX_EQ_QSIZE	1024
-#define	TX_SGL_SEGS	36
+#define	TX_SGL_SEGS	16
 #define	TX_WR_FLITS	(SGE_MAX_WR_LEN / 8)
 
 #define	UDBS_SEG_SHIFT	7	/* log2(UDBS_SEG_SIZE) */

@@ -2137,7 +2137,8 @@ start:	txinfo->nsegs = 0;
 	}
 	m = *fp;
 
-	if (n >= TX_SGL_SEGS || (flags & HW_LSO && MBLKL(m) < 50)) {
+#if 0
+	if (n >= TX_SGL_SEGS || ((flags & HW_LSO) && MBLKL(m) < 50)) {
 		txq->pullup_early++;
 		m = msgpullup(*fp, -1);
 		if (m == NULL) {
@@ -2148,25 +2149,28 @@ start:	txinfo->nsegs = 0;
 		*fp = m;
 		mac_hcksum_set(m, 0, 0, 0, 0, txinfo->flags);
 	}
+#endif
 
 	if (txinfo->len <= IMM_LEN && !sgl_only)
 		return (0);	/* nsegs = 0 tells caller to use imm. tx */
 
 	if (txinfo->len <= txq->copy_threshold &&
-	    copy_into_txb(txq, m, txinfo->len, txinfo) == 0)
+	    copy_into_txb(txq, m, txinfo->len, txinfo) == 0) {
 		goto done;
+	}
 
 	for (; m; m = m->b_cont) {
 
 		len = MBLKL(m);
 
-		/* Use tx copy buffer if this mblk is small enough */
-		if (len <= txq->copy_threshold &&
-		    copy_into_txb(txq, m, len, txinfo) == 0)
-			continue;
-
-		/* Add DMA bindings for this mblk to the SGL */
-		rc = add_mblk(txq, txinfo, m, len);
+		/*
+		 * Use tx copy buffer if this mblk is small enough and there is
+		 * room, otherwise add DMA bindings for this mblk to the SGL.
+		 */
+		if (len > txq->copy_threshold ||
+		    (rc = copy_into_txb(txq, m, len, txinfo)) != 0) {
+			rc = add_mblk(txq, txinfo, m, len);
+		}
 
 		if (rc == E2BIG ||
 		    (txinfo->nsegs == TX_SGL_SEGS && m->b_cont)) {
@@ -2235,7 +2239,7 @@ fits_in_txb(struct sge_txq *txq, int len, int *waste)
  * and txq to indicate resources used.  Caller has to make sure that those many
  * bytes are available in the mblk chain (b_cont linked).
  */
-static inline int
+static int
 copy_into_txb(struct sge_txq *txq, mblk_t *m, int len, struct txinfo *txinfo)
 {
 	int waste, n;
@@ -2272,7 +2276,7 @@ copy_into_txb(struct sge_txq *txq, mblk_t *m, int len, struct txinfo *txinfo)
 	return (0);
 }
 
-static inline void
+static void
 add_seg(struct txinfo *txinfo, uint64_t ba, uint32_t len)
 {
 	ASSERT(txinfo->nsegs < TX_SGL_SEGS);	/* must have room */
