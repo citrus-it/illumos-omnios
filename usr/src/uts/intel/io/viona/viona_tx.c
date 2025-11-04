@@ -418,10 +418,11 @@ viona_tx_offloads(viona_vring_t *ring, const struct virtio_net_mrgrxhdr *hdr,
 	const uint32_t cap_csum = link->l_cap_csum;
 
 	/*
-	 * Since viona is a "legacy device", the data stored by the driver will
-	 * be in the guest's native endian format (see sections 2.4.3 and
-	 * 5.1.6.1 of the VIRTIO 1.0 spec for more info). At this time the only
-	 * guests using viona are x86 and we can assume little-endian.
+	 * Since viona is a "transitional device", the data stored by the
+	 * driver will either be in the guest's native endian format (for the
+	 * legacy interface - see sections 2.4.3 and 5.1.6.1 of the VIRTIO 1.0
+	 * spec for more info) or little-endian. At this time the only guests
+	 * using viona are x86 and we can assume little-endian.
 	 */
 	const uint16_t gso_size = LE_16(hdr->vrh_gso_size);
 
@@ -717,12 +718,7 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	}
 
 	/*
-	 * Get setup to copy the VirtIO header from in front of the packet.
-	 *
-	 * With an eye toward supporting VirtIO 1.0 behavior in the future, we
-	 * determine the size of the header based on the device state.  This
-	 * goes a bit beyond the expectations of legacy VirtIO, where the first
-	 * buffer must cover the header and nothing else.
+	 * Get set up to copy the VirtIO header from in front of the packet.
 	 */
 	iov_bunch_t iob = {
 		.ib_iov = iov,
