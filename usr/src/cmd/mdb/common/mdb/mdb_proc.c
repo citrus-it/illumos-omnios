@@ -1052,6 +1052,7 @@ pt_stack_common(uintptr_t addr, uint_t flags, int argc,
 	i = mdb_getopts(argc, argv,
 	    'n', MDB_OPT_SETBITS, MSF_ADDR, &sflags,
 	    's', MDB_OPT_SETBITS, MSF_SIZES, &sflags,
+	    'S', MDB_OPT_SETBITS, MSF_STRINGS, &sflags,
 	    't', MDB_OPT_SETBITS, MSF_TYPES, &sflags,
 	    'v', MDB_OPT_SETBITS, MSF_VERBOSE, &sflags,
 	    NULL);
@@ -1119,6 +1120,13 @@ pt_stackr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	return (pt_stack_common(addr, flags, argc, argv, 0,
 	    pt_framer, PC_FAKE));
+}
+
+static int
+pt_stackstr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	return (pt_stack_common(addr, flags, argc, argv,
+	    MSF_VERBOSE | MSF_STRINGS, pt_frame, 0));
 }
 
 /*ARGSUSED*/
@@ -1342,6 +1350,7 @@ pt_findstack(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 	boolean_t showargs = B_FALSE;
 	boolean_t types = B_FALSE;
 	boolean_t sizes = B_FALSE;
+	boolean_t strings = B_FALSE;
 	boolean_t addrs = B_FALSE;
 	int count;
 	uintptr_t pc, sp;
@@ -1353,6 +1362,7 @@ pt_findstack(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 	count = mdb_getopts(argc, argv,
 	    'n', MDB_OPT_SETBITS, TRUE, &addrs,
 	    's', MDB_OPT_SETBITS, TRUE, &sizes,
+	    'S', MDB_OPT_SETBITS, TRUE, &strings,
 	    't', MDB_OPT_SETBITS, TRUE, &types,
 	    'v', MDB_OPT_SETBITS, TRUE, &showargs,
 	    NULL);
@@ -1387,9 +1397,10 @@ pt_findstack(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 		(void) mdb_eval(argv->a_un.a_str);
 	} else {
 		(void) mdb_snprintf(buf, sizeof (buf),
-		    "<.$C%s%s%s%s",
+		    "<.$C%s%s%s%s%s",
 		    addrs ? " -n" : "",
 		    sizes ? " -s" : "",
+		    strings ? " -S" : "",
 		    types ? " -t" : "",
 		    showargs ? "" : " 0");
 		(void) mdb_eval(buf);
@@ -2257,6 +2268,7 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	    pt_stack_help },
 	{ "stackregs", "?[-nstv]", "print stack backtrace and registers",
 	    pt_stackr, pt_stack_help },
+	{ "stackstr", "", "", pt_stackstr },
 	{ "status", NULL, "print summary of current target", pt_status_dcmd },
 	{ "tls", ":symbol",
 	    "lookup TLS data in the context of a given thread", pt_tls },

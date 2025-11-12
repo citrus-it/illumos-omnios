@@ -29,10 +29,11 @@ typedef enum {
 	MSF_VERBOSE		= 1 << 0,
 	MSF_TYPES		= 1 << 1,
 	MSF_SIZES		= 1 << 2,
-	MSF_ADDR		= 1 << 3
+	MSF_ADDR		= 1 << 3,
+	MSF_STRINGS		= 1 << 4
 } mdb_stack_frame_flags_t;
 
-#define	MSF_ALL	(MSF_VERBOSE|MSF_TYPES|MSF_SIZES|MSF_ADDR)
+#define	MSF_ALL	(MSF_VERBOSE|MSF_TYPES|MSF_SIZES|MSF_ADDR|MSF_STRINGS)
 
 extern mdb_stack_frame_hdl_t *mdb_stack_frame_init(mdb_tgt_t *, uint_t,
     mdb_stack_frame_flags_t);

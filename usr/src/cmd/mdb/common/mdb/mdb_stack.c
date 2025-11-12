@@ -109,6 +109,42 @@ mdb_stack_typename(mdb_ctf_id_t id, char **bufp, size_t *lenp)
 	return (NULL);
 }
 
+static void
+mdb_stack_strings(mdb_stack_frame_data_t *data, uintptr_t base, uintptr_t top)
+{
+	const size_t psize = sizeof (void *);
+	uintptr_t addr;
+
+	for (addr = top - psize; addr >= base; addr -= psize) {
+		uintptr_t straddr;
+		char buf[BUFSIZ];
+		ssize_t nbytes;
+		size_t i;
+		char *estr;
+
+		if (mdb_tgt_vread(data->msfd_tgt, &straddr, psize, addr) == -1)
+			continue;
+
+		nbytes = mdb_tgt_readstr(data->msfd_tgt, MDB_TGT_AS_VIRT,
+		    buf, sizeof (buf), straddr);
+
+		if (nbytes <= 0)
+			continue;
+
+		for (i = 0; i < nbytes; i++) {
+			if (buf[i] < ' ' || buf[i] > '~')
+				break;
+		}
+
+		if (i < 4)
+			continue;
+
+		buf[i] = '\0';
+
+		mdb_printf("    %lr: %s\n", straddr, buf);
+	}
+}
+
 void
 mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
     uint_t argc, const long *argv)
@@ -119,7 +155,7 @@ mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
 	mdb_ctf_funcinfo_t mcfi;
 	boolean_t ctf;
 	mdb_syminfo_t msi;
-	uintptr_t npc;
+	uintptr_t npc, obp;
 	GElf_Sym sym;
 	uint_t i;
 	int ret;
@@ -140,7 +176,7 @@ mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
 		 *
 		 * Both cases can arise when the return address is from a call
 		 * to a function that the compiler knows will never return. In
-		 * these cases the compiler may elide the caller’s epilogue,
+		 * these cases the compiler may elide the caller's epilogue,
 		 * leaving the return address pointing just past the end of the
 		 * callee; either into the next function or into padding
 		 * between functions.
@@ -167,12 +203,13 @@ mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
 			ctf = B_TRUE;
 	}
 
+	obp = data->msfd_lastbp;
+	data->msfd_lastbp = bp;
 	if (data->msfd_flags & MSF_SIZES) {
-		if (data->msfd_lastbp != 0)
-			mdb_printf("[%4lr] ", bp - data->msfd_lastbp);
+		if (obp != 0)
+			mdb_printf("[%4lr] ", bp - obp);
 		else
 			mdb_printf("%7s", "");
-		data->msfd_lastbp = bp;
 	}
 
 	if (data->msfd_flags & MSF_VERBOSE)
@@ -229,4 +266,7 @@ mdb_stack_frame(mdb_stack_frame_hdl_t *datap, uintptr_t pc, uintptr_t bp,
 	}
 
 	mdb_printf(")\n");
+
+	if ((data->msfd_flags & MSF_STRINGS) && obp != 0)
+		mdb_stack_strings(data, obp, bp);
 }
