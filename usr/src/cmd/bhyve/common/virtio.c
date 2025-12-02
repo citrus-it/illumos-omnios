@@ -101,6 +101,19 @@ static uint64_t vi_modern_pci_read(struct virtio_softc *, int, uint64_t, int);
 static void vi_modern_pci_write(struct virtio_softc *, int, uint64_t, int,
     uint64_t);
 
+void
+vi_queue_linkup(struct virtio_softc *vs, struct vqueue_info *queues)
+{
+	struct virtio_consts *vc = vs->vs_vc;
+
+	vs->vs_queues = queues;
+
+	for (uint_t i = 0; i < vc->vc_nvq; i++) {
+		vs->vs_queues[i].vq_vs = vs;
+		vs->vs_queues[i].vq_num = i;
+	}
+}
+
 /*
  * Link a virtio_softc to its constants, the device softc, and
  * the PCI emulation.
@@ -109,19 +122,13 @@ void
 vi_softc_linkup(struct virtio_softc *vs, struct virtio_consts *vc,
     void *dev_softc, struct pci_devinst *pi, struct vqueue_info *queues)
 {
-	int i;
-
 	/* vs and dev_softc addresses must match */
 	assert((void *)vs == dev_softc);
 	vs->vs_vc = vc;
 	vs->vs_pi = pi;
 	pi->pi_arg = vs;
 
-	vs->vs_queues = queues;
-	for (i = 0; i < vc->vc_nvq; i++) {
-		queues[i].vq_vs = vs;
-		queues[i].vq_num = i;
-	}
+	vi_queue_linkup(vs, queues);
 }
 
 /*
@@ -154,7 +161,6 @@ vi_reset_dev(struct virtio_softc *vs)
 	}
 	vs->vs_negotiated_caps = 0;
 	vs->vs_curq = 0;
-	/* vs->vs_status = 0; -- redundant */
 	if (vs->vs_isr)
 		pci_lintr_deassert(vs->vs_pi);
 	vs->vs_isr = 0;
@@ -369,6 +375,8 @@ static bool
 vi_modern_add_notify_cfg(struct virtio_softc *vs, int barnum, uint32_t *offp)
 {
 	struct virtio_pci_notify_cap cap;
+	struct virtio_consts *vc = vs->vs_vc;
+	uint16_t numq = MAX(vc->vc_max_nvq, vc->vc_nvq);
 	uint32_t bardatalen;
 
 	*offp = roundup2(*offp, VIRTIO_PCI_CAP_NOTIFY_CFG_ALIGN);
@@ -376,8 +384,7 @@ vi_modern_add_notify_cfg(struct virtio_softc *vs, int barnum, uint32_t *offp)
 	 * We choose to round this BAR area up to a page size in common with
 	 * other hypervisors.
 	 */
-	bardatalen = roundup2(VQ_NOTIFY_OFF_MULTIPLIER * vs->vs_vc->vc_nvq,
-	    PAGE_SIZE);
+	bardatalen = roundup2(VQ_NOTIFY_OFF_MULTIPLIER * numq, PAGE_SIZE);
 
 	memset(&cap, 0, sizeof (cap));
 	cap.notify_off_multiplier = VQ_NOTIFY_OFF_MULTIPLIER;
@@ -592,14 +599,15 @@ vi_pcibar_setup(struct virtio_softc *vs)
 bool
 vi_intr_init(struct virtio_softc *vs, bool use_msi, bool use_msix)
 {
-	int nvec;
-
 	if (use_msix) {
+		struct virtio_consts *vc = vs->vs_vc;
+		int nvec = MIN(MAX(vc->vc_max_nvq, vc->vc_nvq) + 1,
+		    MAX_MSIX_TABLE_ENTRIES);
+
 		vs->vs_flags |= VIRTIO_USE_MSIX;
 		VS_LOCK(vs);
 		vi_reset_dev(vs); /* set all vectors to NO_VECTOR */
 		VS_UNLOCK(vs);
-		nvec = vs->vs_vc->vc_nvq + 1;
 		if (pci_emul_add_msixcap(vs->vs_pi, nvec, VIRTIO_MSIX_BAR) != 0)
 			return (false);
 	} else {
@@ -1712,8 +1720,8 @@ vi_pci_notify_cfg_write(struct virtio_softc *vs, uint64_t offset, int size,
 	unsigned int qid = value;
 	struct vqueue_info *vq;
 
-	DPRINTF(vs, "VIRTIO %s notify queue 0x%x write 0x%x",
-	    name, offset, value);
+	DPRINTF(vs, "VIRTIO %s notify queue 0x%x offset 0x%x",
+	    name, qid, offset);
 
 	if (size != 2) {
 		EPRINTLN("%s: bad size 0x%x access at offset 0x%" PRIx64,
@@ -1763,7 +1771,10 @@ vi_pci_isr_cfg_read(struct virtio_softc *vs, uint64_t offset, int size)
 
 	value = (offset == 0) ? vs->vs_isr : 0;
 	vs->vs_isr = 0;
-	DPRINTF(vs, "VIRTIO ISR read[0x%" PRIx64 "] = 0x%x", offset, value);
+	if (value != 0) {
+		DPRINTF(vs, "VIRTIO ISR read[0x%" PRIx64 "] = 0x%x",
+		    offset, value);
+	}
 	return (value);
 }
 
@@ -1868,8 +1879,8 @@ done:
 	if (vs->vs_mtx)
 		pthread_mutex_unlock(vs->vs_mtx);
 
-	DPRINTF(vs, "VIRTIO PCI READ BAR%u[0x%x+%x] = 0x%x",
-	    baridx, baroff, barlen, *retval);
+	DPRINTF(vs, "VIRTIO %s PCI READ BAR%u[0x%x+%x] = 0x%x",
+	    vs->vs_vc->vc_name, baridx, baroff, barlen, *retval);
 
 	return (PE_CFGRW_DROP);
 }
@@ -1921,8 +1932,8 @@ done:
 	if (vs->vs_mtx)
 		pthread_mutex_unlock(vs->vs_mtx);
 
-	DPRINTF(vs, "VIRTIO PCI WRITE BAR%x[0x%x+%x] = 0x%x",
-	    baridx, baroff, barlen, val);
+	DPRINTF(vs, "VIRTIO %s PCI WRITE BAR%x[0x%x+%x] = 0x%x",
+	    vs->vs_vc->vc_name, baridx, baroff, barlen, val);
 
 	return (PE_CFGRW_DROP);
 }
