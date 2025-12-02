@@ -154,6 +154,7 @@ typedef struct viona_vring {
 	kcondvar_t	vr_cv;
 	uint16_t	vr_state;
 	uint16_t	vr_state_flags;
+	uint16_t	vr_index;
 	uint_t		vr_xfer_outstanding;
 	kthread_t	*vr_worker_thread;
 	vmm_lease_t	*vr_lease;
@@ -233,7 +234,9 @@ struct viona_link {
 	boolean_t		l_destroyed;
 	boolean_t		l_modern;
 
-	viona_vring_t		l_vrings[VIONA_VQ_MAX];
+	viona_vring_t		*l_vrings;
+	uint16_t		l_npairs;	/* Number of ring pairs */
+	uint16_t		l_usepairs;	/* Number of pairs to use */
 
 	uint64_t		l_features;
 	uint64_t		l_features_hw;
@@ -386,6 +389,13 @@ struct virtio_net_hdr {
 	arg8, arg9, arg10)
 #define	VIONA_PROBE_BAD_RING_ADDR(r, a)		\
 	VIONA_PROBE2(bad_ring_addr, viona_vring_t *, r, void *, (void *)(a))
+
+#define	VIONA_NRINGS(link) ((link)->l_npairs * 2)
+#define	VIONA_USABLE_RINGS(link) ((link)->l_usepairs * 2)
+/* Check if a ring index is within bounds */
+#define	VIONA_RING_VALID(link, idx) ((idx) < VIONA_NRINGS(link))
+#define	VIONA_RING_ISRX(ring) ((ring)->vr_index % 2 == 0)
+#define	VIONA_RING_ISTX(ring) ((ring)->vr_index % 2 != 0)
 
 /* Increment one of the named ring error stats */
 #define	VIONA_RING_STAT_INCR(r, name)	\
