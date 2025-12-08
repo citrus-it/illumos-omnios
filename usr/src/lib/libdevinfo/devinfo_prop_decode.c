@@ -883,6 +883,11 @@ di_prop_decode_common(void *data, int size, int prop_type, int prom)
 
 		case DI_PROP_TYPE_BYTE:
 			nelements = size;
+			break;
+
+		default:
+			nelements = 0;
+			break;
 		}
 
 		return (nelements);

@@ -339,8 +339,8 @@ devfs_get_all_prom_names(const char *solaris_path, uint_t flags,
 	*paths = NULL;
 	ptr = prom_path;
 	for (i = 0; i < count; i++) {
-		if ((new = (struct devfs_prom_path *)calloc(
-		    sizeof (struct devfs_prom_path), 1)) == NULL) {
+		if ((new = (struct devfs_prom_path *)calloc(1,
+		    sizeof (struct devfs_prom_path))) == NULL) {
 			free(prom_path);
 			devfs_free_all_prom_names(*paths);
 			return (DEVFS_NOMEM);
@@ -1174,14 +1174,14 @@ devfs_phys_to_logical(struct boot_dev **bootdev_array, const int array_size,
 		 * null terminate the array
 		 */
 		dev_name_array[count] = NULL;
-		if ((bootdev_array[i] != NULL) && (bootdev_array[i]->
-		    bootdev_trans[0] != NULL)) {
-			free(bootdev_array[i]->bootdev_trans[0]);
-		}
+
 		if (bootdev_array[i] != NULL) {
+			if (bootdev_array[i]-> bootdev_trans[0] != NULL)
+				free(bootdev_array[i]->bootdev_trans[0]);
 			free(bootdev_array[i]->bootdev_trans);
-			bootdev_array[i]->bootdev_trans = dev_name_array;
 		}
+
+		bootdev_array[i]->bootdev_trans = dev_name_array;
 	}
 	bootdev_list = NULL;
 	free(full_path);

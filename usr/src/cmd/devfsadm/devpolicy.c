@@ -242,7 +242,7 @@ loadpolicy(const char *infile)
 			}
 		}
 
-		while (tok = strtok(NULL, "\n\t ")) {
+		while ((tok = strtok(NULL, "\n\t ")) != NULL) {
 			if (parse_plcy_token(tok, dp)) {
 				err_print(BAD_ENTRY, fep->startline,
 					fep->orgentry);

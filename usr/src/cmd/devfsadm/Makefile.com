@@ -94,13 +94,6 @@ CPPFLAGS +=	-D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT \
 		-I$(COMMON) -I$(UTSBASE)/common -I$(MODLOADDIR)
 CFLAGS += $(CCVERBOSE) $(C_PICFLAGS)
 
-CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-char-subscripts
-CERRWARN += -_gcc=-Wno-parentheses
-
-# not linted
-SMATCH=off
-
 # Define the dependencies required by devfsadm and all shared objects.
 LDLIBS +=		-ldevinfo
 devfsadm :=		LDLIBS += -lgen -lsysevent -lnvpair -lzonecfg -lbsm

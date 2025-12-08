@@ -36,6 +36,7 @@
 #endif
 
 #include <assert.h>
+#include <upanic.h>
 
 static mutex_t update_mutex = DEFAULTMUTEX; /* Protects update record lock */
 static mutex_t temp_file_mutex = DEFAULTMUTEX; /* for file creation tests */
@@ -560,7 +561,7 @@ read_nodes(struct di_devlink_handle *hdp, cache_node_t *pcnp, uint32_t nidx)
 		return (-1);
 	}
 
-	for (; dnp = get_node(hdp, nidx); nidx = dnp->sib) {
+	for (; (dnp = get_node(hdp, nidx)) != NULL; nidx = dnp->sib) {
 
 		path = get_string(hdp, dnp->path);
 
@@ -605,7 +606,7 @@ read_minors(struct di_devlink_handle *hdp, cache_node_t *pcnp, uint32_t nidx)
 		return (-1);
 	}
 
-	for (; dmp = get_minor(hdp, nidx); nidx = dmp->sib) {
+	for (; (dmp = get_minor(hdp, nidx)) != NULL; nidx = dmp->sib) {
 
 		name = get_string(hdp, dmp->name);
 		nodetype = get_string(hdp, dmp->nodetype);
@@ -647,7 +648,7 @@ read_links(struct di_devlink_handle *hdp, cache_minor_t *pcmp, uint32_t nidx)
 		return (-1);
 	}
 
-	for (; dlp = get_link(hdp, nidx); nidx = dlp->sib) {
+	for (; (dlp = get_link(hdp, nidx)) != NULL; nidx = dlp->sib) {
 
 		path = get_string(hdp, dlp->path);
 		content = get_string(hdp, dlp->content);
@@ -1002,6 +1003,31 @@ write_string(struct di_devlink_handle *hdp, const char *str, uint32_t *next)
 		(void) devlink_dprintf(DBG_ERR,
 		    "write_string: invalid index[%u], string(%s)\n", idx, str);
 		return (DB_NIL);
+	}
+
+	/*
+	 * stlouis#723 is tracking a bug where we sometimes end up with corrupt
+	 * entries in the devino database. The corruption observed so far is
+	 * very specific, a bit flip changing the 5th character to lower case.
+	 * We check for any lower case characters in the WWN here and crash if
+	 * any are found to provide a core file for further investigation.
+	 */
+	if ((dstr = strstr(str, "blkdev@w")) != NULL) {
+		uint_t i;
+
+		dstr += strlen("blkdev@w");
+		for (i = 0; i < 16; i++) {
+			if (dstr[i] == '\0')
+				break;
+			if (dstr[i] >= 'a' && dstr[i] <= 'z') {
+				char *msg;
+				size_t len;
+
+				len = asprintf(&msg, "Corrupt WWN str='%s'",
+				    str);
+				upanic(msg, len);
+			}
+		}
 	}
 
 	if ((dstr = set_string(hdp, idx)) == NULL) {
@@ -1443,7 +1469,7 @@ lookup_minor(
 		struct db_minor *dmp;
 
 		nidx = (((struct db_node *)vp)->minor);
-		for (; dmp = get_minor(hdp, nidx); nidx = dmp->sib) {
+		for (; (dmp = get_minor(hdp, nidx)) != NULL; nidx = dmp->sib) {
 			cp = get_string(hdp, dmp->name);
 			if (cp && strcmp(cp, colon + 1) == 0)
 				break;
@@ -1457,7 +1483,7 @@ lookup_node(struct di_devlink_handle *hdp, char *path, const int flags)
 {
 	struct tnode tnd = {NULL};
 
-	if (tnd.node = get_last_node(hdp, path, flags))
+	if ((tnd.node = get_last_node(hdp, path, flags)) != NULL)
 		return (tnd.node);
 
 	tnd.handle = hdp;
@@ -1594,7 +1620,7 @@ walk_tree(
 			(void) strlcat(buf, "/", sizeof (buf));
 		}
 
-		if (slash = strchr(cur, '/')) {
+		if ((slash = strchr(cur, '/')) != NULL) {
 			*slash = '\0';
 			(void) strlcat(buf, cur, sizeof (buf));
 			*slash = '/';
@@ -2298,7 +2324,7 @@ walk_matching_links(struct di_devlink_handle *hdp, link_desc_t *linkp)
 	 */
 	for (;;) {
 		nidx = dmp ? dmp->link : DB_HDR(hdp)->dngl_idx;
-		for (; dlp = get_link(hdp, nidx); nidx = dlp->sib) {
+		for (; (dlp = get_link(hdp, nidx)) != NULL; nidx = dlp->sib) {
 			struct di_devlink vlink = {NULL};
 
 			vlink.rel_path = get_string(hdp, dlp->path);
@@ -3390,7 +3416,7 @@ dca_init(const char *name, struct dca_off *dcp, int dca_flags)
 		return (-1);
 
 	dcp->dca_root = 0;
-	if (cp = strrchr(dcp->dca_name, ':')) {
+	if ((cp = strrchr(dcp->dca_name, ':')) != NULL) {
 		*cp++ = '\0';
 		dcp->dca_minor = cp - dcp->dca_name;
 	}

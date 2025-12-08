@@ -167,7 +167,7 @@ di_init_impl(const char *phys_path, uint_t flag,
 	if (phys_path == NULL ||
 	    strchr(phys_path, ':') ||
 	    (strncmp(phys_path, "/devices", 8) == 0) ||
-	    (strlen(phys_path) > MAXPATHLEN)) {
+	    (strlen(phys_path) > MAXPATHLEN - 1)) {
 		errno = EINVAL;
 		return (DI_NODE_NIL);
 	}
@@ -674,10 +674,10 @@ prune_sib(struct node_list **headp)
 	prev = *headp;
 	curr = prev->next;
 	while (curr) {
-		if (((curr_par = di_parent_node(curr->node)) != DI_NODE_NIL) &&
-		    ((curr_par == parent) || ((curr_gpar =
-		    di_parent_node(curr_par)) != DI_NODE_NIL) &&
-		    (curr_gpar == parent))) {
+		if ((curr_par = di_parent_node(curr->node)) != DI_NODE_NIL &&
+		    (curr_par == parent ||
+		    ((curr_gpar = di_parent_node(curr_par)) != DI_NODE_NIL &&
+		    curr_gpar == parent))) {
 			/*
 			 * match parent/grandparent: delete curr
 			 */
@@ -3788,9 +3788,9 @@ di_lookup_node_impl(di_node_t root, char *devfspath)
 		pname = slash + 1;
 		node = di_child_node(node);
 
-		if (slash = strchr(pname, '/'))
+		if ((slash = strchr(pname, '/')) != NULL)
 			*slash = '\0';
-		if (paddr = strchr(pname, '@'))
+		if ((paddr = strchr(pname, '@')) != NULL)
 			*paddr++ = '\0';
 
 		for (; node != DI_NODE_NIL; node = di_sibling_node(node)) {

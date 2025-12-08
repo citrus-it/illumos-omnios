@@ -33,6 +33,7 @@
 #include <limits.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <upanic.h>
 #include <sys/int_fmtio.h>
 #include <sys/stat.h>
 #include <bsm/devalloc.h>
@@ -227,11 +228,32 @@ disk_callback_blkdev(di_minor_t minor, di_node_t node)
 	char *addr;
 	char disk[DISK_SUBPATH_MAX];
 	char guid[50];
-	uint_t lun = 0;
+	uint_t i, lun = 0;
 
 	addr = di_bus_addr(node);
-	(void) sscanf(addr, "w%49[0-9A-F],%X", &guid, &lun);
+	*guid = '\0';
+	(void) sscanf(addr, "w%49[0-9A-F],%X", guid, &lun);
 	(void) snprintf(disk, DISK_SUBPATH_MAX, "t%sd%d", guid, lun);
+	/*
+	 * stlouis#723 is tracking a bug where we sometimes end up with corrupt
+	 * entries in the devino database. The corruption observed so far is
+	 * very specific, a bit flip changing the 5th character to lower case.
+	 * We check for any lower case characters in the WWN here and crash if
+	 * any are found to provide a core file for further investigation.
+	 */
+	for (i = 0; i < sizeof (guid); i++) {
+		if (guid[i] == '\0')
+			break;
+		if (guid[i] >= 'a' && guid[i] <= 'z') {
+			char *msg;
+			size_t len;
+
+			len = asprintf(&msg,
+			    "Corrupt WWN addr='%s' guid='%s' disk='%s'",
+			    addr, guid, disk);
+			upanic(msg, len);
+		}
+	}
 	disk_common(minor, node, disk, RM_STALE);
 	return (DEVFSADM_CONTINUE);
 }
@@ -331,10 +353,14 @@ disk_callback_sas(di_minor_t minor, di_node_t node)
 			lun64 = (uint64_t)*lun64p;
 		}
 	}
-	if ((!lun64_found) && (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
-	    SCSI_ADDR_PROP_LUN, &intp) > 0)) {
+	if (!lun64_found && di_prop_lookup_ints(DDI_DEV_T_ANY, node,
+	    SCSI_ADDR_PROP_LUN, &intp) > 0) {
+		lun64_found = 1;
 		lun64 = (uint64_t)*intp;
 	}
+
+	if (lun64_found == 0)
+		return (DEVFSADM_CONTINUE);
 
 	lun = scsi_lun64_to_lun(lun64);
 

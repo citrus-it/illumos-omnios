@@ -81,8 +81,9 @@ sgen_callback(di_minor_t minor, di_node_t node)
 		uint64_t wwn;
 		scsi_lun64_t sl;
 		scsi_lun_t lun;
+		boolean_t lun64_found = B_FALSE;
 		int64_t lun64;
-		int64_t *lun64p;
+		int64_t *lun64p = NULL;
 		int *intp;
 		uchar_t addr_method;
 
@@ -91,10 +92,15 @@ sgen_callback(di_minor_t minor, di_node_t node)
 		    SCSI_ADDR_PROP_LUN64, &lun64p) > 0) &&
 		    (*lun64p != SCSI_LUN64_ILLEGAL)) {
 			lun64 = *lun64p;
+			lun64_found = B_TRUE;
 		} else if (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
 		    SCSI_ADDR_PROP_LUN, &intp) > 0) {
 			lun64 = (uint64_t)*intp;
+			lun64_found = B_TRUE;
 		}
+
+		if (!lun64_found)
+			goto done;
 
 		lun = scsi_lun64_to_lun(lun64);
 

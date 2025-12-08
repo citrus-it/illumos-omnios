@@ -40,15 +40,11 @@ LDLIBS +=	-lnvpair -lsec -lc -lgen
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I..
-CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	$(CNOWARN_UNINIT)
 
-# not linted
-SMATCH=off
+pics/devfsinfo.o := SMOFF += strcpy_overflow
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
 
 include ../../Makefile.targ
