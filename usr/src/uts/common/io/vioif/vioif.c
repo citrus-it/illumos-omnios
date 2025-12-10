@@ -14,6 +14,7 @@
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  * Copyright 2021 Joyent, Inc.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2025 Oxide Computer Company
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -362,9 +363,16 @@ vioif_ctrlbuf_free(vioif_t *vif, vioif_ctrlbuf_t *cb)
 }
 
 static void
-vioif_free_bufs(vioif_t *vif)
+vioif_free_bufs(vioif_t *vif, boolean_t init)
 {
-	VERIFY(MUTEX_HELD(&vif->vif_mutex));
+	/*
+	 * If we are being called to clean up from init we don't need to hold
+	 * the mutex; indeed there are several failure points in vioif_init()
+	 * where the mutex doesn't exist yet.
+	 */
+	if (!init) {
+		VERIFY(MUTEX_HELD(&vif->vif_mutex));
+	}
 
 	VERIFY3U(vif->vif_ntxbufs_alloc, ==, 0);
 	for (uint_t i = 0; i < vif->vif_txbufs_capacity; i++) {
@@ -625,7 +633,7 @@ vioif_alloc_bufs(vioif_t *vif)
 	return (0);
 
 fail:
-	vioif_free_bufs(vif);
+	vioif_free_bufs(vif, B_FALSE);
 	return (ENOMEM);
 }
 
@@ -1768,12 +1776,16 @@ vioif_get_mac(vioif_t *vif)
 	VERIFY(MUTEX_HELD(&vif->vif_mutex));
 
 	if (vioif_has_feature(vif, VIRTIO_NET_F_MAC)) {
-		for (uint_t i = 0; i < ETHERADDRL; i++) {
-			vif->vif_mac[i] = virtio_dev_get8(vif->vif_virtio,
-			    VIRTIO_NET_CONFIG_MAC + i);
-		}
-		vif->vif_mac_from_host = 1;
+		uint8_t gen = virtio_dev_getgen(vif->vif_virtio);
+		do {
+			for (uint_t i = 0; i < ETHERADDRL; i++) {
+				vif->vif_mac[i] =
+				    virtio_dev_get8(vif->vif_virtio,
+				    VIRTIO_NET_CONFIG_MAC + i);
+			}
+		} while (gen == virtio_dev_getgen(vif->vif_virtio));
 
+		vif->vif_mac_from_host = 1;
 		return;
 	}
 
@@ -2039,7 +2051,7 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 fail:
-	vioif_free_bufs(vif);
+	vioif_free_bufs(vif, B_TRUE);
 	if (macp != NULL) {
 		mac_free(macp);
 	}
@@ -2113,7 +2125,7 @@ vioif_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * as it uses virtio_chain_free() which itself depends on some
 	 * virtio data structures still being around.
 	 */
-	vioif_free_bufs(vif);
+	vioif_free_bufs(vif, B_FALSE);
 	(void) virtio_fini(vif->vif_virtio, B_FALSE);
 
 	mutex_exit(&vif->vif_mutex);
