@@ -38,6 +38,7 @@
 #include <sys/kernel_ipcc.h>
 #include <sys/smt.h>
 #include <sys/time.h>
+#include <sys/io/zen/fabric.h>
 
 /*
  * Used by apix code that could be shared with other kernels.  Not tunable on
@@ -460,6 +461,23 @@ genunix_set_tunables(void)
 	 * no default value there so we must clear it.
 	 */
 	smt_boot_disable = 0;
+}
+
+void
+oxide_report_boot_stage(boot_stage_t stage)
+{
+	uint8_t buf[0x10];
+	size_t bufl = sizeof (buf);
+	extern int standalone;
+
+	if (standalone != 0) {
+		EB_DBGMSG("BOOT STAGE 0x%x\n", stage);
+	}
+
+	// XXX - trigger a false keylookup that will fail but be logged in the
+	// SP ring buffer.
+	(void) kernel_ipcc_keylookup(0x20 + stage, buf, &bufl);
+	zen_fabric_debug_signal();
 }
 
 /*

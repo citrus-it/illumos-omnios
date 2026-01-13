@@ -796,9 +796,19 @@ espi_oob_writable(mmio_reg_block_t block)
 void
 espi_oob_flush(mmio_reg_block_t block)
 {
+	mmio_reg_t hdr0 = FCH_ESPI_UP_RXHDR0_MMIO(block);
+
+	/*
+	 * Send a bonus indication that we are ready for a new OOB message in
+	 * case the hardware has some stale state.
+	 */
+	mmio_reg_write(hdr0, FCH_ESPI_UP_RXHDR0_CLEAR_UPCMD_STAT(0));
+
 	/* Drain the input buffer */
-	while (espi_oob_readable(block))
+	while (espi_oob_readable(block)) {
 		(void) espi_oob_rx(block, NULL, NULL);
+		eb_pausems(espi_delay_ms);
+	}
 }
 
 /*

@@ -75,6 +75,29 @@ extern void eb_set_tunables(void);
 extern void genunix_set_tunables(void);
 extern bool genunix_is_loaded(void);
 
+typedef enum boot_stage {
+	BOOT_STAGE_START	= 0,
+	BOOT_STAGE_MLSETUP,
+	BOOT_STAGE_ZEN_FABRIC_TOPO_INIT,
+	BOOT_STAGE_ZEN_CCX_INIT,
+	BOOT_STAGE_ZEN_RAS_INIT,
+	BOOT_STAGE_STARTUP,
+	BOOT_STAGE_STARTUP_KMEM,
+	BOOT_STAGE_STARTUP_VM,
+	BOOT_STAGE_STARTUP_TSC,
+	BOOT_STAGE_ZEN_FABRIC_INIT,
+	BOOT_STAGE_PCIE_INIT,
+	BOOT_STAGE_HOTPLUG_INIT,
+	BOOT_STAGE_SMAP,
+	BOOT_STAGE_MODULES,
+	BOOT_STAGE_STARTUP_END,
+	BOOT_STAGE_STARTUP_POST,
+	BOOT_STAGE_STARTUP_AP,
+	BOOT_STAGE_ZEN_FABRIC_INIT_POSTAP
+} boot_stage_t;
+
+extern void oxide_report_boot_stage(boot_stage_t);
+
 #ifdef	__cplusplus
 }
 #endif
