@@ -421,6 +421,7 @@
  * made.
  */
 
+#include <sys/boot_debug.h>
 #include <sys/byteorder.h>
 #include <sys/ddi.h>
 #include <sys/errno.h>
