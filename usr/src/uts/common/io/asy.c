@@ -267,7 +267,7 @@ static bool	async_flowcontrol_sw_input(struct asycom *asy,
 		    async_flowc_action onoff, int type);
 static void	async_flowcontrol_sw_output(struct asycom *asy,
 		    async_flowc_action onoff);
-static void	asy_update_from_modem_status(struct asycom *asy);
+static void	asy_update_from_modem_status(struct asycom *asy, bool);
 static void	async_flowcontrol_hw_input(struct asycom *asy,
 		    async_flowc_action onoff, int type);
 static void	async_flowcontrol_hw_output(struct asycom *asy,
@@ -2553,7 +2553,7 @@ again:
 	/*
 	 * Check carrier.
 	 */
-	asy_update_from_modem_status(asy);
+	asy_update_from_modem_status(asy, false);
 	ASY_DPRINTF(asy, ASY_DEBUG_INIT, "TS_SOFTCAR is %s, MSR & DCD is %s",
 	    (async->async_ttycommon.t_flags & TS_SOFTCAR) ? "set" : "clear",
 	    (asy->asy_msr & ASY_MSR_DCD) ? "set" : "clear");
@@ -2942,7 +2942,7 @@ asy_program(struct asycom *asy, int mode)
 	/* flush/reset the status registers */
 	(void) asy_get(asy, ASY_ISR);
 	(void) asy_get(asy, ASY_LSR);
-	asy_update_from_modem_status(asy);
+	asy_update_from_modem_status(asy, false);
 	flush_reg = asy->asy_msr;
 
 	/*
@@ -3129,7 +3129,7 @@ asyintr(caddr_t argasy, caddr_t argunused __unused)
 			 */
 			(void) asy_get(asy, ASY_LSR);
 			(void) asy_get(asy, ASY_RHR);
-			asy_update_from_modem_status(asy);
+			asy_update_from_modem_status(asy, false);
 			ret_status = DDI_INTR_CLAIMED;
 		}
 		mutex_exit(&asy->asy_excl_hi);
@@ -3482,19 +3482,14 @@ async_msint(struct asycom *asy)
 	ASSERT(MUTEX_HELD(&asy->asy_excl_hi));
 
 	struct asyncline *async = asy->asy_priv;
-	int msr = asy->asy_msr;
-	asy_update_from_modem_status(asy);
-
-	/* Handle PPS event */
-	if (asy->asy_flags & ASY_PPS)
-		asy_ppsevent(asy, msr);
+	asy_update_from_modem_status(asy, true);
 
 	async->async_ext++;
 	asysetsoft(asy);
 }
 
 static void
-asy_update_from_modem_status(struct asycom *asy)
+asy_update_from_modem_status(struct asycom *asym, bool intr)
 {
 	ASSERT(MUTEX_HELD(&asy->asy_excl_hi));
 
@@ -3537,6 +3532,12 @@ asy_update_from_modem_status(struct asycom *asy)
 			async_flowcontrol_hw_output(asy, flow);
 		}
 
+		if (intr) {
+			/* Handle PPS event */
+			if (asy->asy_flags & ASY_PPS)
+				asy_ppsevent(asy, msr);
+		}
+
 		/*
 		 * Reading MSR clears pending interrupts, so we cache the
 		 * value we read so that other functions can examine it without
@@ -3549,9 +3550,13 @@ asy_update_from_modem_status(struct asycom *asy)
 	 * Verify that our flow control status matches what we expect from
 	 * the present value of the modem status register.
 	 */
-	int cts_is_on = (asy->asy_msr & ASY_MSR_CTS) != 0;
-	int flow_is_start = (async->async_flags & ASYNC_HW_OUT_FLW) == 0;
-	VERIFY0(cts_is_on ^ flow_is_start);
+	if (term_uses_hw_flowctl) {
+		int cts_is_on = (asy->asy_msr & ASY_MSR_CTS) != 0;
+		int flow_is_start =
+		    (async->async_flags & ASYNC_HW_OUT_FLW) == 0;
+
+		VERIFY0(cts_is_on ^ flow_is_start);
+	}
 }
 
 /*
@@ -5160,7 +5165,7 @@ asymctl(struct asycom *asy, int bits, int how)
 			ASY_DPRINTF(asy, ASY_DEBUG_MODEM,
 			    "TIOCMGET, read msr_r = %x", msr_r);
 		} else {
-			asy_update_from_modem_status(asy);
+			asy_update_from_modem_status(asy, false);
 			msr_r = asy->asy_msr;
 			ASY_DPRINTF(asy, ASY_DEBUG_MODEM,
 			    "TIOCMGET, read MSR = %x", msr_r);
