@@ -27,6 +27,7 @@
 #include <sys/conf.h>
 #include <sys/cpuvar.h>
 #include <sys/pci.h>
+#include <sys/pci_misc.h>
 #include <sys/sysmacros.h>
 #include <sys/mac.h>
 #include <sys/mac_ether.h>
