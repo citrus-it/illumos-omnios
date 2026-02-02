@@ -677,53 +677,16 @@ ena_cleanup_regs_map(ena_t *ena, bool resetting)
 	ddi_regs_map_free(&ena->ena_reg_hdl);
 }
 
-/*
- * Map a PCI BAR number (0-5) to a DDI register set number.
- */
-static int
-ena_bar_to_rnumber(ena_t *ena, uint8_t bar)
-{
-	pci_regspec_t *regs;
-	uint_t bar_offset, regs_length, rcount;
-	int rnumber = -1;
-
-	if (bar > 5)
-		return (-1);
-
-	/*
-	 * PCI_CONF_BASE0 is 0x10; each BAR is 4 bytes apart.
-	 */
-	bar_offset = PCI_CONF_BASE0 + sizeof (uint32_t) * bar;
-
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, ena->ena_dip,
-	    DDI_PROP_DONTPASS, "reg", (int **)&regs, &regs_length) !=
-	    DDI_PROP_SUCCESS) {
-		return (-1);
-	}
-
-	rcount = regs_length * sizeof (int) / sizeof (pci_regspec_t);
-
-	for (int i = 0; i < rcount; i++) {
-		if (PCI_REG_REG_G(regs[i].pci_phys_hi) == bar_offset) {
-			rnumber = i;
-			break;
-		}
-	}
-
-	ddi_prop_free(regs);
-
-	return (rnumber);
-}
-
 static bool
 ena_attach_regs_map(ena_t *ena)
 {
 	ddi_device_acc_attr_t attr;
+	pci_bar_type_t bar_type;
 	int rnumber;
 	int ret = 0;
 
-	rnumber = ena_bar_to_rnumber(ena, ENA_REG_BAR);
-	if (rnumber == -1) {
+	rnumber = pci_bar_to_rnumber(ena->ena_dip, ENA_REG_BAR, &bar_type);
+	if (rnumber == -1 || (bar_type & PCI_BARTYPE_MEM) == 0) {
 		ena_err(ena, "failed to find rnumber for BAR %d", ENA_REG_BAR);
 		return (false);
 	}
@@ -1320,10 +1283,11 @@ static bool
 ena_map_llq_mem_bar(ena_t *ena)
 {
 	ddi_device_acc_attr_t attr;
+	pci_bar_type_t bar_type;
 	int rnumber, ret;
 
-	rnumber = ena_bar_to_rnumber(ena, ENA_LLQ_BAR);
-	if (rnumber == -1) {
+	rnumber = pci_bar_to_rnumber(ena->ena_dip, ENA_LLQ_BAR, &bar_type);
+	if (rnumber == -1 || (bar_type & PCI_BARTYPE_MEM) == 0) {
 		ena_err(ena, "failed to find rnumber for BAR %d", ENA_LLQ_BAR);
 		return (false);
 	}

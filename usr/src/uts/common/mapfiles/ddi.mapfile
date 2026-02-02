@@ -357,6 +357,8 @@ SYMBOL_SCOPE {
 	nvpair_value_uint8		{ FLAGS = EXTERN; };
 	nvpair_value_uint8_array	{ FLAGS = EXTERN; };
 	panic				{ FLAGS = EXTERN };
+	pci_bar_find_type		{ FLAGS = EXTERN };
+	pci_bar_to_rnumber		{ FLAGS = EXTERN };
 	pci_config_get16		{ FLAGS = EXTERN };
 	pci_config_get32		{ FLAGS = EXTERN };
 	pci_config_get64		{ FLAGS = EXTERN };
