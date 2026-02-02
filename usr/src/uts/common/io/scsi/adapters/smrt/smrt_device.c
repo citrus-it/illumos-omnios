@@ -14,32 +14,7 @@
  */
 
 #include <sys/scsi/adapters/smrt/smrt.h>
-
-/*
- * We must locate what the CISS specification describes as the "I2O
- * registers".  The Intelligent I/O (I2O) Architecture Specification describes
- * this somewhat more coherently as "the memory region specified by the first
- * base address configuration register indicating memory space (offset 10h,
- * 14h, and so forth)".
- */
-static int
-smrt_locate_bar(pci_regspec_t *regs, unsigned nregs,
-    unsigned *i2o_bar)
-{
-	/*
-	 * Locate the first memory-mapped BAR:
-	 */
-	for (unsigned i = 0; i < nregs; i++) {
-		unsigned type = regs[i].pci_phys_hi & PCI_ADDR_MASK;
-
-		if (type == PCI_ADDR_MEM32 || type == PCI_ADDR_MEM64) {
-			*i2o_bar = i;
-			return (DDI_SUCCESS);
-		}
-	}
-
-	return (DDI_FAILURE);
-}
+#include <sys/pci_misc.h>
 
 static int
 smrt_locate_cfgtbl(smrt_t *smrt, pci_regspec_t *regs, unsigned nregs,
@@ -116,9 +91,22 @@ smrt_map_device(smrt_t *smrt)
 	uint_t regslen, nregs;
 	dev_info_t *dip = smrt->smrt_dip;
 	int r = DDI_FAILURE;
+	int rnumber;
 
 	/*
-	 * Get the list of PCI registers from the DDI property "regs":
+	 * Locate the first memory-mapped BAR, which the CISS specification
+	 * describes as the "I2O registers".
+	 */
+	rnumber = pci_bar_find_type(dip, PCI_BAR_MEM, NULL);
+	if (rnumber == -1) {
+		dev_err(dip, CE_WARN, "did not find any memory BARs");
+		return (DDI_FAILURE);
+	}
+	smrt->smrt_i2o_bar = rnumber;
+
+	/*
+	 * Get the list of PCI registers from the DDI property "reg".
+	 * This is needed for smrt_locate_cfgtbl().
 	 */
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "reg", (int **)&regs, &regslen) != DDI_PROP_SUCCESS) {
@@ -126,12 +114,6 @@ smrt_map_device(smrt_t *smrt)
 		return (DDI_FAILURE);
 	}
 	nregs = regslen * sizeof (int) / sizeof (pci_regspec_t);
-
-	if (smrt_locate_bar(regs, nregs, &smrt->smrt_i2o_bar) !=
-	    DDI_SUCCESS) {
-		dev_err(dip, CE_WARN, "did not find any memory BARs");
-		goto out;
-	}
 
 	/*
 	 * Map enough of the I2O memory space to enable us to talk to the

@@ -33,16 +33,9 @@
 #include <sys/pci.h>
 #include <sys/pci_cap.h>
 #include <sys/pci_intr_lib.h>
+#include <sys/pci_misc.h>
 #include <sys/sunddi.h>
 #include <sys/bitmap.h>
-
-/*
- * MSI-X BIR Index Table:
- *
- * BAR indicator register (BIR) to Base Address register.
- */
-static	uchar_t pci_msix_bir_index[8] = {0x10, 0x14, 0x18, 0x1c,
-					0x20, 0x24, 0xff, 0xff};
 
 /* default class to pil value mapping */
 pci_class_val_t pci_default_pil [] = {
@@ -777,15 +770,15 @@ pci_msi_get_supported_type(dev_info_t *rdip, int *typesp)
 ddi_intr_msix_t *
 pci_msix_init(dev_info_t *rdip)
 {
-	uint_t			rnumber, breg, nregs;
+	int			rnumber;
+	pci_bar_type_t		bar_type;
+	uint8_t			bir;
 	size_t			msix_tbl_size;
 	size_t			pba_tbl_size;
 	ushort_t		caps_ptr, msix_ctrl;
 	ddi_intr_msix_t		*msix_p;
 	ddi_acc_handle_t	cfg_hdle;
-	pci_regspec_t		*rp;
-	int			reg_size, addr_space, offset, *regs_list;
-	int			i, ret;
+	int			ret;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: rdip = %p\n", (void *)rdip));
 
@@ -807,8 +800,8 @@ pci_msix_init(dev_info_t *rdip)
 	msix_p->msix_tbl_offset = PCI_CAP_GET32(cfg_hdle, 0, caps_ptr,
 	    PCI_MSIX_TBL_OFFSET);
 
-	if ((breg = pci_msix_bir_index[msix_p->msix_tbl_offset &
-	    PCI_MSIX_TBL_BIR_MASK]) == 0xff)
+	bir = msix_p->msix_tbl_offset & PCI_MSIX_TBL_BIR_MASK;
+	if (bir > 5)
 		goto fail1;
 
 	msix_p->msix_tbl_offset = msix_p->msix_tbl_offset &
@@ -816,40 +809,24 @@ pci_msix_init(dev_info_t *rdip)
 	msix_tbl_size = ((msix_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1) *
 	    PCI_MSIX_VECTOR_SIZE;
 
-	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: MSI-X table offset 0x%x "
-	    "breg 0x%x size 0x%lx\n", msix_p->msix_tbl_offset, breg,
-	    msix_tbl_size));
+	rnumber = pci_bar_to_rnumber(rdip, bir, &bar_type);
 
-	if ((ret = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, rdip,
-	    DDI_PROP_DONTPASS, "reg", (int **)&regs_list, &nregs))
-	    != DDI_PROP_SUCCESS) {
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: MSI-X table offset 0x%x "
+	    "bir %d rnum %d size 0x%lx\n", msix_p->msix_tbl_offset, bir,
+	    rnumber, msix_tbl_size));
+
+	if (rnumber == -1) {
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: "
-		    "ddi_prop_lookup_int_array failed %d\n", ret));
+		    "no matching reg number for bir %d\n", bir));
 
 		goto fail1;
 	}
 
-	reg_size = sizeof (pci_regspec_t) / sizeof (int);
-
-	for (i = 1, rnumber = 0; i < nregs/reg_size; i++) {
-		rp = (pci_regspec_t *)&regs_list[i * reg_size];
-		addr_space = rp->pci_phys_hi & PCI_ADDR_MASK;
-		offset = PCI_REG_REG_G(rp->pci_phys_hi);
-
-		if ((offset == breg) && ((addr_space == PCI_ADDR_MEM32) ||
-		    (addr_space == PCI_ADDR_MEM64))) {
-			rnumber = i;
-			break;
-		}
-	}
-
-	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: MSI-X rnum = %d\n", rnumber));
-
-	if (rnumber == 0) {
+	if ((bar_type & PCI_BAR_MEM) == 0) {
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: "
-		    "no mtaching reg number for offset 0x%x\n", breg));
+		    "wrong address type for bir %d - 0x%x\n", bir, bar_type));
 
-		goto fail2;
+		goto fail1;
 	}
 
 	if ((ret = ddi_regs_map_setup(rdip, rnumber,
@@ -859,7 +836,7 @@ pci_msix_init(dev_info_t *rdip)
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: MSI-X Table "
 		    "ddi_regs_map_setup failed %d\n", ret));
 
-		goto fail2;
+		goto fail1;
 	}
 
 	/*
@@ -868,37 +845,32 @@ pci_msix_init(dev_info_t *rdip)
 	msix_p->msix_pba_offset = PCI_CAP_GET32(cfg_hdle, 0, caps_ptr,
 	    PCI_MSIX_PBA_OFFSET);
 
-	if ((breg = pci_msix_bir_index[msix_p->msix_pba_offset &
-	    PCI_MSIX_PBA_BIR_MASK]) == 0xff)
-		goto fail3;
+	bir = msix_p->msix_pba_offset & PCI_MSIX_PBA_BIR_MASK;
+	if (bir > 5)
+		goto fail2;
 
 	msix_p->msix_pba_offset = msix_p->msix_pba_offset &
 	    ~PCI_MSIX_PBA_BIR_MASK;
 	pba_tbl_size = ((msix_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1)/8;
 
+	rnumber = pci_bar_to_rnumber(rdip, bir, &bar_type);
+
 	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: PBA table offset 0x%x "
-	    "breg 0x%x size 0x%lx\n", msix_p->msix_pba_offset, breg,
-	    pba_tbl_size));
+	    "bir %d rnum %d size 0x%lx\n", msix_p->msix_pba_offset, bir,
+	    rnumber, pba_tbl_size));
 
-	for (i = 1, rnumber = 0; i < nregs/reg_size; i++) {
-		rp = (pci_regspec_t *)&regs_list[i * reg_size];
-		addr_space = rp->pci_phys_hi & PCI_ADDR_MASK;
-		offset = PCI_REG_REG_G(rp->pci_phys_hi);
+	if (rnumber == -1) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: "
+		    "no matching reg number for bir %d\n", bir));
 
-		if ((offset == breg) && ((addr_space == PCI_ADDR_MEM32) ||
-		    (addr_space == PCI_ADDR_MEM64))) {
-			rnumber = i;
-			break;
-		}
+		goto fail2;
 	}
 
-	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: PBA rnum = %d\n", rnumber));
-
-	if (rnumber == 0) {
+	if ((bar_type & PCI_BAR_MEM) == 0) {
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: "
-		    "no matching reg number for offset 0x%x\n", breg));
+		    "wrong address type for bir %d - 0x%x\n", bir, bar_type));
 
-		goto fail3;
+		goto fail2;
 	}
 
 	if ((ret = ddi_regs_map_setup(rdip, rnumber,
@@ -908,19 +880,16 @@ pci_msix_init(dev_info_t *rdip)
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: PBA "
 		    "ddi_regs_map_setup failed %d\n", ret));
 
-		goto fail3;
+		goto fail2;
 	}
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: msix_p = 0x%p DONE!!\n",
 	    (void *)msix_p));
 
-	ddi_prop_free(regs_list);
 	goto done;
 
-fail3:
-	ddi_regs_map_free(&msix_p->msix_tbl_hdl);
 fail2:
-	ddi_prop_free(regs_list);
+	ddi_regs_map_free(&msix_p->msix_tbl_hdl);
 fail1:
 	kmem_free(msix_p, sizeof (ddi_intr_msix_t));
 	msix_p = NULL;

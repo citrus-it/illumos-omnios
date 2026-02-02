@@ -12,7 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -40,6 +40,7 @@
 #include <sys/sysmacros.h>
 #include <sys/pci.h>
 #include <sys/pci_cap.h>
+#include <sys/pci_misc.h>
 
 #include "virtio.h"
 #include "virtio_impl.h"
@@ -87,7 +88,6 @@ static int virtio_interrupts_setup(virtio_t *, int);
 static void virtio_interrupts_teardown(virtio_t *);
 static void virtio_interrupts_disable_locked(virtio_t *);
 static void virtio_queue_free(virtio_queue_t *);
-static int virtio_bar_to_rnumber(virtio_t *, uint8_t);
 
 /*
  * Tuneable that forces use of the legacy interface even if the hypervisor
@@ -305,12 +305,15 @@ virtio_init(dev_info_t *dip)
 	}
 
 	if (vio->vio_mode == VIRTIO_MODE_LEGACY) {
-		int rnumber = virtio_bar_to_rnumber(vio, VIRTIO_LEGACY_BAR);
+		pci_bar_type_t bar_type;
+		int rnumber = pci_bar_to_rnumber(vio->vio_dip,
+		    VIRTIO_LEGACY_BAR, &bartype);
 
 		/*
 		 * Map PCI BAR0 for legacy device access.
 		 */
-		if (rnumber == -1 || ddi_regs_map_setup(dip, rnumber,
+		if (rnumber == -1 || bar_type != PCI_BAR_IO ||
+		    ddi_regs_map_setup(dip, rnumber,
 		    (caddr_t *)&vio->vio_bar, 0, 0, &virtio_acc_attr,
 		    &vio->vio_barh) != DDI_SUCCESS) {
 			dev_err(dip, CE_WARN, "Failed to map BAR0");
@@ -521,8 +524,12 @@ virtio_map_cap(virtio_t *vio, virtio_pci_cap_t *cap)
 	 * driver attach so it is safe to use static locals.
 	 */
 	if (baridx != cap->vpc_baridx) {
+		pci_bar_type_t bar_type;
+
 		baridx = cap->vpc_baridx;
-		rnumber = virtio_bar_to_rnumber(vio, baridx);
+		rnumber = pci_bar_to_rnumber(vio->vio_dip, baridx, &bar_type);
+		if ((bar_type & PCI_BAR_MEM) == 0)
+			rnumber = -1;
 	}
 
 	if (rnumber == -1 || ddi_regs_map_setup(vio->vio_dip, rnumber,
@@ -2051,42 +2058,4 @@ virtio_interrupts_disable(virtio_t *vio)
 	mutex_enter(&vio->vio_mutex);
 	virtio_interrupts_disable_locked(vio);
 	mutex_exit(&vio->vio_mutex);
-}
-
-/*
- * Map a PCI BAR (0-5) to a regset number.
- */
-static int
-virtio_bar_to_rnumber(virtio_t *vio, uint8_t bar)
-{
-	pci_regspec_t *regs;
-	uint_t bar_offset, regs_length, rcount;
-	int rnumber = -1;
-
-	if (bar > 5)
-		return (-1);
-
-	/*
-	 * PCI_CONF_BASE0 is 0x10; each BAR is 4 bytes apart.
-	 */
-	bar_offset = PCI_CONF_BASE0 + sizeof (uint32_t) * bar;
-
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, vio->vio_dip,
-	    DDI_PROP_DONTPASS, "reg", (int **)&regs, &regs_length) !=
-	    DDI_PROP_SUCCESS) {
-		return (-1);
-	}
-
-	rcount = regs_length * sizeof (int) / sizeof (pci_regspec_t);
-
-	for (int i = 0; i < rcount; i++) {
-		if (PCI_REG_REG_G(regs[i].pci_phys_hi) == bar_offset) {
-			rnumber = i;
-			break;
-		}
-	}
-
-	ddi_prop_free(regs);
-
-	return ((rnumber < rcount) ? rnumber : -1);
 }

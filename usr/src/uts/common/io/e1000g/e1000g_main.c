@@ -47,6 +47,7 @@
 
 #include <sys/dlpi.h>
 #include <sys/mac.h>
+#include <sys/pci_misc.h>
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
@@ -129,7 +130,6 @@ static void e1000g_setup_max_mtu(struct e1000g *);
 static void e1000g_get_max_frame_size(struct e1000g *);
 static boolean_t is_valid_mac_addr(uint8_t *);
 static void e1000g_unattach(dev_info_t *, struct e1000g *);
-static int e1000g_get_bar_info(dev_info_t *, int, bar_info_t *);
 #ifdef E1000G_DEBUG
 static void e1000g_ioc_peek_reg(struct e1000g *, e1000g_peekpoke_t *);
 static void e1000g_ioc_poke_reg(struct e1000g *, e1000g_peekpoke_t *);
@@ -661,8 +661,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 	struct e1000_hw *hw = &Adapter->shared;
 	struct e1000g_osdep *osdep = &Adapter->osdep;
 	off_t mem_size;
-	bar_info_t bar_info;
-	int offset, rnumber;
+	int rnumber;
 
 	rnumber = ADAPTER_REG_SET;
 	/* Get size of adapter register memory */
@@ -743,19 +742,8 @@ e1000g_regs_map(struct e1000g *Adapter)
 	case e1000_82541:
 	case e1000_82541_rev_2:
 		/* find the IO bar */
-		rnumber = -1;
-		for (offset = PCI_CONF_BASE1;
-		    offset <= PCI_CONF_BASE5; offset += 4) {
-			if (e1000g_get_bar_info(devinfo, offset, &bar_info)
-			    != DDI_SUCCESS)
-				continue;
-			if (bar_info.type == E1000G_BAR_IO) {
-				rnumber = bar_info.rnumber;
-				break;
-			}
-		}
-
-		if (rnumber < 0) {
+		rnumber = pci_bar_find_type(devinfo, PCI_BAR_IO, NULL);
+		if (rnumber == -1) {
 			E1000G_DEBUGLOG_0(Adapter, CE_WARN,
 			    "No io space is found");
 			goto regs_map_fail;
@@ -1202,64 +1190,6 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 	 * run ddi_set_driver_private(devinfo, null);
 	 */
 	ddi_set_driver_private(devinfo, NULL);
-}
-
-/*
- * Get the BAR type and rnumber for a given PCI BAR offset
- */
-static int
-e1000g_get_bar_info(dev_info_t *dip, int bar_offset, bar_info_t *bar_info)
-{
-	pci_regspec_t *regs;
-	uint_t regs_length;
-	int type, rnumber, rcount;
-
-	ASSERT((bar_offset >= PCI_CONF_BASE0) &&
-	    (bar_offset <= PCI_CONF_BASE5));
-
-	/*
-	 * Get the DDI "reg" property
-	 */
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "reg", (int **)&regs,
-	    &regs_length) != DDI_PROP_SUCCESS) {
-		return (DDI_FAILURE);
-	}
-
-	rcount = regs_length * sizeof (int) / sizeof (pci_regspec_t);
-	/*
-	 * Check the BAR offset
-	 */
-	for (rnumber = 0; rnumber < rcount; ++rnumber) {
-		if (PCI_REG_REG_G(regs[rnumber].pci_phys_hi) == bar_offset) {
-			type = regs[rnumber].pci_phys_hi & PCI_ADDR_MASK;
-			break;
-		}
-	}
-
-	ddi_prop_free(regs);
-
-	if (rnumber >= rcount)
-		return (DDI_FAILURE);
-
-	switch (type) {
-	case PCI_ADDR_CONFIG:
-		bar_info->type = E1000G_BAR_CONFIG;
-		break;
-	case PCI_ADDR_IO:
-		bar_info->type = E1000G_BAR_IO;
-		break;
-	case PCI_ADDR_MEM32:
-		bar_info->type = E1000G_BAR_MEM32;
-		break;
-	case PCI_ADDR_MEM64:
-		bar_info->type = E1000G_BAR_MEM64;
-		break;
-	default:
-		return (DDI_FAILURE);
-	}
-	bar_info->rnumber = rnumber;
-	return (DDI_SUCCESS);
 }
 
 static void

@@ -268,6 +268,7 @@ GENUNIX_OBJS +=	\
 		serializer.o	\
 		pci_intr_lib.o	\
 		pci_cap.o	\
+		pci_misc.o	\
 		pcifm.o		\
 		pgrp.o		\
 		pgrpsys.o	\

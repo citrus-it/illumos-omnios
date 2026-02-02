@@ -42,6 +42,7 @@
 #include <sys/stat.h>
 #include <sys/pci.h>
 #include <sys/pci_cap.h>
+#include <sys/pci_misc.h>
 #include <sys/bitmap.h>
 #include <sys/policy.h>
 
@@ -4626,17 +4627,10 @@ get_msix_pba_size(dev_info_t *dip)
 static void
 hermon_set_msix_info(hermon_state_t *state)
 {
-	uint_t			rnumber, breg, nregs;
+	int			rnumber;
+	uint8_t			bir;
 	ushort_t		caps_ctrl, msix_ctrl;
-	pci_regspec_t		*rp;
-	int			reg_size, addr_space, offset, *regs_list, i;
-
-	/*
-	 * MSI-X BIR Index Table:
-	 * BAR indicator register (BIR) to Base Address register.
-	 */
-	uchar_t pci_msix_bir_index[8] = {0x10, 0x14, 0x18, 0x1c,
-	    0x20, 0x24, 0xff, 0xff};
+	pci_bar_type_t		bar_type;
 
 	/* Fastreboot data access  attribute */
 	ddi_device_acc_attr_t	dev_attr = {
@@ -4661,9 +4655,8 @@ hermon_set_msix_info(hermon_state_t *state)
 	    PCI_MSIX_TBL_OFFSET);
 
 	/* Get the BIR for MSI-X table */
-	breg = pci_msix_bir_index[state->hs_msix_tbl_offset &
-	    PCI_MSIX_TBL_BIR_MASK];
-	ASSERT(breg != 0xFF);
+	bir = state->hs_msix_tbl_offset & PCI_MSIX_TBL_BIR_MASK;
+	ASSERT(bir <= 5);
 
 	/* Set the MSI-X table offset */
 	state->hs_msix_tbl_offset = state->hs_msix_tbl_offset &
@@ -4673,26 +4666,10 @@ hermon_set_msix_info(hermon_state_t *state)
 	state->hs_msix_tbl_size = ((msix_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1) *
 	    PCI_MSIX_VECTOR_SIZE;
 
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, state->hs_dip,
-	    DDI_PROP_DONTPASS, "reg", (int **)&regs_list, &nregs) !=
-	    DDI_PROP_SUCCESS) {
-		return;
-	}
-	reg_size = sizeof (pci_regspec_t) / sizeof (int);
-
-	/* Check the register number for MSI-X table */
-	for (i = 1, rnumber = 0; i < nregs/reg_size; i++) {
-		rp = (pci_regspec_t *)&regs_list[i * reg_size];
-		addr_space = rp->pci_phys_hi & PCI_ADDR_MASK;
-		offset = PCI_REG_REG_G(rp->pci_phys_hi);
-
-		if ((offset == breg) && ((addr_space == PCI_ADDR_MEM32) ||
-		    (addr_space == PCI_ADDR_MEM64))) {
-			rnumber = i;
-			break;
-		}
-	}
-	ASSERT(rnumber != 0);
+	/* Get the register number for MSI-X table */
+	rnumber = pci_bar_to_rnumber(state->hs_dip, bir, &bar_type);
+	ASSERT(rnumber != -1);
+	ASSERT((bar_type & PCI_BAR_MEM) != 0);
 	state->hs_msix_tbl_rnumber = rnumber;
 
 	/* Set device attribute version and access according to Hermon FM */
@@ -4711,9 +4688,8 @@ hermon_set_msix_info(hermon_state_t *state)
 	    PCI_MSIX_PBA_OFFSET);
 
 	/* Get the BIR for MSI-X PBA */
-	breg = pci_msix_bir_index[state->hs_msix_pba_offset &
-	    PCI_MSIX_PBA_BIR_MASK];
-	ASSERT(breg != 0xFF);
+	bir = state->hs_msix_pba_offset & PCI_MSIX_PBA_BIR_MASK;
+	ASSERT(bir <= 5);
 
 	/* Set the MSI-X PBA offset */
 	state->hs_msix_pba_offset = state->hs_msix_pba_offset &
@@ -4723,21 +4699,11 @@ hermon_set_msix_info(hermon_state_t *state)
 	state->hs_msix_pba_size =
 	    ((msix_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 64) / 64 * 8;
 
-	/* Check the register number for MSI-X PBA */
-	for (i = 1, rnumber = 0; i < nregs/reg_size; i++) {
-		rp = (pci_regspec_t *)&regs_list[i * reg_size];
-		addr_space = rp->pci_phys_hi & PCI_ADDR_MASK;
-		offset = PCI_REG_REG_G(rp->pci_phys_hi);
-
-		if ((offset == breg) && ((addr_space == PCI_ADDR_MEM32) ||
-		    (addr_space == PCI_ADDR_MEM64))) {
-			rnumber = i;
-			break;
-		}
-	}
-	ASSERT(rnumber != 0);
+	/* Get the register number for MSI-X PBA */
+	rnumber = pci_bar_to_rnumber(state->hs_dip, bir, &bar_type);
+	ASSERT(rnumber != -1);
+	ASSERT((bar_type & PCI_BAR_MEM) != 0);
 	state->hs_msix_pba_rnumber = rnumber;
-	ddi_prop_free(regs_list);
 
 	/* Map in the MSI-X Pending Bit Array */
 	if (hermon_regs_map_setup(state, state->hs_msix_pba_rnumber,
