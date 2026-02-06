@@ -772,7 +772,6 @@ ipcc_pkt_recv(uint8_t *pkt, size_t len, uint8_t **endp,
     const ipcc_ops_t *ops, void *arg)
 {
 	ipcc_pollevent_t ev;
-	uint8_t *frame = pkt;
 
 	*endp = NULL;
 
@@ -805,35 +804,22 @@ ipcc_pkt_recv(uint8_t *pkt, size_t len, uint8_t **endp,
 			return (ESPINTR);
 		ASSERT((rev & IPCC_POLLIN) != 0);
 
-		n = len;
-		err = ops->io_read(arg, frame, &n);
+		n = 1;
+		err = ops->io_read(arg, pkt, &n);
 		if (err != 0)
 			return (err);
-
-		VERIFY3U(n, <=, len);
 
 		if (n == 0)
 			continue;
 
-		/*
-		 * If the accumulated frame now ends with a terminator, return
-		 * it to the caller;
-		 */
-		uint8_t *end = frame + n - 1;
-		if (*end == '\0') {
-			/*
-			 * Strip off any extra frame terminators which may have
-			 * been accumulated. The SP will send terminators
-			 * whenever it considers the channel idle, including
-			 * just after it has delivered a response.
-			 */
-			while (end > pkt && end[-1] == '\0')
-				end--;
-			*endp = end;
+		VERIFY3U(n, ==, 1);
+
+		if (*pkt == '\0') {
+			*endp = pkt;
 			return (0);
 		}
 
-		frame += n;
+		pkt += n;
 		len -= n;
 	} while (len > 0);
 
@@ -1010,7 +996,7 @@ ipcc_command_locked(const ipcc_ops_t *ops, void *arg,
 	uint64_t send_seq, rcvd_seq;
 	uint32_t rcvd_magic, rcvd_version;
 	uint16_t rcvd_crc, crc;
-	uint8_t rcvd_cmd, *frame, *end;
+	uint8_t rcvd_cmd, *end;
 	uint8_t attempt = 0;
 	int err = 0;
 
@@ -1110,30 +1096,31 @@ reread:
 		goto resend;
 	}
 
-	if (err == ENOBUFS || end == NULL) {
-		LOG("Could not find frame terminator\n");
+	if (err == ENOBUFS) {
+		LOG("Could not find frame terminator - ENOBUFS\n");
+		LOGHEX("   FRAME", ipcc_pkt, sizeof (ipcc_pkt));
 		goto resend;
 	}
 
 	if (err != 0)
 		return (err);
 
-	frame = ipcc_pkt;
+	if (end == NULL) {
+		LOG("Did not find frame terminator\n");
+		LOGHEX("   FRAME", ipcc_pkt, sizeof (ipcc_pkt));
+		goto resend;
+	}
 
-	/* Skip any leading frame terminators */
-	while (*frame == '\0' && end > frame)
-		frame++;
-
-	if (end == frame) {
+	if (end == ipcc_pkt) {
 		LOG("Received empty frame\n");
 		goto reread;
 	}
 
 	/* Decode the frame */
 	if ((ipcc_channel_flags & IPCC_CHAN_QUIET) == 0) {
-		LOGHEX(" COBS IN", frame, end - frame);
+		LOGHEX(" COBS IN", ipcc_pkt, end - ipcc_pkt);
 	}
-	if (!ipcc_cobs_decode(frame, end - frame,
+	if (!ipcc_cobs_decode(ipcc_pkt, end - ipcc_pkt,
 	    ipcc_msg, sizeof (ipcc_msg), &pktl)) {
 		LOG("Error decoding COBS frame\n");
 		goto resend;
@@ -1843,7 +1830,7 @@ ipcc_apob_data(const ipcc_ops_t *ops, void *arg, uint64_t offset,
 	ipcc_encode_bytes((uint8_t *)&offset, sizeof (offset), input, &off);
 	ipcc_encode_bytes(data, len, input, &off);
 
-	outputl = sizeof(result);
+	outputl = sizeof (result);
 	err = ipcc_command_locked(ops, arg, IPCC_HSS_APOBDATA,
 	    IPCC_SP_APOBDATA, input, off, &output, &outputl);
 	if (err != 0)
