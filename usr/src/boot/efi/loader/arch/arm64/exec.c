@@ -108,7 +108,7 @@ elf64_loadfile_(char *filename, uint64_t dest, struct preloaded_file **result)
 	ssize_t got;
 	struct stat st;
 	int i;
-	uint64_t ldest = dest;
+	uint64_t ldest;
 	size_t scratch_size;
 	uint64_t scratch_addr;
 
@@ -190,6 +190,7 @@ elf64_loadfile_(char *filename, uint64_t dest, struct preloaded_file **result)
 	 * that it's trivial to calculate the load destination that will
 	 * place the dboot entrypoint at a page-aligned address.
 	 */
+	dest = archsw.arch_loadaddr(LOAD_RAW, filename, 0);
 	ldest = dest + (PAGE_SIZE - (ehdr->e_entry & 0xfff));
 
 	got = archsw.arch_readin(fd, ldest, st.st_size);
