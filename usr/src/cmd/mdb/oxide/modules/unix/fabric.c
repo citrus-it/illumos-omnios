@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -563,6 +563,33 @@ fabric_ioms_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 
 	return (DCMD_OK);
+}
+
+boolean_t
+fabric_get_smu_version(uint32_t smu_fw[3])
+{
+	GElf_Sym sym;
+	uintptr_t addr;
+
+	/*
+	 * Rather than reading the entire (very large) zen_fabric_t structure,
+	 * compute the offset of zi_smu_fw within zf_socs[0].zs_iodies[0] and
+	 * read just those 12 bytes.
+	 */
+	const size_t off = offsetof(zen_fabric_t, zf_socs) +
+	    offsetof(zen_soc_t, zs_iodies) +
+	    offsetof(zen_iodie_t, zi_smu_fw);
+
+	if (mdb_lookup_by_name("zen_fabric", &sym) == -1)
+		return (B_FALSE);
+
+	addr = sym.st_value + off;
+	if (mdb_vread(smu_fw, 3 * sizeof (uint32_t), addr) !=
+	    3 * sizeof (uint32_t)) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }
 
 typedef struct {

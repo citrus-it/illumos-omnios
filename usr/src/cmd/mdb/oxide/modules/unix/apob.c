@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -18,6 +18,7 @@
  * copy of the APOB (or any APOB the user points us at).
  */
 
+#include <stdbool.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
 #include <sys/sysmacros.h>
@@ -26,6 +27,7 @@
 #include <sys/io/zen/apob.h>
 
 #include "apob_mod.h"
+#include "pmuerr_tables.h"
 
 /*
  * Special value to indicate we should try to discover where the APOB is
@@ -54,17 +56,20 @@ apob_set_target(x86_processor_family_t pf)
 		chan_map = milan_chan_map;
 		chan_map_size = ARRAY_SIZE(milan_chan_map);
 		apob_target_cpu = "Milan";
+		pmuerr_init_family(pf);
 		break;
 	case X86_PF_AMD_GENOA:
 		chan_map = genoa_chan_map;
 		chan_map_size = ARRAY_SIZE(genoa_chan_map);
 		apob_target_cpu = "Genoa";
+		pmuerr_init_family(pf);
 		break;
 	case X86_PF_AMD_TURIN:
 	case X86_PF_AMD_DENSE_TURIN:
 		chan_map = turin_chan_map;
 		chan_map_size = ARRAY_SIZE(turin_chan_map);
 		apob_target_cpu = "Turin";
+		pmuerr_init_family(pf);
 		break;
 	default:
 		mdb_warn("apob: unsupported AMD chiprev family: %u\n", pf);
@@ -276,14 +281,40 @@ apob_read_entry(uintptr_t addr, apob_group_t group, uint32_t type,
 	return (DCMD_OK);
 }
 
+static const char *pmuerrhelp =
+"Decode APOB PMU Training error data from the specified address. The raw\n"
+"error codes and data are always printed. If the -v option is provided and\n"
+"the target CPU family has been detected (or set via ::apob_target), each\n"
+"error code is additionally looked up in the corresponding PMU message table\n"
+"and the human-readable description printed.\n"
+"\n"
+"The error code format is: bits 31:16 = MSG_ID, bits 15:0 = ARG_COUNT.\n"
+"\n"
+"%<b>OPTIONS%</b>\n"
+"\n"
+"  -v    show human-readable description for known errors.\n";
+
+void
+pmuerr_dcmd_help(void)
+{
+	mdb_printf(pmuerrhelp);
+}
+
 int
 pmuerr_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	int ret;
 	apob_pmu_tfi_t tfi;
+	bool verbose = false;
 
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    NULL) != argc) {
+		return (DCMD_USAGE);
+	}
 
 	if ((ret = apob_read_entry(addr, APOB_GROUP_MEMORY,
 	    APOB_MEMORY_TYPE_PMU_TRAIN_FAIL, &tfi, sizeof (tfi))) != DCMD_OK) {
@@ -305,6 +336,7 @@ pmuerr_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	for (uint32_t i = 0; i < tfi.apt_nvalid; i++) {
 		const apob_tfi_ent_t *ent = &tfi.apt_ents[i];
 		uint32_t sock, umc, dim, dnum, dtype;
+		const pmuerr_entry_t *pe;
 
 		/*
 		 * The UMC field is three bits for architectures that have 8
@@ -332,10 +364,51 @@ pmuerr_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    ent->apte_stage, ent->apte_error,
 		    ent->apte_data[0], ent->apte_data[1],
 		    ent->apte_data[2], ent->apte_data[3]);
+
+		if (!verbose)
+			continue;
+
+		pe = pmuerr_lookup(ent->apte_error,
+		    dim == 0 ? PMUERR_PH_TRAIN : PMUERR_PH_POST);
+		if (pe != NULL) {
+			const uint16_t narg = ent->apte_error & 0xffff;
+			const char *phase =
+			    (pe->pme_phases & PMUERR_PH_TRAIN) != 0 &&
+			    (pe->pme_phases & PMUERR_PH_POST) != 0 ?
+			    "train/post" :
+			    (pe->pme_phases & PMUERR_PH_POST) != 0 ?
+			    "post-train" : "train";
+
+			mdb_printf("    ");
+			switch (narg) {
+			default:
+			case 0:
+				mdb_printf("%s", pe->pme_msg);
+				break;
+			case 1:
+				mdb_printf(pe->pme_msg, ent->apte_data[0]);
+				break;
+			case 2:
+				mdb_printf(pe->pme_msg, ent->apte_data[0],
+				    ent->apte_data[1]);
+				break;
+			case 3:
+				mdb_printf(pe->pme_msg, ent->apte_data[0],
+				    ent->apte_data[1], ent->apte_data[2]);
+				break;
+			case 4:
+				mdb_printf(pe->pme_msg, ent->apte_data[0],
+				    ent->apte_data[1], ent->apte_data[2],
+				    ent->apte_data[3]);
+				break;
+			}
+			mdb_printf(" [%s]\n", phase);
+		}
 	}
 
 	return (DCMD_OK);
 }
+
 
 static const char *apob_eventhelp =
 "Decode the APOB Event log. This breaks out each event that occurs and\n"

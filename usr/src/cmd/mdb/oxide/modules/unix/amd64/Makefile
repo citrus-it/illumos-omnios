@@ -23,12 +23,12 @@
 # Use is subject to license terms.
 #
 # Copyright 2019 Joyent, Inc.
-# Copyright 2025 Oxide Computer Co.
+# Copyright 2026 Oxide Computer Co.
 
 MODULE = unix.so
 MDBTGT = kvm
 
-MODSRCS = unix.c i86mmu.c xcall.c apob.c fabric.c
+MODSRCS = unix.c i86mmu.c xcall.c apob.c pmuerr_tables.c fabric.c
 MODSRCS += genoa_impl.c milan_impl.c turin_impl.c zen_fabric_utils.c
 MODASMSRCS = unix_sup.S
 

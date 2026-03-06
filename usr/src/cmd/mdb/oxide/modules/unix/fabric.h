@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_FABRIC_H
@@ -25,6 +25,8 @@ extern void fabric_dcmd_help(void);
 
 extern int fabric_ioms_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern void fabric_ioms_dcmd_help(void);
+
+extern boolean_t fabric_get_smu_version(uint32_t [3]);
 
 extern int fabric_walk_init(mdb_walk_state_t *);
 extern int fabric_walk_soc_step(mdb_walk_state_t *);

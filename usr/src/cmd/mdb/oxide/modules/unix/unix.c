@@ -22,7 +22,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
@@ -39,6 +39,7 @@
 #include <sys/mutex.h>
 #include <sys/mutex_impl.h>
 #include "apob_mod.h"
+#include "pmuerr_tables.h"
 #include "i86mmu.h"
 #include "unix_sup.h"
 #include "zen_kmdb.h"
@@ -1151,8 +1152,15 @@ _mdb_init(void)
 		return (NULL);
 	}
 #endif
-	if (target_chiprev(&chiprev))
-		apob_set_target(_X86_CHIPREV_FAMILY(chiprev));
+	if (target_chiprev(&chiprev)) {
+		x86_processor_family_t family = _X86_CHIPREV_FAMILY(chiprev);
+		uint32_t smu_fw[3];
+
+		apob_set_target(family);
+
+		if (fabric_get_smu_version(smu_fw))
+			pmuerr_init(family, smu_fw);
+	}
 
 	return (&modinfo);
 }
