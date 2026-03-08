@@ -763,10 +763,6 @@ startup_memlist(void)
 	struct memlist *current;
 	extern void startup_build_mem_nodes(struct memlist *);
 
-	/* XX64 fix these - they should be in include files */
-	extern size_t page_coloring_init(uint_t, int, int);
-	extern void page_coloring_setup(caddr_t);
-
 	PRM_POINT("startup_memlist() starting...");
 
 	/*
@@ -1025,8 +1021,6 @@ startup_end(void)
 static void
 startup_kmem(void)
 {
-	extern void page_set_colorequiv_arr(void);
-
 	PRM_POINT("startup_kmem() starting...");
 
 	kernelbase = segkpm_base;

@@ -148,8 +148,6 @@ extern "C" {
  */
 #define	HEAPTEXT_SIZE	(64 * 1024 * 1024)	/* bytes */
 
-#define	ARGSBASE	HOLE_START
-
 /*
  * Use a slightly larger thread stack size for interrupt threads rather than
  * the default. This is useful for cases where the networking stack may do an

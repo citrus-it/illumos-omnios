@@ -386,7 +386,6 @@ extern const unsigned long _mmu_pagesize;
 extern const unsigned int _mmu_pageshift;
 extern const unsigned long _mmu_pageoffset;
 extern const unsigned long _mmu_pagemask;
-extern const uintptr_t _argsbase;
 extern const unsigned long _defaultstksz;
 extern const unsigned int _nbpg;
 extern const int _ncpu;
@@ -408,7 +407,6 @@ extern const int _clsize;
 #define	KERNELBASE	_kernelbase
 #define	USERLIMIT	_userlimit
 #define	USERLIMIT32	_userlimit32
-#define	ARGSBASE	_argsbase
 #define	DEFAULTSTKSZ	_defaultstksz
 #define	NCPU		_ncpu
 #define	NCPU_LOG2	_ncpu_log2
