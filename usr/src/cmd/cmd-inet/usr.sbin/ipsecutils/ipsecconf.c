@@ -1899,8 +1899,8 @@ ipsec_read_dump(int pfd)
 	if (offset > buf + len) {
 		warnx(gettext("dump read: message corruption,"
 		    " %d len exceeds %d boundary."),
-		    SADB_64TO8((uintptr_t)(offset - buf)),
-		    SADB_64TO8((uintptr_t)(len)));
+		    (uint32_t)SADB_64TO8((uintptr_t)(offset - buf)),
+		    (uint32_t)SADB_64TO8((uintptr_t)(len)));
 		return (NULL);
 	}
 
