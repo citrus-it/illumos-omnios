@@ -1128,6 +1128,7 @@ vioscsi_discover(void *arg)
 	vioscsi_softc_t *sc = arg;
 	scsi_hba_tgtmap_t *tm = sc->vs_tgtmap;
 	vioscsi_request_t req;
+	uint32_t target;
 
 	if (vioscsi_req_init(sc, &req, sc->vs_cmd_vq, KM_SLEEP) != 0) {
 		vioscsi_req_fini(&req);
@@ -1138,7 +1139,9 @@ vioscsi_discover(void *arg)
 		vioscsi_req_fini(&req);
 		return;
 	}
-	for (uint8_t target = 0; target < sc->vs_max_target; target++) {
+	for (target = 0;
+	    target <= sc->vs_max_target && target < VIOSCSI_MAX_TARGET;
+	    target++) {
 		char ua[10];
 		switch (vioscsi_probe_target(sc, &req, target)) {
 		case 1:
