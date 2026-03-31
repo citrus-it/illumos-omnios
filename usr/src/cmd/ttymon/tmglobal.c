@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <poll.h>
 #include <signal.h>
+#include <sys/param.h>
 #include <sys/resource.h>
 #include <sac.h>
 #include "tmstruct.h"
@@ -77,7 +78,7 @@ struct Gdef DEFAULT = {		/* default terminal settings	*/
 };
 
 uid_t	Uucp_uid = 5;		/* owner's uid for bi-directional ports	*/
-gid_t	Tty_gid = 7;		/* group id for all tty devices		*/
+gid_t	Tty_gid = GID_TTY;	/* group id for all tty devices		*/
 
 /*
  * Nlocked - 	number of ports that are either locked or have active
