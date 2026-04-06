@@ -12488,7 +12488,7 @@ s usr/share/man/man1/rksh93.1=ksh93.1
 f usr/share/man/man1/rlogin.1 0444 root bin
 f usr/share/man/man1/rm.1 0444 root bin
 s usr/share/man/man1/rmail.1=mail.1
-s usr/share/man/man1/rmdir.1=rm.1
+f usr/share/man/man1/rmdir.1 0444 root bin
 f usr/share/man/man1/rmformat.1 0444 root bin
 f usr/share/man/man1/roles.1 0444 root bin
 f usr/share/man/man1/rsh.1 0444 root bin

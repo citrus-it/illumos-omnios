@@ -10,8 +10,8 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
 # Copyright 2025 MNX Cloud, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 # Common binary names...
@@ -272,6 +272,7 @@ smbsrv-tests/tests/smb_sid/smb_sid.c
 
 util-tests/tests/bunyan/btest
 util-tests/tests/cpmvln/checker
+util-tests/tests/cpmvln/equiv
 util-tests/tests/cpmvln/mkobj
 util-tests/tests/ctf/check-array
 util-tests/tests/ctf/check-enum
