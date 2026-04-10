@@ -21243,6 +21243,7 @@ s usr/share/man/man9f/mod_modname.9f=mod_install.9f
 s usr/share/man/man9f/mod_remove.9f=mod_install.9f
 f usr/share/man/man9f/msgdsize.9f 0444 root bin
 f usr/share/man/man9f/msgpullup.9f 0444 root bin
+s usr/share/man/man9f/msgpullup_pad.9f=msgpullup.9f
 f usr/share/man/man9f/msgsize.9f 0444 root bin
 f usr/share/man/man9f/mt-streams.9f 0444 root bin
 f usr/share/man/man9f/mutex.9f 0444 root bin
