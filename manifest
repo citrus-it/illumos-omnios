@@ -3868,6 +3868,7 @@ f usr/include/rpc/rpc_com.h 0644 root bin
 f usr/include/rpc/rpc_msg.h 0644 root bin
 f usr/include/rpc/rpc_rdma.h 0644 root bin
 f usr/include/rpc/rpc_sztypes.h 0644 root bin
+f usr/include/rpc/rpc_tags.h 0644 root bin
 f usr/include/rpc/rpcb_clnt.h 0644 root bin
 f usr/include/rpc/rpcb_prot.h 0644 root bin
 f usr/include/rpc/rpcb_prot.x 0644 root bin
