@@ -1298,6 +1298,11 @@ nvme_opc_create_io_sq(struct pci_nvme_softc* sc, struct nvme_command* command,
 
 		nsq->qbase = vm_map_gpa(sc->nsc_pi->pi_vmctx, command->prp1,
 		              sizeof(struct nvme_command) * (size_t)nsq->size);
+		if (nsq->qbase == NULL) {
+			pci_nvme_status_genc(&compl->status,
+			    NVME_SC_PRP_OFFSET_INVALID);
+			return (1);
+		}
 
 		DPRINTF("%s sq %u size %u gaddr %p cqid %u", __func__,
 		        qid, nsq->size, nsq->qbase, nsq->cqid);
@@ -1403,6 +1408,11 @@ nvme_opc_create_io_cq(struct pci_nvme_softc* sc, struct nvme_command* command,
 	ncq->qbase = vm_map_gpa(sc->nsc_pi->pi_vmctx,
 		     command->prp1,
 		     sizeof(struct nvme_command) * (size_t)ncq->size);
+	if (ncq->qbase == NULL) {
+		pci_nvme_status_genc(&compl->status,
+		    NVME_SC_PRP_OFFSET_INVALID);
+		return (1);
+	}
 
 	pci_nvme_status_genc(&compl->status, NVME_SC_SUCCESS);
 
@@ -1537,6 +1547,11 @@ nvme_opc_identify(struct pci_nvme_softc* sc, struct nvme_command* command,
 	case 0x02: /* list of 1024 active NSIDs > CDW1.NSID */
 		dest = vm_map_gpa(sc->nsc_pi->pi_vmctx, command->prp1,
 		                  sizeof(uint32_t) * 1024);
+		if (dest == NULL) {
+			pci_nvme_status_genc(&status,
+			    NVME_SC_PRP_OFFSET_INVALID);
+			break;
+		}
 		/* All unused entries shall be zero */
 		memset(dest, 0, sizeof(uint32_t) * 1024);
 		((uint32_t *)dest)[0] = 1;
@@ -1549,6 +1564,11 @@ nvme_opc_identify(struct pci_nvme_softc* sc, struct nvme_command* command,
 		}
 		dest = vm_map_gpa(sc->nsc_pi->pi_vmctx, command->prp1,
 		                  sizeof(uint32_t) * 1024);
+		if (dest == NULL) {
+			pci_nvme_status_genc(&status,
+			    NVME_SC_PRP_OFFSET_INVALID);
+			break;
+		}
 		/* All bytes after the descriptor shall be zero */
 		memset(dest, 0, sizeof(uint32_t) * 1024);
 
@@ -1564,6 +1584,11 @@ nvme_opc_identify(struct pci_nvme_softc* sc, struct nvme_command* command,
 		 */
 		dest = vm_map_gpa(sc->nsc_pi->pi_vmctx, command->prp1,
 		                  sizeof(uint16_t) * 2048);
+		if (dest == NULL) {
+			pci_nvme_status_genc(&status,
+			    NVME_SC_PRP_OFFSET_INVALID);
+			break;
+		}
 		memset(dest, 0, sizeof(uint16_t) * 2048);
 		break;
 	default:
