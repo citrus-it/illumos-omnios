@@ -1582,6 +1582,8 @@ pci_xhci_xfer_complete(struct pci_xhci_softc *sc, struct usb_data_xfer *xfer,
 	int i, err;
 
 	dev = XHCI_SLOTDEV_PTR(sc, slot);
+	if (dev == NULL)
+		return XHCI_TRB_ERROR_PARAMETER;
 	devep = &dev->eps[epid];
 	dev_ctx = pci_xhci_get_dev_ctx(sc, slot);
 	if (dev_ctx == NULL) {
@@ -1976,11 +1978,12 @@ pci_xhci_device_doorbell(struct pci_xhci_softc *sc, uint32_t slot,
 	}
 
 	dev = XHCI_SLOTDEV_PTR(sc, slot);
+	if (dev == NULL)
+		return;
 	devep = &dev->eps[epid];
 	dev_ctx = pci_xhci_get_dev_ctx(sc, slot);
-	if (!dev_ctx) {
+	if (dev_ctx == NULL)
 		return;
-	}
 	ep_ctx = &dev_ctx->ctx_ep[epid];
 
 	sctx_tr = NULL;
