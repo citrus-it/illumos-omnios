@@ -232,6 +232,7 @@ struct pci_xhci_rtsregs {
 	int		er_enq_seg;	/* event ring enqueue segment */
 	uint32_t	er_events_cnt;	/* number of events in ER */
 	uint32_t	event_pcs;	/* producer cycle state flag */
+	uint32_t	er_sz;
 };
 
 
@@ -759,19 +760,19 @@ pci_xhci_insert_event(struct pci_xhci_softc *sc, struct xhci_trb *evtrb,
 	         rts->er_enq_seg, rts->event_pcs));
 	DPRINTF(("\t(erdp=0x%lx, erst=0x%lx, tblsz=%u, do_intr %d)",
 		 erdp, rts->erstba_p->qwEvrsTablePtr,
-	         rts->erstba_p->dwEvrsTableSize, do_intr));
+	         rts->er_sz, do_intr));
 
 	evtrbptr = &rts->erst_p[rts->er_enq_idx];
 
 	/* TODO: multi-segment table */
-	if (rts->er_events_cnt >= rts->erstba_p->dwEvrsTableSize) {
+	if (rts->er_events_cnt >= rts->er_sz) {
 		DPRINTF(("pci_xhci[%d] cannot insert event; ring full",
 		         __LINE__));
 		err = XHCI_TRB_ERROR_EV_RING_FULL;
 		goto done;
 	}
 
-	if (rts->er_events_cnt == rts->erstba_p->dwEvrsTableSize - 1) {
+	if (rts->er_events_cnt == rts->er_sz - 1) {
 		struct xhci_trb	errev;
 
 		if ((evtrbptr->dwTrb3 & 0x1) == (rts->event_pcs & 0x1)) {
@@ -788,8 +789,7 @@ pci_xhci_insert_event(struct pci_xhci_softc *sc, struct xhci_trb *evtrb,
 			rts->er_events_cnt++;
 			memcpy(&rts->erst_p[rts->er_enq_idx], &errev,
 			       sizeof(struct xhci_trb));
-			rts->er_enq_idx = (rts->er_enq_idx + 1) %
-			                  rts->erstba_p->dwEvrsTableSize;
+			rts->er_enq_idx = (rts->er_enq_idx + 1) % rts->er_sz;
 			err = XHCI_TRB_ERROR_EV_RING_FULL;
 			do_intr = 1;
 
@@ -803,8 +803,7 @@ pci_xhci_insert_event(struct pci_xhci_softc *sc, struct xhci_trb *evtrb,
 	evtrb->dwTrb3 |= rts->event_pcs;
 
 	memcpy(&rts->erst_p[rts->er_enq_idx], evtrb, sizeof(struct xhci_trb));
-	rts->er_enq_idx = (rts->er_enq_idx + 1) %
-	                  rts->erstba_p->dwEvrsTableSize;
+	rts->er_enq_idx = (rts->er_enq_idx + 1) % rts->er_sz;
 
 	if (rts->er_enq_idx == 0)
 		rts->event_pcs ^= 1;
@@ -2133,6 +2132,7 @@ pci_xhci_rtsregs_write(struct pci_xhci_softc *sc, uint64_t offset,
 
 		rts->er_enq_idx = 0;
 		rts->er_events_cnt = 0;
+		rts->er_sz = rts->erstba_p->dwEvrsTableSize;
 
 		DPRINTF(("pci_xhci: wr erstba erst (%p) ptr 0x%lx, sz %u",
 		        rts->erstba_p,
@@ -2171,8 +2171,7 @@ pci_xhci_rtsregs_write(struct pci_xhci_softc *sc, uint64_t offset,
 			if (erdp_i <= rts->er_enq_idx)
 				rts->er_events_cnt = rts->er_enq_idx - erdp_i;
 			else
-				rts->er_events_cnt =
-				          rts->erstba_p->dwEvrsTableSize -
+				rts->er_events_cnt = rts->er_sz -
 				          (erdp_i - rts->er_enq_idx);
 
 			DPRINTF(("pci_xhci: erdp 0x%lx, events cnt %u",
