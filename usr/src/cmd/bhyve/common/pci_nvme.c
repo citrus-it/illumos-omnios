@@ -375,7 +375,7 @@ struct pci_nvme_softc {
 };
 
 
-static void pci_nvme_cq_update(struct pci_nvme_softc *sc,
+static bool pci_nvme_cq_update(struct pci_nvme_softc *sc,
     struct nvme_completion_queue *cq,
     uint32_t cdw0,
     uint16_t cid,
@@ -992,11 +992,12 @@ pci_nvme_aen_process(struct pci_nvme_softc *sc)
 		assert(aer != NULL);
 
 		DPRINTF("%s: CID=%#x CDW0=%#x", __func__, aer->cid, (lid << 16) | (aen->event_data << 8) | atype);
-		pci_nvme_cq_update(sc, &sc->compl_queues[0],
+		if (!pci_nvme_cq_update(sc, &sc->compl_queues[0],
 		    (lid << 16) | (aen->event_data << 8) | atype, /* cdw0 */
 		    aer->cid,
 		    0,		/* SQID */
-		    status);
+		    status))
+			break;
 
 		aen->event_data = 0;
 		aen->posted = false;
@@ -1045,20 +1046,24 @@ pci_nvme_reset_locked(struct pci_nvme_softc *sc)
 	assert(sc->submit_queues != NULL);
 
 	for (i = 0; i < sc->num_squeues + 1; i++) {
+		pthread_mutex_lock(&sc->submit_queues[i].mtx);
 		sc->submit_queues[i].qbase = NULL;
 		sc->submit_queues[i].size = 0;
 		sc->submit_queues[i].cqid = 0;
 		sc->submit_queues[i].tail = 0;
 		sc->submit_queues[i].head = 0;
+		pthread_mutex_unlock(&sc->submit_queues[i].mtx);
 	}
 
 	assert(sc->compl_queues != NULL);
 
 	for (i = 0; i < sc->num_cqueues + 1; i++) {
+		pthread_mutex_lock(&sc->compl_queues[i].mtx);
 		sc->compl_queues[i].qbase = NULL;
 		sc->compl_queues[i].size = 0;
 		sc->compl_queues[i].tail = 0;
 		sc->compl_queues[i].head = 0;
+		pthread_mutex_unlock(&sc->compl_queues[i].mtx);
 	}
 
 	sc->num_q_is_set = false;
@@ -1189,7 +1194,7 @@ nvme_prp_memcpy(struct vmctx *ctx, uint64_t prp1, uint64_t prp2, uint8_t *b,
  *
  * Write the completion and update the doorbell value
  */
-static void
+static bool
 pci_nvme_cq_update(struct pci_nvme_softc *sc,
 		struct nvme_completion_queue *cq,
 		uint32_t cdw0,
@@ -1200,9 +1205,12 @@ pci_nvme_cq_update(struct pci_nvme_softc *sc,
 	struct nvme_submission_queue *sq = &sc->submit_queues[sqid];
 	struct nvme_completion *cqe;
 
-	assert(cq->qbase != NULL);
-
 	pthread_mutex_lock(&cq->mtx);
+
+	if (cq->qbase == NULL) {
+		pthread_mutex_unlock(&cq->mtx);
+		return (false);
+	}
 
 	cqe = &cq->qbase[cq->tail];
 
@@ -1221,6 +1229,7 @@ pci_nvme_cq_update(struct pci_nvme_softc *sc,
 	}
 
 	pthread_mutex_unlock(&cq->mtx);
+	return (true);
 }
 
 static int
@@ -2078,6 +2087,11 @@ pci_nvme_handle_admin_cmd(struct pci_nvme_softc* sc, uint64_t value)
 
 	pthread_mutex_lock(&sq->mtx);
 
+	if (sq->qbase == NULL) {
+		pthread_mutex_unlock(&sq->mtx);
+		return;
+	}
+
 	sqhead = sq->head;
 	DPRINTF("sqhead %u, tail %u", sqhead, sq->tail);
 
@@ -2319,7 +2333,8 @@ pci_nvme_set_completion(struct pci_nvme_softc *sc,
 		 __func__, sqid, sq->cqid, cid, NVME_STATUS_GET_SCT(status),
 		 NVME_STATUS_GET_SC(status));
 
-	pci_nvme_cq_update(sc, cq, 0, cid, sqid, status);
+	if (!pci_nvme_cq_update(sc, cq, 0, cid, sqid, status))
+		return;
 
 	if (cq->head != cq->tail) {
 		if (cq->intr_en & NVME_CQ_INTEN) {
@@ -2770,6 +2785,11 @@ pci_nvme_handle_io_cmd(struct pci_nvme_softc* sc, uint16_t idx)
 
 	pthread_mutex_lock(&sq->mtx);
 
+	if (sq->qbase == NULL) {
+		pthread_mutex_unlock(&sq->mtx);
+		return;
+	}
+
 	sqhead = sq->head;
 	DPRINTF("nvme_handle_io qid %u head %u tail %u cmdlist %p",
 	         idx, sqhead, sq->tail, sq->qbase);
@@ -3005,13 +3025,17 @@ pci_nvme_write_bar_0(struct pci_nvme_softc *sc, uint64_t offset, int size,
 		uint64_t idx = belloffset / 8; /* door bell size = 2*int */
 		int is_sq = (belloffset % 8) < 4;
 
+		pthread_mutex_lock(&sc->mtx);
+
 		if ((sc->regs.csts & NVME_CSTS_RDY) == 0) {
+			pthread_mutex_unlock(&sc->mtx);
 			WPRINTF("doorbell write prior to RDY (offset=%#lx)\n",
 			    offset);
 			return;
 		}
 
 		if (belloffset > ((sc->max_queues+1) * 8 - 4)) {
+			pthread_mutex_unlock(&sc->mtx);
 			WPRINTF("guest attempted an overflow write offset "
 			         "0x%lx, val 0x%lx in %s",
 			         offset, value, __func__);
@@ -3019,10 +3043,16 @@ pci_nvme_write_bar_0(struct pci_nvme_softc *sc, uint64_t offset, int size,
 		}
 
 		if (is_sq) {
-			if (sc->submit_queues[idx].qbase == NULL)
+			if (sc->submit_queues[idx].qbase == NULL) {
+				pthread_mutex_unlock(&sc->mtx);
 				return;
-		} else if (sc->compl_queues[idx].qbase == NULL)
+			}
+		} else if (sc->compl_queues[idx].qbase == NULL) {
+			pthread_mutex_unlock(&sc->mtx);
 			return;
+		}
+
+		pthread_mutex_unlock(&sc->mtx);
 
 		pci_nvme_handle_doorbell(sc, idx, is_sq, value);
 		return;
