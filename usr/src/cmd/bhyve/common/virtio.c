@@ -820,6 +820,9 @@ vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
 	req.idx = next = vq->vq_avail->ring[idx & (vq->vq_qsize - 1)];
 	vq->vq_last_avail++;
 	for (i = 0; i < VQ_MAX_DESCRIPTORS; next = vdir->next) {
+		uint32_t len;
+		uint64_t addr;
+
 		if (next >= vq->vq_qsize) {
 			vi_error(vs,
 			    "%s: descriptor index %u out of range, "
@@ -828,6 +831,8 @@ vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
 			return (-1);
 		}
 		vdir = &vq->vq_desc[next];
+		len = atomic_load_32(&vdir->len);
+		addr = atomic_load_64(&vdir->addr);
 		if ((vdir->flags & VRING_DESC_F_INDIRECT) == 0) {
 			_vq_record(vs, i, vdir, iov, niov, &req);
 			i++;
@@ -839,16 +844,14 @@ vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
 			    name);
 			return (-1);
 		} else {
-			n_indir = vdir->len / 16;
-			if ((vdir->len & 0xf) || n_indir == 0) {
+			n_indir = len / 16;
+			if ((len & 0xf) || n_indir == 0) {
 				vi_error(vs,
 				    "%s: invalid indir len 0x%x, "
-				    "driver confused?",
-				    name, (u_int)vdir->len);
+				    "driver confused?", name, (u_int)len);
 				return (-1);
 			}
-			vindir = paddr_guest2host(ctx,
-			    vdir->addr, vdir->len);
+			vindir = paddr_guest2host(ctx, addr, len);
 			/*
 			 * Indirects start at the 0th, then follow
 			 * their own embedded "next"s until those run
