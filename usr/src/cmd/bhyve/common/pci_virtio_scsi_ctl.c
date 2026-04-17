@@ -171,7 +171,8 @@ vtscsi_ctl_reset(struct pci_vtscsi_softc *sc __unused)
 
 static void *vtscsi_ctl_req_alloc(struct pci_vtscsi_softc *sc)
 {
-	struct vtscsi_ctl_backend *ctl = (struct vtscsi_ctl_backend *)sc;
+	struct vtscsi_ctl_backend *ctl =
+	    (struct vtscsi_ctl_backend *)sc->vss_backend;
 	union ctl_io *io = ctl_scsi_alloc_io(ctl->vcb_iid);
 
 	if (io != NULL)
