@@ -175,6 +175,7 @@ ena_admin_read_resp(ena_t *ena, enahw_resp_desc_t *hwresp)
 	uint8_t phase = cq->eac_phase & ENAHW_RESP_PHASE_MASK;
 	uint16_t cmd_id = ENAHW_RESP_CMD_ID(hwresp);
 
+	VERIFY3U(cmd_id, <, aq->ea_qlen);
 	ctx = &aq->ea_cmd_ctxs[cmd_id];
 
 	ASSERT3U(ctx->ectx_id, ==, cmd_id);
@@ -481,6 +482,15 @@ ena_create_cq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 		return (ret);
 	}
 
+	/*
+	 * The CQ head doorbell register is no longer supported by any
+	 * existing adapter hardware.
+	 */
+	VERIFY0(resp_cq->ercq_head_db_reg_offset);
+	/* Check register offsets are within the BAR range */
+	VERIFY3U(resp_cq->ercq_interrupt_mask_reg_offset, <, ena->ena_reg_size);
+	VERIFY3U(resp_cq->ercq_numa_node_reg_offset, <, ena->ena_reg_size);
+
 	*hw_index = resp_cq->ercq_idx;
 	*unmask_addr = (uint32_t *)(ena->ena_reg_base +
 	    resp_cq->ercq_interrupt_mask_reg_offset);
@@ -491,12 +501,6 @@ ena_create_cq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 	} else {
 		*numanode = NULL;
 	}
-
-	/*
-	 * The CQ head doorbell register is no longer supported by any
-	 * existing adapter hardware.
-	 */
-	VERIFY0(resp_cq->ercq_head_db_reg_offset);
 
 	return (0);
 }
@@ -590,6 +594,9 @@ ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 		return (ret);
 	}
 
+	/* Check register offsets are within the BAR range */
+	VERIFY3U(resp_sq->ersq_db_reg_offset, <, ena->ena_reg_size);
+
 	*hw_index = resp_sq->ersq_idx;
 	*db_addr = (uint32_t *)(ena->ena_reg_base +
 	    resp_sq->ersq_db_reg_offset);
@@ -601,6 +608,8 @@ ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 	 */
 	if (placement == ENAHW_PLACEMENT_POLICY_DEV &&
 	    llq_descs_addrp != NULL) {
+		VERIFY3U(resp_sq->ersq_llq_descs_reg_offset, <,
+		    ena->ena_llq_bar_size);
 		*llq_descs_addrp = (void *)(ena->ena_llq_bar_base +
 		    resp_sq->ersq_llq_descs_reg_offset);
 	}
