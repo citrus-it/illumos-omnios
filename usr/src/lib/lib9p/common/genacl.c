@@ -798,7 +798,7 @@ l9p_illumos_nfsv4acl_to_acl(acl_t *sysacl)
 		 */
 		l9ace->ace_mask = ent->a_access_mask;
 		l9ace->ace_idsize = sizeof (ent->a_who);
-		memcpy(l9acl->acl_aces, &ent->a_who, sizeof (ent->a_who));
+		memcpy(l9ace->ace_idbytes, &ent->a_who, sizeof (ent->a_who));
 	}
 
 	return (l9acl);
