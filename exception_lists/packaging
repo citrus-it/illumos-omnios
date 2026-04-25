@@ -847,6 +847,11 @@ opt/os-tests/tests/cores/amd64/libdumper.so	i386
 usr/include/sys/ktest_impl.h
 
 #
+# Private definitions for the private spawn(2) system call.
+#
+usr/include/sys/spawn_impl.h
+
+#
 # Temporary exception until the ACPI nexus is sorted out.
 #
 usr/include/sys/gpio/zen_gpio.h

@@ -685,6 +685,7 @@ main(int argc, char *argv[])
 	praddset(&traceeven, SYS_open64);
 	praddset(&traceeven, SYS_vfork);
 	praddset(&traceeven, SYS_forksys);
+	praddset(&traceeven, SYS_spawn);
 	praddset(&traceeven, SYS_upanic);
 
 	/* for I/O buffer dumps, force tracing of read()s and write()s */

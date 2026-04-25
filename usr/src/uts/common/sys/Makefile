@@ -545,6 +545,7 @@ CHKHDRS=			\
 	sockfilter.h		\
 	sockio.h		\
 	soundcard.h		\
+	spawn_impl.h		\
 	squeue.h		\
 	squeue_impl.h		\
 	srn.h			\
