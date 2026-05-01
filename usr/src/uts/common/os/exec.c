@@ -28,7 +28,7 @@
 /*
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -182,13 +182,15 @@ exece(uintptr_t file, const char **argp, const char **envp, int flags)
 			(void) snprintf(path, allocsize, "/dev/fd/%d", fd);
 		}
 
-		error = exec_common(path, argp, envp, vp, EBA_NONE);
+		error = exec_common(path, argp, envp, vp, EBA_NONE,
+		    UIO_USERSPACE);
 		VN_RELE(vp);
 		kmem_free(path, allocsize);
 	} else {
 		const char *fname = (const char *)file;
 
-		error = exec_common(fname, argp, envp, NULL, EBA_NONE);
+		error = exec_common(fname, argp, envp, NULL, EBA_NONE,
+		    UIO_USERSPACE);
 	}
 
 	return (error ? (set_errno(error)) : 0);
@@ -196,7 +198,7 @@ exece(uintptr_t file, const char **argp, const char **envp, int flags)
 
 int
 exec_common(const char *fname, const char **argp, const char **envp,
-    vnode_t *vp, int brand_action)
+    vnode_t *vp, int brand_action, uio_seg_t seg)
 {
 	vnode_t *dir = NULL, *tmpvp = NULL;
 	proc_t *p = ttoproc(curthread);
@@ -291,7 +293,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 		 * but coreadm is allowed to expand %d to the empty string and
 		 * there are other cases in which that failure may occur.
 		 */
-		if ((error = pn_get((char *)fname, UIO_USERSPACE, &pn)) != 0)
+		if ((error = pn_get((char *)fname, seg, &pn)) != 0)
 			goto out;
 		pn_alloc(&resolvepn);
 		error = lookuppn(&pn, &resolvepn, FOLLOW, &dir, &vp);
@@ -302,7 +304,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 				goto out;
 
 			dir = NULL;
-			if ((error = pn_get((char *)fname, UIO_USERSPACE,
+			if ((error = pn_get((char *)fname, seg,
 			    &pn)) != 0) {
 				goto out;
 			}
@@ -358,6 +360,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	bzero(exec_file, MAXCOMLEN+1);
 	(void) strncpy(exec_file, pn.pn_path, MAXCOMLEN);
 	bzero(&args, sizeof (args));
+	args.argseg = seg;
 	args.pathname = resolvepn.pn_path;
 	/* don't free resolvepn until we are done with args */
 	pn_free(&pn);
@@ -521,7 +524,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	 * must be reset to SIG_DFL.
 	 */
 	sigdefault(p);
-	p->p_flag &= ~(SNOWAIT|SJCTL);
+	p->p_flag &= ~(SNOWAIT|SJCTL|SSPAWNING);
 	p->p_flag |= (SEXECED|SMSACCT|SMSFORK);
 	up->u_signal[SIGCLD - 1] = SIG_DFL;
 
@@ -1697,6 +1700,11 @@ stk_getptr(uarg_t *args, char *src, char **dst)
 {
 	int error;
 
+	if (args->argseg == UIO_SYSSPACE) {
+		*dst = *(char **)src;
+		return (0);
+	}
+
 	if (args->from_model == DATAMODEL_NATIVE) {
 		ulong_t ptr;
 		error = fulword(src, &ptr);
@@ -1755,7 +1763,7 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 		if (args->fname != NULL)
 			error = stk_add(args, args->fname, UIO_SYSSPACE);
 		else
-			error = stk_add(args, uap->fname, UIO_USERSPACE);
+			error = stk_add(args, uap->fname, args->argseg);
 		if (error)
 			return (error);
 
@@ -1779,7 +1787,7 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 				return (EFAULT);
 			if (sp == NULL)
 				break;
-			if ((error = stk_add(args, sp, UIO_USERSPACE)) != 0)
+			if ((error = stk_add(args, sp, args->argseg)) != 0)
 				return (error);
 			argv += ptrsize;
 		}
@@ -1799,7 +1807,7 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 				return (EFAULT);
 			if (sp == NULL)
 				break;
-			if ((error = stk_add(args, sp, UIO_USERSPACE)) != 0)
+			if ((error = stk_add(args, sp, args->argseg)) != 0)
 				return (error);
 			if (args->scrubenv && strncmp(tmp, "LD_", 3) == 0) {
 				/* Undo the copied string */
@@ -2114,7 +2122,14 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 #endif /* defined(_LP64) */
 
 	args->from_model = p->p_model;
-	if (p->p_model == DATAMODEL_NATIVE) {
+	if (args->argseg == UIO_SYSSPACE) {
+		/*
+		 * The argument and environment vectors are in kernel memory,
+		 * so pointers within them are always native sized regardless
+		 * of the process data model.
+		 */
+		args->from_ptrsize = sizeof (char *);
+	} else if (p->p_model == DATAMODEL_NATIVE) {
 		args->from_ptrsize = sizeof (long);
 	} else {
 		args->from_ptrsize = sizeof (int32_t);

@@ -617,6 +617,23 @@ static spawn_fa_test_t tests[] = {
 	    .sft_expected = {
 		{ .srf_fd = -1, .srf_open = 0 },
 		{ .srf_fd = 20, .srf_open = 1, .srf_flags = O_RDONLY } } },
+
+	/*
+	 * A file action whose open fails must abort the spawn with that
+	 * errno rather than treating the error as an opened descriptor.
+	 */
+	{ .sft_name = "addopen of nonexistent path fails with ENOENT",
+	    .sft_setup = addopen_setup,
+	    .sft_open_fd = 10,
+	    .sft_open_path = "/devices/nonexistent/posix_spawn_test",
+	    .sft_open_flags = O_RDONLY,
+	    .sft_expect_errno = ENOENT },
+	{ .sft_name = "addopen onto fd 2 of nonexistent path fails ENOENT",
+	    .sft_setup = addopen_setup,
+	    .sft_open_fd = 2,
+	    .sft_open_path = "/devices/nonexistent/posix_spawn_test",
+	    .sft_open_flags = O_RDONLY,
+	    .sft_expect_errno = ENOENT },
 };
 
 int

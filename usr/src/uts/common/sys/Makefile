@@ -30,7 +30,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Peter Tribble.
 # Copyright 2015, Joyent, Inc. All rights reserved.
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -463,6 +463,7 @@ CHKHDRS=			\
 	pfmod.h			\
 	pg.h			\
 	pghw.h			\
+	pgrpsys.h		\
 	physmem.h		\
 	pkp_hash.h		\
 	pm.h			\
@@ -547,6 +548,8 @@ CHKHDRS=			\
 	sockfilter.h		\
 	sockio.h		\
 	soundcard.h		\
+	spawn.h			\
+	spawn_impl.h		\
 	squeue.h		\
 	squeue_impl.h		\
 	srn.h			\

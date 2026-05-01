@@ -20,39 +20,46 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2026 Oxide Computer Company
  */
 
-#ifndef _SYS_LIBC_KERNEL_H
-#define	_SYS_LIBC_KERNEL_H
+#ifndef _SYS_SPAWN_H
+#define	_SYS_SPAWN_H
 
-/*
- * This file contains definitions for miscellaneous consolidation-private
- * interfaces that are private, exclusively between libc and the kernel.
- * These definitions are for implementation details that can change at
- * any time, even in a patch.  Applications should never see this file.
- */
-
-#ifdef __cplusplus
+#ifdef	__cplusplus
 extern "C" {
 #endif
 
 /*
- * A vfork() child that calls _exit(_EVAPORATE) without having performed
- * an execve() will disappear without a trace, just as though the parent
- * had set the disposition of the SIGCHLD signal to be ignored. libc's
- * posix_spawn() no longer uses this, but it is retained for branded
- * userlands whose libc predates spawn(2).
+ * flags for posix_spawnattr_setflags()
  */
-#define	_EVAPORATE	0xffff0000
+#define	POSIX_SPAWN_RESETIDS		0x0001
+#define	POSIX_SPAWN_SETPGROUP		0x0002
+#define	POSIX_SPAWN_SETSIGDEF		0x0004
+#define	POSIX_SPAWN_SETSIGMASK		0x0008
+#define	POSIX_SPAWN_SETSCHEDPARAM	0x0010
+#define	POSIX_SPAWN_SETSCHEDULER	0x0020
+#define	POSIX_SPAWN_SETSID		0x0040
+/*
+ * non-portable extensions
+ */
+#if !defined(_STRICT_POSIX) || defined(_KERNEL)
+#define	POSIX_SPAWN_SETSIGIGN_NP	0x0800
+#define	POSIX_SPAWN_NOSIGCHLD_NP	0x1000
+#define	POSIX_SPAWN_WAITPID_NP		0x2000
+#define	POSIX_SPAWN_NOEXECERR_NP	0x4000
+#endif	/* !_STRICT_POSIX || defined(_KERNEL) */
 
-#ifdef __cplusplus
+#ifdef	__cplusplus
 }
 #endif
 
-#endif /* _SYS_LIBC_KERNEL_H */
+#endif	/* _SYS_SPAWN_H */
