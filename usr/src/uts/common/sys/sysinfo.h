@@ -213,6 +213,7 @@ typedef struct cpu_sys_stats {
 	uint64_t sysfork;		/* forks */
 	uint64_t sysvfork;		/* vforks */
 	uint64_t sysexec;		/* execs */
+	//uint64_t spawn;			/* spawns */
 	uint64_t readch;		/* bytes read by rdwr() */
 	uint64_t writech;		/* bytes written by rdwr() */
 	uint64_t rcvint;		/* XXX: unused (mostly) */

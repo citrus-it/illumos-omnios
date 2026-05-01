@@ -322,6 +322,7 @@ extern "C" {
 	 *	forkallx(flags) :: forksys(1, flags)
 	 *	vforkx(flags)   :: forksys(2, flags)
 	 */
+#define	SYS_spawn	143
 #define	SYS_sigtimedwait	144
 #define	SYS_lwp_info	145
 #define	SYS_yield	146

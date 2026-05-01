@@ -366,7 +366,7 @@ const struct systable systable[] = {
 {"sharefs",	3, DEC, NOV, DEC, HEX, DEC},			/* 140 */
 {"seteuid",	1, DEC, NOV, UNS},				/* 141 */
 {"forksys",	2, DEC, NOV, DEC, HHX},				/* 142 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"spawn",	5, DEC, NOV, STG, HEX, UNS, HEX, UNS },		/* 143 */
 {"sigtimedwait", 3, DEC, NOV, HEX, HEX, HEX},			/* 144 */
 {"lwp_info",	1, DEC, NOV, HEX},				/* 145 */
 {"yield",	0, DEC, NOV},					/* 146 */

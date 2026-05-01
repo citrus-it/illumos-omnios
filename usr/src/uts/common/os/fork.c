@@ -22,12 +22,14 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 #include <sys/types.h>
+#include <sys/stdbool.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
 #include <sys/signal.h>
@@ -56,6 +58,7 @@
 #include <sys/vtrace.h>
 #include <sys/debug.h>
 #include <sys/shm_impl.h>
+#include <sys/spawn_impl.h>
 #include <sys/door_data.h>
 #include <vm/as.h>
 #include <vm/rm.h>
@@ -80,7 +83,7 @@
 #include <sys/brand.h>
 #include <sys/fork.h>
 
-static int64_t cfork(int, int, int);
+int64_t cfork(int, int, kspawn_param_t *, int);
 static int getproc(proc_t **, pid_t, uint_t);
 #define	GETPROC_USER	0x0
 #define	GETPROC_KERNEL	0x1
@@ -88,6 +91,7 @@ static int getproc(proc_t **, pid_t, uint_t);
 
 static void fork_fail(proc_t *);
 static void forklwp_fail(proc_t *);
+extern void spawn_main(void *);
 
 int fork_fail_pending;
 
@@ -103,7 +107,7 @@ int64_t
 vfork(void)
 {
 	curthread->t_post_sys = 1;	/* so vfwait() will be called */
-	return (cfork(1, 1, 0));
+	return (cfork(1, 1, NULL, 0));
 }
 
 /*
@@ -115,12 +119,12 @@ forksys(int subcode, int flags)
 {
 	switch (subcode) {
 	case 0:
-		return (cfork(0, 1, flags));	/* forkx(flags) */
+		return (cfork(0, 1, NULL, flags));	/* forkx(flags) */
 	case 1:
-		return (cfork(0, 0, flags));	/* forkallx(flags) */
+		return (cfork(0, 0, NULL, flags));	/* forkallx(flags) */
 	case 2:
 		curthread->t_post_sys = 1;	/* so vfwait() will be called */
-		return (cfork(1, 1, flags));	/* vforkx(flags) */
+		return (cfork(1, 1, NULL, flags));	/* vforkx(flags) */
 	default:
 		return ((int64_t)set_errno(EINVAL));
 	}
@@ -149,9 +153,8 @@ disown_proc(proc_t *pp, proc_t *cp)
 		cp->p_psibling->p_sibling = cp->p_sibling;
 }
 
-/* ARGSUSED */
-static int64_t
-cfork(int isvfork, int isfork1, int flags)
+int64_t
+cfork(int isvfork, int isfork1, kspawn_param_t *ksp, int flags)
 {
 	proc_t *p = ttoproc(curthread);
 	struct as *as;
@@ -168,6 +171,9 @@ cfork(int isvfork, int isfork1, int flags)
 	lwpdir_t *ldp;
 	lwpent_t *lep;
 	lwpent_t *clep;
+	const bool isspawn = (ksp != NULL);
+
+	ASSERT(!isspawn || MUTEX_HELD(&ksp->ksp_lock));
 
 	clone = NULL;
 	/*
@@ -200,9 +206,10 @@ cfork(int isvfork, int isfork1, int flags)
 	 * cloned.  If doing forkall(), the process is held with
 	 * SHOLDFORK, so that the lwps are at a point where their
 	 * stacks can be copied which is on entry or exit from
-	 * the kernel.
+	 * the kernel. If we are spawning then we don't need to do
+	 * either.
 	 */
-	if (!holdlwps(isfork1 ? SHOLDFORK1 : SHOLDFORK)) {
+	if (!isspawn && !holdlwps(isfork1 ? SHOLDFORK1 : SHOLDFORK)) {
 		aston(curthread);
 		error = EINTR;
 		atomic_inc_32(&p->p_zone->zone_ffmisc);
@@ -238,7 +245,8 @@ cfork(int isvfork, int isfork1, int flags)
 	if (getproc(&cp, 0, GETPROC_USER) < 0) {
 		mutex_enter(&p->p_lock);
 		pool_barrier_exit();
-		continuelwps(p);
+		if (!isspawn)
+			continuelwps(p);
 		mutex_exit(&p->p_lock);
 		error = EAGAIN;
 		goto forkerr;
@@ -272,7 +280,7 @@ cfork(int isvfork, int isfork1, int flags)
 		 * the child as it uses its address space till it execs.
 		 */
 		cp->p_segacct = p->p_segacct;
-	} else {
+	} else if (!isspawn) {
 		/*
 		 * We need to hold P_PR_LOCK until the address space has
 		 * been duplicated and we've had a chance to remove from the
@@ -369,7 +377,7 @@ cfork(int isvfork, int isfork1, int flags)
 	/*
 	 * Allocate the child's lwp directory and lwpid hash table.
 	 */
-	if (isfork1)
+	if (isfork1 || isspawn)
 		cp->p_lwpdir_sz = 2;
 	else
 		cp->p_lwpdir_sz = p->p_lwpdir_sz;
@@ -397,6 +405,51 @@ cfork(int isvfork, int isfork1, int flags)
 		 */
 		lwptot(clone)->t_proc_flag |=
 		    (curthread->t_proc_flag & TP_TWAIT);
+	} else if (isspawn) {
+		// klwp_t *
+		// lwp_create(void (*proc)(),caddr_t arg,
+		// size_t len, proc_t *p, int state, int pri,
+		// const k_sigset_t *smask, int cid, id_t lwpid)
+		clone = lwp_create(spawn_main, (caddr_t)ksp, 0, cp,
+                    TS_STOPPED, curthread->t_pri, &curthread->t_hold,
+                    (id_t)-1, 1);
+		// possibly -      curthread->t_cid, 1);
+		if (clone == NULL)
+			goto forklwperr;
+
+#if 0
+	// Look at newproc
+		child->lwp->t_forw = &child_lwp->t_back;
+		cp->p_noval[0..3] = 0;
+
+		kthread_t *ct = child_lwp->t_lwp;
+		ct->t_hold = curthread->t_hold;
+
+		/*
+		 * Initialise scheduler state for the child LWP.
+		 * Retry the loop if the parent's class changes mid-copy.
+		 */
+		int cid;
+		do {
+			cid = p->p_cid;
+			CL_FORK(sclass[cid], pp, ct, &sched_params);
+			mutex_enter(&p->p_lock);
+		} while (p->p_cid != cid);
+
+		ct->t_clfuncs = p->p_clfuncs;
+		ct->t_cid     = p->p_cid;
+		ct->t_clpc    = p->p_clpc;
+
+		if (ct->t_cldata != NULL)
+			CL_FREE(sclass[cid], ct);
+		else {
+			ct->t_state = TS_SLEEP;		/* 4 */
+			CL_SETRUN(sclass[cid], p->p_clfuncs, ct);
+		}
+
+		mutex_exit(&p->p_lock);
+#endif
+
 	} else {
 		/* this is forkall(), no one can be in lwp_wait() */
 		ASSERT(p->p_lwpwait == 0 && p->p_lwpdwait == 0);
@@ -457,7 +510,7 @@ cfork(int isvfork, int isfork1, int flags)
 	 */
 
 	cp->p_lwpid = p->p_lwpid;
-	if (!isfork1) {
+	if (!isfork1 && !isspawn) {
 		cp->p_lwpdaemon = p->p_lwpdaemon;
 		cp->p_zombcnt = p->p_zombcnt;
 		/*
@@ -549,26 +602,39 @@ cfork(int isvfork, int isfork1, int flags)
 	 */
 	pgjoin(cp, p->p_pgidp);
 	cp->p_stat = SRUN;
-	/*
-	 * We are now done with all the lwps in the child process.
-	 */
-	t = cp->p_tlist;
-	do {
+	if (isspawn) {
 		/*
-		 * Set the lwp_suspend()ed lwps running.
-		 * They will suspend properly at syscall exit.
+		 * Wake the single LWP. It will run spawn_main() which will
+		 * in turn exec.
 		 */
-		if (t->t_proc_flag & TP_HOLDLWP)
-			lwp_create_done(t);
-		else {
-			/* set TS_CREATE to allow continuelwps() to work */
-			thread_lock(t);
-			ASSERT(t->t_state == TS_STOPPED &&
-			    !(t->t_schedflag & (TS_CREATE|TS_CSTART)));
-			t->t_schedflag |= TS_CREATE;
-			thread_unlock(t);
-		}
-	} while ((t = t->t_forw) != cp->p_tlist);
+		t = lwptot(clone);
+		t->t_proc_flag &= ~TP_HOLDLWP;
+		lwp_create_done(t);
+	} else {
+		/*
+		 * We are now done with all the lwps in the child process.
+		 */
+		t = cp->p_tlist;
+		do {
+			/*
+			 * Set the lwp_suspend()ed lwps running.
+			 * They will suspend properly at syscall exit.
+			 */
+			if (t->t_proc_flag & TP_HOLDLWP)
+				lwp_create_done(t);
+			else {
+				/*
+				 * set TS_CREATE to allow continuelwps() to
+				 * work
+				 * */
+				thread_lock(t);
+				ASSERT(t->t_state == TS_STOPPED &&
+				    !(t->t_schedflag & (TS_CREATE|TS_CSTART)));
+				t->t_schedflag |= TS_CREATE;
+				thread_unlock(t);
+			}
+		} while ((t = t->t_forw) != cp->p_tlist);
+	}
 	mutex_exit(&cp->p_lock);
 
 	if (isvfork) {
@@ -588,6 +654,10 @@ cfork(int isvfork, int isfork1, int flags)
 		sigdefault(cp);
 		continuelwps(cp);
 		mutex_exit(&cp->p_lock);
+	} else if (isspawn) {
+		//CPU_STATS_ADDQ(CPU, sys, spawn, 1);
+		DTRACE_PROC1(create, proc_t *, cp);
+		mutex_exit(&pidlock);
 	} else {
 		CPU_STATS_ADDQ(CPU, sys, sysfork, 1);
 		DTRACE_PROC1(create, proc_t *, cp);
@@ -668,7 +738,8 @@ forklwperr:
 
 	mutex_enter(&p->p_lock);
 	pool_barrier_exit();
-	continuelwps(p);
+	if (!isspawn)
+		continuelwps(p);
 	mutex_exit(&p->p_lock);
 	error = EAGAIN;
 forkerr:

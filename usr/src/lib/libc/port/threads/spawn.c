@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "lint.h"
@@ -33,55 +34,15 @@
 #include <sys/libc_kernel.h>
 #include <sys/procset.h>
 #include <sys/fork.h>
+#include <sys/sysmacros.h>
+#include <sys/syscall.h>
 #include <dirent.h>
 #include <alloca.h>
+#include <limits.h>
 #include <spawn.h>
+#include <stdbool.h>
+#include <sys/spawn_impl.h>
 #include <paths.h>
-
-#define	ALL_POSIX_SPAWN_FLAGS			\
-		(POSIX_SPAWN_RESETIDS |		\
-		POSIX_SPAWN_SETPGROUP |		\
-		POSIX_SPAWN_SETSIGDEF |		\
-		POSIX_SPAWN_SETSIGMASK |	\
-		POSIX_SPAWN_SETSCHEDPARAM |	\
-		POSIX_SPAWN_SETSCHEDULER |	\
-		POSIX_SPAWN_SETSID |		\
-		POSIX_SPAWN_SETSIGIGN_NP |	\
-		POSIX_SPAWN_NOSIGCHLD_NP |	\
-		POSIX_SPAWN_WAITPID_NP |	\
-		POSIX_SPAWN_NOEXECERR_NP)
-
-typedef struct {
-	int		sa_psflags;	/* POSIX_SPAWN_* flags */
-	int		sa_priority;
-	int		sa_schedpolicy;
-	pid_t		sa_pgroup;
-	sigset_t	sa_sigdefault;
-	sigset_t	sa_sigignore;
-	sigset_t	sa_sigmask;
-} spawn_attr_t;
-
-typedef enum file_action {
-	FA_OPEN,
-	FA_CLOSE,
-	FA_DUP2,
-	FA_CLOSEFROM,
-	FA_CHDIR,
-	FA_FCHDIR
-} file_action_t;
-
-typedef struct file_attr {
-	struct file_attr *fa_next;	/* circular list of file actions */
-	struct file_attr *fa_prev;
-	file_action_t	fa_type;	/* type of action */
-	int		fa_need_dirbuf;	/* only consulted in the head action */
-	char		*fa_path;	/* copied pathname for open() */
-	uint_t		fa_pathsize;	/* size of fa_path[] array */
-	int		fa_oflag;	/* oflag for open() */
-	mode_t		fa_mode;	/* mode for open() */
-	int		fa_filedes;	/* file descriptor for open()/close() */
-	int		fa_newfiledes;	/* new file descriptor for dup2() */
-} file_attr_t;
 
 #if defined(_LP64)
 #define	__open64	__open
@@ -92,6 +53,233 @@ extern int getdents64(int, dirent64_t *, size_t);
 #endif
 
 extern const char **_environ;
+
+/*
+ * Pack the argv[] and envp[] string vectors into sargs->sa_data as a single
+ * blob of NUL-terminated strings. Called first with sargs == NULL to compute
+ * the required buffer size, then again to populate the data and record the
+ * offsets and counts. Returns false if the combined size would exceed ARG_MAX
+ * or, on the second pass, would overflow the allocated buffer.
+ */
+static bool
+spawn_marshal_argenv(spawn_args_t *sargs, char *const *argp, char *const *envp,
+    size_t *lenp)
+{
+	struct vec {
+		char *const *vec;
+		uint32_t *off;
+		uint32_t *cnt;
+	} vecs[] = {
+		{ .vec = argp },
+		{ .vec = envp }
+	};
+
+	if (sargs != NULL) {
+		vecs[0].off = &sargs->sa_arg_off;
+		vecs[0].cnt = &sargs->sa_arg_cnt;
+		vecs[1].off = &sargs->sa_env_off;
+		vecs[1].cnt = &sargs->sa_env_cnt;
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(vecs); i++) {
+		struct vec *vec = &vecs[i];
+		uint32_t cnt = 0;
+		char *const *p;
+
+		if (vec->off != NULL)
+			*vec->off = (uint32_t)*lenp;
+
+		for (p = vec->vec; p != NULL && *p != NULL; p++) {
+			size_t sz = strlen(*p) + 1;
+
+			if (sargs != NULL) {
+				if (*lenp + sz > sargs->sa_datalen)
+					return (false);
+				(void) memcpy(&sargs->sa_data[*lenp], *p, sz);
+			}
+			*lenp += sz;
+			if (*lenp > ARG_MAX)
+				return (false);
+			cnt++;
+		}
+
+		if (vec->cnt != NULL)
+			*vec->cnt = cnt;
+	}
+
+	return (true);
+}
+
+/*
+ * Pack the spawn_attr_t and the circular list of file_attr_t records into
+ * sparam->sp_data. Called first with sparam == NULL to compute the required
+ * buffer size, then again to populate the data and record the offsets, lengths
+ * and counts. Returns false on the second pass if the data area would
+ * overflow.
+ */
+static bool
+spawn_marshal_param(spawn_param_t *sparam, const spawn_attr_t *sa,
+    const file_attr_t *fa, size_t *lenp)
+{
+	if (sa != NULL) {
+		size_t sz = sizeof (*sa);
+
+		if (sparam != NULL) {
+			if (*lenp + sz > sparam->sp_datalen)
+				return (false);
+			sparam->sp_attr_off = (uint32_t)*lenp;
+			sparam->sp_attr_len = (uint32_t)sz;
+			(void) memcpy(&sparam->sp_data[*lenp], sa, sz);
+		}
+		*lenp += sz;
+	}
+
+	if (fa != NULL) {
+		const file_attr_t *froot = fa;
+		uint32_t cnt = 0;
+
+		if (sparam != NULL)
+			sparam->sp_fattr_off = (uint32_t)*lenp;
+
+		do {
+			size_t sz = sizeof (kfile_attr_t) + fa->fa_pathsize;
+
+			if (sparam != NULL) {
+				kfile_attr_t *ka;
+
+				if (*lenp + sz > sparam->sp_datalen)
+					return (false);
+
+				ka = (kfile_attr_t *)&sparam->sp_data[*lenp];
+				ka->kfa_len = sz;
+				ka->kfa_type = fa->fa_type;
+				ka->kfa_pathsize = fa->fa_pathsize;
+
+				switch (fa->fa_type) {
+				case FA_OPEN:
+					ka->kfa_filedes = fa->fa_filedes;
+					ka->kfa_oflag = fa->fa_oflag;
+					ka->kfa_mode = fa->fa_mode;
+					/* FALLTHROUGH */
+				case FA_CHDIR:
+					(void) memcpy(ka->kfa_path,
+					    fa->fa_path, fa->fa_pathsize);
+					break;
+				case FA_CLOSE:
+				case FA_CLOSEFROM:
+				case FA_FCHDIR:
+					ka->kfa_filedes = fa->fa_filedes;
+					/* FALLTHROUGH */
+				case FA_DUP2:
+					ka->kfa_newfiledes = fa->fa_newfiledes;
+					break;
+				}
+			}
+			*lenp += sz;
+			cnt++;
+		} while ((fa = fa->fa_next) != froot);
+
+		if (sparam != NULL)
+			sparam->sp_fattr_cnt = cnt;
+	}
+
+	return (true);
+}
+
+int
+posix_spawn_new(pid_t *pidp, const char *path,
+    const posix_spawn_file_actions_t *file_actions,
+    const posix_spawnattr_t *attrp, char *const *argp, char *const *envp)
+{
+	spawn_attr_t *sa = (attrp != NULL) ? attrp->__spawn_attrp : NULL;
+	file_attr_t *fa = (file_actions != NULL) ? file_actions->__file_attrp :
+	    NULL;
+	spawn_args_t *sargs = NULL;
+	spawn_param_t *sparam = NULL;
+	pid_t pid;
+	size_t datalen, len;
+	int ret = 0;
+
+	if (attrp != NULL && sa == NULL)
+		return (EINVAL);
+	if (argp == NULL)
+		return (EINVAL);	// Should we reject this?
+
+	/*
+	 * spawn(2) creates a brand-new child process that does not share the
+	 * parent's address space, so every piece of state needed to set up the
+	 * child must be copied into the kernel ahead of time. Marshal the
+	 * spawn attributes and the list of file actions into a single
+	 * contiguous blob that the kernel can copy in and retain.
+	 */
+	datalen = 0;
+	if (!spawn_marshal_param(NULL, sa, fa, &datalen)) {
+		ret = EINVAL;
+		goto out;
+	}
+	if (datalen > 0) {
+		len = sizeof (*sparam) + datalen;
+		sparam = lmalloc(len);
+		if (sparam == NULL) {
+			ret = errno;
+			goto out;
+		}
+		sparam->sp_size = len;
+		sparam->sp_datalen = datalen;
+
+		datalen = 0;
+		if (!spawn_marshal_param(sparam, sa, fa, &datalen) ||
+		    datalen != sparam->sp_datalen) {
+			ret = EINVAL;
+			goto out;
+		}
+	}
+
+	/*
+	 * Likewise the argument and environment vectors. As supplied by the
+	 * caller these are arrays of pointers into strings that may well be
+	 * scattered around the parent's address space. Flatten the strings
+	 * into a single contiguous blob that the kernel can copy in.
+	 */
+	datalen = 0;
+	if (!spawn_marshal_argenv(NULL, argp, envp, &datalen)) {
+		ret = EINVAL;
+		goto out;
+	}
+	len = sizeof (*sargs) + datalen;
+	sargs = lmalloc(len);
+	if (sargs == NULL) {
+		ret = errno;
+		goto out;
+	}
+	sargs->sa_size = len;
+	sargs->sa_datalen = datalen;
+
+	datalen = 0;
+	if (!spawn_marshal_argenv(sargs, argp, envp, &datalen) ||
+	    datalen != sargs->sa_datalen) {
+		ret = EINVAL;
+		goto out;
+	}
+
+	pid = syscall(SYS_spawn, path,
+	    sparam, sparam != NULL ? sparam->sp_size : 0,
+	    sargs, sargs->sa_size);
+
+	if (pid == -1) {
+		ret = errno;	// XXX flesh out once we work out the kernel
+		goto out;
+	}
+
+	*pidp = pid;
+
+out:
+	if (sparam != NULL)
+		lfree(sparam, sparam->sp_size);
+	if (sargs != NULL)
+		lfree(sargs, sargs->sa_size);
+	return (ret);
+}
 
 /*
  * Support function:
@@ -297,16 +485,16 @@ get_error(int *errp)
  * vforkx() in the child are not and must never be exported from libc
  * as global symbols.  To do so would risk invoking the dynamic linker.
  */
-
 int
-posix_spawn(
-	pid_t *pidp,
-	const char *path,
-	const posix_spawn_file_actions_t *file_actions,
-	const posix_spawnattr_t *attrp,
-	char *const *argv,
-	char *const *envp)
+posix_spawn(pid_t *pidp, const char *path,
+    const posix_spawn_file_actions_t *file_actions,
+    const posix_spawnattr_t *attrp, char *const *argv, char *const *envp)
 {
+	if (getenv("NEW_SPAWN") != NULL) {
+		return (posix_spawn_new(pidp, path, file_actions, attrp,
+		    argv, envp));
+	}
+
 	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
 	void *dirbuf = NULL;
@@ -391,17 +579,12 @@ execat(const char *s1, const char *s2, char *si)
 	return (*s1? ++s1: NULL);
 }
 
-/* ARGSUSED */
 int
-posix_spawnp(
-	pid_t *pidp,
-	const char *file,
-	const posix_spawn_file_actions_t *file_actions,
-	const posix_spawnattr_t *attrp,
-	char *const *argv,
-	char *const *envp)
+posix_spawnp(pid_t *pidp, const char *file,
+    const posix_spawn_file_actions_t *file_actions,
+    const posix_spawnattr_t *attrp, char *const *argv, char *const *envp)
 {
-	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
+	spawn_attr_t *sap = attrp ? attrp->__spawn_attrp : NULL;
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
 	void *dirbuf = NULL;
 	const char *pathstr = (strchr(file, '/') == NULL)? getenv("PATH") : "";
@@ -535,16 +718,14 @@ posix_spawnp(
 }
 
 int
-posix_spawn_file_actions_init(
-	posix_spawn_file_actions_t *file_actions)
+posix_spawn_file_actions_init(posix_spawn_file_actions_t *file_actions)
 {
 	file_actions->__file_attrp = NULL;
 	return (0);
 }
 
 int
-posix_spawn_file_actions_destroy(
-	posix_spawn_file_actions_t *file_actions)
+posix_spawn_file_actions_destroy(posix_spawn_file_actions_t *file_actions)
 {
 	file_attr_t *froot = file_actions->__file_attrp;
 	file_attr_t *fap;
@@ -587,11 +768,8 @@ add_file_attr(posix_spawn_file_actions_t *file_actions, file_attr_t *fap)
 
 int
 posix_spawn_file_actions_addopen(
-	posix_spawn_file_actions_t *restrict file_actions,
-	int filedes,
-	const char *restrict path,
-	int oflag,
-	mode_t mode)
+    posix_spawn_file_actions_t *restrict file_actions,
+    int filedes, const char *restrict path, int oflag, mode_t mode)
 {
 	file_attr_t *fap;
 
@@ -618,8 +796,7 @@ posix_spawn_file_actions_addopen(
 
 int
 posix_spawn_file_actions_addclose(
-	posix_spawn_file_actions_t *restrict file_actions,
-	int filedes)
+    posix_spawn_file_actions_t *restrict file_actions, int filedes)
 {
 	file_attr_t *fap;
 
@@ -637,9 +814,8 @@ posix_spawn_file_actions_addclose(
 
 int
 posix_spawn_file_actions_adddup2(
-	posix_spawn_file_actions_t *restrict file_actions,
-	int filedes,
-	int newfiledes)
+    posix_spawn_file_actions_t *restrict file_actions,
+    int filedes, int newfiledes)
 {
 	file_attr_t *fap;
 
@@ -658,8 +834,7 @@ posix_spawn_file_actions_adddup2(
 
 int
 posix_spawn_file_actions_addclosefrom_np(
-	posix_spawn_file_actions_t *restrict file_actions,
-	int lowfiledes)
+    posix_spawn_file_actions_t *restrict file_actions, int lowfiledes)
 {
 	file_attr_t *fap;
 
@@ -707,8 +882,7 @@ posix_spawn_file_actions_addchdir_np(
 
 int
 posix_spawn_file_actions_addfchdir(
-    posix_spawn_file_actions_t *restrict file_actions,
-    int fd)
+    posix_spawn_file_actions_t *restrict file_actions, int fd)
 {
 	file_attr_t *fap;
 
@@ -724,15 +898,13 @@ posix_spawn_file_actions_addfchdir(
 
 int
 posix_spawn_file_actions_addfchdir_np(
-    posix_spawn_file_actions_t *restrict file_actions,
-    int fd)
+    posix_spawn_file_actions_t *restrict file_actions, int fd)
 {
 	return (posix_spawn_file_actions_addfchdir(file_actions, fd));
 }
 
 int
-posix_spawnattr_init(
-	posix_spawnattr_t *attr)
+posix_spawnattr_init(posix_spawnattr_t *attr)
 {
 	if ((attr->__spawn_attrp = lmalloc(sizeof (posix_spawnattr_t))) == NULL)
 		return (ENOMEM);
@@ -743,8 +915,7 @@ posix_spawnattr_init(
 }
 
 int
-posix_spawnattr_destroy(
-	posix_spawnattr_t *attr)
+posix_spawnattr_destroy(posix_spawnattr_t *attr)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -760,9 +931,7 @@ posix_spawnattr_destroy(
 }
 
 int
-posix_spawnattr_setflags(
-	posix_spawnattr_t *attr,
-	short flags)
+posix_spawnattr_setflags(posix_spawnattr_t *attr, short flags)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -775,9 +944,7 @@ posix_spawnattr_setflags(
 }
 
 int
-posix_spawnattr_getflags(
-	const posix_spawnattr_t *attr,
-	short *flags)
+posix_spawnattr_getflags(const posix_spawnattr_t *attr, short *flags)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -789,9 +956,7 @@ posix_spawnattr_getflags(
 }
 
 int
-posix_spawnattr_setpgroup(
-	posix_spawnattr_t *attr,
-	pid_t pgroup)
+posix_spawnattr_setpgroup(posix_spawnattr_t *attr, pid_t pgroup)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -803,9 +968,7 @@ posix_spawnattr_setpgroup(
 }
 
 int
-posix_spawnattr_getpgroup(
-	const posix_spawnattr_t *attr,
-	pid_t *pgroup)
+posix_spawnattr_getpgroup(const posix_spawnattr_t *attr, pid_t *pgroup)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -817,9 +980,8 @@ posix_spawnattr_getpgroup(
 }
 
 int
-posix_spawnattr_setschedparam(
-	posix_spawnattr_t *attr,
-	const struct sched_param *schedparam)
+posix_spawnattr_setschedparam(posix_spawnattr_t *attr,
+    const struct sched_param *schedparam)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -834,9 +996,8 @@ posix_spawnattr_setschedparam(
 }
 
 int
-posix_spawnattr_getschedparam(
-	const posix_spawnattr_t *attr,
-	struct sched_param *schedparam)
+posix_spawnattr_getschedparam(const posix_spawnattr_t *attr,
+    struct sched_param *schedparam)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -848,9 +1009,7 @@ posix_spawnattr_getschedparam(
 }
 
 int
-posix_spawnattr_setschedpolicy(
-	posix_spawnattr_t *attr,
-	int schedpolicy)
+posix_spawnattr_setschedpolicy(posix_spawnattr_t *attr, int schedpolicy)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -869,9 +1028,7 @@ posix_spawnattr_setschedpolicy(
 }
 
 int
-posix_spawnattr_getschedpolicy(
-	const posix_spawnattr_t *attr,
-	int *schedpolicy)
+posix_spawnattr_getschedpolicy(const posix_spawnattr_t *attr, int *schedpolicy)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -883,9 +1040,8 @@ posix_spawnattr_getschedpolicy(
 }
 
 int
-posix_spawnattr_setsigdefault(
-	posix_spawnattr_t *attr,
-	const sigset_t *sigdefault)
+posix_spawnattr_setsigdefault(posix_spawnattr_t *attr,
+    const sigset_t *sigdefault)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -897,9 +1053,8 @@ posix_spawnattr_setsigdefault(
 }
 
 int
-posix_spawnattr_getsigdefault(
-	const posix_spawnattr_t *attr,
-	sigset_t *sigdefault)
+posix_spawnattr_getsigdefault(const posix_spawnattr_t *attr,
+    sigset_t *sigdefault)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -911,9 +1066,8 @@ posix_spawnattr_getsigdefault(
 }
 
 int
-posix_spawnattr_setsigignore_np(
-	posix_spawnattr_t *attr,
-	const sigset_t *sigignore)
+posix_spawnattr_setsigignore_np(posix_spawnattr_t *attr,
+    const sigset_t *sigignore)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -925,9 +1079,8 @@ posix_spawnattr_setsigignore_np(
 }
 
 int
-posix_spawnattr_getsigignore_np(
-	const posix_spawnattr_t *attr,
-	sigset_t *sigignore)
+posix_spawnattr_getsigignore_np(const posix_spawnattr_t *attr,
+    sigset_t *sigignore)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -939,9 +1092,8 @@ posix_spawnattr_getsigignore_np(
 }
 
 int
-posix_spawnattr_setsigmask(
-	posix_spawnattr_t *attr,
-	const sigset_t *sigmask)
+posix_spawnattr_setsigmask(posix_spawnattr_t *attr,
+    const sigset_t *sigmask)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -953,9 +1105,8 @@ posix_spawnattr_setsigmask(
 }
 
 int
-posix_spawnattr_getsigmask(
-	const posix_spawnattr_t *attr,
-	sigset_t *sigmask)
+posix_spawnattr_getsigmask(const posix_spawnattr_t *attr,
+    sigset_t *sigmask)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
