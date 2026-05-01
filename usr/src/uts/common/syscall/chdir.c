@@ -22,10 +22,11 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -86,6 +87,32 @@ lookup:
 		return (set_errno(error));
 	}
 	return (0);
+}
+
+/*
+ * Kernel-callable version of chdir() taking a kernel-resident path, used to
+ * apply spawn(2) file actions in a spawned child. Unlike chdir(), the error
+ * is returned directly rather than via set_errno().
+ */
+int
+kchdir(const char *fname)
+{
+	vnode_t *vp;
+	int error;
+	int estale_retry = 0;
+
+lookup:
+	error = lookupname((char *)fname, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
+	if (error != 0) {
+		if (error == ESTALE && fs_need_estale_retry(estale_retry++))
+			goto lookup;
+		return (error);
+	}
+
+	error = chdirec(vp, B_FALSE, B_TRUE);
+	if (error == ESTALE && fs_need_estale_retry(estale_retry++))
+		goto lookup;
+	return (error);
 }
 
 /*

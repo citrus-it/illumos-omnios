@@ -24,6 +24,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  * Copyright 2022 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "assym.h"
@@ -135,9 +136,9 @@ fcnname##_info:							\
 	be,a	1f;			/* not weak */			\
 	restore;							\
 	btst	MODS_INSTALLED, %l1;	/* installed?? */		\
- 	bne,a,pt %xcc, 1f;		/* yes, do mod_hold thing */	\
- 	restore;							\
- 	ldn	[%l5 + MODS_RETFCN], %g1;				\
+	bne,a,pt %xcc, 1f;		/* yes, do mod_hold thing */	\
+	restore;							\
+	ldn	[%l5 + MODS_RETFCN], %g1;				\
 	jmp	%g1;			/* no, just jump to retfcn */	\
 	restore;							\
 1:	sub	%sp, %fp, %g1;	/* get (-)size of callers stack */	\
@@ -180,7 +181,7 @@ fcnname##_info:							\
 	btst	MODS_INSTALLED, %l1;					\
 	be,a	%xcc, 1f;			/* no, load module */	\
 	restore;							\
- 	ldn	[%l5], %g1;						\
+	ldn	[%l5], %g1;						\
 	jmp	%g1;				/* yes, off we go */	\
 	restore;							\
 1:	save	%sp, -SA(MINFRAME), %sp;/* new frame */			\
@@ -295,17 +296,17 @@ stubs_base:
 
 #ifndef SPEC_MODULE
 	MODULE(specfs,fs);
-	NO_UNLOAD_STUB(specfs, common_specvp,  	nomod_zero);
+	NO_UNLOAD_STUB(specfs, common_specvp,	nomod_zero);
 	NO_UNLOAD_STUB(specfs, makectty,		nomod_zero);
-	NO_UNLOAD_STUB(specfs, makespecvp,      	nomod_zero);
-	NO_UNLOAD_STUB(specfs, smark,           	nomod_zero);
-	NO_UNLOAD_STUB(specfs, spec_segmap,     	nomod_einval);
-	NO_UNLOAD_STUB(specfs, specfind,        	nomod_zero);
-	NO_UNLOAD_STUB(specfs, specvp,          	nomod_zero);
+	NO_UNLOAD_STUB(specfs, makespecvp,		nomod_zero);
+	NO_UNLOAD_STUB(specfs, smark,		nomod_zero);
+	NO_UNLOAD_STUB(specfs, spec_segmap,		nomod_einval);
+	NO_UNLOAD_STUB(specfs, specfind,		nomod_zero);
+	NO_UNLOAD_STUB(specfs, specvp,		nomod_zero);
 	NO_UNLOAD_STUB(specfs, devi_stillreferenced,	nomod_zero);
 	NO_UNLOAD_STUB(specfs, spec_getvnodeops,	nomod_zero);
 	NO_UNLOAD_STUB(specfs, spec_char_map,		nomod_zero);
-	NO_UNLOAD_STUB(specfs, specvp_devfs,  		nomod_zero);
+	NO_UNLOAD_STUB(specfs, specvp_devfs,		nomod_zero);
 	NO_UNLOAD_STUB(specfs, spec_assoc_vp_with_devi,	nomod_void);
 	NO_UNLOAD_STUB(specfs, spec_hold_devi_by_vp,	nomod_zero);
 	NO_UNLOAD_STUB(specfs, spec_snode_walk,		nomod_void);
@@ -323,34 +324,34 @@ stubs_base:
  */
 #ifndef SOCK_MODULE
 	MODULE(sockfs, fs);
-	SCALL_NU_STUB(sockfs, so_socket,  	nomod_zero);
+	SCALL_NU_STUB(sockfs, so_socket,	nomod_zero);
 	SCALL_NU_STUB(sockfs, so_socketpair,	nomod_zero);
-	SCALL_NU_STUB(sockfs, bind,  		nomod_zero);
-	SCALL_NU_STUB(sockfs, listen,  		nomod_zero);
-	SCALL_NU_STUB(sockfs, accept,  		nomod_zero);
-	SCALL_NU_STUB(sockfs, connect,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, shutdown,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, recv,  		nomod_zero);
-	SCALL_NU_STUB(sockfs, recvfrom,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, recvmsg,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, send,  		nomod_zero);
-	SCALL_NU_STUB(sockfs, sendmsg,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, sendto, 		nomod_zero);
+	SCALL_NU_STUB(sockfs, bind,		nomod_zero);
+	SCALL_NU_STUB(sockfs, listen,		nomod_zero);
+	SCALL_NU_STUB(sockfs, accept,		nomod_zero);
+	SCALL_NU_STUB(sockfs, connect,		nomod_zero);
+	SCALL_NU_STUB(sockfs, shutdown,		nomod_zero);
+	SCALL_NU_STUB(sockfs, recv,		nomod_zero);
+	SCALL_NU_STUB(sockfs, recvfrom,		nomod_zero);
+	SCALL_NU_STUB(sockfs, recvmsg,		nomod_zero);
+	SCALL_NU_STUB(sockfs, send,		nomod_zero);
+	SCALL_NU_STUB(sockfs, sendmsg,		nomod_zero);
+	SCALL_NU_STUB(sockfs, sendto,		nomod_zero);
 #ifdef _SYSCALL32_IMPL
-	SCALL_NU_STUB(sockfs, recv32,  		nomod_zero);
-	SCALL_NU_STUB(sockfs, recvfrom32,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, send32,  		nomod_zero);
-	SCALL_NU_STUB(sockfs, sendto32, 	nomod_zero);
+	SCALL_NU_STUB(sockfs, recv32,		nomod_zero);
+	SCALL_NU_STUB(sockfs, recvfrom32,	nomod_zero);
+	SCALL_NU_STUB(sockfs, send32,		nomod_zero);
+	SCALL_NU_STUB(sockfs, sendto32,		nomod_zero);
 #endif /* _SYSCALL32_IMPL */
-	SCALL_NU_STUB(sockfs, getpeername,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, getsockname,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, getsockopt,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, setsockopt,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, sockconfig,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sock_getmsg,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sock_putmsg,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sosendfile64,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, snf_segmap,  	nomod_einval);
+	SCALL_NU_STUB(sockfs, getpeername,	nomod_zero);
+	SCALL_NU_STUB(sockfs, getsockname,	nomod_zero);
+	SCALL_NU_STUB(sockfs, getsockopt,	nomod_zero);
+	SCALL_NU_STUB(sockfs, setsockopt,	nomod_zero);
+	SCALL_NU_STUB(sockfs, sockconfig,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sock_getmsg,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sock_putmsg,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sosendfile64,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, snf_segmap,	nomod_einval);
 	NO_UNLOAD_STUB(sockfs, sock_getfasync,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sotpi_sototpi,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, socket_sendmblk,	nomod_zero);
@@ -485,15 +486,15 @@ stubs_base:
 #ifndef TLI_MODULE
 	MODULE(tlimod,misc);
 	NO_UNLOAD_STUB(tlimod, t_kopen,		nomod_minus_one);
-	NO_UNLOAD_STUB(tlimod, t_kunbind,  	nomod_zero);
-	NO_UNLOAD_STUB(tlimod, t_kadvise,  	nomod_zero);
-	NO_UNLOAD_STUB(tlimod, t_krcvudata,  	nomod_zero);
-	NO_UNLOAD_STUB(tlimod, t_ksndudata,  	nomod_zero);
-	NO_UNLOAD_STUB(tlimod, t_kalloc,  	nomod_zero);
-	NO_UNLOAD_STUB(tlimod, t_kbind,  	nomod_zero);
-	NO_UNLOAD_STUB(tlimod, t_kclose,  	nomod_zero);
-	NO_UNLOAD_STUB(tlimod, t_kspoll,  	nomod_zero);
-	NO_UNLOAD_STUB(tlimod, t_kfree,  	nomod_zero);
+	NO_UNLOAD_STUB(tlimod, t_kunbind,	nomod_zero);
+	NO_UNLOAD_STUB(tlimod, t_kadvise,	nomod_zero);
+	NO_UNLOAD_STUB(tlimod, t_krcvudata,	nomod_zero);
+	NO_UNLOAD_STUB(tlimod, t_ksndudata,	nomod_zero);
+	NO_UNLOAD_STUB(tlimod, t_kalloc,	nomod_zero);
+	NO_UNLOAD_STUB(tlimod, t_kbind,		nomod_zero);
+	NO_UNLOAD_STUB(tlimod, t_kclose,	nomod_zero);
+	NO_UNLOAD_STUB(tlimod, t_kspoll,	nomod_zero);
+	NO_UNLOAD_STUB(tlimod, t_kfree,		nomod_zero);
 	NO_UNLOAD_STUB(tlimod, t_koptmgmt,	nomod_zero);
 	END_MODULE(tlimod);
 #endif
@@ -519,8 +520,8 @@ stubs_base:
  */
 #ifndef DES_MODULE
 	MODULE(des,misc);
-	STUB(des, cbc_crypt, 	 	nomod_zero);
-	STUB(des, ecb_crypt, 		nomod_zero);
+	STUB(des, cbc_crypt,		nomod_zero);
+	STUB(des, ecb_crypt,		nomod_zero);
 	STUB(des, _des_crypt,		nomod_zero);
 	END_MODULE(des);
 #endif
@@ -577,7 +578,7 @@ stubs_base:
  */
 #ifndef FIFO_MODULE
 	MODULE(fifofs,fs);
-	NO_UNLOAD_STUB(fifofs, fifovp,      	nomod_zero);
+	NO_UNLOAD_STUB(fifofs, fifovp,		nomod_zero);
 	NO_UNLOAD_STUB(fifofs, fifo_getinfo,	nomod_zero);
 	NO_UNLOAD_STUB(fifofs, fifo_vfastoff,	nomod_zero);
 	END_MODULE(fifofs);
@@ -620,7 +621,7 @@ stubs_base:
  */
 #ifndef NAMEFS_MODULE
 	MODULE(namefs,fs);
-	STUB(namefs, nm_unmountall, 	0);
+	STUB(namefs, nm_unmountall,	0);
 	END_MODULE(namefs);
 #endif
 
@@ -746,7 +747,7 @@ stubs_base:
  */
 #ifndef SYSACCT_MODULE
 	MODULE(sysacct,sys);
-	NO_UNLOAD_WSTUB(sysacct, acct,  		nomod_zero);
+	NO_UNLOAD_WSTUB(sysacct, acct,			nomod_zero);
 	NO_UNLOAD_WSTUB(sysacct, acct_fs_in_use,	nomod_zero);
 	END_MODULE(sysacct);
 #endif
@@ -834,7 +835,7 @@ stubs_base:
 #ifndef C2AUDIT_MODULE
 	MODULE(c2audit,sys);
 	NO_UNLOAD_STUB(c2audit, audit_init_module,	nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_start, 		nomod_zero);
+	NO_UNLOAD_STUB(c2audit, audit_start,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_finish,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit,			nomod_zero);
 	NO_UNLOAD_STUB(c2audit, auditdoor,		nomod_zero);
@@ -846,6 +847,7 @@ stubs_base:
 	NO_UNLOAD_STUB(c2audit, audit_anchorpath,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_exit,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_exec,		nomod_zero);
+	NO_UNLOAD_STUB(c2audit, audit_spawn,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_symlink,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_symlink_create,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_vncreate_start,	nomod_zero);
@@ -1223,7 +1225,7 @@ stubs_base:
  */
 #ifndef ELFEXEC_MODULE
 	MODULE(elfexec,exec);
-	STUB(elfexec, elfexec,      	nomod_einval);
+	STUB(elfexec, elfexec,		nomod_einval);
 	STUB(elfexec, elf32exec,	nomod_einval);
 	STUB(elfexec, mapexec_brand,	nomod_einval);
 	STUB(elfexec, mapexec32_brand,	nomod_einval);
