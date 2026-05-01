@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _BSM_AUDIT_KERNEL_H
@@ -340,6 +341,7 @@ extern struct t_audit_data *tad0;
 void au_pathhold(struct audit_path *);
 void au_pathrele(struct audit_path *);
 struct audit_path *au_pathdup(const struct audit_path *, int, int);
+struct audit_path *au_pathmake(const char *);
 
 void au_pad_init(void);
 

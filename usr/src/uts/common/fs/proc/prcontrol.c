@@ -26,7 +26,7 @@
 
 /*
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -583,8 +583,11 @@ pr_control(long cmd, void *generic, prnode_t *pnp, cred_t *cr)
 	p = pcp->prc_proc;
 	ASSERT(p != NULL);
 
-	/* System processes defy control. */
-	if (p->p_flag & SSYS) {
+	/*
+	 * System processes defy control, as does a spawn(2) child that
+	 * has not yet exec'd and is only partially constructed.
+	 */
+	if (p->p_flag & (SSYS | SSPAWNING)) {
 		prunlock(pnp);
 		return (EBUSY);
 	}
@@ -869,7 +872,11 @@ pr_control32(long cmd, void *generic, prnode_t *pnp, cred_t *cr)
 	p = pcp->prc_proc;
 	ASSERT(p != NULL);
 
-	if (p->p_flag & SSYS) {
+	/*
+	 * System processes defy control, as does a spawn(2) child that
+	 * has not yet exec'd and is only partially constructed.
+	 */
+	if (p->p_flag & (SSYS | SSPAWNING)) {
 		prunlock(pnp);
 		return (EBUSY);
 	}
@@ -1739,6 +1746,11 @@ pr_setentryexit(proc_t *p, sysset_t *sysset, int entry)
 int
 pr_set(proc_t *p, long flags)
 {
+	/*
+	 * System processes defy control. A spawn(2) child that has not yet
+	 * exec'd has no address space of its own (p_as == kas), so the same
+	 * test refuses it too.
+	 */
 	if ((p->p_flag & SSYS) || p->p_as == &kas)
 		return (EBUSY);
 
