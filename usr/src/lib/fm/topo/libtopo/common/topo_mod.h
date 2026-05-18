@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _TOPO_MOD_H
@@ -132,6 +132,7 @@ extern void topo_method_unregister(topo_mod_t *, tnode_t *, const char *);
 extern void topo_method_unregister_all(topo_mod_t *, tnode_t *);
 
 extern di_node_t topo_mod_devinfo(topo_mod_t *);
+extern uint64_t topo_mod_snap_gen(topo_mod_t *);
 extern ipmi_handle_t *topo_mod_ipmi_hold(topo_mod_t *);
 extern void topo_mod_ipmi_rele(topo_mod_t *);
 extern smbios_hdl_t *topo_mod_smbios(topo_mod_t *);

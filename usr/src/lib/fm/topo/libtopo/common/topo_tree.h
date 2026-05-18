@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _TOPO_TREE_H
@@ -109,6 +110,7 @@ typedef struct topo_alloc {
 
 struct topo_hdl {
 	pthread_mutex_t	th_lock;	/* lock protecting hdl */
+	uint64_t th_snap_gen;		/* incremented on each new snapshot */
 	char *th_uuid;			/* uuid of snapshot */
 	char *th_rootdir;		/* Root directory of plugin paths */
 	char *th_platform;		/* platform name */

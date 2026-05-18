@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -820,6 +820,18 @@ di_node_t
 topo_mod_devinfo(topo_mod_t *mod)
 {
 	return (topo_hdl_devinfo(mod->tm_hdl));
+}
+
+/*
+ * Returns a monotonically-increasing generation counter that is bumped at the
+ * start of every topo snapshot. Modules that cache per-snapshot state in their
+ * module-private data can use this to detect when the snapshot has changed and
+ * their cache must be invalidated.
+ */
+uint64_t
+topo_mod_snap_gen(topo_mod_t *mod)
+{
+	return (mod->tm_hdl->th_snap_gen);
 }
 
 smbios_hdl_t *

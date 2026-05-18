@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -333,6 +333,8 @@ topo_snap_create(topo_hdl_t *thp, int *errp, boolean_t need_force)
 
 	uuid_generate(uuid);
 	uuid_unparse(uuid, thp->th_uuid);
+	thp->th_snap_gen++;
+
 	if ((ustr = topo_hdl_strdup(thp, thp->th_uuid)) == NULL) {
 		*errp = ETOPO_NOMEM;
 		topo_hdl_unlock(thp);

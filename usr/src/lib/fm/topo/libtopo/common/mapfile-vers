@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -143,6 +143,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_mod_setdebug;
 	topo_mod_seterrno;
 	topo_mod_setspecific;
+	topo_mod_snap_gen;
 	topo_mod_str2nvl;
 	topo_mod_strdup;
 	topo_mod_strfree;

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -87,6 +87,7 @@ struct pcie_enum {
 
 static tnode_t *pcie_topo_add_bridge(topo_mod_t *, pcie_t *, tnode_t *,
     pcie_node_t *);
+static void pcie_free_tree(topo_mod_t *, pcie_t *, pcie_node_t *);
 
 static void
 pcie_node_print(topo_mod_t *mod, pcie_t *pcie, topo_list_t *list, uint_t indent)
@@ -530,11 +531,51 @@ pcie_rootnexus_enum_children(topo_mod_t *mod, pcie_t *pcie)
 	}
 }
 
+/*
+ * Discard any state populated by a previous call to pcie_gather().
+ */
+static void
+pcie_reset(topo_mod_t *mod, pcie_t *pcie)
+{
+	pcie_node_t *nexus, *nnexus;
+
+	topo_mod_dprintf(mod, "clearing cached state");
+
+	for (nexus = topo_list_next(&pcie->tp_rootnexus); nexus != NULL;
+	    nexus = nnexus) {
+		nnexus = topo_list_next(nexus);
+		topo_list_delete(&pcie->tp_rootnexus, nexus);
+		pcie_free_tree(mod, pcie, nexus);
+	}
+	nvlist_free(pcie->tp_cpupcidata);
+	pcie->tp_cpupcidata = NULL;
+	/* The devinfo handle is owned by fm; no cleanup required here */
+	pcie->tp_devinfo = DI_NODE_NIL;
+	pcie->tp_enumdone = false;
+}
+
 static bool
 pcie_gather(topo_mod_t *mod, pcie_t *pcie)
 {
+	uint64_t cur_gen = topo_mod_snap_gen(mod);
+
+	/*
+	 * If the snapshot generation has changed then any di_node_t handles
+	 * and tnode_t pointers we cached are stale; reset.
+	 */
+	if (pcie->tp_enumdone && cur_gen != pcie->tp_snap_gen) {
+		topo_mod_dprintf(mod, "new snapshot detected");
+		pcie_reset(mod, pcie);
+	}
+	pcie->tp_snap_gen = cur_gen;
+
 	if (pcie->tp_enumdone)
 		return (true);
+
+	if ((pcie->tp_devinfo = topo_mod_devinfo(mod)) == DI_NODE_NIL) {
+		topo_mod_dprintf(mod, "No devinfo node from framework");
+		return (false);
+	}
 
 	if (!pcie_physcpu_enum(mod, pcie))
 		return (false);
@@ -1027,23 +1068,13 @@ pcie_free_tree(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *node)
 static void
 pcie_free(topo_mod_t *mod, pcie_t *pcie)
 {
-	pcie_node_t *nexus, *nnexus;
-
 	if (pcie == NULL)
 		return;
-	/* The devinfo handle came from fm, don't do anything ourselves. */
-	pcie->tp_devinfo = DI_NODE_NIL;
+
+	pcie_reset(mod, pcie);
 
 	if (pcie->tp_pcidb_hdl != NULL)
 		pcidb_close(pcie->tp_pcidb_hdl);
-
-	for (nexus = topo_list_next(&pcie->tp_rootnexus); nexus != NULL;
-	    nexus = nnexus) {
-		nnexus = topo_list_next(nexus);
-		pcie_free_tree(mod, pcie, nexus);
-	}
-
-	nvlist_free(pcie->tp_cpupcidata);
 
 	topo_mod_free(mod, pcie, sizeof (*pcie));
 }
@@ -1060,11 +1091,7 @@ pcie_alloc(topo_mod_t *mod)
 		return (NULL);
 	}
 
-	if ((pcie->tp_devinfo = topo_mod_devinfo(mod)) == DI_NODE_NIL) {
-		topo_mod_dprintf(mod, "No devinfo node from framework");
-		pcie_free(mod, pcie);
-		return (NULL);
-	}
+	pcie->tp_devinfo = DI_NODE_NIL;
 
 	if ((pcie->tp_pcidb_hdl = pcidb_open(PCIDB_VERSION)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to open pcidb");

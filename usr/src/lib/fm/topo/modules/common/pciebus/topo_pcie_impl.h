@@ -54,6 +54,7 @@ typedef enum {
 
 typedef struct pcie {
 	di_node_t		tp_devinfo;
+	uint64_t		tp_snap_gen;
 	pcidb_hdl_t		*tp_pcidb_hdl;
 	topo_list_t		tp_rootnexus;
 	bool			tp_enumdone;
