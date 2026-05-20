@@ -640,6 +640,11 @@ inotify_vp_cmp(const void *lp, const void *rp)
 	return (0);
 }
 
+/*
+ * Lock-free refcount; safe because fem_install() and fem_uninstall() on the
+ * same vnode are serialised under inotify_lock, so a hold cannot race a
+ * release that would drop the count to zero.
+ */
 static void
 inotify_vp_hold(void *arg)
 {
