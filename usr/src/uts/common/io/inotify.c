@@ -1571,7 +1571,7 @@ inotify_ioctl(dev_t dev, int cmd, intptr_t arg, int md __unused,
 }
 
 static int
-inotify_close(dev_t dev, int flag, __unused int otyp __unused,
+inotify_close(dev_t dev, int flag __unused, int otyp __unused,
     cred_t *cred_p __unused)
 {
 	inotify_state_t *state, **sp;
