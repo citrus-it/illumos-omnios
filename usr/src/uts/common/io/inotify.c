@@ -675,47 +675,37 @@ inotify_vp_release(void *arg)
  * We snapshot rather than iterate-under-lock because inotify_watch_event()
  * acquires the owning state's ins_lock and may recursively call
  * inotify_watch_remove() -> inotify_fem_uninstall() (for IN_ONESHOT), which
- * needs to reacquire the container lock.
+ * needs to re-acquire the container lock.
+ *
+ * Sizing is determined by a single read of ivp_nwatches. If more watches
+ * happen to be inserted between that read and the walk, they sit at the tail
+ * of the list and we skip them. Those watches were installed in a race with
+ * this in-flight VOP and would not be guaranteed to see the event under any
+ * interleaving.
  */
 static inotify_watch_t **
 inotify_vp_snapshot(inotify_vp_t *ivp, inotify_watch_t **fast, uint_t fastsz,
     uint_t *outsz, uint_t *outn)
 {
-	inotify_watch_t **watches = NULL;
+	inotify_watch_t **watches;
 	inotify_watch_t *w;
 	uint_t sz, n;
 
 	mutex_enter(&ivp->ivp_lock);
-	for (;;) {
-		sz = ivp->ivp_nwatches;
-		if (sz <= fastsz) {
-			if (watches != NULL) {
-				kmem_free(watches,
-				    *outsz * sizeof (inotify_watch_t *));
-			}
-			watches = fast;
-			*outsz = fastsz;
-			break;
-		}
-		if (watches != NULL && sz <= *outsz)
-			break;
-
-		/*
-		 * Allocate outside the lock but loop around to re-check
-		 * `ivp_nwatches` afterwards.
-		 */
+	sz = ivp->ivp_nwatches;
+	if (sz <= fastsz) {
+		watches = fast;
+		*outsz = fastsz;
+	} else {
 		mutex_exit(&ivp->ivp_lock);
-		if (watches != NULL)
-			kmem_free(watches, *outsz * sizeof (*watches));
 		watches = kmem_alloc(sz * sizeof (*watches), KM_SLEEP);
 		*outsz = sz;
 		mutex_enter(&ivp->ivp_lock);
 	}
 
 	n = 0;
-	for (w = list_head(&ivp->ivp_watches); w != NULL;
+	for (w = list_head(&ivp->ivp_watches); w != NULL && n < sz;
 	    w = list_next(&ivp->ivp_watches, w)) {
-		VERIFY3U(n, <, sz);
 		inotify_watch_hold(w);
 		watches[n++] = w;
 	}
