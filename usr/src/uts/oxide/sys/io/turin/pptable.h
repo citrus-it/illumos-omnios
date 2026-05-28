@@ -60,6 +60,14 @@ typedef struct turin_pptable_debug {
 	int32_t		tppd_vddcr_soc_margin; /* mV */
 	int32_t		tppd_vddio_margin; /* mV */
 	uint8_t		tppd_cc1_dis; /* bool */
+	/*
+	 * 0 - fused default
+	 * 1 - disable performance determinism
+	 * 2 - enable performance determinism
+	 */
+#define TPPD_DETERMINISM_DEFAULT	0
+#define TPPD_DETERMINISM_DISABLE	1
+#define TPPD_DETERMINISM_ENABLE		2
 	uint8_t		tppd_detctl;
 	uint8_t		tppd_ccx_dci_mode; /* 1: async */
 	uint8_t		tppd_apb_dis; /* bool */

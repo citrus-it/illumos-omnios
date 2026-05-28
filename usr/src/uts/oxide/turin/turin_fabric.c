@@ -420,7 +420,7 @@ turin_fabric_smu_pptable_init(zen_fabric_t *fabric, void *pptable, size_t *len)
 	const uint8_t maj = iodie->zi_smu_fw[0];
 	const uint8_t min = iodie->zi_smu_fw[1];
 	const x86_processor_family_t family =
-	    chiprev_family(cpuid_getchiprev(CPU));
+	    chiprev_family(oxide_board_data->obd_cpuinfo.obc_chiprev);
 
 	/*
 	 * The format of the PP table is consistent across several SMU
@@ -453,6 +453,9 @@ turin_fabric_smu_pptable_init(zen_fabric_t *fabric, void *pptable, size_t *len)
 	turin_pptable_v94_91_t *tpp = pptable;
 	CTASSERT(sizeof (*tpp) <= MMU_PAGESIZE);
 	VERIFY3U(sizeof (*tpp), <=, *len);
+
+	/* XXX */
+	tpp->tpp_debug.tppd_detctl = TPPD_DETERMINISM_DEFAULT;
 
 	/*
 	 * Explicitly disable the overclocking part of the table.

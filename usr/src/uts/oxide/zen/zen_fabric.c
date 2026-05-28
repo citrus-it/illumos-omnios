@@ -29,6 +29,8 @@
 #include <sys/pcie.h>
 #include <sys/platform_detect.h>
 #include <sys/boot_data.h>
+#include <sys/boot_physmem.h>
+#include <vm/kboot_mmu.h>
 
 #include <io/amdzen/amdzen.h>
 #include <sys/amdzen/df.h>
@@ -1328,6 +1330,81 @@ zen_fabric_topo_init_ioms(zen_iodie_t *iodie, uint8_t nbiono, uint8_t iomsno)
 }
 
 static void
+zen_fabric_send_pptable(zen_iodie_t *iodie, zen_pptable_t *pptable)
+{
+	const zen_fabric_ops_t *fops = oxide_zen_fabric_ops();
+
+	if (zen_smu_rpc_send_pptable(iodie, pptable)) {
+		/*
+		 * A warning will already have been emitted in the case of a
+		 * failure.
+		 */
+		cmn_err(CE_CONT, "?IO die %u: Sent PP Table to SMU\n",
+		    iodie->zi_num);
+	}
+
+	if (fops->zfo_smu_pptable_post != NULL)
+		fops->zfo_smu_pptable_post(iodie);
+}
+
+/*
+ * This runs from zen_fabric_topo_init() before the VM system is online. We
+ * therefore allocate the buffer used to ship the PP table to the SMU from the
+ * earlyboot allocator. Once KMEM is up the contents will be copied into
+ * permanent kmem so that the table is observable via the debugger.
+ */
+static void
+zen_fabric_init_pptable(zen_fabric_t *fabric)
+{
+	zen_pptable_t *pptable = &fabric->zf_pptable;
+	const zen_fabric_ops_t *fops = oxide_zen_fabric_ops();
+	paddr_t pa;
+	uintptr_t va;
+	size_t len = MMU_PAGESIZE;
+
+	if (fops->zfo_smu_pptable_init == NULL)
+		return;
+
+	pa = eb_phys_alloc(MMU_PAGESIZE, MMU_PAGESIZE);
+	va = kbm_valloc(MMU_PAGESIZE, MMU_PAGESIZE);
+	kbm_map(va, pa, 0, PT_WRITABLE);
+	bzero((void *)va, MMU_PAGESIZE);
+
+	pptable->zpp_table = (void *)va;
+	pptable->zpp_pa = pa;
+	pptable->zpp_alloc_len = MMU_PAGESIZE;
+
+	if (!fops->zfo_smu_pptable_init(fabric, pptable->zpp_table, &len)) {
+		/*
+		 * We cannot return the earlyboot page, it will be reclaimed
+		 * along with the rest of earlyboot memory.
+		 */
+		pptable->zpp_table = NULL;
+		pptable->zpp_pa = 0;
+		pptable->zpp_alloc_len = 0;
+		return;
+	}
+
+	pptable->zpp_size = len;
+}
+
+static void
+zen_fabric_preserve_pptable(zen_fabric_t *fabric)
+{
+	zen_pptable_t *pptable = &fabric->zf_pptable;
+	void *new_table;
+
+	if (pptable->zpp_table == NULL)
+		return;
+
+	new_table = kmem_alloc(pptable->zpp_alloc_len, KM_SLEEP);
+	bcopy(pptable->zpp_table, new_table, pptable->zpp_alloc_len);
+
+	pptable->zpp_table = new_table;
+	pptable->zpp_pa = 0;
+}
+
+static void
 zen_fabric_topo_init_iodie(zen_soc_t *soc, uint8_t dieno)
 {
 	zen_iodie_t *iodie = &soc->zs_iodies[dieno];
@@ -1416,6 +1493,16 @@ zen_fabric_topo_init_iodie(zen_soc_t *soc, uint8_t dieno)
 		bcopy(iodie->zi_soc->zs_iodies[0].zi_brandstr,
 		    iodie->zi_brandstr, sizeof (iodie->zi_brandstr));
 	}
+
+	/*
+	 * The PP table is allocated and filled here, on the primary iodie,
+	 * because we need the SMU firmware version (populated above).
+	 * Subsequent iodies reuse the populated fabric-wide table.
+	 */
+	if ((iodie->zi_flags & ZEN_IODIE_F_PRIMARY) != 0)
+		zen_fabric_init_pptable(fabric);
+
+	zen_fabric_send_pptable(iodie, &fabric->zf_pptable);
 
 	/*
 	 * Invoke miscellaneous uarch-specific SMU initialization.
@@ -2475,58 +2562,6 @@ zen_fabric_ioms_iohc_disable_unused_pcie_bridges(zen_ioms_t *ioms,
 }
 
 static int
-zen_fabric_send_pptable(zen_iodie_t *iodie, void *pptable)
-{
-	const zen_fabric_ops_t *fops = oxide_zen_fabric_ops();
-
-	if (zen_smu_rpc_send_pptable(iodie, (zen_pptable_t *)pptable)) {
-		/*
-		 * A warning will already have been emitted in the case of a
-		 * failure.
-		 */
-		cmn_err(CE_CONT, "?IO die %u: Sent PP Table to SMU\n",
-		    iodie->zi_num);
-	}
-
-	if (fops->zfo_smu_pptable_post != NULL)
-		fops->zfo_smu_pptable_post(iodie);
-
-	return (0);
-}
-
-static void
-zen_fabric_init_pptable(zen_fabric_t *fabric)
-{
-	zen_pptable_t *pptable = &fabric->zf_pptable;
-	const zen_fabric_ops_t *fops = oxide_zen_fabric_ops();
-	ddi_dma_attr_t attr;
-	pfn_t pfn;
-	size_t len;
-
-	if (fops->zfo_smu_pptable_init == NULL)
-		return;
-
-	zen_fabric_dma_attr(&attr);
-	pptable->zpp_alloc_len = len = MMU_PAGESIZE;
-	pptable->zpp_table = contig_alloc(len, &attr, MMU_PAGESIZE, 1);
-	bzero(pptable->zpp_table, len);
-
-	if (!fops->zfo_smu_pptable_init(fabric, pptable->zpp_table, &len)) {
-		contig_free(pptable->zpp_table, pptable->zpp_alloc_len);
-		pptable->zpp_table = NULL;
-		pptable->zpp_alloc_len = 0;
-		return;
-	}
-
-	pptable->zpp_size = len;
-
-	pfn = hat_getpfnum(kas.a_hat, (caddr_t)pptable->zpp_table);
-	pptable->zpp_pa = mmu_ptob((uint64_t)pfn);
-
-	(void) zen_fabric_walk_iodie(fabric, zen_fabric_send_pptable, pptable);
-}
-
-static int
 zen_fabric_enable_hsmp_int(zen_iodie_t *iodie, void *arg __unused)
 {
 	if (zen_smu_rpc_enable_hsmp_int(iodie)) {
@@ -3055,6 +3090,13 @@ zen_fabric_init(void)
 	 */
 
 	/*
+	 * The PP table was allocated from the earlyboot allocator during
+	 * zen_fabric_topo_init(); now that kmem is available, copy it into
+	 * permanent memory so it survives earlyboot teardown.
+	 */
+	zen_fabric_preserve_pptable(fabric);
+
+	/*
 	 * These register debugging facilities are costly in both space and
 	 * time, so the source data used to populate them are only non-empty on
 	 * DEBUG kernels.
@@ -3092,11 +3134,6 @@ zen_fabric_init(void)
 	 * to hide this RAM from anyone.
 	 */
 	zen_fabric_walk_ioms(fabric, zen_fabric_disable_vga, NULL);
-
-	/*
-	 * Send the Power and Performance table to the SMU.
-	 */
-	zen_fabric_init_pptable(fabric);
 
 	/*
 	 * Miscellaneous SMU configuration.
