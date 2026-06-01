@@ -175,6 +175,27 @@ pcieadm_di_node_is_pci(di_node_t node)
 	return (B_FALSE);
 }
 
+/*
+ * Determine how deep this node is in the PCI hierarchy by counting the number
+ * of PCI ancestors above it. The kernel builds the devinfo tree from the
+ * secondary bus numbers of intervening bridges, so this count reflects the
+ * device's position behind any bridges. Devices on a root complex's bus have a
+ * depth of zero. This is used to indent tree-style output.
+ */
+uint_t
+pcieadm_di_pci_depth(di_node_t node)
+{
+	uint_t depth = 0;
+
+	for (di_node_t p = di_parent_node(node); p != DI_NODE_NIL;
+	    p = di_parent_node(p)) {
+		if (pcieadm_di_node_is_pci(p))
+			depth++;
+	}
+
+	return (depth);
+}
+
 static int
 pcieadm_di_walk_cb(di_node_t node, void *arg)
 {

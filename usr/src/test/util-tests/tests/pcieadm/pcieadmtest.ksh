@@ -96,6 +96,8 @@ pcieadm_bad_args save-cfgspace -a -d fantasy
 pcieadm_bad_args show-devs -h
 pcieadm_bad_args show-devs -p
 pcieadm_bad_args show-devs -s -o
+pcieadm_bad_args show-devs -t -o bdf
+pcieadm_bad_args show-devs -t -p -o bdf
 pcieadm_bad_args show-cfgspace
 pcieadm_bad_args show-cfgspace -d -H
 pcieadm_bad_args show-cfgspace -d
