@@ -34,6 +34,8 @@ typedef struct pcieadm_show_devs {
 	boolean_t *psd_used;
 	uint_t psd_nprint;
 	topo_hdl_t *psd_topo;
+	boolean_t psd_tree;
+	uint_t psd_maxdepth;
 } pcieadm_show_devs_t;
 
 typedef enum pcieadm_show_devs_otype {
@@ -92,6 +94,7 @@ typedef struct pcieadm_show_devs_ofmt {
 	char *psdo_ap;
 	char *psdo_ctlap;
 	char *psdo_loc;
+	uint_t psdo_depth;
 } pcieadm_show_devs_ofmt_t;
 
 static uint_t
@@ -140,7 +143,8 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 
 	switch (ofarg->ofmt_id) {
 	case PCIEADM_SDO_BDF:
-		ret = snprintf(buf, buflen, "%x/%x/%x", psdo->psdo_bus,
+		ret = snprintf(buf, buflen, "%*s%x/%x/%x",
+		    (int)(psdo->psdo_depth * 2), "", psdo->psdo_bus,
 		    psdo->psdo_dev, psdo->psdo_func);
 		break;
 	case PCIEADM_SDO_BDF_BUS:
@@ -684,6 +688,9 @@ pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 	oarg.psdo_dev = PCI_REG_DEV_G(regs[0]);
 	oarg.psdo_func = PCI_REG_FUNC_G(regs[0]);
 
+	if (psd->psd_tree)
+		oarg.psdo_depth = pcieadm_di_pci_depth(node);
+
 	if (oarg.psdo_func != 0 && !psd->psd_funcs) {
 		goto done;
 	}
@@ -875,11 +882,55 @@ done:
 	return (ret);
 }
 
+static int
+pcieadm_show_devs_maxdepth_cb(di_node_t node, void *arg)
+{
+	pcieadm_show_devs_t *psd = arg;
+	uint_t depth = pcieadm_di_pci_depth(node);
+
+	if (depth > psd->psd_maxdepth)
+		psd->psd_maxdepth = depth;
+
+	return (DI_WALK_CONTINUE);
+}
+
+/*
+ * Duplicate an ofmt field array, widening the BDF column by the requested
+ * amount so that indented tree output remains aligned. The caller is
+ * responsible for freeing the returned array.
+ */
+static ofmt_field_t *
+pcieadm_show_devs_tree_fields(const ofmt_field_t *base, uint_t extra)
+{
+	uint_t nfields = 0;
+	ofmt_field_t *fields;
+
+	while (base[nfields].of_name != NULL)
+		nfields++;
+
+	fields = calloc(nfields + 1, sizeof (ofmt_field_t));
+	if (fields == NULL) {
+		err(EXIT_FAILURE,
+		    "failed to allocate memory for tree output fields");
+	}
+
+	(void) memcpy(fields, base, (nfields + 1) * sizeof (ofmt_field_t));
+
+	for (uint_t i = 0; i < nfields; i++) {
+		if (fields[i].of_id == PCIEADM_SDO_BDF) {
+			fields[i].of_width += extra;
+			break;
+		}
+	}
+
+	return (fields);
+}
+
 void
 pcieadm_show_devs_usage(FILE *f)
 {
-	(void) fprintf(f, "\tshow-devs\t[-F] [-H] [-s | -o field[,...] [-p]] "
-	    "[filter...]\n");
+	(void) fprintf(f, "\tshow-devs\t[-F] [-H] [-t] [-L | -s] "
+	    "[-o field[,...] [-p]] [filter...]\n");
 }
 
 static void
@@ -894,8 +945,8 @@ pcieadm_show_devs_help(const char *fmt, ...)
 		(void) fprintf(stderr, "\n");
 	}
 
-	(void) fprintf(stderr, "Usage:  %s show-devs [-F] [-H] [-L | -s ] [-o "
-	    "field[,...] [-p]] [filter...]\n", pcieadm_progname);
+	(void) fprintf(stderr, "Usage:  %s show-devs [-F] [-H] [-t] [-L | -s] "
+	    "[-o field[,...] [-p]] [filter...]\n", pcieadm_progname);
 
 	(void) fprintf(stderr, "\nList PCI devices and functions in the "
 	    "system. Each <filter> selects a set\nof devices to show and "
@@ -905,7 +956,8 @@ pcieadm_show_devs_help(const char *fmt, ...)
 	    "\t-H\t\tomit the column header\n"
 	    "\t-o field\toutput fields to print\n"
 	    "\t-p\t\tparsable output (requires -o)\n"
-	    "\t-s\t\tlist speeds and widths\n\n"
+	    "\t-s\t\tlist speeds and widths\n"
+	    "\t-t\t\tindent devices to show the PCI hierarchy as a tree\n\n"
 	    "The following fields are supported:\n"
 	    "\tvid\t\tthe PCI vendor ID in hex\n"
 	    "\tdid\t\tthe PCI device ID in hex\n"
@@ -947,6 +999,7 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 	pcieadm_di_walk_t walk;
 	ofmt_status_t oferr;
 	const ofmt_field_t *ofmt;
+	ofmt_field_t *tree_ofmt = NULL;
 	boolean_t parse = B_FALSE;
 	boolean_t speeds = B_FALSE;
 	boolean_t loc = B_FALSE;
@@ -955,7 +1008,7 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 	psd.psd_pia = pcip;
 	psd.psd_funcs = B_TRUE;
 
-	while ((c = getopt(argc, argv, ":FHLo:ps")) != -1) {
+	while ((c = getopt(argc, argv, ":FHLo:pst")) != -1) {
 		switch (c) {
 		case 'F':
 			psd.psd_funcs = B_FALSE;
@@ -975,6 +1028,9 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 			break;
 		case 's':
 			speeds = B_TRUE;
+			break;
+		case 't':
+			psd.psd_tree = B_TRUE;
 			break;
 		case ':':
 			pcieadm_show_devs_help("option -%c requires an "
@@ -996,6 +1052,19 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 
 	if (fields != NULL && speeds) {
 		errx(EXIT_USAGE, "-s cannot be used with with -o");
+	}
+
+	/*
+	 * Tree output relies on a fixed set of indented columns, so it is not
+	 * compatible with custom field selection or parsable output. It does
+	 * work with the -s and -L variants of the default columns.
+	 */
+	if (psd.psd_tree && fields != NULL) {
+		errx(EXIT_USAGE, "-t cannot be used with -o");
+	}
+
+	if (psd.psd_tree && parse) {
+		errx(EXIT_USAGE, "-t cannot be used with -p");
 	}
 
 	if (fields == NULL) {
@@ -1026,9 +1095,6 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 			    "memory");
 		}
 	}
-
-	oferr = ofmt_open(fields, ofmt, flags, 0, &psd.psd_ofmt);
-	ofmt_check(oferr, parse, psd.psd_ofmt, pcieadm_ofmt_errx, warnx);
 
 	if (loc) {
 		/*
@@ -1068,6 +1134,29 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 		}
 	}
 
+	/*
+	 * For tree output we need to know the maximum hierarchy depth so that
+	 * we can widen the BDF column to keep the remaining columns aligned.
+	 * Take a pass over the devinfo tree to determine it and then build a
+	 * copy of the field set with a suitably widened BDF column. This must
+	 * happen after any topo snapshot above as libtopo cannot take its
+	 * snapshot while we are holding a devinfo snapshot of our own.
+	 */
+	if (psd.psd_tree) {
+		pcieadm_di_walk_t dwalk;
+
+		dwalk.pdw_arg = &psd;
+		dwalk.pdw_func = pcieadm_show_devs_maxdepth_cb;
+		pcieadm_di_walk(pcip, &dwalk);
+
+		tree_ofmt = pcieadm_show_devs_tree_fields(ofmt,
+		    psd.psd_maxdepth * 2);
+		ofmt = tree_ofmt;
+	}
+
+	oferr = ofmt_open(fields, ofmt, flags, 0, &psd.psd_ofmt);
+	ofmt_check(oferr, parse, psd.psd_ofmt, pcieadm_ofmt_errx, warnx);
+
 	walk.pdw_arg = &psd;
 	walk.pdw_func = pcieadm_show_devs_walk_cb;
 
@@ -1090,6 +1179,8 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 		topo_snap_release(psd.psd_topo);
 		topo_close(psd.psd_topo);
 	}
+
+	free(tree_ofmt);
 
 	return (ret);
 }
