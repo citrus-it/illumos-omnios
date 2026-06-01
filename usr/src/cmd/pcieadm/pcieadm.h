@@ -71,6 +71,7 @@ typedef struct {
  * Utilities
  */
 extern void pcieadm_di_walk(pcieadm_t *, pcieadm_di_walk_t *);
+extern uint_t pcieadm_di_pci_depth(di_node_t);
 extern void pcieadm_init_ops_kernel(pcieadm_t *, const pcieadm_ops_t **,
     void **);
 extern void pcieadm_fini_ops_kernel(void *);
