@@ -31,6 +31,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * WARNING: This is an implementation-specific header,
  * its contents are not guaranteed. Applications
  * should include <unistd.h> and not this header.
@@ -410,6 +414,18 @@ extern "C" {
 #define	_POSIX_REGEXP		1	/* Supports POSIX Regular Expressions */
 #define	_POSIX_SHELL		1	/* Supports POSIX shell */
 #define	_XOPEN_STREAMS		1	/* Supports XSI Streams Option Group */
+
+#if !defined(_STRICT_POSIX)
+/*
+ * Flags for close_range(). The values match those used by FreeBSD and
+ * Linux so that, should this interface ever be standardised, we are
+ * unlikely to end up conflicting with the standard. For the same reason
+ * flag (1 << 1) must never be assigned a meaning here; it is
+ * CLOSE_RANGE_UNSHARE on Linux, which has no equivalent on illumos.
+ */
+#define	CLOSE_RANGE_CLOEXEC	(1 << 2) /* Set FD_CLOEXEC, do not close */
+#define	CLOSE_RANGE_CLOFORK	(1 << 3) /* Set FD_CLOFORK, do not close */
+#endif /* !_STRICT_POSIX */
 
 #ifdef	__cplusplus
 }
