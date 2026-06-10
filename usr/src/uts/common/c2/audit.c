@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1262,6 +1263,44 @@ audit_exec(
 	}
 
 	if (pfcred != NULL || (kctx->auk_policy & AUDIT_ARGV) != 0)
+		au_uwrite(au_to_exec_args(argstr, argc));
+
+	if (kctx->auk_policy & AUDIT_ARGE)
+		au_uwrite(au_to_exec_env(envstr, envc));
+}
+
+/*
+ * ROUTINE:	AUDIT_SPAWN
+ * PURPOSE:	Records the details of a spawn(2) call: the path of the
+ *		program that was (or would have been) executed and, subject
+ *		to the same policies as for exec, the argument strings and
+ *		environment variables. The child's pid, or the error, is
+ *		carried by the return token. spawn(2) combines what are
+ *		otherwise two separately audited operations - fork and exec -
+ *		and the child itself never passes through system call entry,
+ *		so this single record must serve both purposes.
+ * CALLBY:	SPAWN
+ * NOTE:
+ * TODO:
+ * QUESTION:
+ */
+
+void
+audit_spawn(const char *path, const char *argstr, const char *envstr,
+    ssize_t argc, ssize_t envc)
+{
+	t_audit_data_t *tad;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
+
+	tad = U2A(u);
+
+	/* if not auditing this event, then do nothing */
+	if (!tad->tad_flag)
+		return;
+
+	au_uwrite(au_to_text(path));
+
+	if ((kctx->auk_policy & AUDIT_ARGV) != 0)
 		au_uwrite(au_to_exec_args(argstr, argc));
 
 	if (kctx->auk_policy & AUDIT_ARGE)

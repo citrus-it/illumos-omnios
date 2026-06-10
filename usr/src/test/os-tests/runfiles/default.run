@@ -70,6 +70,9 @@ tests = ['basic_args', 'basic_read', 'multipoll']
 [/opt/os-tests/tests/sigqueue]
 tests = ['sigqueue_queue_size']
 
+[/opt/os-tests/tests/spawn]
+tests = ['spawn-syscall.32', 'spawn-syscall.64']
+
 [/opt/os-tests/tests/sdevfs]
 user = root
 tests = ['sdevfs_eisdir']

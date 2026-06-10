@@ -14,7 +14,8 @@
 #
 
 PROGS = posix_spawn_chdir posix_spawn_fileactions posix_spawn_attr \
-	posix_spawn_path posix_spawn_pipe_np posix_spawn_priv
+	posix_spawn_defpath posix_spawn_path posix_spawn_pipe_np \
+	posix_spawn_priv
 
 HELPERS32 = posix_spawn_child.32
 HELPERS64 = posix_spawn_child.64

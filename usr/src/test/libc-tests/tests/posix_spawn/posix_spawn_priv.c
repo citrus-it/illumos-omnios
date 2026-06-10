@@ -48,22 +48,67 @@ typedef struct spawn_priv_test {
 static char posix_spawn_child_path[PATH_MAX];
 
 /*
+ * Spawn the child helper with the given attributes and verify that it
+ * reports the expected scheduling policy and priority.
+ */
+static bool
+spawn_sched_check(const char *desc, posix_spawnattr_t *attr, int want_policy,
+    int want_prio)
+{
+	posix_spawn_file_actions_t acts;
+	spawn_sched_result_t res;
+	ssize_t n;
+	bool bret = true;
+	char *argv[] = { posix_spawn_child_path, "sched", NULL };
+	int pipes[2];
+
+	posix_spawn_pipe_setup(&acts, pipes);
+
+	if (!posix_spawn_run_child(desc, posix_spawn_child_path,
+	    &acts, attr, argv)) {
+		bret = false;
+		goto out;
+	}
+
+	n = read(pipes[0], &res, sizeof (res));
+	if (n != sizeof (res)) {
+		warnx("TEST FAILED: %s: short read from pipe (%zd)", desc, n);
+		bret = false;
+		goto out;
+	}
+
+	if (res.ssr_policy != want_policy) {
+		warnx("TEST FAILED: %s: child policy is %d, expected %d",
+		    desc, res.ssr_policy, want_policy);
+		bret = false;
+	}
+
+	if (res.ssr_priority != want_prio) {
+		warnx("TEST FAILED: %s: child priority is %d, expected %d",
+		    desc, res.ssr_priority, want_prio);
+		bret = false;
+	}
+
+out:
+	VERIFY0(posix_spawn_file_actions_destroy(&acts));
+	VERIFY0(close(pipes[1]));
+	VERIFY0(close(pipes[0]));
+
+	return (bret);
+}
+
+/*
  * SETSCHEDULER: set the child's scheduling policy to a real-time class with a
  * specific priority. Verify the child sees the correct policy and priority.
  */
 static bool
 setscheduler_test(spawn_priv_test_t *test)
 {
-	posix_spawn_file_actions_t acts;
 	posix_spawnattr_t attr;
 	struct sched_param param;
-	spawn_sched_result_t res;
-	ssize_t n;
-	bool bret = true;
+	bool bret;
 	int orig_policy, new_policy, prio_min;
-	char *argv[] = { posix_spawn_child_path, "sched", NULL };
 	const char *desc = test->spt_name;
-	int pipes[2];
 
 	/*
 	 * Pick a real-time class that is not the policy for the current
@@ -78,45 +123,56 @@ setscheduler_test(spawn_priv_test_t *test)
 		return (false);
 	}
 
-	posix_spawn_pipe_setup(&acts, pipes);
-
 	VERIFY0(posix_spawnattr_init(&attr));
 	VERIFY0(posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSCHEDULER));
 	VERIFY0(posix_spawnattr_setschedpolicy(&attr, new_policy));
 	param.sched_priority = prio_min;
 	VERIFY0(posix_spawnattr_setschedparam(&attr, &param));
 
-	if (!posix_spawn_run_child(desc, posix_spawn_child_path,
-	    &acts, &attr, argv)) {
-		bret = false;
-		goto out;
-	}
+	bret = spawn_sched_check(desc, &attr, new_policy, prio_min);
 
-	n = read(pipes[0], &res, sizeof (res));
-	if (n != sizeof (res)) {
-		warnx("TEST FAILED: %s: short read from pipe (%zd)", desc, n);
-		bret = false;
-		goto out;
-	}
-
-	if (res.ssr_policy != new_policy) {
-		warnx("TEST FAILED: %s: "
-		    "child policy is %d, expected %d",
-		    desc, res.ssr_policy, new_policy);
-		bret = false;
-	}
-
-	if (res.ssr_priority != prio_min) {
-		warnx("TEST FAILED: %s: child priority is %d, expected %d",
-		    desc, res.ssr_priority, prio_min);
-		bret = false;
-	}
-
-out:
 	VERIFY0(posix_spawnattr_destroy(&attr));
-	VERIFY0(posix_spawn_file_actions_destroy(&acts));
-	VERIFY0(close(pipes[1]));
-	VERIFY0(close(pipes[0]));
+
+	return (bret);
+}
+
+/*
+ * SETSCHEDULER: set the child's scheduling policy to the fixed-priority
+ * class. libc constructs explicit scheduling class parameters only for the
+ * TS and RT classes; for everything else it uses the class-independent
+ * priority interface, so unlike the test above this exercises that path.
+ */
+static bool
+setscheduler_fx_test(spawn_priv_test_t *test)
+{
+	posix_spawnattr_t attr;
+	struct sched_param param;
+	bool bret;
+	int prio_max;
+	const char *desc = test->spt_name;
+
+	prio_max = sched_get_priority_max(SCHED_FX);
+	if (prio_max == -1) {
+		warn("TEST FAILED: %s: sched_get_priority_max(SCHED_FX)",
+		    desc);
+		return (false);
+	}
+	if (prio_max < 2) {
+		warnx("TEST FAILED: %s: FX priority range too small (%d)",
+		    desc, prio_max);
+		return (false);
+	}
+
+	VERIFY0(posix_spawnattr_init(&attr));
+	VERIFY0(posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSCHEDULER));
+	VERIFY0(posix_spawnattr_setschedpolicy(&attr, SCHED_FX));
+	/* A priority distinguishable from the FX default of 0 */
+	param.sched_priority = prio_max / 2;
+	VERIFY0(posix_spawnattr_setschedparam(&attr, &param));
+
+	bret = spawn_sched_check(desc, &attr, SCHED_FX, prio_max / 2);
+
+	VERIFY0(posix_spawnattr_destroy(&attr));
 
 	return (bret);
 }
@@ -131,15 +187,10 @@ static bool
 setschedparam_test(spawn_priv_test_t *test)
 {
 	const char *desc = test->spt_name;
-	int pipes[2];
-	posix_spawn_file_actions_t acts;
 	posix_spawnattr_t attr;
 	struct sched_param param, orig_param;
-	spawn_sched_result_t res;
-	ssize_t n;
-	bool bret = true;
+	bool bret;
 	int orig_policy, new_policy, parent_policy, prio_min;
-	char *argv[] = { posix_spawn_child_path, "sched", NULL };
 
 	/*
 	 * Save the original scheduling policy so we can restore it later.
@@ -179,49 +230,83 @@ setschedparam_test(spawn_priv_test_t *test)
 
 	parent_policy = sched_getscheduler(0);
 
-	posix_spawn_pipe_setup(&acts, pipes);
-
 	VERIFY0(posix_spawnattr_init(&attr));
 	VERIFY0(posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSCHEDPARAM));
 	param.sched_priority = prio_min + 1;
 	VERIFY0(posix_spawnattr_setschedparam(&attr, &param));
 
-	if (!posix_spawn_run_child(desc, posix_spawn_child_path,
-	    &acts, &attr, argv)) {
-		bret = false;
-		goto out;
-	}
+	bret = spawn_sched_check(desc, &attr, parent_policy, prio_min + 1);
 
-	n = read(pipes[0], &res, sizeof (res));
-	if (n != sizeof (res)) {
-		warnx("TEST FAILED: %s: short read from pipe (%zd)", desc, n);
-		bret = false;
-		goto out;
-	}
-
-	if (res.ssr_policy != parent_policy) {
-		warnx("TEST FAILED: %s: "
-		    "child policy is %d, expected parent's policy (%d)",
-		    desc, res.ssr_policy, parent_policy);
-		bret = false;
-	}
-
-	if (res.ssr_priority != prio_min + 1) {
-		warnx("TEST FAILED: %s: child priority is %d, expected %d",
-		    desc, res.ssr_priority, prio_min + 1);
-		bret = false;
-	}
-
-out:
 	/*
 	 * Restore the original scheduling policy.
 	 */
 	(void) sched_setscheduler(0, orig_policy, &orig_param);
 
 	VERIFY0(posix_spawnattr_destroy(&attr));
-	VERIFY0(posix_spawn_file_actions_destroy(&acts));
-	VERIFY0(close(pipes[1]));
-	VERIFY0(close(pipes[0]));
+
+	return (bret);
+}
+
+/*
+ * SETSCHEDPARAM with the parent in the fixed-priority class. The child
+ * inherits FX and the priority change is applied through the
+ * class-independent priority interface, as for the FX SETSCHEDULER test
+ * above.
+ */
+static bool
+setschedparam_fx_test(spawn_priv_test_t *test)
+{
+	const char *desc = test->spt_name;
+	posix_spawnattr_t attr;
+	struct sched_param param, orig_param;
+	bool bret;
+	int orig_policy, prio_max;
+
+	/*
+	 * Save the original scheduling policy so we can restore it later.
+	 */
+	orig_policy = sched_getscheduler(0);
+	if (orig_policy == -1) {
+		warn("TEST FAILED: %s: sched_getscheduler", desc);
+		return (false);
+	}
+	if (sched_getparam(0, &orig_param) != 0) {
+		warn("TEST FAILED: %s: sched_getparam", desc);
+		return (false);
+	}
+
+	prio_max = sched_get_priority_max(SCHED_FX);
+	if (prio_max == -1) {
+		warn("TEST FAILED: %s: sched_get_priority_max(SCHED_FX)",
+		    desc);
+		return (false);
+	}
+	if (prio_max < 2) {
+		warnx("TEST FAILED: %s: FX priority range too small (%d)",
+		    desc, prio_max);
+		return (false);
+	}
+
+	param.sched_priority = prio_max / 2;
+	if (sched_setscheduler(0, SCHED_FX, &param) == -1) {
+		warn("TEST FAILED: %s: sched_setscheduler(SCHED_FX) failed",
+		    desc);
+		return (false);
+	}
+
+	VERIFY0(posix_spawnattr_init(&attr));
+	VERIFY0(posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSCHEDPARAM));
+	param.sched_priority = prio_max / 2 + 1;
+	VERIFY0(posix_spawnattr_setschedparam(&attr, &param));
+
+	bret = spawn_sched_check(desc, &attr, SCHED_FX, prio_max / 2 + 1);
+
+	/*
+	 * Restore the original scheduling policy.
+	 */
+	(void) sched_setscheduler(0, orig_policy, &orig_param);
+
+	VERIFY0(posix_spawnattr_destroy(&attr));
 
 	return (bret);
 }
@@ -458,8 +543,12 @@ cleanup:
 static spawn_priv_test_t tests[] = {
 	{ .spt_name = "SETSCHEDULER: RT SCHED with min priority",
 	    .spt_func = setscheduler_test, .spt_priv = PRIV_PROC_PRIOCNTL },
+	{ .spt_name = "SETSCHEDULER: FX SCHED with mid-range priority",
+	    .spt_func = setscheduler_fx_test, .spt_priv = PRIV_PROC_PRIOCNTL },
 	{ .spt_name = "SETSCHEDPARAM: priority change under RT SCHED",
 	    .spt_func = setschedparam_test, .spt_priv = PRIV_PROC_PRIOCNTL },
+	{ .spt_name = "SETSCHEDPARAM: priority change under FX SCHED",
+	    .spt_func = setschedparam_fx_test, .spt_priv = PRIV_PROC_PRIOCNTL },
 	{ .spt_name = "RESETIDS: euid reset after seteuid(nobody)",
 	    .spt_func = resetids_priv_test, .spt_priv = PRIV_PROC_SETID },
 	{ .spt_name = "RESETIDS: setuid binary retains suid euid",

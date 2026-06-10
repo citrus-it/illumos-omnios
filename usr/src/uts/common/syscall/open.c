@@ -29,6 +29,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Oxide Computer Company
  */
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -48,6 +49,7 @@
 #include <sys/vfs.h>
 #include <sys/file.h>
 #include <sys/mode.h>
+#include <sys/model.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
 #include <c2/audit.h>
@@ -58,7 +60,7 @@
  */
 
 static int
-copen(int startfd, char *fname, int filemode, int createmode)
+copen(int startfd, char *fname, int filemode, int createmode, uio_seg_t seg)
 {
 	struct pathname pn;
 	vnode_t *vp, *sdvp;
@@ -68,7 +70,6 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	int fd, dupfd;
 	vnode_t *startvp;
 	proc_t *p = curproc;
-	uio_seg_t seg = UIO_USERSPACE;
 	char *open_filename = fname;
 	uint32_t auditing = AU_AUDITING();
 	char startchar;
@@ -94,7 +95,9 @@ copen(int startfd, char *fname, int filemode, int createmode)
 		/*
 		 * We're here via openat()
 		 */
-		if (copyin(fname, &startchar, sizeof (char)))
+		if (seg == UIO_SYSSPACE)
+			startchar = *fname;
+		else if (copyin(fname, &startchar, sizeof (char)))
 			return (set_errno(EFAULT));
 
 		/*
@@ -131,7 +134,9 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	 */
 	if (filemode & FXATTR) {
 		if (startfd == AT_FDCWD) {
-			if (copyin(fname, &startchar, sizeof (char)))
+			if (seg == UIO_SYSSPACE)
+				startchar = *fname;
+			else if (copyin(fname, &startchar, sizeof (char)))
 				return (set_errno(EFAULT));
 
 			/*
@@ -161,7 +166,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	if (filemode & (FXATTR|FXATTRDIROPEN)) {
 		vattr_t vattr;
 
-		if (error = pn_get(fname, UIO_USERSPACE, &pn)) {
+		if (error = pn_get(fname, seg, &pn)) {
 			goto out;
 		}
 
@@ -298,12 +303,28 @@ out:
 #endif
 
 /*
+ * Kernel-callable open of a kernel-resident path, used to apply spawn(2)
+ * file actions in a spawned child. The open mode conversion honours the
+ * data model of the spawning process.
+ */
+int
+kopenat(int startfd, char *path, int fmode, int cmode, model_t model)
+{
+	if (model == DATAMODEL_ILP32)
+		fmode = OPENMODE32(fmode);
+	else
+		fmode = OPENMODE64(fmode);
+
+	return (copen(startfd, path, fmode, cmode, UIO_SYSSPACE));
+}
+
+/*
  * Open a file.
  */
 int
 openat(int fd, char *path, int fmode, int cmode)
 {
-	return (copen(fd, path, OPENMODE(fmode), cmode));
+	return (copen(fd, path, OPENMODE(fmode), cmode, UIO_USERSPACE));
 }
 
 int
@@ -319,7 +340,7 @@ open(char *path, int fmode, int cmode)
 int
 openat64(int fd, char *path, int fmode, int cmode)
 {
-	return (copen(fd, path, OPENMODE64(fmode), cmode));
+	return (copen(fd, path, OPENMODE64(fmode), cmode, UIO_USERSPACE));
 }
 
 int
@@ -337,7 +358,7 @@ open64(char *path, int fmode, int cmode)
 int
 openat32(int fd, char *path, int fmode, int cmode)
 {
-	return (copen(fd, path, OPENMODE32(fmode), cmode));
+	return (copen(fd, path, OPENMODE32(fmode), cmode, UIO_USERSPACE));
 }
 
 int

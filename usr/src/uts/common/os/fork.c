@@ -22,12 +22,14 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/types.h>
+#include <sys/stdbool.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
 #include <sys/signal.h>
@@ -56,6 +58,7 @@
 #include <sys/vtrace.h>
 #include <sys/debug.h>
 #include <sys/shm_impl.h>
+#include <sys/spawn_impl.h>
 #include <sys/door_data.h>
 #include <vm/as.h>
 #include <vm/rm.h>
@@ -80,8 +83,8 @@
 #include <sys/brand.h>
 #include <sys/fork.h>
 
-static int64_t cfork(int, int, int);
-static int getproc(proc_t **, pid_t, uint_t);
+int64_t cfork(int, int, kspawn_param_t *, int);
+static int getproc(proc_t **, pid_t, uint_t, kspawn_param_t *);
 #define	GETPROC_USER	0x0
 #define	GETPROC_KERNEL	0x1
 #define	GETPROC_ZSCHED	0x2
@@ -103,7 +106,7 @@ int64_t
 vfork(void)
 {
 	curthread->t_post_sys = 1;	/* so vfwait() will be called */
-	return (cfork(1, 1, 0));
+	return (cfork(1, 1, NULL, 0));
 }
 
 /*
@@ -115,12 +118,12 @@ forksys(int subcode, int flags)
 {
 	switch (subcode) {
 	case 0:
-		return (cfork(0, 1, flags));	/* forkx(flags) */
+		return (cfork(0, 1, NULL, flags));	/* forkx(flags) */
 	case 1:
-		return (cfork(0, 0, flags));	/* forkallx(flags) */
+		return (cfork(0, 0, NULL, flags));	/* forkallx(flags) */
 	case 2:
 		curthread->t_post_sys = 1;	/* so vfwait() will be called */
-		return (cfork(1, 1, flags));	/* vforkx(flags) */
+		return (cfork(1, 1, NULL, flags));	/* vforkx(flags) */
 	default:
 		return ((int64_t)set_errno(EINVAL));
 	}
@@ -149,9 +152,8 @@ disown_proc(proc_t *pp, proc_t *cp)
 		cp->p_psibling->p_sibling = cp->p_sibling;
 }
 
-/* ARGSUSED */
-static int64_t
-cfork(int isvfork, int isfork1, int flags)
+int64_t
+cfork(int isvfork, int isfork1, kspawn_param_t *ksp, int flags)
 {
 	proc_t *p = ttoproc(curthread);
 	struct as *as;
@@ -168,6 +170,9 @@ cfork(int isvfork, int isfork1, int flags)
 	lwpdir_t *ldp;
 	lwpent_t *lep;
 	lwpent_t *clep;
+	const bool isspawn = (ksp != NULL);
+
+	ASSERT(!isspawn || MUTEX_HELD(&ksp->ksp_lock));
 
 	clone = NULL;
 	/*
@@ -200,9 +205,10 @@ cfork(int isvfork, int isfork1, int flags)
 	 * cloned.  If doing forkall(), the process is held with
 	 * SHOLDFORK, so that the lwps are at a point where their
 	 * stacks can be copied which is on entry or exit from
-	 * the kernel.
+	 * the kernel. If we are spawning then we don't need to do
+	 * either.
 	 */
-	if (!holdlwps(isfork1 ? SHOLDFORK1 : SHOLDFORK)) {
+	if (!isspawn && !holdlwps(isfork1 ? SHOLDFORK1 : SHOLDFORK)) {
 		aston(curthread);
 		error = EINTR;
 		atomic_inc_32(&p->p_zone->zone_ffmisc);
@@ -235,10 +241,11 @@ cfork(int isvfork, int isfork1, int flags)
 	/*
 	 * Create a child proc struct. Place a VN_HOLD on appropriate vnodes.
 	 */
-	if (getproc(&cp, 0, GETPROC_USER) < 0) {
+	if (getproc(&cp, 0, GETPROC_USER, ksp) < 0) {
 		mutex_enter(&p->p_lock);
 		pool_barrier_exit();
-		continuelwps(p);
+		if (!isspawn)
+			continuelwps(p);
 		mutex_exit(&p->p_lock);
 		error = EAGAIN;
 		goto forkerr;
@@ -272,7 +279,7 @@ cfork(int isvfork, int isfork1, int flags)
 		 * the child as it uses its address space till it execs.
 		 */
 		cp->p_segacct = p->p_segacct;
-	} else {
+	} else if (!isspawn) {
 		/*
 		 * We need to hold P_PR_LOCK until the address space has
 		 * been duplicated and we've had a chance to remove from the
@@ -369,7 +376,7 @@ cfork(int isvfork, int isfork1, int flags)
 	/*
 	 * Allocate the child's lwp directory and lwpid hash table.
 	 */
-	if (isfork1)
+	if (isfork1 || isspawn)
 		cp->p_lwpdir_sz = 2;
 	else
 		cp->p_lwpdir_sz = p->p_lwpdir_sz;
@@ -397,6 +404,50 @@ cfork(int isvfork, int isfork1, int flags)
 		 */
 		lwptot(clone)->t_proc_flag |=
 		    (curthread->t_proc_flag & TP_TWAIT);
+	} else if (isspawn) {
+		kthread_t *ct;
+		void *bufp;
+		id_t cid;
+		int val;
+
+		/*
+		 * Create the single LWP that will carry out the spawn. It
+		 * starts life in the kernel in spawn_main() which will
+		 * exec the target program after applying appropriate
+		 * attributes.
+		 */
+		clone = lwp_create(spawn_main, (caddr_t)ksp, 0, cp,
+		    TS_STOPPED, curthread->t_pri, &curthread->t_hold,
+		    NOCLASS, 1);
+		if (clone == NULL)
+			goto forklwperr;
+
+		/*
+		 * Initialise the scheduling class of the new LWP from the
+		 * spawning thread, as is done in forklwp().
+		 */
+		ct = lwptot(clone);
+retry:
+		cid = curthread->t_cid;
+		val = CL_ALLOC(&bufp, cid, KM_SLEEP);
+		ASSERT(val == 0);
+
+		mutex_enter(&p->p_lock);
+		if (cid != curthread->t_cid) {
+			/*
+			 * Someone just changed this thread's scheduling
+			 * class, so go back and allocating the buffer again.
+			 */
+			mutex_exit(&p->p_lock);
+			CL_FREE(cid, bufp);
+			goto retry;
+		}
+
+		ct->t_clfuncs = curthread->t_clfuncs;
+		CL_FORK(curthread, ct, bufp);
+		/* set after data is allocated so prgetpsinfo works */
+		ct->t_cid = curthread->t_cid;
+		mutex_exit(&p->p_lock);
 	} else {
 		/* this is forkall(), no one can be in lwp_wait() */
 		ASSERT(p->p_lwpwait == 0 && p->p_lwpdwait == 0);
@@ -456,8 +507,12 @@ cfork(int isvfork, int isfork1, int flags)
 	 * No fork failures occur beyond this point.
 	 */
 
-	cp->p_lwpid = p->p_lwpid;
-	if (!isfork1) {
+	/*
+	 * A spawned child has a single new LWP with tid 1. Everything else
+	 * inherits the parent's most recently allocated lwpid.
+	 */
+	cp->p_lwpid = isspawn ? 1 : p->p_lwpid;
+	if (!isfork1 && !isspawn) {
 		cp->p_lwpdaemon = p->p_lwpdaemon;
 		cp->p_zombcnt = p->p_zombcnt;
 		/*
@@ -513,10 +568,17 @@ cfork(int isvfork, int isfork1, int flags)
 		mutex_exit(&p->p_lock);
 	}
 
-	if (PROC_IS_BRANDED(p))
-		BROP(p)->b_lwp_setrval(clone, p->p_pid, 1);
-	else
-		lwp_setrval(clone, p->p_pid, 1);
+	/*
+	 * There is no need to set a return value for a spawned child; its
+	 * register frame is completely rebuilt by setregs() when it execs
+	 * and it never returns from a fork.
+	 */
+	if (!isspawn) {
+		if (PROC_IS_BRANDED(p))
+			BROP(p)->b_lwp_setrval(clone, p->p_pid, 1);
+		else
+			lwp_setrval(clone, p->p_pid, 1);
+	}
 
 	/* set return values for parent */
 	r.r_val1 = (int)cp->p_pid;
@@ -549,26 +611,41 @@ cfork(int isvfork, int isfork1, int flags)
 	 */
 	pgjoin(cp, p->p_pgidp);
 	cp->p_stat = SRUN;
-	/*
-	 * We are now done with all the lwps in the child process.
-	 */
-	t = cp->p_tlist;
-	do {
+	if (isspawn) {
+		cp->p_spawn_ksp = ksp;
+
 		/*
-		 * Set the lwp_suspend()ed lwps running.
-		 * They will suspend properly at syscall exit.
+		 * Wake the single LWP. It will run spawn_main() which will
+		 * in turn exec.
 		 */
-		if (t->t_proc_flag & TP_HOLDLWP)
-			lwp_create_done(t);
-		else {
-			/* set TS_CREATE to allow continuelwps() to work */
-			thread_lock(t);
-			ASSERT(t->t_state == TS_STOPPED &&
-			    !(t->t_schedflag & (TS_CREATE|TS_CSTART)));
-			t->t_schedflag |= TS_CREATE;
-			thread_unlock(t);
-		}
-	} while ((t = t->t_forw) != cp->p_tlist);
+		t = lwptot(clone);
+		t->t_proc_flag &= ~TP_HOLDLWP;
+		lwp_create_done(t);
+	} else {
+		/*
+		 * We are now done with all the lwps in the child process.
+		 */
+		t = cp->p_tlist;
+		do {
+			/*
+			 * Set the lwp_suspend()ed lwps running.
+			 * They will suspend properly at syscall exit.
+			 */
+			if (t->t_proc_flag & TP_HOLDLWP) {
+				lwp_create_done(t);
+			} else {
+				/*
+				 * set TS_CREATE to allow continuelwps() to
+				 * work
+				 */
+				thread_lock(t);
+				ASSERT(t->t_state == TS_STOPPED &&
+				    !(t->t_schedflag & (TS_CREATE|TS_CSTART)));
+				t->t_schedflag |= TS_CREATE;
+				thread_unlock(t);
+			}
+		} while ((t = t->t_forw) != cp->p_tlist);
+	}
 	mutex_exit(&cp->p_lock);
 
 	if (isvfork) {
@@ -588,6 +665,10 @@ cfork(int isvfork, int isfork1, int flags)
 		sigdefault(cp);
 		continuelwps(cp);
 		mutex_exit(&cp->p_lock);
+	} else if (isspawn) {
+		CPU_STATS_ADDQ(CPU, sys, sysspawn, 1);
+		DTRACE_PROC1(create, proc_t *, cp);
+		mutex_exit(&pidlock);
 	} else {
 		CPU_STATS_ADDQ(CPU, sys, sysfork, 1);
 		DTRACE_PROC1(create, proc_t *, cp);
@@ -619,9 +700,15 @@ forklwperr:
 	} else {
 		if (cp->p_segacct)
 			shmexit(cp);
-		as = cp->p_as;
-		cp->p_as = &kas;
-		as_free(as);
+		/*
+		 * A spawned child has no address space of its own before it
+		 * execs (cp->p_as remains &kas), so there is nothing to free.
+		 */
+		if (cp->p_as != &kas) {
+			as = cp->p_as;
+			cp->p_as = &kas;
+			as_free(as);
+		}
 	}
 
 	if (cp->p_lwpdir) {
@@ -668,7 +755,8 @@ forklwperr:
 
 	mutex_enter(&p->p_lock);
 	pool_barrier_exit();
-	continuelwps(p);
+	if (!isspawn)
+		continuelwps(p);
 	mutex_exit(&p->p_lock);
 	error = EAGAIN;
 forkerr:
@@ -816,7 +904,7 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct,
 		ASSERT(pid != 1);
 		ASSERT(pid >= 0);
 
-		if (getproc(&p, pid, GETPROC_KERNEL) < 0)
+		if (getproc(&p, pid, GETPROC_KERNEL, NULL) < 0)
 			return (EAGAIN);
 
 		/*
@@ -869,7 +957,7 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct,
 			pid = 0;
 		}
 
-		if (getproc(&p, pid, flag) < 0)
+		if (getproc(&p, pid, flag, NULL) < 0)
 			return (EAGAIN);
 		/*
 		 * init creates a new task, distinct from the task
@@ -955,7 +1043,7 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct,
  * create a child proc struct.
  */
 static int
-getproc(proc_t **cpp, pid_t pid, uint_t flags)
+getproc(proc_t **cpp, pid_t pid, uint_t flags, kspawn_param_t *ksp)
 {
 	proc_t		*pp, *cp;
 	pid_t		newpid;
@@ -968,6 +1056,7 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	kproject_t	*proj;
 	zone_t		*zone;
 	int		rctlfail = 0;
+	const bool	isspawn = (ksp != NULL);
 
 	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN)
 		return (-1);	/* no point in starting new processes */
@@ -1080,7 +1169,7 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	cr = CRED();
 	ruid = crgetruid(cr);
 	zoneid = crgetzoneid(cr);
-	if (nproc >= v.v_maxup && 	/* short-circuit; usually false */
+	if (nproc >= v.v_maxup &&	/* short-circuit; usually false */
 	    (nproc >= v.v_maxupttl ||
 	    upcount_get(ruid, zoneid) >= v.v_maxup) &&
 	    secpolicy_newproc(cr) != 0) {
@@ -1102,9 +1191,14 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	practive->p_prev = cp;
 	practive = cp;
 
-	cp->p_ignore = pp->p_ignore;
-	cp->p_siginfo = pp->p_siginfo;
 	cp->p_flag = pp->p_flag & (SJCTL|SNOWAIT|SNOCD);
+	/*
+	 * A spawn(2) child is only partially constructed until it execs.
+	 * SSPAWNING tells /proc to refuse attempts to control it until
+	 * then.
+	 */
+	if (isspawn)
+		cp->p_flag |= SSPAWNING;
 	cp->p_sessp = pp->p_sessp;
 	sess_hold(pp);
 	cp->p_bssbase = pp->p_bssbase;
@@ -1210,15 +1304,18 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 	 * Duplicate any audit information kept in the process table
 	 */
 	if (audit_active)	/* copy audit data to cp */
-		audit_newproc(cp);
+		audit_newproc(cp, ksp != NULL);
 
 	crhold(cp->p_cred = cr);
 
 	/*
 	 * Bump up the counts on the file structures pointed at by the
 	 * parent's file table since the child will point at them too.
+	 * When spawning, only a subset of the descriptors may be copied
+	 * and flist_spawn() takes the additional holds itself.
 	 */
-	fcnt_add(P_FINFO(pp), 1);
+	if (!isspawn)
+		fcnt_add(P_FINFO(pp), 1);
 
 	mutex_enter(&pp->p_lock);
 	if (PTOU(pp)->u_cdir) {
@@ -1234,14 +1331,27 @@ getproc(proc_t **cpp, pid_t pid, uint_t flags)
 		VN_HOLD(PTOU(pp)->u_rdir);
 	if (PTOU(pp)->u_cwd)
 		refstr_hold(PTOU(pp)->u_cwd);
-	mutex_exit(&pp->p_lock);
 
 	/*
-	 * copy the parent's uarea.
+	 * Copy the parent's uarea and signal dispositions. This is done
+	 * while still holding pp->p_lock so that the directory vnode
+	 * pointers copied are those on which the holds were just taken.
+	 * Unlike fork, a spawning parent's other threads keep running, so
+	 * without the lock a concurrent chdir() could swap and release a
+	 * vnode between the hold and the copy. The signal disposition
+	 * copies need the same protection from a concurrent sigaction()
+	 * since setsigact() mutates them under p_lock.
 	 */
 	uarea = PTOU(cp);
 	bcopy(PTOU(pp), uarea, sizeof (*uarea));
-	flist_fork(P_FINFO(pp), P_FINFO(cp));
+	cp->p_ignore = pp->p_ignore;
+	cp->p_siginfo = pp->p_siginfo;
+	mutex_exit(&pp->p_lock);
+
+	if (isspawn)
+		flist_spawn(P_FINFO(pp), P_FINFO(cp), ksp);
+	else
+		flist_fork(P_FINFO(pp), P_FINFO(cp));
 
 	gethrestime(&uarea->u_start);
 	uarea->u_ticks = ddi_get_lbolt();

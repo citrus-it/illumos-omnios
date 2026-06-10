@@ -20,59 +20,46 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ *
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
+ * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2026 Oxide Computer Company
  */
 
-#pragma weak _getpgrp = getpgrp
-#pragma weak _setpgrp = setpgrp
-#pragma weak _getsid = getsid
-#pragma weak _setsid = setsid
-#pragma weak _getpgid = getpgid
-#pragma weak _setpgid = setpgid
+#ifndef _SYS_SPAWN_H
+#define	_SYS_SPAWN_H
 
-#include "lint.h"
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/syscall.h>
-#include <sys/pgrpsys.h>
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
-pid_t
-getpgrp(void)
-{
-	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_GETPGRP));
+/*
+ * flags for posix_spawnattr_setflags()
+ */
+#define	POSIX_SPAWN_RESETIDS		0x0001
+#define	POSIX_SPAWN_SETPGROUP		0x0002
+#define	POSIX_SPAWN_SETSIGDEF		0x0004
+#define	POSIX_SPAWN_SETSIGMASK		0x0008
+#define	POSIX_SPAWN_SETSCHEDPARAM	0x0010
+#define	POSIX_SPAWN_SETSCHEDULER	0x0020
+#define	POSIX_SPAWN_SETSID		0x0040
+/*
+ * non-portable extensions
+ */
+#if !defined(_STRICT_POSIX) || defined(_KERNEL)
+#define	POSIX_SPAWN_SETSIGIGN_NP	0x0800
+#define	POSIX_SPAWN_NOSIGCHLD_NP	0x1000
+#define	POSIX_SPAWN_WAITPID_NP		0x2000
+#define	POSIX_SPAWN_NOEXECERR_NP	0x4000
+#endif	/* !_STRICT_POSIX || defined(_KERNEL) */
+
+#ifdef	__cplusplus
 }
+#endif
 
-pid_t
-setpgrp(void)
-{
-	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_SETPGRP));
-}
-
-pid_t
-getsid(pid_t pid)
-{
-	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_GETSID, pid));
-}
-
-pid_t
-setsid(void)
-{
-	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_SETSID));
-}
-
-pid_t
-getpgid(pid_t pid)
-{
-	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_GETPGID, pid));
-}
-
-int
-setpgid(pid_t pid, pid_t pgid)
-{
-	return (syscall(SYS_pgrpsys, PGRPSYS_SETPGID, pid, pgid));
-}
+#endif	/* _SYS_SPAWN_H */
