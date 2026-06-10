@@ -31,6 +31,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * WARNING: This is an implementation-specific header,
  * its contents are not guaranteed. Applications
  * should include <unistd.h> and not this header.
@@ -410,6 +414,16 @@ extern "C" {
 #define	_POSIX_REGEXP		1	/* Supports POSIX Regular Expressions */
 #define	_POSIX_SHELL		1	/* Supports POSIX shell */
 #define	_XOPEN_STREAMS		1	/* Supports XSI Streams Option Group */
+
+#if !defined(_STRICT_SYMBOLS)
+/*
+ * Flags for close_range(). These have the same values as on FreeBSD and
+ * Linux. Flag (1 << 1) is reserved; it is CLOSE_RANGE_UNSHARE on Linux,
+ * which has no meaning here.
+ */
+#define	CLOSE_RANGE_CLOEXEC	(1 << 2) /* Set FD_CLOEXEC, do not close */
+#define	CLOSE_RANGE_CLOFORK	(1 << 3) /* Set FD_CLOFORK, do not close */
+#endif /* !_STRICT_SYMBOLS */
 
 #ifdef	__cplusplus
 }

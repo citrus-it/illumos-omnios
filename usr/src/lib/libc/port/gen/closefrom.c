@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
+ * Copyright 2026 Oxide Computer Company
  */
 
 #pragma weak _closefrom = closefrom
@@ -120,12 +121,12 @@ fdwalk(int (*func)(void *, int), void *cd)
 }
 
 /*
- * Call-back function for closefrom(), below.
+ * Call-back function for the fdwalk() fallback in closefrom(), below.
  */
 static int
-void_close(void *lowp, int fd)
+void_close(void *lowfdp, int fd)
 {
-	if (fd >= *(int *)lowp)
+	if (fd >= *(int *)lowfdp)
 		(void) close(fd);
 	return (0);
 }
@@ -136,13 +137,22 @@ void_close(void *lowp, int fd)
 void
 closefrom(int lowfd)
 {
-	int low = (lowfd < 0)? 0 : lowfd;
+	int low = (lowfd < 0) ? 0 : lowfd;
 
 	/*
-	 * Close lowfd right away as a hedge against failing
-	 * to open the /proc file descriptor directory due
-	 * all file descriptors being currently used up.
+	 * Fall back to walking the descriptor table in userland if the
+	 * system call is unavailable, as it can be under tracing tools
+	 * such as valgrind which intercept, and return ENOSYS for, system
+	 * calls that they do not recognise.
 	 */
-	(void) close(low);
-	(void) fdwalk(void_close, &low);
+	if (close_range((unsigned int)low, UINT_MAX, 0) != 0 &&
+	    errno == ENOSYS) {
+		/*
+		 * Close lowfd right away as a hedge against failing to open
+		 * the /proc file descriptor directory due to all file
+		 * descriptors being currently used up.
+		 */
+		(void) close(low);
+		(void) fdwalk(void_close, &low);
+	}
 }
