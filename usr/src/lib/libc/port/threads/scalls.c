@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
@@ -727,6 +728,26 @@ close(int fildes)
 	if (curthread->ul_critical == 0)
 		_aio_close(fildes);
 	PERFORM(__close(fildes))
+}
+
+/*
+ * The close_range() system call doesn't know anything about user-level aio.
+ * When the call is going to close descriptors (versus just adjusting their
+ * flags), outstanding aio requests against them must be cancelled here,
+ * as close() does above for a single descriptor.
+ */
+int
+close_range(uint_t low, uint_t high, int flags)
+{
+	extern void _aio_closerange(int, int);
+	extern int __close_range(uint_t, uint_t, int);
+
+	if (flags == 0 && low <= INT_MAX && curthread->ul_critical == 0) {
+		_aio_closerange((int)low,
+		    (high > INT_MAX) ? INT_MAX : (int)high);
+	}
+
+	return (__close_range(low, high, flags));
 }
 
 int
