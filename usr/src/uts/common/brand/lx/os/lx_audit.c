@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -862,7 +863,7 @@ lx_audit_syscall_exit(int sysnum, long ret)
 	if (lxzd->lxzd_audit_enabled == LXAE_DISABLED)
 		return;
 
-	if (sysnum >= LX_NSYSCALLS)
+	if (sysnum > LX_NSYSCALLS)
 		return;
 
 	asp = lxzd->lxzd_audit_state;
