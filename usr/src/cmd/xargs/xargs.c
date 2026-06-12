@@ -22,6 +22,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2012 DEY Storage Systems, Inc.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  *
  * Portions of this file developed by DEY Storage Systems, Inc. are licensed
  * under the terms of the Common Development and Distribution License (CDDL)
@@ -55,8 +56,10 @@
 #include <poll.h>
 #include <errno.h>
 #include <stdarg.h>
-#include <sys/fork.h>
+#include <spawn.h>
 #include "getresponse.h"
+
+extern char **environ;
 
 #define	HEAD	0
 #define	TAIL	1
@@ -918,11 +921,22 @@ static void
 lcall(char *sub, char **subargs)
 {
 	int	retry = 0;
+	int	err;
 	pid_t	child;
+	posix_spawnattr_t attr;
+
+	if ((err = posix_spawnattr_init(&attr)) == 0)
+		err = posix_spawnattr_setflags(&attr, POSIX_SPAWN_NOSIGCHLD_NP);
+	if (err != 0) {
+		errno = err;
+		PERR(FORKFAIL);
+		exit(123);
+	}
 
 	for (;;) {
-		switch (child = forkx(FORK_NOSIGCHLD)) {
-		default:
+		err = posix_spawnp(&child, sub, NULL, &attr, subargs, environ);
+		if (err == 0) {
+			(void) posix_spawnattr_destroy(&attr);
 			procs_store(child);
 			/*
 			 * Note, if we have used up all of our slots, then this
@@ -930,20 +944,25 @@ lcall(char *sub, char **subargs)
 			 */
 			procs_wait(B_FALSE);
 			return;
-		case 0:
-			(void) execvp(sub, subargs);
-			PERR(EXECFAIL);
-			if (errno == EACCES)
-				exit(126);
-			exit(127);
-			/* NOTREACHED */
-		case -1:
-			if (errno != EAGAIN && retry++ < FORK_RETRY) {
-				PERR(FORKFAIL);
-				exit(123);
-			}
-			(void) sleep(1);
 		}
+		if (err != EAGAIN && err != ENOMEM) {
+			/*
+			 * The utility could not be invoked. Accumulate the
+			 * status that a child whose exec failed used to
+			 * produce.
+			 */
+			(void) posix_spawnattr_destroy(&attr);
+			errno = err;
+			PERR(EXECFAIL);
+			exitstat |= (err == EACCES) ? 126 : 127;
+			return;
+		}
+		if (err != EAGAIN && retry++ < FORK_RETRY) {
+			errno = err;
+			PERR(FORKFAIL);
+			exit(123);
+		}
+		(void) sleep(1);
 	}
 }
 
