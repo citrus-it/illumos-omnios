@@ -45,6 +45,24 @@
  * set mdb.m_out to point to this new iob.  The shellio is simply a pass-thru
  * to the fdio, except that its io_close routine performs a waitpid for the
  * spawned child process.
+ *
+ * The parser also implements two corresponding forms of shell input escape,
+ * in which the standard output of the shell command is captured and then
+ * evaluated by the debugger as if it had been read from a macro file:
+ * (3) "!<command", which executes the command and then sources its output,
+ * and (4) "dcmds !< command", in which the output of one or more dcmds is
+ * first sent as standard input to the shell command, as in form (2).
+ * In both cases the child's standard output is captured in an unlinked
+ * temporary file rather than a pipe: the child can never block writing its
+ * results, so no deadlock can arise between the debugger feeding the child
+ * and the child feeding the debugger. Form (3) is handled entirely from the
+ * parser by mdb_shell_source. For form (4), the captured output cannot be
+ * evaluated until the dcmd pipeline has run and the child has exited, so
+ * mdb_shell_pipe_source just records the capture; mdb_call() invokes
+ * mdb_shell_source_run() once the statement has completed (the frame reset
+ * destroys the shellio, which waits for the child), and the error paths in
+ * mdb_run() invoke mdb_shell_source_discard() to drop a pending capture if
+ * the statement instead fails.
  */
 
 #include <sys/types.h>
@@ -67,14 +85,14 @@ extern char **environ;
 
 /*
  * Spawn the shell to run the given command.  close_fd, when not -1, is
- * closed in the child first and fd 0 is then replaced by stdin_fd when that
- * is not -1.  Descriptors above stderr are closed in the child by a file
- * action rather than by manipulating our own fd flags; posix_spawn()
- * reports a failure to exec back to us directly, so there is no need to
- * preserve descriptors for a child-side error message.
+ * closed in the child first; fd 0 is then replaced by stdin_fd and fd 1 by
+ * stdout_fd when those are not -1. Descriptors above stderr are closed in
+ * the child by a file action rather than by manipulating our own fd flags;
+ * posix_spawn() reports a failure to exec back to us directly, so there is
+ * no need to preserve descriptors for a child-side error message.
  */
 static int
-shell_spawn(char *cmd, int stdin_fd, int close_fd, pid_t *pidp)
+shell_spawn(char *cmd, int stdin_fd, int stdout_fd, int close_fd, pid_t *pidp)
 {
 	posix_spawn_file_actions_t fact;
 	int err;
@@ -89,6 +107,10 @@ shell_spawn(char *cmd, int stdin_fd, int close_fd, pid_t *pidp)
 	if (err == 0 && stdin_fd != -1) {
 		err = posix_spawn_file_actions_adddup2(&fact, stdin_fd,
 		    STDIN_FILENO);
+	}
+	if (err == 0 && stdout_fd != -1) {
+		err = posix_spawn_file_actions_adddup2(&fact, stdout_fd,
+		    STDOUT_FILENO);
 	}
 	if (err == 0) {
 		err = posix_spawn_file_actions_addclosefrom_np(&fact,
@@ -112,7 +134,7 @@ mdb_shell_exec(char *cmd)
 	if (access(mdb.m_shell, X_OK) == -1)
 		yyperror("cannot access %s", mdb.m_shell);
 
-	if ((err = shell_spawn(cmd, -1, -1, &pid)) != 0) {
+	if ((err = shell_spawn(cmd, -1, -1, -1, &pid)) != 0) {
 		errno = err;
 		yyperror("failed to exec %s", mdb.m_shell);
 	}
@@ -176,8 +198,14 @@ static const mdb_io_ops_t shellio_ops = {
 	.io_resume = no_io_resume
 };
 
-void
-mdb_shell_pipe(char *cmd)
+/*
+ * Construct a pipe to a spawned shell command and redirect subsequent
+ * debugger output into it. When stdout_fd is not -1 the child's standard
+ * output is additionally redirected there; on failure the descriptor is
+ * closed before the error is reported, so the caller need not clean up.
+ */
+static void
+shell_pipe(char *cmd, int stdout_fd)
 {
 	uint_t iflag = mdb_iob_getflags(mdb.m_out) & MDB_IOB_INDENT;
 	mdb_iob_t *iob;
@@ -185,19 +213,27 @@ mdb_shell_pipe(char *cmd)
 	int err, pfds[2];
 	pid_t pid;
 
-	if (access(mdb.m_shell, X_OK) == -1)
+	if (access(mdb.m_shell, X_OK) == -1) {
+		if (stdout_fd != -1)
+			(void) close(stdout_fd);
 		yyperror("cannot access %s", mdb.m_shell);
+	}
 
-	if (pipe(pfds) == -1)
+	if (pipe(pfds) == -1) {
+		if (stdout_fd != -1)
+			(void) close(stdout_fd);
 		yyperror("failed to open pipe");
+	}
 
 	iob = mdb_iob_create(mdb_fdio_create(pfds[1]), MDB_IOB_WRONLY | iflag);
 	mdb_iob_clrflags(iob, MDB_IOB_AUTOWRAP | MDB_IOB_INDENT);
 	mdb_iob_resize(iob, BUFSIZ, BUFSIZ);
 
-	if ((err = shell_spawn(cmd, pfds[0], pfds[1], &pid)) != 0) {
+	if ((err = shell_spawn(cmd, pfds[0], stdout_fd, pfds[1], &pid)) != 0) {
 		(void) close(pfds[0]);
 		(void) close(pfds[1]);
+		if (stdout_fd != -1)
+			(void) close(stdout_fd);
 		mdb_iob_destroy(iob);
 		errno = err;
 		yyperror("failed to exec %s", mdb.m_shell);
@@ -216,4 +252,188 @@ mdb_shell_pipe(char *cmd)
 	mdb_iob_stack_push(&mdb.m_frame->f_ostk, mdb.m_out, yylineno);
 	mdb_iob_push_io(iob, io);
 	mdb.m_out = iob;
+}
+
+void
+mdb_shell_pipe(char *cmd)
+{
+	shell_pipe(cmd, -1);
+}
+
+/*
+ * The file descriptor of the unlinked temporary file holding the captured
+ * standard output of a pending "dcmds !< command" escape, or -1 when no
+ * capture is outstanding. There can be at most one: the parser permits one
+ * shell escape per statement, and mdb_call() consumes the capture before the
+ * sourced commands can themselves create another.
+ */
+static int shell_src_fd = -1;
+
+/*
+ * Create an unlinked temporary file to receive a child's standard output.
+ */
+static int
+shell_tmpfd(void)
+{
+	char tmpl[] = "/tmp/mdb.XXXXXX";
+	int fd;
+
+	if ((fd = mkstemp(tmpl)) == -1)
+		return (-1);
+
+	(void) unlink(tmpl);
+	return (fd);
+}
+
+/*
+ * Evaluate the captured output in the given file descriptor as debugger
+ * input, in the manner of $<<. Ownership of the descriptor passes to the
+ * iob; it is closed when the input is exhausted. The error handling here
+ * mirrors cmd_src_file(): errors that must abort or unwind past this
+ * statement are propagated to the current frame.
+ */
+static void
+shell_source_eval(int fd)
+{
+	mdb_frame_t *fp = mdb.m_frame;
+	int err;
+
+	if (lseek(fd, 0, SEEK_SET) == -1) {
+		(void) close(fd);
+		yyperror("failed to rewind temporary file");
+	}
+
+	mdb_iob_stack_push(&fp->f_istk, mdb.m_in, yylineno);
+	mdb.m_in = mdb_iob_create(mdb_fdio_create(fd), MDB_IOB_RDONLY);
+	err = mdb_run();
+
+	ASSERT(fp == mdb.m_frame);
+	mdb.m_in = mdb_iob_stack_pop(&fp->f_istk);
+	yylineno = mdb_iob_lineno(mdb.m_in);
+
+	if (err == MDB_ERR_PAGER && mdb.m_fmark != fp)
+		longjmp(fp->f_pcb, err);
+
+	if (err == MDB_ERR_QUIT || err == MDB_ERR_ABORT ||
+	    err == MDB_ERR_SIGINT || err == MDB_ERR_OUTPUT)
+		longjmp(fp->f_pcb, err);
+}
+
+void
+mdb_shell_source(char *cmd)
+{
+	int err, fd, status;
+	pid_t pid;
+
+	if (access(mdb.m_shell, X_OK) == -1)
+		yyperror("cannot access %s", mdb.m_shell);
+
+	if ((fd = shell_tmpfd()) == -1)
+		yyperror("failed to create temporary file");
+
+	if ((err = shell_spawn(cmd, -1, fd, -1, &pid)) != 0) {
+		(void) close(fd);
+		errno = err;
+		yyperror("failed to exec %s", mdb.m_shell);
+	}
+
+	strfree(cmd);
+
+	do {
+		mdb_dprintf(MDB_DBG_SHELL, "waiting for PID %d\n", (int)pid);
+	} while (waitpid(pid, &status, 0) == -1 && errno == EINTR);
+
+	mdb_dprintf(MDB_DBG_SHELL, "waitpid %d -> 0x%x\n", (int)pid, status);
+
+	shell_source_eval(fd);
+}
+
+void
+mdb_shell_pipe_source(char *cmd)
+{
+	int fd;
+
+	if ((fd = shell_tmpfd()) == -1)
+		yyperror("failed to create temporary file");
+
+	shell_pipe(cmd, fd);
+
+	ASSERT(shell_src_fd == -1);
+	shell_src_fd = fd;
+}
+
+void
+mdb_shell_source_run(void)
+{
+	int fd = shell_src_fd;
+
+	if (fd == -1)
+		return;
+
+	shell_src_fd = -1;
+	shell_source_eval(fd);
+}
+
+void
+mdb_shell_source_discard(void)
+{
+	if (shell_src_fd != -1) {
+		(void) close(shell_src_fd);
+		shell_src_fd = -1;
+	}
+}
+
+/*
+ * Set up the shell stage of a dcmd pipeline ("dcmd ! 'command' | dcmd"):
+ * debugger output is redirected into the spawned command just as for
+ * mdb_shell_pipe, and the command's standard output is captured in an
+ * unlinked temporary file whose descriptor is returned. The caller owns
+ * the descriptor: once the producing dcmd has completed and the shellio
+ * has been destroyed (waiting for the child), the capture is replayed
+ * into the consuming side of the pipeline with mdb_shell_filter_pump.
+ */
+int
+mdb_shell_filter(const char *cmd)
+{
+	int fd;
+
+	if ((fd = shell_tmpfd()) == -1)
+		yyperror("failed to create temporary file");
+
+	shell_pipe(strdup(cmd), fd);
+	return (fd);
+}
+
+/*
+ * Replay a captured shell stage's output into the write side of a dcmd
+ * pipeline, where it is parsed into the consuming dcmd's address list just
+ * as direct dcmd output would be. Parse errors raised by the read side
+ * propagate by longjmp to the caller's frame; the caller retains ownership
+ * of fd throughout so that it can be closed on all paths.
+ */
+void
+mdb_shell_filter_pump(int fd, mdb_iob_t *iob)
+{
+	char buf[BUFSIZ];
+	ssize_t n;
+
+	if (lseek(fd, 0, SEEK_SET) == -1)
+		yyperror("failed to rewind temporary file");
+
+	while ((n = read(fd, buf, sizeof (buf))) > 0) {
+		if (mdb_iob_write(iob, buf, n) < 0)
+			break;
+	}
+}
+
+/*
+ * Release the capture descriptor for a shell pipeline stage. This exists as
+ * a function (rather than the caller using close() directly) because the
+ * caller is code shared with kmdb, where descriptors do not exist.
+ */
+void
+mdb_shell_filter_close(int fd)
+{
+	if (fd != -1)
+		(void) close(fd);
 }

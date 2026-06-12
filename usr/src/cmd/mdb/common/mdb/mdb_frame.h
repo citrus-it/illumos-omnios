@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef	_MDB_FRAME_H
 #define	_MDB_FRAME_H
 
@@ -46,6 +50,7 @@ typedef struct mdb_cmd {
 	mdb_argvec_t c_argv;		/* Arguments for this command */
 	mdb_addrvec_t c_addrv;		/* Addresses for this command */
 	mdb_vcb_t *c_vcbs;		/* Variable control block list */
+	char *c_shcmd;			/* Shell stage feeding this command */
 } mdb_cmd_t;
 
 typedef struct mdb_frame {

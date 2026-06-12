@@ -24,8 +24,14 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef	_MDB_SHELL_H
 #define	_MDB_SHELL_H
+
+#include <mdb/mdb_io.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -35,6 +41,13 @@ extern "C" {
 
 extern void mdb_shell_exec(char *);
 extern void mdb_shell_pipe(char *);
+extern void mdb_shell_source(char *);
+extern void mdb_shell_pipe_source(char *);
+extern void mdb_shell_source_run(void);
+extern void mdb_shell_source_discard(void);
+extern int mdb_shell_filter(const char *);
+extern void mdb_shell_filter_pump(int, mdb_iob_t *);
+extern void mdb_shell_filter_close(int);
 
 #endif /* _MDB */
 

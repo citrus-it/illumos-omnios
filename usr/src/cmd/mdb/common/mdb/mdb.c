@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2021 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -52,6 +53,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/stdbool.h>
 #include <stropts.h>
 
 #define	_MDB_PRIVATE
@@ -71,6 +73,7 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb_io.h>
+#include <mdb/mdb_shell.h>
 #include <mdb/mdb_ctf.h>
 #ifdef _KMDB
 #include <kmdb/kmdb_module.h>
@@ -696,12 +699,15 @@ mdb_run(void)
 
 		/*
 		 * Reset standard output and the current frame to a known,
-		 * clean state, so we can continue execution.
+		 * clean state, so we can continue execution. Any shell
+		 * output captured by a "!<" escape in the failed statement
+		 * is discarded rather than evaluated.
 		 */
 		mdb_iob_margin(mdb.m_out, MDB_IOB_DEFMARGIN);
 		mdb_iob_clrflags(mdb.m_out, MDB_IOB_INDENT);
 		mdb_iob_discard(mdb.m_out);
 		mdb_frame_reset(&f);
+		mdb_shell_source_discard();
 
 		/*
 		 * If there was an error writing to output, display a warning
@@ -897,15 +903,36 @@ mdb_call(uintmax_t addr, uintmax_t count, uint_t flags)
 
 	for (cp = mdb_list_next(&fp->f_cmds); cp; cp = mdb_list_next(cp)) {
 		if (mdb_list_next(cp) != NULL) {
+			bool filter, fclosed = false;
+			int sfd = -1;
+
+			ncp = mdb_list_next(cp);
+			filter = (ncp->c_shcmd != NULL);
+
+			/*
+			 * If a shell command separates these two dcmds,
+			 * mdb_shell_filter() redirects our output to the
+			 * spawned child in the manner of a "!" escape
+			 * (pushing m_out itself) and returns a descriptor
+			 * for the file capturing the child's output, which
+			 * is replayed into the pipeline once the producer
+			 * has completed. This is done before any pipe iobs
+			 * are constructed so that a failure to spawn the
+			 * child unwinds cleanly.
+			 */
+			if (filter)
+				sfd = mdb_shell_filter(ncp->c_shcmd);
+
 			mdb_iob_pipe(iobs, rdsvc, wrsvc);
 
 			mdb_iob_stack_push(&fp->f_istk, mdb.m_in, yylineno);
 			mdb.m_in = iobs[MDB_IOB_RDIOB];
 
-			mdb_iob_stack_push(&fp->f_ostk, mdb.m_out, 0);
-			mdb.m_out = iobs[MDB_IOB_WRIOB];
+			if (!filter) {
+				mdb_iob_stack_push(&fp->f_ostk, mdb.m_out, 0);
+				mdb.m_out = iobs[MDB_IOB_WRIOB];
+			}
 
-			ncp = mdb_list_next(cp);
 			mdb_vcb_inherit(cp, ncp);
 
 			bcopy(fp->f_pcb, pcb, sizeof (jmp_buf));
@@ -915,14 +942,43 @@ mdb_call(uintmax_t addr, uintmax_t count, uint_t flags)
 			mdb_frame_set_pipe(fp);
 
 			if ((err = setjmp(fp->f_pcb)) == 0) {
+				/*
+				 * A dcmd feeding a shell stage produces its
+				 * normal human-readable output, as it would
+				 * for a trailing "!" escape, so DCMD_PIPE_OUT
+				 * is not set in that case.
+				 */
 				status = mdb_call_idcmd(cp->c_dcmd, addr, count,
-				    flags | DCMD_PIPE_OUT, &cp->c_argv,
-				    &cp->c_addrv, cp->c_vcbs);
+				    flags | (filter ? 0 : DCMD_PIPE_OUT),
+				    &cp->c_argv, &cp->c_addrv, cp->c_vcbs);
 
 				mdb.m_lastret = status;
 
 				ASSERT(mdb.m_in == iobs[MDB_IOB_RDIOB]);
-				ASSERT(mdb.m_out == iobs[MDB_IOB_WRIOB]);
+				ASSERT(filter ||
+				    mdb.m_out == iobs[MDB_IOB_WRIOB]);
+
+				if (filter && !DCMD_ABORTED(status)) {
+					/*
+					 * Tear down the shell side of the
+					 * stage: the child sees EOF on its
+					 * standard input and is waited for
+					 * when the shellio is destroyed. Its
+					 * captured output is then replayed
+					 * into the pipeline, where it is
+					 * parsed into the next dcmd's address
+					 * list just as direct dcmd output
+					 * would be.
+					 */
+					mdb_iob_flush(mdb.m_out);
+					mdb_iob_destroy(mdb.m_out);
+					mdb.m_out =
+					    mdb_iob_stack_pop(&fp->f_ostk);
+					fclosed = true;
+
+					mdb_shell_filter_pump(sfd,
+					    iobs[MDB_IOB_WRIOB]);
+				}
 			} else {
 				mdb_dprintf(MDB_DBG_DSTK, "frame <%u> caught "
 				    "error %s from pipeline\n", fp->f_id,
@@ -931,17 +987,32 @@ mdb_call(uintmax_t addr, uintmax_t count, uint_t flags)
 
 			if (err != 0 || DCMD_ABORTED(status)) {
 				mdb_iob_setflags(mdb.m_in, MDB_IOB_ERR);
-				mdb_iob_setflags(mdb.m_out, MDB_IOB_ERR);
+				mdb_iob_setflags(iobs[MDB_IOB_WRIOB],
+				    MDB_IOB_ERR);
 			} else {
-				mdb_iob_flush(mdb.m_out);
-				(void) mdb_iob_ctl(mdb.m_out, I_FLUSH,
-				    (void *)FLUSHW);
+				mdb_iob_flush(iobs[MDB_IOB_WRIOB]);
+				(void) mdb_iob_ctl(iobs[MDB_IOB_WRIOB],
+				    I_FLUSH, (void *)FLUSHW);
 			}
 
 			mdb_frame_clear_pipe(fp);
 
-			mdb_iob_destroy(mdb.m_out);
-			mdb.m_out = mdb_iob_stack_pop(&fp->f_ostk);
+			if (filter && !fclosed) {
+				/*
+				 * The producer failed before the shell side
+				 * of the stage was torn down: destroy it now,
+				 * waiting for the child. The capture is
+				 * discarded below.
+				 */
+				mdb_iob_setflags(mdb.m_out, MDB_IOB_ERR);
+				mdb_iob_destroy(mdb.m_out);
+				mdb.m_out = mdb_iob_stack_pop(&fp->f_ostk);
+			}
+			mdb_shell_filter_close(sfd);
+
+			mdb_iob_destroy(iobs[MDB_IOB_WRIOB]);
+			if (!filter)
+				mdb.m_out = mdb_iob_stack_pop(&fp->f_ostk);
 
 			if (mdb.m_in != NULL)
 				mdb_iob_destroy(mdb.m_in);
@@ -986,6 +1057,18 @@ mdb_call(uintmax_t addr, uintmax_t count, uint_t flags)
 	mdb_list_move(&fp->f_cmds, &mdb.m_lastc);
 	mdb_frame_reset(fp);
 	mdb_intr_enable();
+
+	/*
+	 * If a "!<" escape captured shell output for this statement, evaluate
+	 * it now: the frame reset above destroyed the shellio, so the child
+	 * has exited and its output is complete. If the statement failed,
+	 * discard the capture instead.
+	 */
+	if (err == 0)
+		mdb_shell_source_run();
+	else
+		mdb_shell_source_discard();
+
 	return (err == 0);
 }
 
