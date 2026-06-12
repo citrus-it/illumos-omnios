@@ -24,6 +24,7 @@
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2015, Joyent Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -44,6 +45,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <signal.h>
+#include <spawn.h>
 #include <stdarg.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -91,6 +93,8 @@
 
 #define	MAXARGS	8
 #define	SOURCE_ZONE (CMD_MAX + 1)
+
+extern char **environ;
 
 /* Reflects kernel zone entries */
 typedef struct zone_entry {
@@ -1515,13 +1519,11 @@ do_subproc(char *cmdbuf)
 	void (*saveterm)(int);
 	void (*savequit)(int);
 	void (*savehup)(int);
-	int pid, child, status;
+	char *argv[] = { "sh", "-c", cmdbuf, NULL };
+	int pid, status;
+	pid_t child;
 
-	if ((child = vfork()) == 0) {
-		(void) execl("/bin/sh", "sh", "-c", cmdbuf, (char *)NULL);
-	}
-
-	if (child == -1)
+	if (posix_spawn(&child, "/bin/sh", NULL, NULL, argv, environ) != 0)
 		return (-1);
 
 	saveint = sigset(SIGINT, SIG_IGN);
