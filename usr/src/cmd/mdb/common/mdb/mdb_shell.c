@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * Shell Escape I/O Backend
  *
  * The MDB parser implements two forms of shell escapes: (1) traditional adb(1)
@@ -34,13 +38,13 @@
  * command", in which the output of one or more MDB dcmds is sent as standard
  * input to a shell command (or shell pipeline).  Form (1) can be handled
  * entirely from the parser by calling mdb_shell_exec (below); it simply
- * forks the shell, executes the desired command, and waits for completion.
- * Form (2) is slightly more complicated: we construct a UNIX pipe, fork
- * the shell, and then built an fdio object out of the write end of the pipe.
+ * spawns the shell, executes the desired command, and waits for completion.
+ * Form (2) is slightly more complicated: we construct a UNIX pipe, spawn
+ * the shell, and then build an fdio object out of the write end of the pipe.
  * We then layer a shellio object (implemented below) and iob on top, and
  * set mdb.m_out to point to this new iob.  The shellio is simply a pass-thru
  * to the fdio, except that its io_close routine performs a waitpid for the
- * forked child process.
+ * spawned child process.
  */
 
 #include <sys/types.h>
@@ -48,7 +52,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <fcntl.h>
+#include <spawn.h>
 
 #include <mdb/mdb_shell.h>
 #include <mdb/mdb_lex.h>
@@ -59,43 +63,58 @@
 #include <mdb/mdb_io_impl.h>
 #include <mdb/mdb.h>
 
-#define	E_BADEXEC	127	/* Exit status for failed exec */
+extern char **environ;
 
 /*
- * We must manually walk the open file descriptors and set FD_CLOEXEC, because
- * we need to be able to print an error if execlp() fails.  If mdb.m_err has
- * been altered, then using closefrom() could close our output file descriptor,
- * preventing us from displaying an error message.  Using FD_CLOEXEC ensures
- * that the file descriptors are only closed if execlp() succeeds.
+ * Spawn the shell to run the given command.  close_fd, when not -1, is
+ * closed in the child first and fd 0 is then replaced by stdin_fd when that
+ * is not -1.  Descriptors above stderr are closed in the child by a file
+ * action rather than by manipulating our own fd flags; posix_spawn()
+ * reports a failure to exec back to us directly, so there is no need to
+ * preserve descriptors for a child-side error message.
  */
-/*ARGSUSED*/
 static int
-closefd_walk(void *unused, int fd)
+shell_spawn(char *cmd, int stdin_fd, int close_fd, pid_t *pidp)
 {
-	if (fd > 2)
-		(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
-	return (0);
+	posix_spawn_file_actions_t fact;
+	int err;
+	char *argv[] = {
+	    (char *)strbasename(mdb.m_shell), "-c", cmd, NULL };
+
+	if ((err = posix_spawn_file_actions_init(&fact)) != 0)
+		return (err);
+
+	if (close_fd != -1)
+		err = posix_spawn_file_actions_addclose(&fact, close_fd);
+	if (err == 0 && stdin_fd != -1) {
+		err = posix_spawn_file_actions_adddup2(&fact, stdin_fd,
+		    STDIN_FILENO);
+	}
+	if (err == 0) {
+		err = posix_spawn_file_actions_addclosefrom_np(&fact,
+		    STDERR_FILENO + 1);
+	}
+	if (err == 0) {
+		err = posix_spawnp(pidp, mdb.m_shell, &fact, NULL,
+		    argv, environ);
+	}
+
+	(void) posix_spawn_file_actions_destroy(&fact);
+	return (err);
 }
 
 void
 mdb_shell_exec(char *cmd)
 {
-	int status;
+	int err, status;
 	pid_t pid;
 
 	if (access(mdb.m_shell, X_OK) == -1)
 		yyperror("cannot access %s", mdb.m_shell);
 
-	if ((pid = vfork()) == -1)
-		yyperror("failed to fork");
-
-	if (pid == 0) {
-		(void) fdwalk(closefd_walk, NULL);
-		(void) execlp(mdb.m_shell, strbasename(mdb.m_shell),
-		    "-c", cmd, NULL);
-
-		warn("failed to exec %s", mdb.m_shell);
-		_exit(E_BADEXEC);
+	if ((err = shell_spawn(cmd, -1, -1, &pid)) != 0) {
+		errno = err;
+		yyperror("failed to exec %s", mdb.m_shell);
 	}
 
 	do {
@@ -163,7 +182,7 @@ mdb_shell_pipe(char *cmd)
 	uint_t iflag = mdb_iob_getflags(mdb.m_out) & MDB_IOB_INDENT;
 	mdb_iob_t *iob;
 	mdb_io_t *io;
-	int pfds[2];
+	int err, pfds[2];
 	pid_t pid;
 
 	if (access(mdb.m_shell, X_OK) == -1)
@@ -176,24 +195,12 @@ mdb_shell_pipe(char *cmd)
 	mdb_iob_clrflags(iob, MDB_IOB_AUTOWRAP | MDB_IOB_INDENT);
 	mdb_iob_resize(iob, BUFSIZ, BUFSIZ);
 
-	if ((pid = vfork()) == -1) {
+	if ((err = shell_spawn(cmd, pfds[0], pfds[1], &pid)) != 0) {
 		(void) close(pfds[0]);
 		(void) close(pfds[1]);
 		mdb_iob_destroy(iob);
-		yyperror("failed to fork");
-	}
-
-	if (pid == 0) {
-		(void) close(pfds[1]);
-		(void) close(STDIN_FILENO);
-		(void) dup2(pfds[0], STDIN_FILENO);
-
-		(void) fdwalk(closefd_walk, NULL);
-		(void) execlp(mdb.m_shell, strbasename(mdb.m_shell),
-		    "-c", cmd, NULL);
-
-		warn("failed to exec %s", mdb.m_shell);
-		_exit(E_BADEXEC);
+		errno = err;
+		yyperror("failed to exec %s", mdb.m_shell);
 	}
 
 	(void) close(pfds[0]);
