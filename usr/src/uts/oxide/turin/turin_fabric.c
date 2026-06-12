@@ -444,10 +444,9 @@ turin_fabric_smu_pptable_init(zen_fabric_t *fabric, void *pptable, size_t *len)
 	}
 
 	if (!valid) {
-		cmn_err(CE_PANIC,
+		cmn_err(CE_NOTE,
 		    "The PP table layout for SMU version %u.%u is unknown",
 		    maj, min);
-		/* NOTREACHED */
 	}
 
 	turin_pptable_v94_91_t *tpp = pptable;
