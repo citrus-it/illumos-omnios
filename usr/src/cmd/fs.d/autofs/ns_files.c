@@ -23,10 +23,13 @@
  *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <spawn.h>
 #include <syslog.h>
 #include <string.h>
 #include <ctype.h>
@@ -529,19 +532,21 @@ stack_op(int op, char *name, char **stack, char ***stkptr)
 
 #define	READ_EXECOUT_ARGS 3
 
+extern char **environ;
+
 /*
  * read_execout(char *key, char **lp, char *fname, char *line, int linesz)
- * A simpler, multithreaded implementation of popen(). Used due to
- * non multithreaded implementation of popen() (it calls vfork()) and a
- * significant bug in execl().
+ * Run the executable map fname with key as its argument and read the
+ * first line of its output, popen() style.
  * Returns 0 on OK or -1 on error.
  */
 static int
 read_execout(char *key, char **lp, char *fname, char *line, int linesz)
 {
+	posix_spawn_file_actions_t fact;
 	int p[2];
-	int status = 0;
-	int child_pid;
+	int err, status = 0;
+	pid_t child_pid;
 	char *args[READ_EXECOUT_ARGS];
 	FILE *fp0;
 
@@ -550,7 +555,7 @@ read_execout(char *key, char **lp, char *fname, char *line, int linesz)
 		return (-1);
 	}
 
-	/* setup args for execv */
+	/* setup args for posix_spawn */
 	if (((args[0] = strdup(fname)) == NULL) ||
 	    ((args[1] = strdup(key)) == NULL)) {
 		if (args[0] != NULL)
@@ -561,66 +566,70 @@ read_execout(char *key, char **lp, char *fname, char *line, int linesz)
 	args[2] = NULL;
 
 	if (trace > 3)
-		trace_prt(1, "\tread_execout: forking .....\n");
+		trace_prt(1, "\tread_execout: spawning .....\n");
 
-	switch ((child_pid = fork1())) {
-	case -1:
-		syslog(LOG_ERR, "read_execout: Cannot fork");
-		return (-1);
-	case 0:
-		/*
-		 * Child
-		 */
+	/*
+	 * The child's stdout becomes the pipe's write end; the read end
+	 * stays with us.
+	 */
+	if ((err = posix_spawn_file_actions_init(&fact)) == 0) {
+		if ((err = posix_spawn_file_actions_addclose(&fact,
+		    p[0])) == 0 &&
+		    (err = posix_spawn_file_actions_adddup2(&fact, p[1],
+		    STDOUT_FILENO)) == 0 &&
+		    (err = posix_spawn_file_actions_addclose(&fact,
+		    p[1])) == 0) {
+			err = posix_spawn(&child_pid, fname, &fact, NULL,
+			    args, environ);
+		}
+		(void) posix_spawn_file_actions_destroy(&fact);
+	}
+
+	if (err != 0) {
+		syslog(LOG_ERR, "read_execout: Cannot spawn %s: %s",
+		    fname, strerror(err));
 		close(p[0]);
-		close(1);
-		if (fcntl(p[1], F_DUPFD, 1) != 1) {
-			syslog(LOG_ERR,
-			"read_execout: dup of stdout failed");
-			_exit(-1);
-		}
 		close(p[1]);
-		execv(fname, &args[0]);
-		_exit(-1);
-	default:
-		/*
-		 * Parent
-		 */
-		close(p[1]);
-
-		/*
-		 * wait for child to complete. Note we read after the
-		 * child exits to guarantee a full pipe.
-		 */
-		while (waitpid(child_pid, &status, 0) < 0) {
-			/* if waitpid fails with EINTR, restart */
-			if (errno != EINTR) {
-				status = -1;
-				break;
-			}
-		}
-		if (status != -1) {
-			if ((fp0 = fdopen(p[0], "r")) != NULL) {
-				*lp = get_line(fp0, fname, line, linesz);
-				fclose(fp0);
-			} else {
-				close(p[0]);
-				status = -1;
-			}
-		} else {
-			close(p[0]);
-		}
-
-		/* free args */
 		free(args[0]);
 		free(args[1]);
-
-		if (trace > 3) {
-			trace_prt(1, "\tread_execout: map=%s key=%s line=%s\n",
-			    fname, key, line);
-		}
-
-		return (status);
+		return (-1);
 	}
+
+	close(p[1]);
+
+	/*
+	 * wait for child to complete. Note we read after the
+	 * child exits to guarantee a full pipe.
+	 */
+	while (waitpid(child_pid, &status, 0) < 0) {
+		/* if waitpid fails with EINTR, restart */
+		if (errno != EINTR) {
+			status = -1;
+			break;
+		}
+	}
+	if (status != -1) {
+		if ((fp0 = fdopen(p[0], "r")) != NULL) {
+			*lp = get_line(fp0, fname, line, linesz);
+			fclose(fp0);
+		} else {
+			close(p[0]);
+			status = -1;
+		}
+	} else {
+		close(p[0]);
+	}
+
+	/* free args */
+	free(args[0]);
+	free(args[1]);
+
+	if (trace > 3) {
+		trace_prt(1, "\tread_execout: map=%s key=%s line=%s\n",
+		    fname, key, line);
+	}
+
+	return (status);
 }
 
 void
