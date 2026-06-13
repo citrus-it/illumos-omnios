@@ -145,6 +145,16 @@ extern "C" {
 #define	ENA_PROP_RXQ_INTR_LIMIT_MAX	4096
 #define	ENA_PROP_RXQ_INTR_LIMIT_DEF	256
 
+/*
+ * Received frames smaller than this are copied into a freshly
+ * allocated message; frames this size or larger have their buffer
+ * loaned to the networking stack instead, where possible.
+ */
+#define	ENA_PROP_RXCOPY_THRESH	"rx_copy_threshold"
+#define	ENA_PROP_RXCOPY_THRESH_MIN	0
+#define	ENA_PROP_RXCOPY_THRESH_MAX	INT_MAX
+#define	ENA_PROP_RXCOPY_THRESH_DEF	256
+
 #define	ENA_DMA_BIT_MASK(x)	((1ULL << (x)) - 1ULL)
 #define	ENA_DMA_VERIFY_ADDR(ena, phys_addr)				\
 	VERIFY3U(ENA_DMA_BIT_MASK((ena)->ena_dma_width) & (phys_addr), \
@@ -549,6 +559,40 @@ typedef struct ena_rx_ctrl_block {
 	uint16_t	ercb_length;
 } ena_rx_ctrl_block_t;
 
+typedef struct ena_rx_pool ena_rx_pool_t;
+
+/*
+ * A loanable receive buffer. When a received frame is large enough to
+ * be worth loaning to the networking stack rather than copying, the
+ * frame's DMA buffer is exchanged with the spare held here and goes
+ * upstream wrapped in a desballoc(9F) message; the spare takes its
+ * place in the receive ring. The free callback returns the loan to
+ * its pool.
+ */
+typedef struct ena_rx_loan {
+	ena_dma_buf_t	erl_dma;
+	frtn_t		erl_frtn;
+	ena_rx_pool_t	*erl_pool;
+} ena_rx_loan_t;
+
+/*
+ * A pool of loanable receive buffers, one per receive queue. The pool
+ * is reference counted by the buffers out on loan: when the owning
+ * queue releases the pool, any buffers still on loan are freed as
+ * they are returned, with the last return destroying the pool itself.
+ * This allows the queue's other resources to be torn down (such as
+ * for a device reset) while the networking stack still holds loaned
+ * buffers.
+ */
+struct ena_rx_pool {
+	kmutex_t	erp_lock;
+	bool		erp_defunct;
+	uint_t		erp_arr_sz;
+	uint_t		erp_nfree;
+	uint_t		erp_nloaned;
+	ena_rx_loan_t	**erp_free;
+};
+
 typedef enum {
 	ENA_RXQ_MODE_POLLING	= 1,
 	ENA_RXQ_MODE_INTR	= 2,
@@ -571,6 +615,16 @@ typedef struct ena_rxq_stat_t {
 	 * for an incoming frame.
 	 */
 	kstat_named_t	ers_allocb_fail;
+
+	/*
+	 * The total number of frames whose buffer was loaned to the
+	 * networking stack rather than copied, the number that were
+	 * copied only because no spare loan buffer was available, and
+	 * the number of times desballoc() failed for a loan.
+	 */
+	kstat_named_t	ers_loaned;
+	kstat_named_t	ers_loan_nobuf;
+	kstat_named_t	ers_desballoc_fail;
 
 	/*
 	 * The total number of times the Rx interrupt handler reached
@@ -641,6 +695,9 @@ typedef struct ena_rxq {
 	uint32_t		*er_cq_numa_addr;    /* WO (currently unused) */
 
 	ena_rx_ctrl_block_t	*er_rcbs; /* RM */
+
+	/* The pool of loanable receive buffers for this queue. */
+	ena_rx_pool_t		*er_pool; /* WO */
 
 	kmutex_t		er_stat_lock;
 	ena_rxq_stat_t		er_stat;
@@ -825,6 +882,12 @@ typedef struct ena {
 	 */
 	uint16_t		ena_rxq_intr_limit;
 
+	/*
+	 * Received frames smaller than this are copied rather than
+	 * loaned; see ENA_PROP_RXCOPY_THRESH.
+	 */
+	uint32_t		ena_rxcopy_thresh;
+
 	/* The Rx/Tx data queues (rings). */
 	ena_rxq_t		*ena_rxqs;
 	uint16_t		ena_num_rxqs;
@@ -931,6 +994,7 @@ typedef struct ena {
 /*
  * Misc
  */
+extern volatile uint64_t ena_rx_loans_out;
 extern bool ena_reset(ena_t *, const enahw_reset_reason_t);
 extern bool ena_is_feat_avail(ena_t *, const enahw_feature_id_t);
 extern bool ena_is_cap_avail(ena_t *, const enahw_capability_id_t);

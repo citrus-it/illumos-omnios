@@ -13,7 +13,158 @@
  * Copyright 2026 Oxide Computer Company
  */
 
+#include <sys/atomic.h>
 #include "ena.h"
+
+/*
+ * The number of receive buffers currently loaned to the networking
+ * stack, across all instances. The buffer free callback lives in this
+ * module's text, so instances must not detach (and the module must not
+ * unload) while any loans remain outstanding.
+ */
+volatile uint64_t ena_rx_loans_out = 0;
+
+static void ena_rx_loan_return(caddr_t);
+
+static void
+ena_rx_loan_free(ena_rx_loan_t *loan)
+{
+	ena_dma_free(&loan->erl_dma);
+	kmem_free(loan, sizeof (*loan));
+}
+
+/*
+ * Create a pool of loanable receive buffers for a queue. Loaning is
+ * opportunistic: if some of the buffers cannot be allocated we make do
+ * with those that could, falling back to copying when none is
+ * available.
+ */
+static ena_rx_pool_t *
+ena_rx_pool_create(ena_t *ena, uint_t nbufs)
+{
+	ena_rx_pool_t *pool;
+
+	pool = kmem_zalloc(sizeof (*pool), KM_SLEEP);
+	mutex_init(&pool->erp_lock, NULL, MUTEX_DRIVER, NULL);
+	pool->erp_arr_sz = nbufs;
+	pool->erp_free = kmem_zalloc(
+	    sizeof (ena_rx_loan_t *) * pool->erp_arr_sz, KM_SLEEP);
+
+	for (uint_t i = 0; i < nbufs; i++) {
+		ena_rx_loan_t *loan;
+		ena_dma_conf_t buf_conf = {
+			.edc_size = ena->ena_rx_buf_sz,
+			.edc_align = 1,
+			.edc_sgl = ena->ena_rx_sgl_max_sz,
+			.edc_endian = DDI_NEVERSWAP_ACC,
+			.edc_stream = true,
+		};
+
+		loan = kmem_zalloc(sizeof (*loan), KM_SLEEP);
+		if (!ena_dma_alloc(ena, &loan->erl_dma, &buf_conf,
+		    ena->ena_rx_buf_sz)) {
+			kmem_free(loan, sizeof (*loan));
+			break;
+		}
+
+		loan->erl_pool = pool;
+		loan->erl_frtn.free_func = ena_rx_loan_return;
+		loan->erl_frtn.free_arg = (caddr_t)loan;
+		pool->erp_free[pool->erp_nfree++] = loan;
+	}
+
+	return (pool);
+}
+
+static void
+ena_rx_pool_destroy(ena_rx_pool_t *pool)
+{
+	ASSERT0(pool->erp_nloaned);
+	ASSERT0(pool->erp_nfree);
+
+	mutex_destroy(&pool->erp_lock);
+	kmem_free(pool->erp_free,
+	    sizeof (ena_rx_loan_t *) * pool->erp_arr_sz);
+	kmem_free(pool, sizeof (*pool));
+}
+
+/*
+ * Release a queue's loan pool. Spare buffers are freed immediately;
+ * buffers out on loan are freed as the networking stack returns them,
+ * with the last return destroying the pool itself.
+ */
+static void
+ena_rx_pool_release(ena_rx_pool_t *pool)
+{
+	bool last;
+
+	mutex_enter(&pool->erp_lock);
+	VERIFY(!pool->erp_defunct);
+	pool->erp_defunct = true;
+
+	while (pool->erp_nfree > 0) {
+		pool->erp_nfree--;
+		ena_rx_loan_free(pool->erp_free[pool->erp_nfree]);
+		pool->erp_free[pool->erp_nfree] = NULL;
+	}
+	last = (pool->erp_nloaned == 0);
+	mutex_exit(&pool->erp_lock);
+
+	if (last)
+		ena_rx_pool_destroy(pool);
+}
+
+/*
+ * The desballoc(9F) free callback for a loaned receive buffer. This may
+ * run long after the owning queue, or even the owning instance, has been
+ * torn down.
+ */
+static void
+ena_rx_loan_return(caddr_t arg)
+{
+	ena_rx_loan_t *loan = (ena_rx_loan_t *)arg;
+	ena_rx_pool_t *pool = loan->erl_pool;
+	bool last = false;
+
+	mutex_enter(&pool->erp_lock);
+	VERIFY3U(pool->erp_nloaned, >, 0);
+	pool->erp_nloaned--;
+
+	if (pool->erp_defunct) {
+		ena_rx_loan_free(loan);
+		last = (pool->erp_nloaned == 0);
+	} else {
+		VERIFY3U(pool->erp_nfree, <, pool->erp_arr_sz);
+		pool->erp_free[pool->erp_nfree++] = loan;
+	}
+	mutex_exit(&pool->erp_lock);
+
+	if (last)
+		ena_rx_pool_destroy(pool);
+
+	atomic_dec_64(&ena_rx_loans_out);
+}
+
+static ena_rx_loan_t *
+ena_rx_loan_get(ena_rx_pool_t *pool)
+{
+	ena_rx_loan_t *loan;
+
+	mutex_enter(&pool->erp_lock);
+	if (pool->erp_nfree == 0) {
+		mutex_exit(&pool->erp_lock);
+		return (NULL);
+	}
+	pool->erp_nfree--;
+	loan = pool->erp_free[pool->erp_nfree];
+	pool->erp_free[pool->erp_nfree] = NULL;
+	pool->erp_nloaned++;
+	mutex_exit(&pool->erp_lock);
+
+	atomic_inc_64(&ena_rx_loans_out);
+
+	return (loan);
+}
 
 static void
 ena_refill_rx(ena_rxq_t *rxq, uint16_t num)
@@ -67,6 +218,11 @@ ena_refill_rx(ena_rxq_t *rxq, uint16_t num)
 void
 ena_free_rx_dma(ena_rxq_t *rxq)
 {
+	if (rxq->er_pool != NULL) {
+		ena_rx_pool_release(rxq->er_pool);
+		rxq->er_pool = NULL;
+	}
+
 	if (rxq->er_rcbs != NULL) {
 		for (uint_t i = 0; i < rxq->er_sq_num_descs; i++) {
 			ena_rx_ctrl_block_t *rcb = &rxq->er_rcbs[i];
@@ -133,6 +289,12 @@ ena_alloc_rx_dma(ena_rxq_t *rxq)
 			goto error;
 		}
 	}
+
+	/*
+	 * Allow up to half a ring's worth of receive buffers to be out
+	 * on loan to the networking stack at once.
+	 */
+	rxq->er_pool = ena_rx_pool_create(ena, rxq->er_sq_num_descs / 2);
 
 	ena_dma_conf_t cq_conf = {
 		.edc_size = cq_descs_sz,
@@ -394,17 +556,90 @@ ena_ring_rx(ena_rxq_t *rxq, int poll_bytes)
 		rcb->ercb_offset = cdesc->erc_offset;
 		rcb->ercb_length = cdesc->erc_length;
 		VERIFY3U(rcb->ercb_length, <=, ena->ena_max_frame_total);
-		mp = allocb(rcb->ercb_length + ENA_RX_BUF_IPHDR_ALIGNMENT, 0);
+
+		ENA_DMA_SYNC(rcb->ercb_dma, DDI_DMA_SYNC_FORCPU);
+
+		mp = NULL;
 
 		/*
-		 * If we can't allocate an mblk, things are looking
-		 * grim. Forget about this frame and move on.
+		 * Frames large enough to be worth it have their buffer
+		 * loaned to the networking stack rather than copied: the
+		 * frame's buffer is exchanged with a spare from the loan
+		 * pool, which takes its place in the receive ring. If no
+		 * spare is available the frame is copied instead.
+		 *
+		 * Note that for loaned frames the alignment of the IP
+		 * header is at the mercy of the device's write offset
+		 * (erc_offset); on x86 the possible misalignment is
+		 * tolerated.
 		 */
+		if (rcb->ercb_length >= ena->ena_rxcopy_thresh) {
+			ena_rx_loan_t *loan = ena_rx_loan_get(rxq->er_pool);
+
+			if (loan == NULL) {
+				mutex_enter(&rxq->er_stat_lock);
+				rxq->er_stat.ers_loan_nobuf.value.ui64++;
+				mutex_exit(&rxq->er_stat_lock);
+			} else {
+				ena_dma_buf_t swap = loan->erl_dma;
+
+				loan->erl_dma = rcb->ercb_dma;
+				rcb->ercb_dma = swap;
+
+				mp = desballoc((uchar_t *)loan->erl_dma.edb_va
+				    + rcb->ercb_offset, rcb->ercb_length, 0,
+				    &loan->erl_frtn);
+				if (mp == NULL) {
+					/*
+					 * Take the buffer back and fall
+					 * through to copying the frame.
+					 */
+					swap = loan->erl_dma;
+					loan->erl_dma = rcb->ercb_dma;
+					rcb->ercb_dma = swap;
+					ena_rx_loan_return((caddr_t)loan);
+
+					mutex_enter(&rxq->er_stat_lock);
+					rxq->er_stat.ers_desballoc_fail.
+					    value.ui64++;
+					mutex_exit(&rxq->er_stat_lock);
+				} else {
+					mp->b_wptr += rcb->ercb_length;
+
+					mutex_enter(&rxq->er_stat_lock);
+					rxq->er_stat.ers_loaned.value.ui64++;
+					mutex_exit(&rxq->er_stat_lock);
+				}
+			}
+		}
+
 		if (mp == NULL) {
-			mutex_enter(&rxq->er_stat_lock);
-			rxq->er_stat.ers_allocb_fail.value.ui64++;
-			mutex_exit(&rxq->er_stat_lock);
-			goto next_desc;
+			mp = allocb(rcb->ercb_length +
+			    ENA_RX_BUF_IPHDR_ALIGNMENT, 0);
+
+			/*
+			 * If we can't allocate an mblk, things are looking
+			 * grim. Forget about this frame and move on.
+			 */
+			if (mp == NULL) {
+				mutex_enter(&rxq->er_stat_lock);
+				rxq->er_stat.ers_allocb_fail.value.ui64++;
+				mutex_exit(&rxq->er_stat_lock);
+				goto next_desc;
+			}
+
+			/*
+			 * We need to make sure the bytes are copied to the
+			 * correct offset to achieve 4-byte IP header
+			 * alignment.
+			 */
+			mp->b_wptr += ENA_RX_BUF_IPHDR_ALIGNMENT;
+			mp->b_rptr += ENA_RX_BUF_IPHDR_ALIGNMENT;
+			bcopy(rcb->ercb_dma.edb_va + rcb->ercb_offset,
+			    mp->b_wptr, rcb->ercb_length);
+			mp->b_wptr += rcb->ercb_length;
+			VERIFY3P(mp->b_wptr, >, mp->b_rptr);
+			VERIFY3P(mp->b_wptr, <=, mp->b_datap->db_lim);
 		}
 
 		/*
@@ -419,26 +654,7 @@ ena_ring_rx(ena_rxq_t *rxq, int poll_bytes)
 
 		tail = mp;
 
-		/*
-		 * We need to make sure the bytes are copied to the
-		 * correct offset to achieve 4-byte IP header
-		 * alignment.
-		 *
-		 * If we start using desballoc on the buffers, then we
-		 * will need to make sure to apply this offset to the
-		 * DMA buffers as well. Though it may be the case the
-		 * device does this implicitly and that's what
-		 * cdesc->erc_offset is for; we don't know because
-		 * it's not documented.
-		 */
-		mp->b_wptr += ENA_RX_BUF_IPHDR_ALIGNMENT;
-		mp->b_rptr += ENA_RX_BUF_IPHDR_ALIGNMENT;
-		bcopy(rcb->ercb_dma.edb_va + rcb->ercb_offset, mp->b_wptr,
-		    rcb->ercb_length);
-		mp->b_wptr += rcb->ercb_length;
 		total_bytes += rcb->ercb_length;
-		VERIFY3P(mp->b_wptr, >, mp->b_rptr);
-		VERIFY3P(mp->b_wptr, <=, mp->b_datap->db_lim);
 
 		l3proto = ENAHW_RX_CDESC_L3_PROTO(cdesc);
 		l4proto = ENAHW_RX_CDESC_L4_PROTO(cdesc);

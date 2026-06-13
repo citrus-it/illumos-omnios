@@ -448,6 +448,17 @@ ena_stat_rxq_init(ena_rxq_t *rxq)
 	    KSTAT_DATA_UINT64);
 	ers->ers_allocb_fail.value.ui64 = 0;
 
+	kstat_named_init(&ers->ers_loaned, "loaned", KSTAT_DATA_UINT64);
+	ers->ers_loaned.value.ui64 = 0;
+
+	kstat_named_init(&ers->ers_loan_nobuf, "loan_nobuf",
+	    KSTAT_DATA_UINT64);
+	ers->ers_loan_nobuf.value.ui64 = 0;
+
+	kstat_named_init(&ers->ers_desballoc_fail, "desballoc_fail",
+	    KSTAT_DATA_UINT64);
+	ers->ers_desballoc_fail.value.ui64 = 0;
+
 	kstat_named_init(&ers->ers_intr_limit, "intr_limit", KSTAT_DATA_UINT64);
 	ers->ers_intr_limit.value.ui64 = 0;
 

@@ -37,7 +37,6 @@
  *    o Admin Queue Interrupts: queue completion events are always polled
  *    o FMA
  *    o Tx DMA bind (borrow buffers)
- *    o Rx DMA bind (loaned buffers)
  *    o TSO
  *    o RSS
  *    o Support for different Tx completion policies
@@ -293,11 +292,20 @@
  * the contents of those buffers for a given received frame. At Rx
  * ring start we allocate a Rx Control Buffer (RCB) for each
  * descriptor in the ring. Each RCB has a DMA buffer associated with
- * it; and each buffer is large enough to hold the MTU. For each
- * received frame we copy the contents out of the RCB and into its own
- * mblk, immediately returning the RCB for reuse. As with Tx, this
- * gives us a simple 1:1 mapping currently, but if more advanced
- * features are implemented later this could change.
+ * it; and each buffer is large enough to hold the MTU.
+ *
+ * Received frames smaller than the "rx_copy_threshold" property are
+ * copied out of the RCB and into their own mblk, immediately
+ * returning the RCB for reuse. Larger frames have their buffer loaned
+ * to the networking stack with desballoc(9F): the frame's buffer is
+ * exchanged with a spare from the queue's loan pool, the spare takes
+ * the place of the original in the receive ring, and the original is
+ * returned to the pool when the stack frees the message. If no spare
+ * is available the frame is copied as before. The loan pool is
+ * reference counted by its outstanding loans so that the queue can be
+ * torn down (such as for a device reset) while the stack still holds
+ * loaned buffers; instances cannot detach until all loans have been
+ * returned.
  *
  * Asynchronous Event Notification Queue (AENQ)
  * --------------------------------------------
@@ -1188,6 +1196,10 @@ ena_attach_read_conf(ena_t *ena)
 	ASSERT3U(gcv, <=, INT_MAX);
 	ena->ena_txq_num_descs = ena_get_prop(ena, ENA_PROP_TXQ_NUM_DESCS,
 	    ENA_PROP_TXQ_NUM_DESCS_MIN, gcv, gcv);
+
+	ena->ena_rxcopy_thresh = ena_get_prop(ena, ENA_PROP_RXCOPY_THRESH,
+	    ENA_PROP_RXCOPY_THRESH_MIN, ENA_PROP_RXCOPY_THRESH_MAX,
+	    ENA_PROP_RXCOPY_THRESH_DEF);
 
 	return (true);
 }
@@ -2430,6 +2442,20 @@ ena_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ena_t *ena = ddi_get_driver_private(dip);
 
 	if (ena == NULL) {
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * The free callback for loaned receive buffers lives in this
+	 * module's text, so we must not allow the module to be
+	 * unloaded while any loans remain outstanding. The count is
+	 * global; loans made by this instance can only decrease at
+	 * this point, as its rings have been stopped.
+	 */
+	if (ena_rx_loans_out != 0) {
+		ena_err(ena, "!cannot detach: %lu receive buffers are "
+		    "loaned to the networking stack",
+		    (ulong_t)ena_rx_loans_out);
 		return (DDI_FAILURE);
 	}
 
