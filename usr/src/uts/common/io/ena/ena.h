@@ -343,7 +343,6 @@ typedef struct ena_tx_control_block {
 	 * its associated TCB.
 	 */
 	uint16_t	etcb_id;
-	mblk_t		*etcb_mp;
 	ena_tcb_type_t	etcb_type;
 	ena_dma_buf_t	etcb_dma;
 } ena_tx_control_block_t;

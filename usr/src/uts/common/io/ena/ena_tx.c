@@ -23,8 +23,6 @@ ena_free_tx_dma(ena_txq_t *txq)
 		for (uint_t i = 0; i < txq->et_sq_num_descs; i++) {
 			ena_tx_control_block_t *tcb = &txq->et_tcbs[i];
 			ena_dma_free(&tcb->etcb_dma);
-			if (tcb->etcb_mp != NULL)
-				freemsg(tcb->etcb_mp);
 		}
 
 		kmem_free(txq->et_tcbs,
@@ -340,6 +338,11 @@ ena_tx_copy_fragment(ena_tx_control_block_t *tcb, const mblk_t *mp,
 	tcb->etcb_dma.edb_used_len += len;
 }
 
+/*
+ * Copy the entire message into the TCB's DMA buffer. The message itself
+ * is not consumed; once the copy is complete the device has no further
+ * need of it and the caller can free it.
+ */
 static void
 ena_tcb_pull(const ena_txq_t *txq, ena_tx_control_block_t *tcb, mblk_t *mp)
 {
@@ -364,9 +367,6 @@ ena_tcb_pull(const ena_txq_t *txq, ena_tx_control_block_t *tcb, mblk_t *mp)
 	}
 
 	ENA_DMA_SYNC(tcb->etcb_dma, DDI_DMA_SYNC_FORDEV);
-
-	VERIFY3P(tcb->etcb_mp, ==, NULL);
-	tcb->etcb_mp = mp;
 }
 
 static void
@@ -649,6 +649,13 @@ ena_ring_tx(void *arg, mblk_t *mp)
 
 	mutex_exit(&txq->et_lock);
 
+	/*
+	 * The packet was copied into the TCB's DMA buffer before submission,
+	 * so the message can be freed straight away rather than holding it
+	 * until the device has finished with the descriptor.
+	 */
+	freemsg(mp);
+
 	return (NULL);
 }
 
@@ -671,8 +678,6 @@ ena_tx_intr_work(ena_txq_t *txq)
 
 	/* Recycle any completed descriptors. */
 	while (ENAHW_TX_CDESC_GET_PHASE(cdesc) == txq->et_cq_phase) {
-		mblk_t *mp;
-
 		/* Get the corresponding TCB. */
 		req_id = cdesc->etc_req_id;
 		if (req_id >= txq->et_sq_num_descs) {
@@ -684,12 +689,7 @@ ena_tx_intr_work(ena_txq_t *txq)
 		DTRACE_PROBE2(tx__complete, uint16_t, req_id,
 		    ena_tx_control_block_t *, tcb);
 
-		/* Free the associated mblk. */
 		tcb->etcb_dma.edb_used_len = 0;
-		mp = tcb->etcb_mp;
-		tcb->etcb_mp = NULL;
-		VERIFY3P(mp, !=, NULL);
-		freemsg(mp);
 
 		/* Add this descriptor back to the free list. */
 		ena_tcb_free(txq, tcb);

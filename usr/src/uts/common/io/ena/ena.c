@@ -173,10 +173,10 @@
  * DMA buffer associated with it; and each buffer is large enough to
  * hold the MTU. Therefore, Tx descriptors and TCBs currently have a
  * 1:1 mapping. When a packet is sent, the mblk's buffer is copied to
- * the TCB's DMA buffer, and a new descriptor is written to the SQ
- * describing said TCB buffer. If and when we add more advanced
- * features like DMA binding of mblks and TSO, this 1:1 guarantee will
- * no longer hold.
+ * the TCB's DMA buffer and the mblk is freed immediately, then a new
+ * descriptor is written to the SQ describing said TCB buffer. If and
+ * when we add more advanced features like DMA binding of mblks and
+ * TSO, this 1:1 guarantee will no longer hold.
  *
  * Low Latency Queues (LLQ)
  * ------------------------
