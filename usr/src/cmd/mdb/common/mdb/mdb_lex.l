@@ -106,6 +106,7 @@ extern int yydebug;
 %s	S_FMTLIST
 %s	S_ARGLIST
 %s	S_EXPR
+%s	S_PIPECMD
 
 RGX_CMD_CHAR	[?%@A-Z\^_`a-z]
 RGX_SYMBOL	[a-zA-Z_.][0-9a-zA-Z_.`]*
@@ -150,10 +151,11 @@ RGX_COMMENT	"//".*\n
 <S_FMTLIST>"|"	|
 <S_ARGLIST>"|"	{
 		/*
-		 * Pipelines can appear in any of these states -- switch to
-		 * the initial state and return the | character.
+		 * Pipelines can appear in any of these states -- switch to the
+		 * pipe-command state, in which the leading "::" of a dcmd is
+		 * optional, and return the | character.
 		 */
-		BEGIN(S_INITIAL);
+		BEGIN(S_PIPECMD);
 		return (yytext[0]);
 	}
 
@@ -168,7 +170,7 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_STRING);
 	}
 
-<S_INITIAL>"::"{RGX_SYMBOL}	{
+<S_INITIAL,S_PIPECMD>"::"{RGX_SYMBOL}	{
 		/*
 		 * Verb ::command-name -- lookup the correspond dcmd and
 		 * switch to the argument list state.
@@ -180,8 +182,22 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_DCMD);
 	}
 
-<S_INITIAL>"$<<"|"$<"|"$>"	|
-<S_INITIAL>[\$:]{RGX_CMD_CHAR}	{
+<S_PIPECMD>{RGX_SYMBOL}	{
+		/*
+		 * Inside a pipeline a bare word names a dcmd: it is treated as
+		 * if it had been written with a leading "::". This rule only
+		 * fires immediately after a |, so a leading symbol elsewhere is
+		 * still parsed as an expression.
+		 */
+		if ((yylval.l_dcmd = mdb_dcmd_lookup(yytext)) == NULL)
+			yyperror("invalid command '%s'", yytext);
+
+		BEGIN(S_ARGLIST);
+		return (MDB_TOK_DCMD);
+	}
+
+<S_INITIAL,S_PIPECMD>"$<<"|"$<"|"$>"	|
+<S_INITIAL,S_PIPECMD>[\$:]{RGX_CMD_CHAR}	{
 		/*
 		 * Old-style :c or $c command -- lookup the corresponding dcmd
 		 * and switch to the argument list state.
@@ -193,7 +209,7 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_DCMD);
 	}
 
-<S_INITIAL>">/"[a-zA-Z0-9]"/"	{
+<S_INITIAL,S_PIPECMD>">/"[a-zA-Z0-9]"/"	{
 		/*
 		 * Variable assignment with size cast -- append the cast letter
 		 * to the argument list, and switch to the argument list state.
@@ -210,7 +226,7 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_DCMD);
 	}
 
-<S_INITIAL>">"	{
+<S_INITIAL,S_PIPECMD>">"	{
 		/*
 		 * Variable assignment -- switch to the argument list state.
 		 */
@@ -219,7 +235,7 @@ RGX_COMMENT	"//".*\n
 		return (MDB_TOK_DCMD);
 	}
 
-<S_INITIAL>[/\\?][ \t]*[vwzWZlLM]	{
+<S_INITIAL,S_PIPECMD>[/\\?][ \t]*[vwzWZlLM]	{
 		/*
 		 * Format verb followed by write or match signifier -- switch
 		 * to the value list state and return the verb character.  We
@@ -236,7 +252,7 @@ RGX_COMMENT	"//".*\n
 		return yytext[0];
 	}
 
-<S_INITIAL>[/\\@?=]	{
+<S_INITIAL,S_PIPECMD>[/\\@?=]	{
 		/*
 		 * Format verb -- switch to the format list state and return
 		 * the actual verb character verbatim.

@@ -214,6 +214,14 @@ failed, or was invoked with invalid arguments.
 A
 .Em pipeline
 is a sequence of one or more simple commands separated by |.
+Within a pipeline, the leading
+.Sq ::
+of a dcmd name may be omitted: the word immediately following a | is always
+interpreted as a dcmd, so
+.Ic ::walk thread | ::findstack
+and
+.Ic ::walk thread | findstack
+are equivalent.
 Unlike the shell, dcmds in
 .Nm
 pipelines are not executed as separate processes.

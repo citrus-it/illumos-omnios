@@ -57,32 +57,52 @@
 /*
  * find_command_start --
  *
- *	Given a buffer find the start of the last command.
+ *	Given a buffer, find the start of the dcmd name for the last command.
+ *	A command is introduced either by a "::" verb or, within a pipeline, by
+ *	a "|" -- and the leading "::" of a piped dcmd is optional. We therefore
+ *	begin at whichever separator appears last in the buffer. The returned
+ *	pointer is positioned at the dcmd name itself (past any "::"), and may
+ *	point at a '\0' if a command is being started but not yet typed (as in a
+ *	bare "::" or "|"). NULL is returned only if the buffer contains no
+ *	command at all.
  */
 static char *
 tab_find_command_start(char *buf)
 {
+	char *dcolon = NULL;
+	char *pipe = strrchr(buf, '|');
 	char *offset = strstr(buf, COMMAND_SEPARATOR);
 
-	if (offset == NULL)
-		return (NULL);
-
-	for (;;) {
-		char *next = strstr(offset + strlen(COMMAND_SEPARATOR),
+	/*
+	 * Find the last "::" in the buffer.
+	 */
+	while (offset != NULL) {
+		dcolon = offset;
+		offset = strstr(offset + strlen(COMMAND_SEPARATOR),
 		    COMMAND_SEPARATOR);
-
-		if (next == NULL) {
-			return (offset);
-		}
-
-		offset = next;
 	}
+
+	/*
+	 * If a "|" appears after the last "::" (or there is no "::" at all),
+	 * the final command is introduced by the pipe and has no leading "::".
+	 * Skip the "|" and any blanks to reach the dcmd name.
+	 */
+	if (pipe != NULL && (dcolon == NULL || pipe > dcolon)) {
+		for (pipe++; *pipe != '\0' && isspace(*pipe); pipe++)
+			continue;
+		return (pipe);
+	}
+
+	if (dcolon != NULL)
+		return (dcolon + strlen(COMMAND_SEPARATOR));
+
+	return (NULL);
 }
 
 /*
  * get_dcmd --
  *
- *	Given a buffer containing a command and its argument return
+ *	Given a buffer positioned at a dcmd name and its arguments return
  *	the name of the command and the offset in the buffer where
  *	the command arguments start.
  *
@@ -91,7 +111,7 @@ tab_find_command_start(char *buf)
 char *
 tab_get_dcmd(char *buf, char **args, uint_t *flags)
 {
-	char *start = buf + strlen(COMMAND_SEPARATOR);
+	char *start = buf;
 	char *separator = start;
 	const char *end = buf + strlen(buf);
 	uint_t space = 0;
