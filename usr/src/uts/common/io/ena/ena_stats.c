@@ -380,6 +380,10 @@ ena_stat_txq_init(ena_txq_t *txq)
 	    KSTAT_DATA_UINT64);
 	ets->ets_hck_meoifail.value.ui64 = 0;
 
+	kstat_named_init(&ets->ets_hck_dropped, "hck_dropped",
+	    KSTAT_DATA_UINT64);
+	ets->ets_hck_dropped.value.ui64 = 0;
+
 	kstat_named_init(&ets->ets_blocked, "blocked", KSTAT_DATA_UINT64);
 	ets->ets_blocked.value.ui64 = 0;
 

@@ -1869,14 +1869,32 @@ typedef struct enahw_tx_data_desc {
 #define	ENAHW_TX_DESC_TSO_OFF(desc)				\
 	(((desc)->etd_meta_ctrl) &= ~ENAHW_TX_DESC_TSO_EN_MASK)
 
+#define	ENAHW_TX_DESC_L3_CSUM_ON(desc)				\
+	(((desc)->etd_meta_ctrl) |= ENAHW_TX_DESC_L3_CSUM_EN_MASK)
+
 #define	ENAHW_TX_DESC_L3_CSUM_OFF(desc)				\
 	(((desc)->etd_meta_ctrl) &= ~ENAHW_TX_DESC_L3_CSUM_EN_MASK)
+
+#define	ENAHW_TX_DESC_L4_CSUM_ON(desc)				\
+	(((desc)->etd_meta_ctrl) |= ENAHW_TX_DESC_L4_CSUM_EN_MASK)
 
 #define	ENAHW_TX_DESC_L4_CSUM_OFF(desc)				\
 	(((desc)->etd_meta_ctrl) &= ~ENAHW_TX_DESC_L4_CSUM_EN_MASK)
 
 #define	ENAHW_TX_DESC_L4_CSUM_PARTIAL_ON(desc)				\
+	(((desc)->etd_meta_ctrl) |= ENAHW_TX_DESC_L4_CSUM_PARTIAL_MASK)
+
+#define	ENAHW_TX_DESC_L4_CSUM_PARTIAL_OFF(desc)			\
 	(((desc)->etd_meta_ctrl) &= ~ENAHW_TX_DESC_L4_CSUM_PARTIAL_MASK)
+
+#define	ENAHW_TX_DESC_L3_PROTO_IDX(desc, proto)			\
+	(((desc)->etd_meta_ctrl) |=				\
+	    ((proto) & ENAHW_TX_DESC_L3_PROTO_IDX_MASK))
+
+#define	ENAHW_TX_DESC_L4_PROTO_IDX(desc, proto)			\
+	(((desc)->etd_meta_ctrl) |=				\
+	    (((proto) << ENAHW_TX_DESC_L4_PROTO_IDX_SHIFT) &	\
+	    ENAHW_TX_DESC_L4_PROTO_IDX_MASK))
 
 /* common: ena_eth_io_tx_meta_desc */
 typedef struct enahw_tx_meta_desc {
@@ -1987,6 +2005,15 @@ typedef struct enahw_tx_meta_desc {
 	((desc)->etmd_word2 |=					\
 	    (((off) << ENAHW_TX_META_DESC_L3_HDR_OFF_SHIFT) &	\
 	    ENAHW_TX_META_DESC_L3_HDR_OFF_MASK))
+
+#define	ENAHW_TX_META_DESC_L3_HDR_LEN(desc, len)		\
+	((desc)->etmd_word2 |=					\
+	    ((len) & ENAHW_TX_META_DESC_L3_HDR_LEN_MASK))
+
+#define	ENAHW_TX_META_DESC_L4_HDR_LEN_WORDS(desc, words)	\
+	((desc)->etmd_word2 |=					\
+	    (((words) << ENAHW_TX_META_DESC_L4_HDR_LEN_SHIFT) &	\
+	    ENAHW_TX_META_DESC_L4_HDR_LEN_MASK))
 
 /* common: N/A */
 typedef union enahw_tx_desc {

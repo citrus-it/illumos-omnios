@@ -14,6 +14,7 @@
  */
 
 #include <sys/atomic.h>
+#include <netinet/in.h>
 #include "ena.h"
 
 void
@@ -187,6 +188,8 @@ ena_alloc_txq(ena_txq_t *txq)
 	txq->et_sq_avail_descs = txq->et_sq_num_descs;
 	txq->et_blocked = false;
 	txq->et_stall_watchdog = 0;
+	/* A newly created queue has an empty meta descriptor cache. */
+	txq->et_meta_valid = false;
 	txq->et_state |= ENA_TXQ_STATE_SQ_CREATED;
 
 	/*
@@ -405,22 +408,96 @@ ena_fill_tx_data_desc(ena_txq_t *txq, ena_tx_control_block_t *tcb,
 	ENAHW_TX_DESC_TSO_OFF(desc);
 	ENAHW_TX_DESC_L3_CSUM_OFF(desc);
 	ENAHW_TX_DESC_L4_CSUM_OFF(desc);
-	/*
-	 * Enabling this bit tells the device NOT to calculate the
-	 * pseudo header checksum.
-	 */
-	ENAHW_TX_DESC_L4_CSUM_PARTIAL_ON(desc);
+	ENAHW_TX_DESC_L4_CSUM_PARTIAL_OFF(desc);
 }
 
 /*
- * Fill in a TX meta descriptor. With DISABLE_META_CACHING the device
- * requires a meta descriptor for every packet. We don't use TSO so
- * MSS is always zero; the meta descriptor carries header offset
- * information.
+ * Set the checksum offload bits in a Tx data descriptor as requested by
+ * the packet's offload flags. The caller has already verified, with
+ * ena_tx_csum_check(), that the parsed header information covers the
+ * requested offloads.
+ */
+static void
+ena_tx_set_csum(enahw_tx_data_desc_t *desc,
+    const mac_ether_offload_info_t *meo, uint32_t hck_flags)
+{
+	if (meo->meoi_l3proto == ETHERTYPE_IP) {
+		ENAHW_TX_DESC_L3_PROTO_IDX(desc, ENAHW_IO_L3_PROTO_IPV4);
+	} else if (meo->meoi_l3proto == ETHERTYPE_IPV6) {
+		ENAHW_TX_DESC_L3_PROTO_IDX(desc, ENAHW_IO_L3_PROTO_IPV6);
+	}
+
+	if ((hck_flags & HCK_IPV4_HDRCKSUM) != 0)
+		ENAHW_TX_DESC_L3_CSUM_ON(desc);
+
+	if ((hck_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM)) != 0) {
+		ENAHW_TX_DESC_L4_PROTO_IDX(desc,
+		    meo->meoi_l4proto == IPPROTO_TCP ?
+		    ENAHW_IO_L4_PROTO_TCP : ENAHW_IO_L4_PROTO_UDP);
+		ENAHW_TX_DESC_L4_CSUM_ON(desc);
+
+		/*
+		 * In the device's partial checksum mode the caller has
+		 * already placed the pseudo-header checksum in the L4
+		 * checksum field and the device must not compute it;
+		 * setting the PARTIAL bit indicates this. In full mode
+		 * the device computes the entire checksum itself.
+		 */
+		if ((hck_flags & HCK_PARTIALCKSUM) != 0)
+			ENAHW_TX_DESC_L4_CSUM_PARTIAL_ON(desc);
+	}
+}
+
+/*
+ * Verify that a packet's requested checksum offloads can be honoured,
+ * based on the parsed header information. If they cannot, the packet
+ * must be dropped; transmitting it without the checksums it was
+ * promised would send corrupt frames.
+ */
+static bool
+ena_tx_csum_check(const mac_ether_offload_info_t *meo, uint32_t hck_flags)
+{
+	if ((hck_flags & HCK_IPV4_HDRCKSUM) != 0) {
+		if ((meo->meoi_flags & MEOI_L3INFO_SET) == 0 ||
+		    meo->meoi_l3proto != ETHERTYPE_IP) {
+			return (false);
+		}
+	}
+
+	if ((hck_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM)) != 0) {
+		const mac_ether_offload_flags_t needed =
+		    MEOI_L3INFO_SET | MEOI_L4INFO_SET;
+
+		if ((meo->meoi_flags & needed) != needed)
+			return (false);
+
+		if (meo->meoi_l4proto != IPPROTO_TCP &&
+		    meo->meoi_l4proto != IPPROTO_UDP) {
+			return (false);
+		}
+	}
+
+	/*
+	 * The meta descriptor's header length and offset fields are
+	 * 8 bits wide.
+	 */
+	if (meo->meoi_l2hlen > UINT8_MAX || meo->meoi_l3hlen > UINT8_MAX)
+		return (false);
+
+	return (true);
+}
+
+/*
+ * Fill in a TX meta descriptor, carrying the L3 header offset and
+ * length for checksum offload. We don't use TSO so MSS is always zero.
+ * In LLQ mode the device runs with DISABLE_META_CACHING and requires a
+ * meta descriptor for every packet; in host placement mode one is only
+ * despatched when its contents change, and the device applies its
+ * cached copy to the packets in between.
  */
 static void
 ena_fill_tx_meta_desc(enahw_tx_meta_desc_t *meta, uint8_t phase,
-    mac_ether_offload_info_t *meo)
+    bool comp_req, const mac_ether_offload_info_t *meo)
 {
 	bzero(meta, sizeof (*meta));
 	ENAHW_TX_META_DESC_META_DESC_ON(meta);
@@ -429,8 +506,10 @@ ena_fill_tx_meta_desc(enahw_tx_meta_desc_t *meta, uint8_t phase,
 	ENAHW_TX_META_DESC_META_STORE_ON(meta);
 	ENAHW_TX_META_DESC_PHASE(meta, phase);
 	ENAHW_TX_META_DESC_FIRST_ON(meta);
-	ENAHW_TX_META_DESC_COMP_REQ_ON(meta);
+	if (comp_req)
+		ENAHW_TX_META_DESC_COMP_REQ_ON(meta);
 	ENAHW_TX_META_DESC_L3_HDR_OFF(meta, meo->meoi_l2hlen);
+	ENAHW_TX_META_DESC_L3_HDR_LEN(meta, meo->meoi_l3hlen);
 }
 
 /*
@@ -479,8 +558,8 @@ ena_submit_tx(ena_txq_t *txq, uint16_t desc_idx)
 }
 
 /*
- * For now we do the simplest thing possible. All Tx uses bcopy to
- * pre-allocated buffers, no checksum, no TSO, etc.
+ * All Tx uses bcopy to pre-allocated buffers; we do not yet support
+ * DMA binding of large packets or TSO.
  */
 mblk_t *
 ena_ring_tx(void *arg, mblk_t *mp)
@@ -491,6 +570,9 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	enahw_tx_data_desc_t *desc;
 	ena_tx_control_block_t *tcb;
 	const uint16_t modulo_mask = txq->et_sq_num_descs - 1;
+	uint32_t hck_flags;
+	bool need_meta = false;
+	uint16_t ndescs = 1;
 	uint16_t tail_mod;
 
 	VERIFY3P(mp->b_next, ==, NULL);
@@ -519,7 +601,34 @@ ena_ring_tx(void *arg, mblk_t *mp)
 		return (NULL);
 	}
 
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &hck_flags);
+	hck_flags &= HCK_IPV4_HDRCKSUM | HCK_PARTIALCKSUM | HCK_FULLCKSUM;
+
+	if (hck_flags != 0 && !ena_tx_csum_check(&meo, hck_flags)) {
+		freemsg(mp);
+		mutex_enter(&txq->et_stat_lock);
+		txq->et_stat.ets_hck_dropped.value.ui64++;
+		mutex_exit(&txq->et_stat_lock);
+		return (NULL);
+	}
+
 	mutex_enter(&txq->et_lock);
+
+	/*
+	 * In host placement mode, a packet requesting checksum offload
+	 * must be preceded by a meta descriptor carrying the header
+	 * offsets, unless one matching this packet has already been
+	 * stored in the device's cache. In LLQ mode a meta descriptor
+	 * is part of every LLQ entry, so no additional descriptor is
+	 * needed.
+	 */
+	if (!ena->ena_llq_enabled && hck_flags != 0 &&
+	    (!txq->et_meta_valid ||
+	    txq->et_meta_l3_off != meo.meoi_l2hlen ||
+	    txq->et_meta_l3_len != meo.meoi_l3hlen)) {
+		need_meta = true;
+		ndescs = 2;
+	}
 
 	/*
 	 * For the moment there are an equal number of Tx descs and Tx
@@ -527,7 +636,7 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	 * guaranteed to be as large as MTU + frame header, see
 	 * ena_update_buf_sizes().
 	 */
-	if (txq->et_blocked || txq->et_sq_avail_descs == 0) {
+	if (txq->et_blocked || txq->et_sq_avail_descs < ndescs) {
 		txq->et_blocked = true;
 		mutex_enter(&txq->et_stat_lock);
 		txq->et_stat.ets_blocked.value.ui64++;
@@ -572,7 +681,7 @@ ena_ring_tx(void *arg, mblk_t *mp)
 
 		/* Slot 0: meta descriptor */
 		meta = (enahw_tx_meta_desc_t *)buf;
-		ena_fill_tx_meta_desc(meta, txq->et_sq_phase, &meo);
+		ena_fill_tx_meta_desc(meta, txq->et_sq_phase, true, &meo);
 
 		/* Slot 1: data descriptor */
 		desc = (enahw_tx_data_desc_t *)(buf + sizeof (enahw_tx_desc_t));
@@ -595,6 +704,8 @@ ena_ring_tx(void *arg, mblk_t *mp)
 		ena_fill_tx_data_desc(txq, tcb, tcb->etcb_id,
 		    txq->et_sq_phase, desc, &meo,
 		    meo.meoi_len - hdr_copy);
+		if (hck_flags != 0)
+			ena_tx_set_csum(desc, &meo, hck_flags);
 		ENAHW_TX_DESC_FIRST_OFF(desc);
 		ENAHW_TX_DESC_HEADER_LENGTH(desc, hdr_copy);
 		ENAHW_TX_DESC_ADDR_LO(desc,
@@ -619,17 +730,50 @@ ena_ring_tx(void *arg, mblk_t *mp)
 		}
 	} else {
 		/* Host placement */
+		if (need_meta) {
+			enahw_tx_meta_desc_t *meta;
+
+			tail_mod = txq->et_sq_tail_idx & modulo_mask;
+			meta = &txq->et_sq_descs[tail_mod].etd_meta;
+			ena_fill_tx_meta_desc(meta, txq->et_sq_phase, false,
+			    &meo);
+
+			txq->et_sq_tail_idx++;
+			if ((txq->et_sq_tail_idx & modulo_mask) == 0)
+				txq->et_sq_phase ^= 1;
+
+			/*
+			 * The META_STORE bit instructs the device to
+			 * cache this meta descriptor and apply it to
+			 * subsequent packets, so we need not send
+			 * another until the header layout changes.
+			 */
+			txq->et_meta_valid = true;
+			txq->et_meta_l3_off = (uint8_t)meo.meoi_l2hlen;
+			txq->et_meta_l3_len = (uint8_t)meo.meoi_l3hlen;
+		}
+
 		tail_mod = txq->et_sq_tail_idx & modulo_mask;
 		desc = &txq->et_sq_descs[tail_mod].etd_data;
 		ena_fill_tx_data_desc(txq, tcb, tcb->etcb_id,
 		    txq->et_sq_phase, desc, &meo, meo.meoi_len);
+		if (hck_flags != 0)
+			ena_tx_set_csum(desc, &meo, hck_flags);
+		if (need_meta) {
+			/*
+			 * The meta descriptor is the first descriptor
+			 * of this packet.
+			 */
+			ENAHW_TX_DESC_FIRST_OFF(desc);
+		}
 		ENA_DMA_SYNC(txq->et_sq_dma, DDI_DMA_SYNC_FORDEV);
 	}
 
 	DTRACE_PROBE3(tx__submit, ena_tx_control_block_t *, tcb, uint16_t,
 	    tcb->etcb_id, enahw_tx_data_desc_t *, desc);
 
-	txq->et_sq_avail_descs--;
+	tcb->etcb_ndescs = ndescs;
+	txq->et_sq_avail_descs -= ndescs;
 
 	/*
 	 * Remember, we submit the raw tail value to the device, the
@@ -637,15 +781,15 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	 * tail_mod).
 	 */
 	txq->et_sq_tail_idx++;
+	if ((txq->et_sq_tail_idx & modulo_mask) == 0)
+		txq->et_sq_phase ^= 1;
+
 	ena_submit_tx(txq, txq->et_sq_tail_idx);
 
 	mutex_enter(&txq->et_stat_lock);
 	txq->et_stat.ets_packets.value.ui64++;
 	txq->et_stat.ets_bytes.value.ui64 += meo.meoi_len;
 	mutex_exit(&txq->et_stat_lock);
-
-	if ((txq->et_sq_tail_idx & modulo_mask) == 0)
-		txq->et_sq_phase ^= 1;
 
 	mutex_exit(&txq->et_lock);
 
@@ -691,9 +835,15 @@ ena_tx_intr_work(ena_txq_t *txq)
 
 		tcb->etcb_dma.edb_used_len = 0;
 
-		/* Add this descriptor back to the free list. */
+		/*
+		 * Return the TCB to the free list, and reclaim the
+		 * submission queue descriptors the packet consumed,
+		 * including any meta descriptor that preceded the data
+		 * descriptor.
+		 */
+		ASSERT3U(tcb->etcb_ndescs, >=, 1);
 		ena_tcb_free(txq, tcb);
-		txq->et_sq_avail_descs++;
+		txq->et_sq_avail_descs += tcb->etcb_ndescs;
 
 		/* Move on and check for phase rollover. */
 		txq->et_cq_head_idx++;

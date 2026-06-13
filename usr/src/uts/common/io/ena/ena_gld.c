@@ -235,7 +235,16 @@ ena_m_getcapab(void *arg, mac_capab_t capab, void *cap_data)
 
 		break;
 
-	case MAC_CAPAB_HCKSUM:
+	case MAC_CAPAB_HCKSUM: {
+		uint32_t *txflags = cap_data;
+
+		if (ena->ena_tx_hcksum_flags == 0)
+			return (B_FALSE);
+
+		*txflags = ena->ena_tx_hcksum_flags;
+		break;
+	}
+
 	case MAC_CAPAB_LSO:
 		return (B_FALSE);
 	default:

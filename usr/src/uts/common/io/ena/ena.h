@@ -32,6 +32,7 @@
 #include <sys/mac_ether.h>
 #include <sys/mac_provider.h>
 #include <sys/pattr.h>
+#include <sys/dlpi.h>
 #include <sys/strsun.h>
 #include <sys/ethernet.h>
 #include <sys/vlan.h>
@@ -343,6 +344,13 @@ typedef struct ena_tx_control_block {
 	 * its associated TCB.
 	 */
 	uint16_t	etcb_id;
+
+	/*
+	 * The number of submission queue descriptors consumed by this
+	 * packet, reclaimed when the packet's completion arrives.
+	 */
+	uint16_t	etcb_ndescs;
+
 	ena_tcb_type_t	etcb_type;
 	ena_dma_buf_t	etcb_dma;
 } ena_tx_control_block_t;
@@ -359,6 +367,12 @@ typedef enum ena_txq_state {
 typedef struct ena_txq_stat {
 	/* Number of times mac_ether_offload_info() has failed. */
 	kstat_named_t	ets_hck_meoifail;
+
+	/*
+	 * Number of packets dropped because a requested checksum
+	 * offload could not be honoured.
+	 */
+	kstat_named_t	ets_hck_dropped;
 
 	/*
 	 * Total number of times the ring was blocked due to
@@ -443,6 +457,18 @@ typedef struct ena_txq {
 	 */
 	uint16_t		et_sq_phase; /* TM */
 	uint16_t		et_sq_hw_idx; /* WO */
+
+	/*
+	 * In host placement mode the device caches the most recently
+	 * stored Tx meta descriptor and applies it to subsequent
+	 * packets, so one need only be despatched when its contents
+	 * change. These fields mirror the device's cache so that we
+	 * know when that is. They are reset whenever the queue is
+	 * created, as is the device's cache.
+	 */
+	bool			et_meta_valid; /* TM */
+	uint8_t			et_meta_l3_off; /* TM */
+	uint8_t			et_meta_l3_len; /* TM */
 
 	/*
 	 * The "doorbell" address is how the host indicates to the
@@ -887,6 +913,16 @@ typedef struct ena {
 	bool			ena_rx_l4_ipv4_csum;
 	bool			ena_rx_l4_ipv6_csum;
 	bool			ena_rx_hash;
+
+	/*
+	 * The Tx checksum offloads we advertise to MAC, derived from
+	 * the device features above, and whether the L4 offload uses
+	 * the device's partial checksum mode (the caller provides the
+	 * pseudo-header checksum) or its full mode (the device
+	 * computes the entire checksum).
+	 */
+	uint32_t		ena_tx_hcksum_flags;
+	bool			ena_tx_l4_csum_partial;
 
 	uint32_t		ena_max_mtu;
 	uint8_t			ena_mac_addr[ETHERADDRL];

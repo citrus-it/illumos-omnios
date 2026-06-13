@@ -36,8 +36,6 @@
  *
  *    o Admin Queue Interrupts: queue completion events are always polled
  *    o FMA
- *    o Rx checksum offloads
- *    o Tx checksum offloads
  *    o Tx DMA bind (borrow buffers)
  *    o Rx DMA bind (loaned buffers)
  *    o TSO
@@ -979,12 +977,48 @@ ena_get_hints(ena_t *ena)
 	return (true);
 }
 
+/*
+ * Derive the set of Tx checksum offloads to advertise to MAC from the
+ * device's stateless offload features. The device offers two L4 checksum
+ * modes: "partial", where the caller seeds the checksum field with the
+ * pseudo-header checksum and the device adds the L4 payload, and "full",
+ * where the device computes the entire checksum itself. These correspond
+ * to the HCKSUM_INET_PARTIAL and HCKSUM_INET_FULL_* MAC capabilities
+ * respectively. We can only advertise one mode, and as
+ * HCKSUM_INET_PARTIAL applies to both IPv4 and IPv6 we only use it when
+ * the device supports partial mode for both.
+ */
+static void
+ena_derive_tx_hcksum(ena_t *ena)
+{
+	uint32_t flags = 0;
+
+	if (ena->ena_tx_l3_ipv4_csum)
+		flags |= HCKSUM_IPHDRCKSUM;
+
+	if (ena->ena_tx_l4_ipv4_part_csum && ena->ena_tx_l4_ipv6_part_csum) {
+		flags |= HCKSUM_INET_PARTIAL;
+		ena->ena_tx_l4_csum_partial = true;
+	} else {
+		if (ena->ena_tx_l4_ipv4_full_csum)
+			flags |= HCKSUM_INET_FULL_V4;
+		if (ena->ena_tx_l4_ipv6_full_csum)
+			flags |= HCKSUM_INET_FULL_V6;
+		ena->ena_tx_l4_csum_partial = false;
+	}
+
+	ena->ena_tx_hcksum_flags = flags;
+}
+
 static bool
 ena_get_offloads(ena_t *ena)
 {
 	int ret = 0;
 	enahw_resp_desc_t resp;
 	enahw_feat_offload_t *feat = &resp.erd_resp.erd_get_feat.ergf_offload;
+
+	ena->ena_tx_hcksum_flags = 0;
+	ena->ena_tx_l4_csum_partial = false;
 
 	ena->ena_tx_l3_ipv4_csum = false;
 
@@ -1034,6 +1068,9 @@ ena_get_offloads(ena_t *ena)
 	ena->ena_rx_l3_ipv4_csum = ENAHW_FEAT_OFFLOAD_RX_L3_IPV4_CSUM(feat);
 	ena->ena_rx_l4_ipv4_csum = ENAHW_FEAT_OFFLOAD_RX_L4_IPV4_CSUM(feat);
 	ena->ena_rx_l4_ipv6_csum = ENAHW_FEAT_OFFLOAD_RX_L4_IPV6_CSUM(feat);
+
+	ena_derive_tx_hcksum(ena);
+
 	return (true);
 }
 
