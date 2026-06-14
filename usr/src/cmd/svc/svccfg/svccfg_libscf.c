@@ -5364,6 +5364,83 @@ handle_dependent_conflict(const entity_t * const ient,
 }
 
 /*
+ * A service can be assembled from more than one manifest, with each manifest
+ * contributing a different part of the service. For example, one manifest may
+ * declare the service-level exec methods while another adds a further instance.
+ * In that situation a service-level property group that is present in the
+ * last-import snapshot but absent from the manifest now being imported may have
+ * been contributed by one of the other manifests, and so must not be treated as
+ * having been removed.
+ *
+ * The repository's manifestfiles property group records one property per
+ * contributing manifest, keyed by the mangled manifest path. The manifest now
+ * being imported is identified by the single property in its own, in-memory,
+ * manifestfiles property group. Return B_TRUE if the service is recorded as
+ * having been imported from a manifest other than the one currently being
+ * processed.
+ */
+static boolean_t
+svc_has_other_manifest(entity_t *ient, void *ent)
+{
+	pgroup_t *mpg;
+	property_t *prop;
+	const char *cur_propname = NULL;
+	scf_propertygroup_t *pg = NULL;
+	scf_iter_t *iter = NULL;
+	scf_property_t *sprop = NULL;
+	char pname[MAXPATHLEN];
+	uint_t count = 0;
+	boolean_t other = B_FALSE;
+
+	/* Identify the manifest currently being imported. */
+	mpg = internal_pgroup_find(ient, SCF_PG_MANIFESTFILES,
+	    SCF_GROUP_FRAMEWORK);
+	if (mpg != NULL) {
+		prop = uu_list_first(mpg->sc_pgroup_props);
+		if (prop != NULL)
+			cur_propname = prop->sc_property_name;
+	}
+
+	pg = scf_pg_create(g_hndl);
+	iter = scf_iter_create(g_hndl);
+	sprop = scf_property_create(g_hndl);
+	if (pg == NULL || iter == NULL || sprop == NULL)
+		goto out;
+
+	/* A service with no manifestfiles record is single-manifest. */
+	if (entity_get_pg(ent, 1, SCF_PG_MANIFESTFILES, pg) != 0)
+		goto out;
+
+	if (scf_iter_pg_properties(iter, pg) != SCF_SUCCESS)
+		goto out;
+
+	while (scf_iter_next_property(iter, sprop) == 1) {
+		if (scf_property_get_name(sprop, pname, sizeof (pname)) < 0)
+			continue;
+		count++;
+		if (cur_propname != NULL &&
+		    strcmp(pname, cur_propname) != 0) {
+			other = B_TRUE;
+			break;
+		}
+	}
+
+	/*
+	 * If we could not identify the current manifest, fall back to treating
+	 * the service as multi-manifest only when more than one manifest is
+	 * recorded.
+	 */
+	if (cur_propname == NULL && count > 1)
+		other = B_TRUE;
+
+out:
+	scf_property_destroy(sprop);
+	scf_iter_destroy(iter);
+	scf_pg_destroy(pg);
+	return (other);
+}
+
+/*
  * lipg is a property group in the last-import snapshot of ent, which is an
  * scf_service_t or an scf_instance_t (according to ient).  If lipg is not in
  * ient's pgroups, delete it from ent if it hasn't been customized.  If it is
@@ -5528,6 +5605,22 @@ process_old_pg(const scf_propertygroup_t *lipg, entity_t *ient, void *ent,
 			default:
 				bad_error("scf_pg_delete", scf_error());
 			}
+		}
+
+		/*
+		 * The property group is present in the last-import snapshot but
+		 * absent from the manifest now being imported. When a service
+		 * is assembled from more than one manifest, this property group
+		 * may have been contributed by one of the other manifests, and
+		 * deleting it here would clobber that manifest's properties. In
+		 * that case, retain and warn rather than silently removing it.
+		 */
+		if (issvc && svc_has_other_manifest(ient, ent)) {
+			warn(gettext("%s: retaining property group \"%s\" "
+			    "which is not present in this manifest; the "
+			    "service is assembled from multiple manifest "
+			    "files.\n"), ient->sc_fmri, imp_str);
+			return (0);
 		}
 
 		r = load_pg(lipg, &lipg_i, ient->sc_fmri, snap_lastimport);
