@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -27,7 +26,9 @@
 #
 
 #
-#	This makefile drives the production of the xpvd nexus driver
+#	This makefile drives the production of the hvm_bootstrap misc module,
+#	which arranges for the paravirtualised front-end drivers to be
+#	configured early when booting under Xen HVM.
 #
 #	i86pc implementation architecture dependent
 #
@@ -35,31 +36,27 @@
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../../..
+UTSBASE	= ../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= xpvd
-OBJECTS		= $(XPVD_OBJS:%=$(OBJS_DIR)/%)
-ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/xen/io
+MODULE		= hvm_bootstrap
+OBJECTS		= $(HVM_BOOTSTRAP_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
+include $(UTSBASE)/i86pc/Makefile.i86pc
 
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(CONFMOD)
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+ALL_TARGET	= $(BINARY)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-CPPFLAGS	+= -DHVMPV_XPVD_VERS=1
-LDFLAGS		+= -Ndrv/xpv
-
-CERRWARN	+= $(CNOWARN_UNINIT)
+CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS
 
 #
 #	Default build targets.
@@ -79,4 +76,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/i86hvm/Makefile.targ
+include $(UTSBASE)/i86pc/Makefile.targ

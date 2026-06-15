@@ -606,7 +606,7 @@ xen_shutdown(void *arg)
 /*ARGSUSED*/
 static void
 xen_shutdown_handler(struct xenbus_watch *watch, const char **vec,
-	unsigned int len)
+    unsigned int len)
 {
 	char *str;
 	xenbus_transaction_t xbt;
