@@ -24,6 +24,7 @@
 # Copyright 2022 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Peter Tribble
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include ../Makefile.master
@@ -134,7 +135,6 @@ MANIFEST_SUBDIRS=			\
 	tsol/tnd			\
 	tsol/tsol-zones			\
 	vscan/vscand			\
-	xvm/ipagent			\
 	ypcmd/yppasswd			\
 	ypcmd/ypupdated			\
 	zonestat/zonestatd

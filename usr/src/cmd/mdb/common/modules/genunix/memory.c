@@ -22,6 +22,7 @@
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <mdb/mdb_param.h>
@@ -42,9 +43,6 @@
 #include <vm/seg_map.h>
 #include <vm/seg_vn.h>
 #include <vm/seg_hole.h>
-#if defined(__i386) || defined(__amd64)
-#include <sys/balloon_impl.h>
-#endif
 
 #include "avl.h"
 #include "memory.h"
@@ -508,10 +506,6 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	GElf_Sym sym;
 	vn_htable_t ht;
 	uintptr_t vn_size = 0;
-#if defined(__i386) || defined(__amd64)
-	bln_stats_t bln_stats;
-	ssize_t bln_size;
-#endif
 
 	bzero(&stats, sizeof (memstat_t));
 
@@ -631,28 +625,9 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	else
 		freemem = 0;
 
-#if defined(__i386) || defined(__amd64)
-	/* Are we running under Xen?  If so, get balloon memory usage. */
-	if ((bln_size = mdb_readvar(&bln_stats, "bln_stats")) != -1) {
-		if (freemem > bln_stats.bln_hv_pages)
-			freemem -= bln_stats.bln_hv_pages;
-		else
-			freemem = 0;
-	}
-#endif
-
 	mdb_printf("Free (freelist)  %16lu  %16llu  %3lu%%\n", freemem,
 	    (uint64_t)freemem * PAGESIZE / (1024 * 1024),
 	    MS_PCT_TOTAL(freemem));
-
-#if defined(__i386) || defined(__amd64)
-	if (bln_size != -1) {
-		mdb_printf("Balloon          %16lu  %16llu  %3lu%%\n",
-		    bln_stats.bln_hv_pages,
-		    (uint64_t)bln_stats.bln_hv_pages * PAGESIZE / (1024 * 1024),
-		    MS_PCT_TOTAL(bln_stats.bln_hv_pages));
-	}
-#endif
 
 	mdb_printf("\nTotal            %16lu  %16lu\n",
 	    physmem,

@@ -23,6 +23,8 @@
     Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
+    Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+
     Default service profile, containing a typical set of active service
     instances.
 
@@ -178,10 +180,6 @@
       Enable VNC config service for xVM
   -->
   <service name='system/xvm/vnc-config' version='1' type='service'>
-     <instance name='default' enabled='true'/>
-  </service>
-
-  <service name='system/xvm/ipagent' version='1' type='service'>
      <instance name='default' enabled='true'/>
   </service>
 

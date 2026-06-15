@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -46,12 +47,6 @@ dir  path=platform/i86pc/kernel/drv group=sys
 dir  path=platform/i86pc/kernel/drv/$(ARCH64) group=sys
 file path=platform/i86pc/kernel/drv/$(ARCH64)/ioat group=sys
 file path=platform/i86pc/kernel/drv/ioat.conf group=sys
-dir  path=platform/i86xpv group=sys
-dir  path=platform/i86xpv/kernel group=sys
-dir  path=platform/i86xpv/kernel/drv group=sys
-dir  path=platform/i86xpv/kernel/drv/$(ARCH64) group=sys
-file path=platform/i86xpv/kernel/drv/$(ARCH64)/ioat group=sys
-file path=platform/i86xpv/kernel/drv/ioat.conf group=sys
 driver name=ioat \
     alias=pciex8086,1a38 \
     alias=pciex8086,360b \

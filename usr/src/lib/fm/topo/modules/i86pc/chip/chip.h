@@ -22,6 +22,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019, Joyent, Inc.
  * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _CHIP_H
@@ -159,7 +160,6 @@ extern int add_nvlist_longprops(topo_mod_t *, tnode_t *, nvlist_t *,
 extern int mkrsrc(topo_mod_t *, tnode_t *, const char *, int,
     nvlist_t *, nvlist_t **);
 extern nvlist_t *cpu_fmri_create(topo_mod_t *, uint32_t, char *, uint8_t);
-extern boolean_t is_xpv();
 extern void get_chip_kstat_strs(topo_mod_t *, kstat_ctl_t *, int32_t, char **,
     char **);
 

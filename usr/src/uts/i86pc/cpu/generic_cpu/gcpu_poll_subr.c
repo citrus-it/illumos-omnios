@@ -25,7 +25,11 @@
  */
 
 /*
- * Generic x86 CPU MCA poller - support functions for native and xpv pollers.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
+ * Generic x86 CPU MCA poller - support functions for the native poller.
  */
 
 #include <sys/types.h>

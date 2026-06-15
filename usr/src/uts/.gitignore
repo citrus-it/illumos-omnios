@@ -11,6 +11,7 @@
 
 #
 # Copyright 2025 Oxide Computer Company
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
 **/debug32/
@@ -55,8 +56,6 @@ i86pc/io/dr/dr_err.c
 i86pc/io/dr/sbdgenerr
 
 i86pc/cpu/scripts/ao_gendisp
-i86xpv/cpu/scripts/ao_gendisp
-i86xpv/cpu/scripts/ao_gendisp.pl
 
 common/io/fibre-channel/fca/qlc/ql_fw_table.c
 
