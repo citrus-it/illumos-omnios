@@ -27,6 +27,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/machparam.h>
@@ -37,9 +41,6 @@
 #include "dboot_printf.h"
 #include "dboot_xboot.h"
 
-#ifdef __xpv
-#include <sys/hypervisor.h>
-#endif
 
 /*
  * This file provides simple output formatting via dboot_printf()

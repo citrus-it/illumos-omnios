@@ -27,6 +27,10 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * isa-specific console configuration routines
  */
 
@@ -47,9 +51,6 @@
 #include <sys/pci.h>
 #include <sys/framebuffer.h>
 #include <sys/boot_console.h>
-#if defined(__xpv)
-#include <sys/hypervisor.h>
-#endif
 
 extern int pseudo_isa;
 
@@ -95,14 +96,6 @@ console_type(int *tnum)
 		return (boot_console);
 	}
 
-#if defined(__xpv)
-	if (!DOMAIN_IS_INITDOMAIN(xen_info) || bcons_hypervisor_redirect()) {
-		boot_console = CONS_HYPERVISOR;
-		if (tnum != NULL)
-			*tnum = tty_num;
-		return (boot_console);
-	}
-#endif /* __xpv */
 
 	/*
 	 * console is defined by "console" property, with
@@ -132,10 +125,6 @@ console_type(int *tnum)
 			 */
 			delay(drv_usectohz(2000000));
 			boot_console = CONS_USBSER;
-#if defined(__xpv)
-		} else if (strcmp(cons, "hypervisor") == 0) {
-			boot_console = CONS_HYPERVISOR;
-#endif /* __xpv */
 		}
 		ddi_prop_free(cons);
 	}
@@ -497,10 +486,6 @@ plat_stdinpath(void)
 	int tty_num = 0;
 
 	switch (console_type(&tty_num)) {
-#if defined(__xpv)
-	case CONS_HYPERVISOR:
-		return ("/xpvd/xencons@0");
-#endif /* __xpv */
 	case CONS_TTY:
 		return (plat_ttypath(tty_num));
 	case CONS_USBSER:
@@ -518,10 +503,6 @@ plat_stdoutpath(void)
 	int tty_num = 0;
 
 	switch (console_type(&tty_num)) {
-#if defined(__xpv)
-	case CONS_HYPERVISOR:
-		return ("/xpvd/xencons@0");
-#endif /* __xpv */
 	case CONS_TTY:
 		return (plat_ttypath(tty_num));
 	case CONS_USBSER:

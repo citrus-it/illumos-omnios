@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * Miniature VGA driver for bootstrap.
  */
 
@@ -41,26 +45,10 @@
 #include "../dboot/dboot_xboot.h"
 #endif
 
-#if defined(__xpv) && defined(_BOOT)
-
-/*
- * Device memory address
- *
- * In dboot under the hypervisor we don't have any memory mappings
- * for the first meg of low memory so we can't access devices there.
- * Intead we've mapped the device memory that we need to access into
- * a local variable within dboot so we can access the device memory
- * there.
- */
-extern unsigned short *video_fb;
-#define	VGA_SCREEN		(video_fb)
-
-#else /* __xpv && _BOOT */
 
 /* Device memory address */
 #define	VGA_SCREEN	((uint16_t *)(VGA_MEM_ADDR + VGA_COLOR_BASE))
 
-#endif /* __xpv && _BOOT */
 
 static int cons_color = CONS_COLOR;
 

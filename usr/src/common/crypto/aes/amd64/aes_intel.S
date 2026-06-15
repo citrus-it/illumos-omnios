@@ -22,6 +22,10 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * ====================================================================
  * Copyright (c) 1998-2008 The OpenSSL Project.  All rights reserved.
  *
@@ -186,23 +190,8 @@ rijndael_key_setup_dec_intel(uint32_t rk[], const uint32_t cipherKey[],
 #endif
 
 #ifdef _KERNEL
-	/*
-	 * Note: the CLTS macro clobbers P2 (%rsi) under i86xpv.  That is,
-	 * it calls HYPERVISOR_fpu_taskswitch() which modifies %rsi when it
-	 * uses it to pass P2 to syscall.
-	 * This also occurs with the STTS macro, but we don't care if
-	 * P2 (%rsi) is modified just before function exit.
-	 * The CLTS and STTS macros push and pop P1 (%rdi) already.
-	 */
-#ifdef __xpv
-#define	PROTECTED_CLTS \
-	push	%rsi; \
-	CLTS; \
-	pop	%rsi
-#else
 #define	PROTECTED_CLTS \
 	CLTS
-#endif	/* __xpv */
 
 #define	CLEAR_TS_OR_PUSH_XMM0_XMM1(tmpreg) \
 	push	%rbp; \

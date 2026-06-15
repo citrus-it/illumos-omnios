@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -678,7 +679,6 @@ int cma_mca_trap_lofault_forgiven = 0;
 void
 cmi_mca_trap(struct regs *rp)
 {
-#ifndef	__xpv
 	cmi_hdl_t hdl = NULL;
 	uint64_t disp;
 	cmi_t *cmi;
@@ -749,7 +749,6 @@ cmi_mca_trap(struct regs *rp)
 
 	cmi_hdl_rele(hdl);
 	splx(s);
-#endif	/* __xpv */
 }
 
 void
@@ -763,7 +762,6 @@ cmi_hdl_poke(cmi_hdl_t hdl)
 	CMI_OPS(cmi)->cmi_hdl_poke(hdl);
 }
 
-#ifndef	__xpv
 void
 cmi_cmci_trap()
 {
@@ -793,7 +791,6 @@ cmi_cmci_trap()
 
 	cmi_hdl_rele(hdl);
 }
-#endif	/* __xpv */
 
 void
 cmi_mc_register(cmi_hdl_t hdl, const cmi_mc_ops_t *mcops, void *mcdata)

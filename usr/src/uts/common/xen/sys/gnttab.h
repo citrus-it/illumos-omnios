@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef	_SYS_GNTTAB_H
 #define	_SYS_GNTTAB_H
 
@@ -78,9 +82,6 @@ struct gnttab_free_callback {
 	uint16_t count;
 };
 
-/*
- * For i86xpv the "frames" in grant table terminology are really MFNs.
- */
 typedef mfn_t gnttab_frame_t;
 #define	FRAME_TO_MA(f)	((maddr_t)(f) << PAGESHIFT)
 

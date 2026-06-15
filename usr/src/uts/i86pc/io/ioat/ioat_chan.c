@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/errno.h>
@@ -44,9 +45,6 @@
 #include <vm/hat.h>
 #include <vm/as.h>
 #include <sys/mach_mmu.h>
-#ifdef __xpv
-#include <sys/hypervisor.h>
-#endif
 
 #include <sys/ioat.h>
 

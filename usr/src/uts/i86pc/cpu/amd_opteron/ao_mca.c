@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Oxide Computer Co.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -821,7 +822,6 @@ ao_ms_bankctl_val(cmi_hdl_t hdl, int banknum, uint64_t def)
 void
 ao_bankstatus_prewrite(cmi_hdl_t hdl, ao_ms_data_t *ao)
 {
-#ifndef __xpv
 	uint64_t hwcr;
 
 	if (cmi_hdl_rdmsr(hdl, MSR_AMD_HWCR, &hwcr) != CMI_SUCCESS)
@@ -833,21 +833,18 @@ ao_bankstatus_prewrite(cmi_hdl_t hdl, ao_ms_data_t *ao)
 		hwcr |= AMD_HWCR_MCI_STATUS_WREN;
 		(void) cmi_hdl_wrmsr(hdl, MSR_AMD_HWCR, hwcr);
 	}
-#endif
 }
 
 /*ARGSUSED*/
 void
 ao_bankstatus_postwrite(cmi_hdl_t hdl, ao_ms_data_t *ao)
 {
-#ifndef __xpv
 	uint64_t hwcr = ao->ao_ms_hwcr_val;
 
 	if (!(hwcr & AMD_HWCR_MCI_STATUS_WREN)) {
 		hwcr &= ~AMD_HWCR_MCI_STATUS_WREN;
 		(void) cmi_hdl_wrmsr(hdl, MSR_AMD_HWCR, hwcr);
 	}
-#endif
 }
 
 void

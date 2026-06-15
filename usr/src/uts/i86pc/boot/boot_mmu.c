@@ -25,15 +25,16 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * WARNING: This file is used by both dboot and the kernel.
  */
 
 #include <sys/param.h>
 #include <sys/machparam.h>
 #include <sys/mach_mmu.h>
-#ifdef __xpv
-#include <sys/hypervisor.h>
-#endif
 
 #ifdef _BOOT
 #include <dboot/dboot_printf.h>

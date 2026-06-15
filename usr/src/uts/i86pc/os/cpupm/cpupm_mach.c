@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/cpu_pm.h>
@@ -117,7 +118,6 @@ uint32_t cpupm_cs_idle_save_tunable = 2;	/* idle power savings */
 uint16_t cpupm_C2_idle_pct_tunable = 70;
 uint16_t cpupm_C3_idle_pct_tunable = 80;
 
-#ifndef __xpv
 extern boolean_t cpupm_intel_init(cpu_t *);
 extern boolean_t cpupm_amd_init(cpu_t *);
 
@@ -133,7 +133,6 @@ static cpupm_vendor_t cpupm_vendors[] = {
 	cpupm_amd_init,
 	NULL
 };
-#endif
 
 /*
  * Initialize the machine.
@@ -143,7 +142,6 @@ static cpupm_vendor_t cpupm_vendors[] = {
 void
 cpupm_init(cpu_t *cp)
 {
-#ifndef __xpv
 	cpupm_vendor_t *vendors;
 	cpupm_mach_state_t *mach_state;
 	struct machcpu *mcpu = &(cp->cpu_m);
@@ -285,7 +283,6 @@ cpupm_init(cpu_t *cp)
 		cpupm_add_notify_handler(cp, cpupm_event_notify_handler, cp);
 	}
 	first = B_FALSE;
-#endif
 }
 
 /*
@@ -295,7 +292,6 @@ cpupm_init(cpu_t *cp)
 void
 cpupm_free(cpu_t *cp, boolean_t cpupm_stop)
 {
-#ifndef __xpv
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 
@@ -337,7 +333,6 @@ cpupm_free(cpu_t *cp, boolean_t cpupm_stop)
 	mutex_destroy(&mach_state->ms_lock);
 	kmem_free(mach_state, sizeof (cpupm_mach_state_t));
 	cp->cpu_m.mcpu_pm_mach_state = NULL;
-#endif
 }
 
 void
@@ -373,7 +368,6 @@ cpupm_stop(cpu_t *cp)
 boolean_t
 cpupm_is_ready(cpu_t *cp)
 {
-#ifndef __xpv
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 	uint32_t cpupm_caps = mach_state->ms_caps;
@@ -387,10 +381,6 @@ cpupm_is_ready(cpu_t *cp)
 
 		return (B_TRUE);
 	return (B_FALSE);
-#else
-	_NOTE(ARGUNUSED(cp));
-	return (B_FALSE);
-#endif
 }
 
 boolean_t
@@ -745,22 +735,16 @@ cpupm_plat_change_state(cpu_t *cp, cpupm_state_t *state)
 uint_t
 cpupm_get_speeds(cpu_t *cp, int **speeds)
 {
-#ifndef __xpv
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 	return (cpu_acpi_get_speeds(mach_state->ms_acpi_handle, speeds));
-#else
-	return (0);
-#endif
 }
 
 /*ARGSUSED*/
 void
 cpupm_free_speeds(int *speeds, uint_t nspeeds)
 {
-#ifndef __xpv
 	cpu_acpi_free_speeds(speeds, nspeeds);
-#endif
 }
 
 /*
@@ -810,7 +794,6 @@ cpupm_notify_handler(ACPI_HANDLE obj, UINT32 val, void *ctx)
 void
 cpupm_add_notify_handler(cpu_t *cp, CPUPM_NOTIFY_HANDLER handler, void *ctx)
 {
-#ifndef __xpv
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 	cpupm_notification_t *entry;
@@ -830,14 +813,12 @@ cpupm_add_notify_handler(cpu_t *cp, CPUPM_NOTIFY_HANDLER handler, void *ctx)
 		mach_state->ms_handlers = entry;
 	}
 	mutex_exit(&mach_state->ms_lock);
-#endif
 }
 
 /*ARGSUSED*/
 static void
 cpupm_free_notify_handlers(cpu_t *cp)
 {
-#ifndef __xpv
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 	cpupm_notification_t *entry;
@@ -860,7 +841,6 @@ cpupm_free_notify_handlers(cpu_t *cp)
 	}
 	mach_state->ms_handlers = NULL;
 	mutex_exit(&mach_state->ms_lock);
-#endif
 }
 
 /*
@@ -870,7 +850,6 @@ cpupm_free_notify_handlers(cpu_t *cp)
 int
 cpupm_get_top_speed(cpu_t *cp)
 {
-#ifndef __xpv
 	cpupm_mach_state_t	*mach_state;
 	cpu_acpi_handle_t	handle;
 	int			plat_level;
@@ -894,9 +873,6 @@ cpupm_get_top_speed(cpu_t *cp)
 	}
 
 	return (plat_level);
-#else
-	return (0);
-#endif
 }
 
 /*
@@ -921,7 +897,6 @@ cpupm_power_manage_notifications(void *ctx)
 static void
 cpupm_event_notify_handler(ACPI_HANDLE obj, UINT32 val, void *ctx)
 {
-#ifndef __xpv
 
 	cpu_t *cp = ctx;
 	cpupm_mach_state_t *mach_state =
@@ -943,7 +918,6 @@ cpupm_event_notify_handler(ACPI_HANDLE obj, UINT32 val, void *ctx)
 	    mach_state->ms_caps & CPUPM_P_STATES) {
 		cpupm_power_manage_notifications(ctx);
 	}
-#endif
 }
 
 /*

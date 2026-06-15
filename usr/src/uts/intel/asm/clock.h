@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef _ASM_CLOCK_H
 #define	_ASM_CLOCK_H
 
@@ -48,31 +52,6 @@ unlock_hres_lock(void)
 	    : "cc");
 }
 
-#if defined(__xpv)
-
-extern __GNU_INLINE hrtime_t
-__rdtsc_insn(void)
-{
-#if defined(__amd64)
-	uint32_t lobits, hibits;
-
-	__asm__ __volatile__(
-	    "rdtsc"
-	    : "=a" (lobits), "=d" (hibits));
-	return (lobits | ((hrtime_t)hibits << 32));
-#elif defined(__i386)
-	hrtime_t __value;
-
-	__asm__ __volatile__(
-	    "rdtsc"
-	    : "=A" (__value));
-	return (__value);
-#else
-#error	"port me"
-#endif
-}
-
-#endif /* __xpv */
 
 #endif	/* !__lint && __GNUC__ */
 

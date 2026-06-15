@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _ASM_MMU_H
@@ -37,7 +38,6 @@ extern "C" {
 
 #if defined(__GNUC__)
 
-#if !defined(__xpv)
 
 extern __GNU_INLINE ulong_t
 getcr3(void)
@@ -100,7 +100,6 @@ invpcid_insn(uint64_t type, uint64_t pcid, uintptr_t addr)
 	    : "memory");
 }
 
-#endif /* !__xpv */
 
 extern __GNU_INLINE void
 mmu_invlpg(caddr_t addr)

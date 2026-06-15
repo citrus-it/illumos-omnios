@@ -24,17 +24,19 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef	_SYS_XENDEV_H
 #define	_SYS_XENDEV_H
 
 
 #include <sys/hypervisor.h>
 #include <sys/taskq.h>
-#ifndef	__xpv
 #include <public/io/ring.h>
 #include <public/event_channel.h>
 #include <public/grant_table.h>
-#endif
 #include <xen/sys/xenbus_impl.h>
 
 #ifdef	__cplusplus
