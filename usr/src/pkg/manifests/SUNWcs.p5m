@@ -870,7 +870,6 @@ file path=usr/lib/devfsadm/linkmod/SUNW_sgen_link.so group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_smp_link.so group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_tape_link.so group=sys
 file path=usr/lib/devfsadm/linkmod/SUNW_usb_link.so group=sys
-$(i386_ONLY)file path=usr/lib/devfsadm/linkmod/SUNW_xen_link.so group=sys
 file path=usr/lib/diffh mode=0555
 link path=usr/lib/embedded_su target=../bin/su
 file path=usr/lib/expreserve mode=0555

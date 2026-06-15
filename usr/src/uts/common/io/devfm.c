@@ -114,7 +114,6 @@ static const fm_subr_t fm_subrs[] = {
 };
 
 static dev_info_t *fm_dip;
-static boolean_t is_i86xpv;
 static nvlist_t *fm_vers_nvl;
 
 static int
@@ -128,7 +127,6 @@ fm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 		}
 		fm_dip = dip;
-		is_i86xpv = (strcmp(platform, "i86xpv") == 0);
 		break;
 	case DDI_RESUME:
 		break;
@@ -211,9 +209,6 @@ fm_ioctl_page_retire(int cmd, nvlist_t *invl, nvlist_t **onvlp)
 	uint64_t pa;
 	nvlist_t *fmri;
 	int err;
-
-	if (is_i86xpv)
-		return (ENOTSUP);
 
 	if ((err = nvlist_lookup_nvlist(invl, FM_PAGE_RETIRE_FMRI, &fmri))
 	    != 0)

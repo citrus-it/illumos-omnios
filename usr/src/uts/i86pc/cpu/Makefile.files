@@ -36,10 +36,6 @@ CPU_GCPU_OBJS = \
 CPU_GCPU_NTV_OBJS = \
 	gcpu_poll_ntv.o
 
-CPU_GCPU_XPV_OBJS = \
-	gcpu_mca_xpv.o \
-	gcpu_poll_xpv.o
-
 CPU_AUTHAMD_OBJS = \
 	authamd_main.o
 

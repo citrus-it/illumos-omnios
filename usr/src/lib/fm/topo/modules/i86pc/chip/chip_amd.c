@@ -431,7 +431,7 @@ amd_rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl,
 			whinge(mod, &nerr, "amd_rank_create: "
 			    "topo_method_register failed");
 
-		if (! is_xpv() && topo_method_register(mod, ranknode,
+		if (topo_method_register(mod, ranknode,
 		    ntv_page_retire_methods) < 0)
 			whinge(mod, &nerr, "amd_rank_create: "
 			    "topo_method_register failed");

@@ -602,31 +602,18 @@ _fmd_init(fmd_hdl_t *hdl)
 	hrtime_t nsec;
 #ifdef i386
 	char buf[BUFSIZ];
-	const char *dom0 = "control_d";
 
 	/*
-	 * Abort the cpumem-retire module if Solaris is running under DomU.
+	 * The cpumem-retire module only operates on a bare-metal (or HVM)
+	 * i86pc system.
 	 */
 	if (sysinfo(SI_PLATFORM, buf, sizeof (buf)) == -1)
 		return;
 
-	if (strncmp(buf, "i86pc", sizeof (buf)) == 0) {
-		cma_is_native = B_TRUE;
-	} else if (strncmp(buf, "i86xpv", sizeof (buf)) != 0) {
+	if (strncmp(buf, "i86pc", sizeof (buf)) != 0)
 		return;
-	} else {
-		int fd = open("/dev/xen/domcaps", O_RDONLY);
 
-		if (fd != -1) {
-			if (read(fd, buf, sizeof (buf)) <= 0 ||
-			    strncmp(buf, dom0, strlen(dom0)) != 0) {
-				(void) close(fd);
-				return;
-			}
-			(void) close(fd);
-		}
-		cma_is_native = B_FALSE;
-	}
+	cma_is_native = B_TRUE;
 #endif /* i386 */
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)

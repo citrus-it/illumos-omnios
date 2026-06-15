@@ -27,7 +27,6 @@
  */
 
 #include <unistd.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -132,20 +131,6 @@ _topo_fini(topo_mod_t *mod)
 	topo_mod_unregister(mod);
 }
 
-boolean_t
-is_xpv(void)
-{
-	static int r = -1;
-	char platform[MAXNAMELEN];
-
-	if (r != -1)
-		return (r == 0);
-
-	(void) sysinfo(SI_PLATFORM, platform, sizeof (platform));
-	r = strcmp(platform, "i86xpv");
-	return (r == 0);
-}
-
 static tnode_t *
 create_node(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth, char *name,
     topo_instance_t inst, nvlist_t *cpu, uint16_t smbios_id)
@@ -238,8 +223,7 @@ create_strand(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 		return (-1);
 
 	/*
-	 * Inherit FRU from core node, in native use cpu scheme ASRU,
-	 * in xpv, use hc scheme ASRU.
+	 * Inherit FRU from core node and use the cpu scheme ASRU.
 	 */
 	(void) topo_node_fru_set(strand, NULL, 0, &perr);
 	/*
@@ -260,31 +244,18 @@ create_strand(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 			serial = topo_mod_strdup(mod, val);
 		nvlist_free(fmri);
 	}
-	if (is_xpv()) {
-		if (topo_node_resource(strand, &fmri, &err) == -1) {
-			whinge(mod, &nerr, "create_strand: "
-			    "topo_node_resource failed\n");
-		} else {
-			if (FM_AWARE_SMBIOS(mod))
-				(void) nvlist_add_string(fmri,
-				    FM_FMRI_HC_SERIAL_ID, serial);
-			(void) topo_node_asru_set(strand, fmri, 0, &err);
-			nvlist_free(fmri);
-		}
+	if (nvlist_lookup_int32(cpu, STRAND_CPU_ID, &cpuid) != 0) {
+		whinge(mod, &nerr, "create_strand: lookup cpuid "
+		    "failed\n");
 	} else {
-		if (nvlist_lookup_int32(cpu, STRAND_CPU_ID, &cpuid) != 0) {
-			whinge(mod, &nerr, "create_strand: lookup cpuid "
-			    "failed\n");
+		if ((fmri = cpu_fmri_create(mod, cpuid, serial, 0))
+		    != NULL) {
+			(void) topo_node_asru_set(strand, fmri,
+			    0, &err);
+			nvlist_free(fmri);
 		} else {
-			if ((fmri = cpu_fmri_create(mod, cpuid, serial, 0))
-			    != NULL) {
-				(void) topo_node_asru_set(strand, fmri,
-				    0, &err);
-				nvlist_free(fmri);
-			} else {
-				whinge(mod, &nerr, "create_strand: "
-				    "cpu_fmri_create() failed\n");
-			}
+			whinge(mod, &nerr, "create_strand: "
+			    "cpu_fmri_create() failed\n");
 		}
 	}
 
@@ -359,8 +330,7 @@ create_core(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 			return (-1);
 
 		/*
-		 * Inherit FRU from the chip node, for native, we use hc
-		 * scheme ASRU for the core node.
+		 * Inherit FRU from the chip node.
 		 */
 		(void) topo_node_fru_set(core, NULL, 0, &perr);
 		/*
@@ -380,18 +350,6 @@ create_core(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 			else
 				serial = topo_mod_strdup(mod, val);
 			nvlist_free(fmri);
-		}
-		if (is_xpv()) {
-			if (topo_node_resource(core, &fmri, &err) == -1) {
-				whinge(mod, &nerr, "create_core: "
-				    "topo_node_resource failed\n");
-			} else {
-				if (FM_AWARE_SMBIOS(mod))
-					(void) nvlist_add_string(fmri,
-					    FM_FMRI_HC_SERIAL_ID, serial);
-				(void) topo_node_asru_set(core, fmri, 0, &err);
-				nvlist_free(fmri);
-			}
 		}
 		if (topo_method_register(mod, core, strands_retire_methods) < 0)
 			whinge(mod, &nerr, "create_core: "
@@ -413,24 +371,22 @@ create_core(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 		(void) chip_create_core_temp_sensor(mod, core);
 	}
 
-	if (!is_xpv()) {
-		/*
-		 * In native mode, we're in favor of cpu scheme ASRU for
-		 * printing reason.  More work needs to be done to support
-		 * multi-strand cpu: the ASRU will be a list of cpuid then.
-		 */
-		if (nvlist_lookup_int32(cpu, STRAND_CPU_ID, &cpuid) != 0) {
-			whinge(mod, &nerr, "create_core: lookup cpuid "
-			    "failed\n");
+	/*
+	 * We use the cpu scheme ASRU for printing reason.  More work needs
+	 * to be done to support multi-strand cpu: the ASRU will be a list
+	 * of cpuid then.
+	 */
+	if (nvlist_lookup_int32(cpu, STRAND_CPU_ID, &cpuid) != 0) {
+		whinge(mod, &nerr, "create_core: lookup cpuid "
+		    "failed\n");
+	} else {
+		if ((fmri = cpu_fmri_create(mod, cpuid, serial, 0))
+		    != NULL) {
+			(void) topo_node_asru_set(core, fmri, 0, &err);
+			nvlist_free(fmri);
 		} else {
-			if ((fmri = cpu_fmri_create(mod, cpuid, serial, 0))
-			    != NULL) {
-				(void) topo_node_asru_set(core, fmri, 0, &err);
-				nvlist_free(fmri);
-			} else {
-				whinge(mod, &nerr, "create_core: "
-				    "cpu_fmri_create() failed\n");
-			}
+			whinge(mod, &nerr, "create_core: "
+			    "cpu_fmri_create() failed\n");
 		}
 	}
 
@@ -766,30 +722,15 @@ chip_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	nvlist_t *auth = NULL;
 	int offchip_mc;
 	char buf[BUFSIZ];
-	const char *dom0 = "control_d";
 
 	/*
-	 * Create nothing if we're running in domU.
+	 * Create nothing if we're not running on i86pc.
 	 */
 	if (sysinfo(SI_PLATFORM, buf, sizeof (buf)) == -1)
 		return (-1);
 
-	if (strncmp(buf, "i86pc", sizeof (buf)) != 0 &&
-	    strncmp(buf, "i86xpv", sizeof (buf)) != 0)
+	if (strncmp(buf, "i86pc", sizeof (buf)) != 0)
 		return (0);
-
-	if (strncmp(buf, "i86xpv", sizeof (buf)) == 0) {
-		int fd = open("/dev/xen/domcaps", O_RDONLY);
-
-		if (fd != -1) {
-			if (read(fd, buf, sizeof (buf)) <= 0 ||
-			    strncmp(buf, dom0, strlen(dom0)) != 0) {
-				(void) close(fd);
-				return (0);
-			}
-			(void) close(fd);
-		}
-	}
 
 	/*
 	 * Set Chip Enumerator Module's private data with the value passed by

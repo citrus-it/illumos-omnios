@@ -249,9 +249,6 @@ have_valid_ku(char *zonename)
 	char		zonepath[MAXPATHLEN];
 	char		sanity_skip[MAXPATHLEN];
 	struct stat64	buf;
-	boolean_t	is_xpv = B_FALSE;
-	char		platform[80];
-	char		*xpv_vers = "142910";
 	char 		*vers_table[] = {
 			    "141444-09",
 			    "141445-09"};
@@ -273,32 +270,14 @@ have_valid_ku(char *zonename)
 	if (get_ku_patchlist(zonepath, &patchlist) != 0 || patchlist == NULL)
 		return (B_FALSE);
 
-	/*
-	 * Check if we're running on the i86xpv platform.  If so, the zone
-	 * needs a different ku patch to work properly.
-	 */
-	if (sysinfo(SI_PLATFORM, platform, sizeof (platform)) != -1 &&
-	    strcmp(platform, "i86xpv") == 0)
-		is_xpv = B_TRUE;
-
 	pstr = patchlist;
 	while ((p = strtok_r(pstr, " ", &lastp)) != NULL) {
-		if (is_xpv) {
-			if (strncmp(p, xpv_vers, 6) == 0)
-				return (B_TRUE);
-		} else {
-			if (strcmp(p, vers_table[0]) == 0 ||
-			    strcmp(p, vers_table[1]) == 0)
-				return (B_TRUE);
-		}
+		if (strcmp(p, vers_table[0]) == 0 ||
+		    strcmp(p, vers_table[1]) == 0)
+			return (B_TRUE);
 
 		pstr = NULL;
 	}
-
-	if (is_xpv)
-		s10_err(gettext("the zone must have patch 142910 installed "
-		    "when running in a paravirtualized domain"));
-
 
 	return (B_FALSE);
 }

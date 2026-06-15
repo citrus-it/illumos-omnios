@@ -1802,11 +1802,8 @@ cmi_hdl_rdmsr(cmi_hdl_t ophdl, uint_t msr, uint64_t *valp)
 	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
 
 	/*
-	 * Regardless of the handle class, we first check for am
-	 * interposed value.  In the xVM case you probably want to
-	 * place interposed values within the hypervisor itself, but
-	 * we still allow interposing them in dom0 for test and bringup
-	 * purposes.
+	 * Regardless of the handle class, we first check for an
+	 * interposed value.
 	 */
 	if ((hdl->cmih_msrsrc & CMI_MSR_FLAG_RD_INTERPOSEOK) &&
 	    msri_lookup(hdl, msr, valp))

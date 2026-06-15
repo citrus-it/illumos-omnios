@@ -161,7 +161,7 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 			whinge(mod, &err, "mc_add_ranks: "
 			    "topo_method_register failed");
 
-		if (! is_xpv() && topo_method_register(mod, rnode,
+		if (topo_method_register(mod, rnode,
 		    ntv_page_retire_methods) < 0)
 			whinge(mod, &err, "mc_add_ranks: "
 			    "topo_method_register failed");
@@ -487,7 +487,7 @@ mc_rank_create_v1(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 		    "failed for rank_methods: %d", topo_mod_errno(mod));
 	}
 
-	if (!is_xpv() && topo_method_register(mod, rank,
+	if (topo_method_register(mod, rank,
 	    ntv_page_retire_methods) != 0) {
 		whinge(mod, NULL, "mc_rank_create_v1: topo_method_register "
 		    "failed for page retire: %d", topo_mod_errno(mod));

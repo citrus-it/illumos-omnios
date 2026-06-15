@@ -503,8 +503,7 @@ i386_SUBDIRS=		\
 	rsrvrctl	\
 	rtc		\
 	ucodeadm	\
-	xhci		\
-	xvm
+	xhci
 
 sparc_SUBDIRS=		\
 	dcs		\

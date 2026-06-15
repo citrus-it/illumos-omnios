@@ -38,7 +38,7 @@ include ../Makefile.master
 #
 sparc_ARCHITECTURES = sun4v sun4u sparc
 
-i386_ARCHITECTURES = i86pc i86xpv intel
+i386_ARCHITECTURES = i86pc intel
 
 #
 # For i386 all architectures can be compiled in parallel.
@@ -160,7 +160,7 @@ DYNHDRDIRS =	common/gssapi \
 		common/sys
 
 sparc_HDRDIRS= sun/sys
-i386_HDRDIRS= i86pc/vm i86xpv/vm
+i386_HDRDIRS= i86pc/vm
 
 HDRDIRS= $(COMMON_HDRDIRS) $($(MACH)_HDRDIRS)
 install_h check: $(HDRDIRS) $($(MACH)_ARCHITECTURES)

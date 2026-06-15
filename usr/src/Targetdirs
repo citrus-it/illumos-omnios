@@ -53,8 +53,6 @@ i386_DIRS=			\
 	/boot/grub/bin		\
 	/platform/i86pc		\
 	/lib/libmvec		\
-	/usr/lib/xen		\
-	/usr/lib/xen/bin	\
 	/usr/share/bhyve
 
 sparc_DIRS=			\

@@ -31,7 +31,7 @@ PROG= bootadm
 
 SBINLINKS= $(PROG)
 
-OBJS= bootadm.o bootadm_upgrade.o bootadm_hyper.o bootadm_digest.o \
+OBJS= bootadm.o bootadm_upgrade.o bootadm_digest.o \
 	bootadm_loader.o
 POFILES= $(OBJS:%.o=%.po)
 
