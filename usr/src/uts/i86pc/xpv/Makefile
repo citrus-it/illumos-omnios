@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -26,17 +25,47 @@
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
-UTSBASE=	../../..
+#
+#	This makefile drives the production of the xpv driver, which provides
+#	the necessary infrastructure for paravirtualised front-end drivers in
+#	Xen HVM systems.
+#
+#	i86pc implementation architecture dependent
+#
 
-MODULE=		rtls
-OBJECTS=	$(PV_RTLS_OBJS:%=$(OBJS_DIR)/%)
-ROOTMODULE=	$(ROOT_HVM_DRV_DIR)/$(MODULE)
+#
+#	Path to the base of the uts directory tree (usually /usr/src/uts).
+#
+UTSBASE	= ../..
 
-include		$(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
+#
+#	Define the module and object file sets.
+#
+MODULE		= xpv
+OBJECTS		= $(XPV_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/i86pc/io/xen
 
-ALL_TARGET=	$(BINARY)
-INSTALL_TARGET=	$(BINARY) $(ROOTMODULE)
+#
+#	Include common rules.
+#
+include $(UTSBASE)/i86pc/Makefile.i86pc
 
+#
+#	Define targets
+#
+ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS -DHVMPV_XPV_VERS=1
+LDFLAGS		+= -N mach/pcplusmp
+
+# needs work
+SMATCH		= off
+
+#
+#	Default build targets.
+#
 .KEEP_STATE:
 
 def:		$(DEF_DEPS)
@@ -49,4 +78,7 @@ clobber:	$(CLOBBER_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-include		$(UTSBASE)/i86pc/i86hvm/Makefile.targ
+#
+#	Include common targets.
+#
+include $(UTSBASE)/i86pc/Makefile.targ

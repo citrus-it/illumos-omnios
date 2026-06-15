@@ -825,7 +825,7 @@ fcnname##_info:							\
         END_MODULE(cpr);
 
 /*
- * Stubs for i86hvm bootstraping
+ * Stubs for Xen HVM bootstrapping
  */
 	MODULE(hvm_bootstrap,misc);
 	NO_UNLOAD_STUB(hvm_bootstrap, hvmboot_rootconf, nomod_zero);

@@ -18,43 +18,67 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
-
-ROOT_HVM_DIR		= $(ROOT_PLAT_DIR)/i86hvm
-ROOT_HVM_MOD_DIR	= $(ROOT_HVM_DIR)/kernel
-ROOT_HVM_DRV_DIR_32	= $(ROOT_HVM_MOD_DIR)/drv
-ROOT_HVM_DRV_DIR_64	= $(ROOT_HVM_MOD_DIR)/drv/$(MACH64)
-ROOT_HVM_DRV_DIR	= $(ROOT_HVM_DRV_DIR_$(CLASS))
-ROOT_HVM_MISC_DIR_32	= $(ROOT_HVM_MOD_DIR)/misc
-ROOT_HVM_MISC_DIR_64	= $(ROOT_HVM_MOD_DIR)/misc/$(MACH64)
-ROOT_HVM_MISC_DIR	= $(ROOT_HVM_MISC_DIR_$(CLASS))
-USR_HVM_DIR		= $(USR_PLAT_DIR)/i86hvm
+#
 
 #
-#       Define modules.
+#	This makefile drives the production of the xpvd nexus driver.
 #
-HVM_DRV_KMODS=	cmdk rtls xdf xnf xpv xpvd
-HVM_MISC_KMODS=	hvm_bootstrap
-HVM_KMODS=	$(HVM_DRV_KMODS) $(HVM_MISC_KMODS)
+#	i86pc implementation architecture dependent
+#
 
-include $(UTSBASE)/i86pc/i86hvm/Makefile.files
 #
-#       Include common rules.
+#	Path to the base of the uts directory tree (usually /usr/src/uts).
+#
+UTSBASE	= ../..
+
+#
+#	Define the module and object file sets.
+#
+MODULE		= xpvd
+OBJECTS		= $(XPVD_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/i86pc/io/xen
+
+#
+#	Include common rules.
 #
 include $(UTSBASE)/i86pc/Makefile.i86pc
 
 #
-# Indicate that we are building for the i86hvm semi-platform.
-# Also use Solaris specific code in xen public header files.
+#	Define targets
 #
-CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS
-ASFLAGS		+= -DXPV_HVM_DRIVER
+ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS -DHVMPV_XPVD_VERS=1
+LDFLAGS		+= -Ndrv/xpv
+
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
-SMATCH=off
+SMATCH		= off
+
+#
+#	Default build targets.
+#
+.KEEP_STATE:
+
+def:		$(DEF_DEPS)
+
+all:		$(ALL_DEPS)
+
+clean:		$(CLEAN_DEPS)
+
+clobber:	$(CLOBBER_DEPS)
+
+install:	$(INSTALL_DEPS)
+
+#
+#	Include common targets.
+#
+include $(UTSBASE)/i86pc/Makefile.targ

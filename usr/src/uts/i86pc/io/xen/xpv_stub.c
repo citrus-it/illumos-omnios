@@ -25,13 +25,35 @@
  */
 
 /*
- * Fake rtls module. Prevents the real rtls driver from loading in
- * a xen HVM domain so that xnf may operate instead.
+ * Stub driver for the devices that Xen emulates alongside its
+ * paravirtualised equivalents. Under Xen HVM a disk is presented both as an
+ * emulated PCI IDE controller and as a paravirtualised xdf device, and the
+ * default NIC both as an emulated Realtek 8139 and as a paravirtualised xnf
+ * device. Binding this do-nothing driver to the emulated devices keeps
+ * pci-ide/cmdk and rtls from attaching to them so that the xdf and xnf
+ * front-end drivers are used instead.
+ *
+ * The driver_aliases for this module match only the Xen subsystem variants of
+ * the emulated devices (subsystem vendor 0x5853, "XS"), so it never claims
+ * anything on bare metal. A specific compatible match also takes precedence
+ * over the generic "pci-ide" node name assigned during PCI enumeration.
  */
 
 #include <sys/sunddi.h>
 #include <sys/errno.h>
 #include <sys/modctl.h>
+
+static int
+stubattach(dev_info_t *dip __unused, ddi_attach_cmd_t cmd __unused)
+{
+	return (DDI_SUCCESS);
+}
+
+static int
+stubdetach(dev_info_t *dip __unused, ddi_detach_cmd_t cmd __unused)
+{
+	return (DDI_SUCCESS);
+}
 
 static struct dev_ops stub_ops = {
 	DEVO_REV,
@@ -39,8 +61,8 @@ static struct dev_ops stub_ops = {
 	NULL,
 	nulldev,
 	nulldev,
-	NULL,
-	NULL,
+	stubattach,
+	stubdetach,
 	nodev,
 	NULL,
 	NULL,
@@ -50,7 +72,7 @@ static struct dev_ops stub_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"xVM rtls stub",
+	"Xen HVM emulated device stub",
 	&stub_ops
 };
 
