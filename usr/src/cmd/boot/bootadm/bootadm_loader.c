@@ -61,7 +61,6 @@ extern char *bam_root;
 #define	CONF_DIR	BOOT_DIR "/conf.d"
 #define	MENU		BOOT_DIR "/menu.lst"
 #define	TRANSIENT	BOOT_DIR "/transient.conf"
-#define	XEN_CONFIG	CONF_DIR "/xen"
 
 typedef struct menu_entry {
 	int me_idx;
@@ -79,8 +78,6 @@ static error_t list_entry(struct menu_lst *, char *, char *);
 static error_t update_entry(struct menu_lst *, char *, char *);
 static error_t update_temp(struct menu_lst *, char *, char *);
 static error_t list_setting(struct menu_lst *menu, char *, char *);
-static error_t disable_hyper(struct menu_lst *, char *, char *);
-static error_t enable_hyper(struct menu_lst *, char *, char *);
 
 /* Menu related sub commands */
 static subcmd_defn_t menu_subcmds[] = {
@@ -89,8 +86,6 @@ static subcmd_defn_t menu_subcmds[] = {
 	"update_entry",		OPT_REQ,	update_entry, 0, /* menu */
 	"update_temp",		OPT_OPTIONAL,	update_temp, 0,	/* reboot */
 	"list_setting",		OPT_OPTIONAL,	list_setting, 1, /* menu */
-	"disable_hypervisor",	OPT_ABSENT,	disable_hyper, 0, /* menu */
-	"enable_hypervisor",	OPT_ABSENT,	enable_hyper, 0, /* menu */
 	NULL,			0,		NULL, 0 /* must be last */
 };
 
@@ -525,8 +520,7 @@ bam_loader_menu(char *subcmd, char *opt, int largc, char *largv[])
 	if (strcmp(subcmd, "set_option") == 0) {
 		assert(largc == 1 && largv[0] && largv[1] == NULL);
 		opt = largv[0];
-	} else if ((strcmp(subcmd, "enable_hypervisor") != 0) &&
-	    (strcmp(subcmd, "list_setting") != 0)) {
+	} else if (strcmp(subcmd, "list_setting") != 0) {
 		assert(largc == 0 && largv == NULL);
 	}
 
@@ -543,60 +537,6 @@ bam_loader_menu(char *subcmd, char *opt, int largc, char *largv[])
 	} else if (strcmp(subcmd, "list_setting") == 0) {
 		ret = f(&menu, ((largc > 0) ? largv[0] : ""),
 		    ((largc > 1) ? largv[1] : ""));
-	} else if (strcmp(subcmd, "disable_hypervisor") == 0) {
-		if (is_sparc()) {
-			bam_error(_("%s operation unsupported on SPARC "
-			    "machines\n"), subcmd);
-			ret = BAM_ERROR;
-		} else {
-			ret = f(&menu, bam_root, NULL);
-		}
-	} else if (strcmp(subcmd, "enable_hypervisor") == 0) {
-		if (is_sparc()) {
-			bam_error(_("%s operation unsupported on SPARC "
-			    "machines\n"), subcmd);
-			ret = BAM_ERROR;
-		} else {
-			char *extra_args = NULL;
-
-			/*
-			 * Compress all arguments passed in the largv[] array
-			 * into one string that can then be appended to the
-			 * end of the kernel$ string the routine to enable the
-			 * hypervisor will build.
-			 *
-			 * This allows the caller to supply arbitrary unparsed
-			 * arguments, such as dom0 memory settings or APIC
-			 * options.
-			 *
-			 * This concatenation will be done without ANY syntax
-			 * checking whatsoever, so it's the responsibility of
-			 * the caller to make sure the arguments are valid and
-			 * do not duplicate arguments the conversion routines
-			 * may create.
-			 */
-			if (largc > 0) {
-				int extra_len, i;
-
-				for (extra_len = 0, i = 0; i < largc; i++)
-					extra_len += strlen(largv[i]);
-
-				/*
-				 * Allocate space for argument strings,
-				 * intervening spaces and terminating NULL.
-				 */
-				extra_args = alloca(extra_len + largc);
-
-				(void) strcpy(extra_args, largv[0]);
-
-				for (i = 1; i < largc; i++) {
-					(void) strcat(extra_args, " ");
-					(void) strcat(extra_args, largv[i]);
-				}
-			}
-
-			ret = f(&menu, bam_root, extra_args);
-		}
 	} else
 		ret = f(&menu, NULL, opt);
 
@@ -931,39 +871,13 @@ list_menu_entry(menu_entry_t *entry, char *setting)
 		goto done;
 	}
 
-	ptr = getenv("xen_kernel");
+	ptr = getenv("kernelname");
 	if (ptr != NULL) {
-			if (*setting == '\0') {
-				(void) printf("Xen kernel:  %s\n", ptr);
-			} else if (strcasecmp(setting, "xen_kernel") == 0) {
-				(void) printf("%s\n", ptr);
-				goto done;
-			}
-
-			if (*setting == '\0') {
-				(void) printf("Xen args:    \"%s\"\n",
-				    getenv("xen_cmdline"));
-			} else if (strcasecmp(setting, "xen_cmdline") == 0) {
-				(void) printf("%s\n", getenv("xen_cmdline"));
-				goto done;
-			}
-
-			if (*setting == '\0') {
-				(void) printf("Kernel:      %s\n",
-				    getenv("bootfile"));
-			} else if (strcasecmp(setting, "kernel") == 0) {
-				(void) printf("%s\n", getenv("bootfile"));
-				goto done;
-			}
-	} else {
-		ptr = getenv("kernelname");
-		if (ptr != NULL) {
-			if (*setting == '\0') {
-				(void) printf("Kernel:      %s\n", ptr);
-			} else if (strcasecmp(setting, "kernel") == 0) {
-				(void) printf("%s\n", ptr);
-				goto done;
-			}
+		if (*setting == '\0') {
+			(void) printf("Kernel:      %s\n", ptr);
+		} else if (strcasecmp(setting, "kernel") == 0) {
+			(void) printf("%s\n", ptr);
+			goto done;
 		}
 	}
 
@@ -1106,7 +1020,7 @@ update_temp(struct menu_lst *menu, char *dummy, char *opt)
 	struct mnttab mpref = { 0 };
 	struct mnttab mp = { 0 };
 	ficlVm *vm;
-	char *env, *o;
+	char *o;
 	FILE *fp;
 
 	(void) snprintf(path, PATH_MAX, "%s" TRANSIENT, bam_root);
@@ -1137,7 +1051,6 @@ update_temp(struct menu_lst *menu, char *dummy, char *opt)
 
 	/*
 	 * need to check current boot config, so fire up the ficl
-	 * if its xen setup, we add option to boot-args list, not replacing it.
 	 */
 	(void) snprintf(buf, MAX_INPUT, "set currdev=zfs:%s:", mp.mnt_special);
 	ret = ficlVmEvaluate(vm, buf);
@@ -1170,16 +1083,11 @@ update_temp(struct menu_lst *menu, char *dummy, char *opt)
 	bf_fini();
 
 	if (opt[0] == '-') {
-		env = getenv("xen_kernel");
 		fp = fopen(path, "w");
 		if (fp == NULL)
 			return (BAM_ERROR);
 
-		if (env != NULL) {
-			env = getenv("boot-args");
-			(void) fprintf(fp, "boot-args='%s %s'\n", env, opt);
-		} else
-			(void) fprintf(fp, "boot-args='%s'\n", opt);
+		(void) fprintf(fp, "boot-args='%s'\n", opt);
 		(void) fclose(fp);
 		return (BAM_SUCCESS);
 	}
@@ -1189,8 +1097,6 @@ update_temp(struct menu_lst *menu, char *dummy, char *opt)
 	 * so, we split the opt at first space
 	 * and store bootfile= and boot-args=
 	 */
-	env = getenv("xen_kernel");
-
 	o = strchr(opt, ' ');
 	if (o == NULL) {
 		fp = fopen(path, "w");
@@ -1206,11 +1112,7 @@ update_temp(struct menu_lst *menu, char *dummy, char *opt)
 		return (BAM_ERROR);
 	(void) fprintf(fp, "bootfile='%s;unix'\n", opt);
 
-	if (env != NULL) {
-		env = getenv("boot-args");
-		(void) fprintf(fp, "boot-args='%s %s'\n", env, o);
-	} else
-		(void) fprintf(fp, "boot-args='%s'\n", o);
+	(void) fprintf(fp, "boot-args='%s'\n", o);
 
 	(void) fflush(fp);
 	(void) fclose(fp);
@@ -1284,137 +1186,4 @@ list_setting(struct menu_lst *menu, char *which, char *setting)
 	}
 
 	return (list_menu_entry(m, setting));
-}
-
-/*ARGSUSED*/
-static error_t
-disable_hyper(struct menu_lst *menu, char *osroot, char *opt)
-{
-	char path[PATH_MAX];
-
-	(void) snprintf(path, PATH_MAX, "%s" XEN_CONFIG, bam_root);
-	(void) unlink(path);
-	return (BAM_SUCCESS);
-}
-
-/*ARGSUSED*/
-static error_t
-enable_hyper(struct menu_lst *menu, char *osroot, char *opt)
-{
-	ficlVm *vm;
-	char path[PATH_MAX];
-	char buf[MAX_INPUT];
-	char *env;
-	FILE *fp;
-	struct mnttab mpref = { 0 };
-	struct mnttab mp = { 0 };
-	int ret;
-
-	fp = fopen(MNTTAB, "r");
-	if (fp == NULL)
-		return (BAM_ERROR);
-
-	mpref.mnt_mountp = "/";
-	if (getmntany(fp, &mp, &mpref) != 0) {
-		(void) fclose(fp);
-		return (BAM_ERROR);
-	}
-	(void) fclose(fp);
-
-	vm = bf_init("", ficlTextOutSilent);
-	if (vm == NULL) {
-		bam_error(_("Error setting up forth interpreter\n"));
-		return (BAM_ERROR);
-	}
-
-	/*
-	 * need to check current boot config, so fire up the ficl
-	 * if its xen setup, we add option to boot-args list, not replacing it.
-	 */
-	(void) snprintf(buf, MAX_INPUT, "set currdev=zfs:%s:", mp.mnt_special);
-	ret = ficlVmEvaluate(vm, buf);
-	if (ret != FICL_VM_STATUS_OUT_OF_TEXT) {
-		bam_error(_("Error interpreting boot config\n"));
-		bf_fini();
-		return (BAM_ERROR);
-	}
-	(void) snprintf(buf, MAX_INPUT, "include /boot/forth/loader.4th");
-	ret = ficlVmEvaluate(vm, buf);
-	if (ret != FICL_VM_STATUS_OUT_OF_TEXT) {
-		bam_error(_("Error interpreting boot config\n"));
-		bf_fini();
-		return (BAM_ERROR);
-	}
-	(void) snprintf(buf, MAX_INPUT, "start");
-	ret = ficlVmEvaluate(vm, buf);
-	if (ret != FICL_VM_STATUS_OUT_OF_TEXT) {
-		bam_error(_("Error interpreting boot config\n"));
-		bf_fini();
-		return (BAM_ERROR);
-	}
-	(void) snprintf(buf, MAX_INPUT, "boot");
-	ret = ficlVmEvaluate(vm, buf);
-	if (ret != FICL_VM_STATUS_OUT_OF_TEXT) {
-		bam_error(_("Error interpreting boot config\n"));
-		bf_fini();
-		return (BAM_ERROR);
-	}
-	bf_fini();
-
-	(void) mkdir(CONF_DIR, 0755);
-	(void) snprintf(path, PATH_MAX, "%s" XEN_CONFIG, bam_root);
-	fp = fopen(path, "w");
-	if (fp == NULL) {
-		return (BAM_ERROR);	/* error, cant write config */
-	}
-
-	errno = 0;
-	/*
-	 * on write error, remove file to ensure we have bootable config.
-	 * note we dont mind if config exists, it will get updated
-	 */
-	(void) fprintf(fp, "xen_kernel=\"/boot/${ISADIR}/xen\"\n");
-	if (errno != 0)
-		goto error;
-
-	/*
-	 * really simple and stupid console conversion.
-	 * it really has to be gone, it belongs to milestone/xvm properties.
-	 */
-	env = getenv("console");
-	if (env != NULL) {
-		if (strcmp(env, "ttya") == 0)
-			(void) fprintf(fp, "xen_cmdline=\"console=com1 %s\"\n",
-			    opt);
-		else if (strcmp(env, "ttyb") == 0)
-			(void) fprintf(fp, "xen_cmdline=\"console=com2 %s\"\n",
-			    opt);
-		else
-			(void) fprintf(fp, "xen_cmdline=\"console=vga %s\"\n",
-			    opt);
-	} else
-		(void) fprintf(fp, "xen_cmdline=\"%s\"\n", opt);
-	if (errno != 0)
-		goto error;
-
-	(void) fprintf(fp,
-	    "bootfile=\"/platform/i86xpv/kernel/${ISADIR}/unix\"\n");
-	if (errno != 0)
-		goto error;
-
-	(void) fprintf(fp,
-	    "boot-args=\"/platform/i86xpv/kernel/${ISADIR}/unix\"\n");
-	if (errno != 0)
-		goto error;
-
-	(void) fclose(fp);
-	if (errno != 0) {
-		(void) unlink(path);
-		return (BAM_ERROR);
-	}
-	return (BAM_SUCCESS);
-error:
-	(void) fclose(fp);
-	(void) unlink(path);
-	return (BAM_ERROR);
 }

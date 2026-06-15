@@ -52,10 +52,13 @@ dir  path=platform/$(ARCH32)pc/kernel/misc group=sys
 dir  path=platform/$(ARCH32)pc/kernel/misc/$(ARCH64) group=sys
 file path=platform/$(ARCH32)pc/kernel/misc/$(ARCH64)/hvm_bootstrap group=sys \
     mode=0755
+driver name=xdf
+driver name=xnf
 driver name=xpv alias=pci5853,1.1
 driver name=xpv_stub \
     alias=pci10ec,8139.5853.1 \
     alias=pci8086,7010.5853.1
+driver name=xpvd
 legacy pkg=SUNWxvmpv desc="xVM Paravirtualized Drivers" \
     name="xVM Paravirtualized Drivers"
 license cr_Sun license=cr_Sun

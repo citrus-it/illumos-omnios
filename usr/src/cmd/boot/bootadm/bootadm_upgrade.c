@@ -42,7 +42,6 @@
 #include "bootadm.h"
 
 direct_or_multi_t bam_direct = BAM_DIRECT_NOT_SET;
-hv_t bam_is_hv = BAM_HV_UNKNOWN;
 findroot_t bam_is_findroot = BAM_FINDROOT_UNKNOWN;
 
 static void
@@ -205,11 +204,7 @@ get_boot_cap(const char *osroot)
 
 	INJECT_ERROR1("GET_CAP_MULTIBOOT", bam_direct = BAM_DIRECT_MULTIBOOT);
 	if (bam_direct == BAM_DIRECT_DBOOT) {
-		if (bam_is_hv == BAM_HV_PRESENT) {
-			BAM_DPRINTF(("%s: is xVM system\n", fcn));
-		} else {
-			BAM_DPRINTF(("%s: is *NOT* xVM system\n", fcn));
-		}
+		BAM_DPRINTF(("%s: is DBOOT unix\n", fcn));
 	} else {
 		BAM_DPRINTF(("%s: is MULTIBOOT unix\n", fcn));
 	}
@@ -812,37 +807,6 @@ bam_add_findroot(menu_t *mp, char *grubsign, char *grubroot, int root_opt)
 }
 
 static error_t
-bam_add_hv(menu_t *mp, char *grubsign, char *grubroot, int root_opt)
-{
-	entry_t		*entry;
-	const char	*fcn = "bam_add_hv()";
-
-	bam_print(_("adding xVM entries...\n"));
-
-	entry = find_matching_entry(mp->entries, grubsign, grubroot, root_opt);
-	while (entry != NULL) {
-		if (entry->flags & BAM_ENTRY_HV) {
-			BAM_DPRINTF(("%s: entry %d already converted to "
-			    "xvm HV\n", fcn, entry->entryNum));
-			return (BAM_SUCCESS);
-		}
-		entry = find_matching_entry(entry->next, grubsign, grubroot,
-		    root_opt);
-	}
-
-	(void) add_boot_entry(mp, NEW_HV_ENTRY, grubsign, XEN_MENU,
-	    XEN_KERNEL_MODULE_LINE, DIRECT_BOOT_ARCHIVE, NULL);
-
-	BAM_DPRINTF(("%s: added xVM HV entry via add_boot_entry()\n", fcn));
-
-	update_numbering(mp);
-
-	BAM_DPRINTF(("%s: returning SUCCESS\n", fcn));
-
-	return (BAM_SUCCESS);
-}
-
-static error_t
 bam_add_dboot(
 	menu_t *mp,
 	char *osroot,
@@ -935,7 +899,6 @@ upgrade_menu(menu_t *mp, char *osroot, char *menu_root)
 	char		*grubroot;
 	int		ret1;
 	int		ret2;
-	int		ret3;
 	const char	*fcn = "upgrade_menu()";
 
 	assert(osroot);
@@ -944,8 +907,7 @@ upgrade_menu(menu_t *mp, char *osroot, char *menu_root)
 	BAM_DPRINTF(("%s: entered. args: %s %s\n", fcn, osroot, menu_root));
 
 	/*
-	 * We only support upgrades. Xen may not be present
-	 * on smaller metaclusters so we don't check for that.
+	 * We only support upgrades.
 	 */
 	if (bam_is_findroot != BAM_FINDROOT_PRESENT ||
 	    bam_direct != BAM_DIRECT_DBOOT) {
@@ -985,22 +947,13 @@ upgrade_menu(menu_t *mp, char *osroot, char *menu_root)
 	if (ret1 == BAM_ERROR)
 		goto abort;
 
-	if (bam_is_hv == BAM_HV_PRESENT) {
-		ret2 = bam_add_hv(mp, grubsign, grubroot,
-		    root_optional(osroot, menu_root));
-		INJECT_ERROR1("UPGRADE_ADD_HV", ret2 = BAM_ERROR);
-		if (ret2 == BAM_ERROR)
-			goto abort;
-	} else
-		ret2 = BAM_SUCCESS;
-
-	ret3 = bam_add_dboot(mp, osroot, grubsign,
+	ret2 = bam_add_dboot(mp, osroot, grubsign,
 	    grubroot, root_optional(osroot, menu_root));
-	INJECT_ERROR1("UPGRADE_ADD_DBOOT", ret3 = BAM_ERROR);
-	if (ret3 == BAM_ERROR)
+	INJECT_ERROR1("UPGRADE_ADD_DBOOT", ret2 = BAM_ERROR);
+	if (ret2 == BAM_ERROR)
 		goto abort;
 
-	if (ret1 == BAM_MSG || ret2 == BAM_MSG || ret3 == BAM_MSG) {
+	if (ret1 == BAM_MSG || ret2 == BAM_MSG) {
 		bam_error(_("one or more GRUB menu entries were not "
 		    "automatically upgraded\nFor details on manually "
 		    "updating entries, see %s\n"), MENU_URL(osroot));

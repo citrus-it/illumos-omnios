@@ -45,7 +45,6 @@ ROOTBIN=		$(ROOT)/usr/bin
 ROOTLIB=		$(ROOT)/usr/lib
 ROOTLIBSVCBIN=		$(ROOT)/lib/svc/bin
 ROOTLIBSVCMETHOD=	$(ROOT)/lib/svc/method
-ROOTLIBXEN=		$(ROOT)/usr/lib/xen/bin
 ROOTLIBZONES=		$(ROOT)/lib/zones
 
 ROOTSHLIB=	$(ROOT)/usr/share/lib
@@ -332,9 +331,6 @@ $(ROOTETCZONES)/%: %
 	$(INS.file)
 
 $(ROOTLIBZONES)/%: %
-	$(INS.file)
-
-$(ROOTLIBXEN)/%: %
 	$(INS.file)
 
 $(ROOTHASBIN)/%: %

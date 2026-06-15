@@ -305,8 +305,6 @@ static subcmd_defn_t menu_subcmds[] = {
 	"update_temp",		OPT_OPTIONAL,	update_temp, 0,	/* reboot */
 	"upgrade",		OPT_ABSENT,	upgrade_menu, 0, /* menu */
 	"list_setting",		OPT_OPTIONAL,	list_setting, 1, /* menu */
-	"disable_hypervisor",	OPT_ABSENT,	cvt_to_metal, 0, /* menu */
-	"enable_hypervisor",	OPT_ABSENT,	cvt_to_hyper, 0, /* menu */
 	NULL,			0,		NULL, 0	/* must be last */
 };
 
@@ -567,7 +565,7 @@ main(int argc, char *argv[])
 	}
 
 	if (ret != BAM_SUCCESS)
-		bam_exit((ret == BAM_NOCHANGE) ? 2 : 1);
+		bam_exit(1);
 
 	bam_unlock();
 	return (0);
@@ -639,8 +637,6 @@ parse_args(int argc, char *argv[])
  *	-m list_entry			-- list-menu
  *	-m update_temp			-- (reboot -- [boot-args])
  *	-m delete_all_entries		-- (called from install)
- *	-m enable_hypervisor [args]	-- cvt_to_hyper
- *	-m disable_hypervisor		-- cvt_to_metal
  *	-m list_setting [entry] [value]	-- list_setting
  *
  * A set of private flags is there too:
@@ -656,9 +652,9 @@ parse_args_internal(int argc, char *argv[])
 	extern char *optarg;
 	extern int optind, opterr;
 #if defined(_OBP)
-	const char *optstring = "a:d:fF:i:m:no:veQCLR:p:P:XZ";
+	const char *optstring = "a:d:fF:i:m:no:veQCLR:p:P:Z";
 #else
-	const char *optstring = "a:d:fF:i:m:no:veQCMLR:p:P:XZ";
+	const char *optstring = "a:d:fF:i:m:no:veQCMLR:p:P:Z";
 #endif
 
 	/* Suppress error message from getopt */
@@ -799,9 +795,6 @@ parse_args_internal(int argc, char *argv[])
 				    bam_platform);
 			}
 			break;
-		case 'X':
-			bam_is_hv = BAM_HV_PRESENT;
-			break;
 		case 'Z':
 			bam_zfs = 1;
 			break;
@@ -906,11 +899,11 @@ check_subcmd_and_options(
 		}
 		if (bam_argc == 1)
 			sync_menu = 0;
-	} else if (((strcmp(subcmd, "enable_hypervisor") != 0) &&
-	    (strcmp(subcmd, "list_setting") != 0)) && (bam_argc || bam_argv)) {
+	} else if ((strcmp(subcmd, "list_setting") != 0) &&
+	    (bam_argc || bam_argv)) {
 		/*
-		 * Of the remaining subcommands, only "enable_hypervisor" and
-		 * "list_setting" take trailing arguments.
+		 * Of the remaining subcommands, only "list_setting" takes
+		 * trailing arguments.
 		 */
 		bam_error(_("invalid trailing arguments\n"));
 		usage();
@@ -1469,8 +1462,7 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	if (strcmp(subcmd, "set_option") == 0) {
 		assert(largc == 1 && largv[0] && largv[1] == NULL);
 		opt = largv[0];
-	} else if ((strcmp(subcmd, "enable_hypervisor") != 0) &&
-	    (strcmp(subcmd, "list_setting") != 0)) {
+	} else if (strcmp(subcmd, "list_setting") != 0) {
 		assert(largc == 0 && largv == NULL);
 	}
 
@@ -1493,60 +1485,6 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	} else if (strcmp(subcmd, "list_setting") == 0) {
 		ret = f(menu, ((largc > 0) ? largv[0] : ""),
 		    ((largc > 1) ? largv[1] : ""));
-	} else if (strcmp(subcmd, "disable_hypervisor") == 0) {
-		if (is_sparc()) {
-			bam_error(_("%s operation unsupported on SPARC "
-			    "machines\n"), subcmd);
-			ret = BAM_ERROR;
-		} else {
-			ret = f(menu, bam_root, NULL);
-		}
-	} else if (strcmp(subcmd, "enable_hypervisor") == 0) {
-		if (is_sparc()) {
-			bam_error(_("%s operation unsupported on SPARC "
-			    "machines\n"), subcmd);
-			ret = BAM_ERROR;
-		} else {
-			char *extra_args = NULL;
-
-			/*
-			 * Compress all arguments passed in the largv[] array
-			 * into one string that can then be appended to the
-			 * end of the kernel$ string the routine to enable the
-			 * hypervisor will build.
-			 *
-			 * This allows the caller to supply arbitrary unparsed
-			 * arguments, such as dom0 memory settings or APIC
-			 * options.
-			 *
-			 * This concatenation will be done without ANY syntax
-			 * checking whatsoever, so it's the responsibility of
-			 * the caller to make sure the arguments are valid and
-			 * do not duplicate arguments the conversion routines
-			 * may create.
-			 */
-			if (largc > 0) {
-				int extra_len, i;
-
-				for (extra_len = 0, i = 0; i < largc; i++)
-					extra_len += strlen(largv[i]);
-
-				/*
-				 * Allocate space for argument strings,
-				 * intervening spaces and terminating NULL.
-				 */
-				extra_args = alloca(extra_len + largc);
-
-				(void) strcpy(extra_args, largv[0]);
-
-				for (i = 1; i < largc; i++) {
-					(void) strcat(extra_args, " ");
-					(void) strcat(extra_args, largv[i]);
-				}
-			}
-
-			ret = f(menu, bam_root, extra_args);
-		}
 	} else
 		ret = f(menu, NULL, opt);
 
@@ -4807,9 +4745,6 @@ kernel_parser(entry_t *entry, char *cmd, char *arg, int linenum)
 		BAM_DPRINTF(("%s: setting MULTIBOOT|MULTIBOOT_FAILSAFE "
 		    "flag: %s\n", fcn, arg));
 		entry->flags |= BAM_ENTRY_MULTIBOOT | BAM_ENTRY_FAILSAFE;
-	} else if (strstr(arg, XEN_KERNEL_SUBSTR)) {
-		BAM_DPRINTF(("%s: setting XEN HV flag: %s\n", fcn, arg));
-		entry->flags |= BAM_ENTRY_HV;
 	} else if (!(entry->flags & (BAM_ENTRY_BOOTADM|BAM_ENTRY_LU))) {
 		BAM_DPRINTF(("%s: is HAND kernel flag: %s\n", fcn, arg));
 		return (BAM_ERROR);
@@ -4850,9 +4785,7 @@ module_parser(entry_t *entry, char *cmd, char *arg, int linenum)
 	    strcmp(arg, MULTIBOOT_ARCHIVE) == 0 ||
 	    strcmp(arg, FAILSAFE_ARCHIVE) == 0 ||
 	    strcmp(arg, FAILSAFE_ARCHIVE_32) == 0 ||
-	    strcmp(arg, FAILSAFE_ARCHIVE_64) == 0 ||
-	    strcmp(arg, XEN_KERNEL_MODULE_LINE) == 0 ||
-	    strcmp(arg, XEN_KERNEL_MODULE_LINE_ZFS) == 0) {
+	    strcmp(arg, FAILSAFE_ARCHIVE_64) == 0) {
 		BAM_DPRINTF(("%s: bootadm or LU module cmd: %s\n", fcn, arg));
 		return (BAM_SUCCESS);
 	} else if (!(entry->flags & BAM_ENTRY_BOOTADM) &&
@@ -8766,15 +8699,6 @@ update_entry(menu_t *mp, char *menu_root, char *osdev)
 		    root_optional(osroot, menu_root));
 		BAM_DPRINTF(("%s: updated boot entry bam_zfs=%d, "
 		    "grubsign = %s\n", fcn, bam_zfs, grubsign));
-		if ((entry != BAM_ERROR) && (bam_is_hv == BAM_HV_PRESENT)) {
-			(void) update_boot_entry(mp, NEW_HV_ENTRY, grubsign,
-			    grubroot, XEN_MENU, bam_zfs ?
-			    XEN_KERNEL_MODULE_LINE_ZFS : XEN_KERNEL_MODULE_LINE,
-			    DIRECT_BOOT_ARCHIVE,
-			    root_optional(osroot, menu_root));
-			BAM_DPRINTF(("%s: updated HV entry bam_zfs=%d, "
-			    "grubsign = %s\n", fcn, bam_zfs, grubsign));
-		}
 	} else {
 		entry = update_boot_entry(mp, title, grubsign, grubroot,
 		    MULTI_BOOT, NULL, MULTIBOOT_ARCHIVE,

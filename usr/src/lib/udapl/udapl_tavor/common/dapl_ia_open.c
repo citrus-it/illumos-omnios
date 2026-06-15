@@ -75,7 +75,6 @@ dapl_ro_disallowed(void)
 {
 	static const char * const non_ro_capable_platforms[] = {
 		"i86pc",
-		"i86xpv",
 		"SUNW,Sun-Fire-V215",
 		"SUNW,Sun-Fire-V245",
 		"SUNW,Sun-Fire-V445",

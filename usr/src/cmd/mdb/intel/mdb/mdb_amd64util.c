@@ -223,7 +223,6 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 	uintptr_t fp = gsp->kregs[KREG_RBP];
 	uintptr_t pc = gsp->kregs[KREG_RIP];
-	uintptr_t lastfp = 0;
 
 	ssize_t size;
 	ssize_t insnsize;
@@ -232,15 +231,8 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	GElf_Sym s;
 	mdb_syminfo_t sip;
 	mdb_ctf_funcinfo_t mfp;
-	int xpv_panic = 0;
 	int advance_tortoise = 1;
 	uintptr_t tortoise_fp = 0;
-#ifndef	_KMDB
-	int xp;
-
-	if ((mdb_readsym(&xp, sizeof (xp), "xpv_panicking") != -1) && (xp > 0))
-		xpv_panic = 1;
-#endif
 
 	bcopy(gsp, &gregs, sizeof (gregs));
 
@@ -389,19 +381,7 @@ mdb_amd64_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 		kregs[KREG_RSP] = kregs[KREG_RBP];
 
-		lastfp = fp;
 		fp = fr.fr_savfp;
-		/*
-		 * The Xen hypervisor marks a stack frame as belonging to
-		 * an exception by inverting the bits of the pointer to
-		 * that frame.  We attempt to identify these frames by
-		 * inverting the pointer and seeing if it is within 0xfff
-		 * bytes of the last frame.
-		 */
-		if (xpv_panic)
-			if ((fp != 0) && (fp < lastfp) &&
-			    ((lastfp ^ ~fp) < 0xfff))
-				fp = ~fp;
 
 		kregs[KREG_RBP] = fp;
 		kregs[KREG_RIP] = pc = fr.fr_savpc;

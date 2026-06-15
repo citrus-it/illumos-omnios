@@ -87,7 +87,6 @@ typedef struct entry {
 #define	BAM_ENTRY_FAILSAFE	0x10	/* failsafe entry  */
 #define	BAM_ENTRY_DBOOT		0x20	/* Is dboot (normal or failsafe) */
 #define	BAM_ENTRY_32BIT		0x40	/* Is a 32-bit entry */
-#define	BAM_ENTRY_HV		0x80	/* Is a hypervisor entry */
 #define	BAM_ENTRY_FINDROOT	0x100	/* entry has a findroot line */
 #define	BAM_ENTRY_MULTIBOOT	0x200	/* is multiboot (normal or failsafe) */
 #define	BAM_ENTRY_64BIT		0x400	/* Is a 64-bit entry */
@@ -110,8 +109,7 @@ typedef enum {
 	BAM_ERROR = -1,	/* Must be negative. add_boot_entry() depends on it */
 	BAM_SUCCESS = 0,
 	BAM_WRITE = 2,
-	BAM_MSG,	/* Used by upgrade_menu() */
-	BAM_NOCHANGE	/* Used by cvt_to_hyper()/cvt_to_metal() */
+	BAM_MSG		/* Used by upgrade_menu() */
 } error_t;
 
 /*
@@ -147,13 +145,6 @@ typedef enum {
 	BAM_DIRECT_DBOOT
 } direct_or_multi_t;
 
-/* Is there a hypervisor present? */
-typedef enum {
-	BAM_HV_UNKNOWN,
-	BAM_HV_NO,
-	BAM_HV_PRESENT
-} hv_t;
-
 /* Is there findroot capability present ? */
 typedef enum {
 	BAM_FINDROOT_UNKNOWN,
@@ -185,7 +176,6 @@ typedef enum zfs_mnted {
 extern int bam_verbose;
 extern int bam_force;
 extern direct_or_multi_t bam_direct;
-extern hv_t bam_is_hv;
 extern findroot_t bam_is_findroot;
 extern int bam_debug;
 
@@ -193,8 +183,6 @@ extern void bam_add_line(menu_t *mp, entry_t *entry, line_t *prev, line_t *lp);
 extern void update_numbering(menu_t *mp);
 extern error_t set_global(menu_t *, char *, int);
 extern error_t upgrade_menu(menu_t *, char *, char *);
-extern error_t cvt_to_hyper(menu_t *, char *, char *);
-extern error_t cvt_to_metal(menu_t *, char *, char *);
 extern error_t check_subcmd_and_options(char *, char *, subcmd_defn_t *,
     error_t (**fp)());
 extern char *mount_top_dataset(char *pool, zfs_mnted_t *mnted);
@@ -252,9 +240,6 @@ extern int bootadm_digest(const char *, char **);
 /* Title used for failsafe entries */
 #define	FAILSAFE_TITLE	"Solaris failsafe"
 
-/* Title used for hv entries */
-#define	NEW_HV_ENTRY	"Solaris xVM"
-
 /* ZFS boot option */
 #define	ZFS_BOOT	"-B $ZFS-BOOTFS"
 
@@ -279,9 +264,6 @@ extern int bootadm_digest(const char *, char **);
 #define	AMD_UNIX_SPACE	"/amd64/unix "
 #define	UNIX_SPACE	"/unix "
 
-/* xVM kernels */
-#define	XEN_KERNEL_SUBSTR "xen.gz"
-
 /* Boot archives */
 #define	ARCHIVE_PREFIX		"/platform/"
 #define	ARCHIVE_SUFFIX		"/boot_archive"
@@ -298,14 +280,6 @@ extern int bootadm_digest(const char *, char **);
 #define	CACHEDIR_64		"/platform/i86pc/amd64/archive_cache"
 #define	UPDATEDIR_32		"/platform/i86pc/updates"
 #define	UPDATEDIR_64		"/platform/i86pc/amd64/updates"
-
-/* Hypervisors */
-#define	XEN_64			"/boot/amd64/xen.gz"
-#define	XEN_MENU		"/boot/$ISADIR/xen.gz"
-#define	HYPERVISOR_KERNEL	"/platform/i86xpv/kernel/$ISADIR/unix"
-#define	XEN_KERNEL_MODULE_LINE	HYPERVISOR_KERNEL " " HYPERVISOR_KERNEL
-#define	XEN_KERNEL_MODULE_LINE_ZFS	\
-	HYPERVISOR_KERNEL " " HYPERVISOR_KERNEL " " ZFS_BOOT
 
 /* Helpers */
 #define	MKISOFS_PATH		"/usr/bin/mkisofs"

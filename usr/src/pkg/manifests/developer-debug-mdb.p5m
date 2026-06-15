@@ -87,17 +87,6 @@ $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/unix group=sys \
     mode=0555
 $(i386_ONLY)file path=platform/i86pc/kernel/kmdb/$(ARCH64)/uppc group=sys \
     mode=0555
-$(i386_ONLY)dir path=platform/i86xpv group=sys variant.opensolaris.zone=global
-$(i386_ONLY)dir path=platform/i86xpv/kernel group=sys \
-    variant.opensolaris.zone=global
-$(i386_ONLY)dir path=platform/i86xpv/kernel/kmdb group=sys
-$(i386_ONLY)dir path=platform/i86xpv/kernel/kmdb/$(ARCH64) group=sys
-$(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/unix group=sys \
-    mode=0555
-$(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/xpv_psm group=sys \
-    mode=0555
-$(i386_ONLY)file path=platform/i86xpv/kernel/kmdb/$(ARCH64)/xpv_uppc group=sys \
-    mode=0555
 dir  path=usr group=sys
 dir  path=usr/bin
 dir  path=usr/bin/$(ARCH32)
@@ -133,7 +122,6 @@ file path=usr/lib/mdb/kvm/$(ARCH64)/krtld.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/lofs.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/logindmux.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/mac.so group=sys mode=0555
-$(i386_ONLY)file path=usr/lib/mdb/kvm/$(ARCH64)/mdb_kb.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/mdb_ks.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/mm.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/mpt.so group=sys mode=0555
@@ -206,19 +194,6 @@ $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/pcplusmp.so \
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/unix.so \
     group=sys mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/mdb/kvm/$(ARCH64)/uppc.so \
-    group=sys mode=0555
-$(i386_ONLY)dir path=usr/platform/i86xpv group=sys
-$(i386_ONLY)dir path=usr/platform/i86xpv/lib
-$(i386_ONLY)dir path=usr/platform/i86xpv/lib/mdb group=sys
-$(i386_ONLY)dir path=usr/platform/i86xpv/lib/mdb/kvm group=sys
-$(i386_ONLY)dir path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64) group=sys
-$(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/unix.so \
-    group=sys mode=0555
-$(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/xpv.so \
-    group=sys mode=0555
-$(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/xpv_psm.so \
-    group=sys mode=0555
-$(i386_ONLY)file path=usr/platform/i86xpv/lib/mdb/kvm/$(ARCH64)/xpv_uppc.so \
     group=sys mode=0555
 dir  path=usr/share/man
 dir  path=usr/share/man/man1

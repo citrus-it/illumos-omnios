@@ -134,7 +134,6 @@ MANIFEST_SUBDIRS=			\
 	tsol/tnd			\
 	tsol/tsol-zones			\
 	vscan/vscand			\
-	xvm/ipagent			\
 	ypcmd/yppasswd			\
 	ypcmd/ypupdated			\
 	zonestat/zonestatd

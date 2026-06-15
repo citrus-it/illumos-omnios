@@ -554,8 +554,6 @@ gcpu_mpt_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"unfaulting",		/* GCPU_MPT_WHAT_UNFAULTING */
 		"#MC",			/* GCPU_MPT_WHAT_MC_ERR */
 		"CMCI-int",		/* GCPU_MPT_WHAT_CMCI_ERR */
-		"xpv-virq-nrec",	/* GCPU_MPT_WHAT_XPV_VIRQ */
-		"xpv-virq-lgout",	/* GCPU_MPT_WHAT_XPV_VIRQ_LOGOUT */
 	};
 
 	gcpu_poll_trace_t mpt;

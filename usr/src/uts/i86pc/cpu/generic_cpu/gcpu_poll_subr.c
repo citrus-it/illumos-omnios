@@ -25,7 +25,7 @@
  */
 
 /*
- * Generic x86 CPU MCA poller - support functions for native and xpv pollers.
+ * Generic x86 CPU MCA poller - support functions for the native poller.
  */
 
 #include <sys/types.h>
