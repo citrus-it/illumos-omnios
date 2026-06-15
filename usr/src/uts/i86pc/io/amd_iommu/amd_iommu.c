@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/errno.h>
@@ -123,7 +127,6 @@ _init(void)
 {
 	int error = ENOTSUP;
 
-#if !defined(__xpv)
 
 	if (get_hwenv() != HW_NATIVE)
 		return (ENOTSUP);
@@ -178,7 +181,6 @@ _init(void)
 		return (error);
 	}
 	error = 0;
-#endif
 
 	return (error);
 }

@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Joyent, Inc.
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 
@@ -23,9 +24,7 @@
 #include <vm/as.h>
 #include <vm/seg_umap.h>
 
-#if !defined(__xpv)
 #include <sys/comm_page.h>
-#endif /* !defined(__xpv) */
 
 /*
  * Map in the comm page.
@@ -38,7 +37,6 @@
 caddr_t
 comm_page_mapin()
 {
-#if !defined(__xpv)
 	proc_t *p = curproc;
 	caddr_t addr = NULL;
 	const size_t len = sizeof (comm_page_t);
@@ -59,7 +57,4 @@ comm_page_mapin()
 		return (NULL);
 	}
 	return (addr);
-#else /* !defined(__xpv) */
-	return (NULL);
-#endif /* !defined(__xpv) */
 }

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -43,9 +44,6 @@
 #include <sys/sdt.h>
 #include <sys/stack.h>
 #include <sys/ddi_impldefs.h>
-#ifdef __xpv
-#include <sys/evtchn_impl.h>
-#endif
 
 typedef struct av_softinfo {
 	cpuset_t	av_pending;	/* pending bitmasks */
@@ -75,11 +73,7 @@ static char multilevel2[] =
 	"conflicts with another device using the same vector %d with an IPL\n"
 	"of %d. Reconfigure the conflicting devices to use different vectors.";
 
-#ifdef __xpv
-#define	MAX_VECT	NR_IRQS
-#else
 #define	MAX_VECT	256
-#endif
 
 struct autovec *nmivect = NULL;
 struct av_head autovect[MAX_VECT];

@@ -24,6 +24,7 @@
  *
  * Copyright 2018 Joyent, Inc.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_MACH_MMU_H
@@ -154,11 +155,7 @@ extern void mmu_invlpg(caddr_t);
 
 #endif
 
-#ifdef __xpv
-#include <sys/xen_mmu.h>
-#else
 #include <sys/pc_mmu.h>
-#endif
 
 /*
  * The software extraction for a single Page Table Entry will always
