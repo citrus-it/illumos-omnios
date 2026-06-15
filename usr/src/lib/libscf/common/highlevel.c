@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * This file contains high level functions used by multiple utilities.
  */
 
@@ -333,14 +337,6 @@ int
 scf_is_fastboot_default(void)
 {
 	uint8_t	boot_config = 0, boot_config_ovr;
-	char procbuf[SYS_NMLN];
-
-	/*
-	 * If we are on xVM, do not fast reboot by default.
-	 */
-	if (sysinfo(SI_PLATFORM, procbuf, sizeof (procbuf)) == -1 ||
-	    strcmp(procbuf, "i86xpv") == 0)
-		return (0);
 
 	/*
 	 * Get property values from "config" property group

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _GCPU_H
@@ -119,8 +120,6 @@ struct gcpu_bios_cfg {
 #define	GCPU_MPT_WHAT_UNFAULTING	2	/* discarded error state */
 #define	GCPU_MPT_WHAT_MC_ERR		3	/* MC# */
 #define	GCPU_MPT_WHAT_CMCI_ERR		4	/* CMCI interrupt */
-#define	GCPU_MPT_WHAT_XPV_VIRQ		5	/* MCA_VIRQ in dom0 */
-#define	GCPU_MPT_WHAT_XPV_VIRQ_LOGOUT	6	/* MCA_VIRQ logout complete */
 
 typedef struct gcpu_poll_trace {
 	hrtime_t mpt_when;		/* timestamp of event */
