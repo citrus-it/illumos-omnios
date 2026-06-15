@@ -29,7 +29,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2018 Gary Mills
 # Copyright 2019 Peter Tribble
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2026 Oxide Computer Company
 #
 
@@ -503,8 +503,7 @@ i386_SUBDIRS=		\
 	rsrvrctl	\
 	rtc		\
 	ucodeadm	\
-	xhci		\
-	xvm
+	xhci
 
 sparc_SUBDIRS=		\
 	dcs		\

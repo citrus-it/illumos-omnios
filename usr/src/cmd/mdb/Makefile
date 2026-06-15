@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2022 Garrett D'Amore
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include $(SRC)/Makefile.master
@@ -32,7 +33,7 @@ include $(SRC)/Makefile.master
 
 i386_MACHDIR = intel
 
-i386_SUBDIRS = intel i86pc i86xpv
+i386_SUBDIRS = intel i86pc
 
 MACHDIR = $($(MACH)_MACHDIR)
 SUBDIRS = tools $($(MACH)_SUBDIRS) demo

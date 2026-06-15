@@ -24,14 +24,14 @@
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2016 Nexenta Systems, Inc.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright (c) 2018, Joyent, Inc.
 
 PROG= bootadm
 
 SBINLINKS= $(PROG)
 
-OBJS= bootadm.o bootadm_upgrade.o bootadm_hyper.o bootadm_digest.o \
+OBJS= bootadm.o bootadm_upgrade.o bootadm_digest.o \
 	bootadm_loader.o
 POFILES= $(OBJS:%.o=%.po)
 

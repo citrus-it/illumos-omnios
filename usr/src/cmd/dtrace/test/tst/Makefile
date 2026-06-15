@@ -23,10 +23,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+#
 
 include $(SRC)/Makefile.master
 
-SUBDIRS= common $(MACH:i386=i386 i86xpv)
+SUBDIRS= common $(MACH)
 include ../Makefile.subdirs
 
 dstyle := TARGET += dstyle
