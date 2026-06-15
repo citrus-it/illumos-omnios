@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -64,21 +65,10 @@ int use_sse_pagecopy = 0;
 int use_sse_pagezero = 0;
 int use_sse_copy = 0;
 
-#if defined(__xpv)
-
-/*
- * Use of SSE or otherwise is forcibly configured for us by the hypervisor.
- */
-
-#define	ENABLE_SSE()
-#define	DISABLE_SSE()
-
-#else	/* __xpv */
 
 #define	ENABLE_SSE()	setcr4(CR4_ENABLE_SSE_FLAGS(getcr4()))
 #define	DISABLE_SSE()	setcr4(CR4_DISABLE_SSE_FLAGS(getcr4()))
 
-#endif	/* __xpv */
 
 /*
  * Try and figure out what kind of FP capabilities we have, and
@@ -95,7 +85,6 @@ fpu_probe(void)
 		goto nofpu;
 	}
 
-#ifndef __xpv
 	/*
 	 * Check and see if the fpu is present by looking
 	 * at the "extension type" bit.  (While this used to
@@ -105,7 +94,6 @@ fpu_probe(void)
 	 */
 	if ((getcr0() & CR0_ET) == 0)
 		goto nofpu;
-#endif
 
 	/* Use the more complex exception clearing code if necessary */
 	if (cpuid_need_fp_excp_handling())

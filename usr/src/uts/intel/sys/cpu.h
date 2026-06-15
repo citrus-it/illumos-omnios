@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef _SYS_CPU_H
 #define	_SYS_CPU_H
 
@@ -39,9 +43,6 @@
 #include <sys/inttypes.h>
 
 #if defined(_KERNEL)
-#if defined(__xpv)
-#include <sys/hypervisor.h>
-#endif
 #if defined(__GNUC__) && defined(_ASM_INLINES)
 #include <asm/cpu.h>
 #endif

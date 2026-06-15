@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _ASM_CPU_H
@@ -101,7 +102,6 @@ prefetch_write_once(void *addr)
 #endif	/* __amd64 */
 }
 
-#if !defined(__xpv)
 
 extern __GNU_INLINE void
 cli(void)
@@ -130,7 +130,6 @@ i86_halt(void)
 	    "sti; hlt");
 }
 
-#endif /* !__xpv */
 
 #endif	/* __i386 || defined(__amd64) */
 

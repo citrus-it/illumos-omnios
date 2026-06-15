@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/dtrace.h>
@@ -381,9 +382,5 @@ dtrace_safe_defer_signal(void)
 int
 dtrace_mach_aframes(void)
 {
-#ifdef __xpv
-	return (1);
-#else
 	return (0);
-#endif
 }

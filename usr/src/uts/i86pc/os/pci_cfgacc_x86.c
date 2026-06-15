@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/systm.h>
@@ -60,10 +61,6 @@ static caddr_t pci_cfgacc_virt_base = NULL;
 static caddr_t
 pci_cfgacc_map(paddr_t phys_addr)
 {
-#ifdef __xpv
-	phys_addr = pfn_to_pa(xen_assign_pfn(mmu_btop(phys_addr))) |
-	    (phys_addr & MMU_PAGEOFFSET);
-#endif
 	if (khat_running) {
 		pfn_t pfn = mmu_btop(phys_addr);
 		/*

@@ -56,6 +56,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2026 Gernot Strasser
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -101,15 +102,8 @@
  * entry CR0 value to the exit macro and must not be touched in between
  * (the transform only uses %rax, %rdi, %rsi, %rdx and %xmm0-%xmm10).
  */
-#ifdef	__xpv
-#define	PROTECTED_CLTS \
-	pushq	%rsi; \
-	CLTS; \
-	popq	%rsi
-#else
 #define	PROTECTED_CLTS \
 	CLTS
-#endif	/* __xpv */
 
 #define	CLEAR_TS_OR_PUSH_XMM0_TO_XMM10(tmpreg) \
 	pushq	%rbp; \

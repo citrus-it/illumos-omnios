@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -271,7 +272,7 @@ static cpu_idle_callback_t cpu_idle_callback_dtrace = {
 	cpu_idle_dtrace_exit,
 };
 
-#if defined(__x86) && !defined(__xpv)
+#if defined(__x86)
 extern void tlb_going_idle(void);
 extern void tlb_service(void);
 
@@ -333,7 +334,7 @@ cpu_event_init(void)
 		cmn_err(CE_PANIC,
 		    "cpu_idle: failed to register callback for dtrace.");
 	}
-#if defined(__x86) && !defined(__xpv)
+#if defined(__x86)
 	if (cpu_idle_register_callback(CPU_IDLE_CB_PRIO_TLB,
 	    &cpu_idle_callback_tlb, NULL, &cpu_idle_cb_handle_tlb) != 0) {
 		cmn_err(CE_PANIC,

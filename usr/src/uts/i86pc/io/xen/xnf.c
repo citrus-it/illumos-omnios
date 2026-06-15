@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -141,7 +142,6 @@
 #else
 #include <sys/hypervisor.h>
 #include <sys/evtchn_impl.h>
-#include <sys/balloon_impl.h>
 #endif
 #include <xen/public/io/netif.h>
 #include <sys/gnttab.h>
