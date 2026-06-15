@@ -76,11 +76,7 @@
 #include <sys/pci_cfgspace.h>
 #include <sys/mach_mmu.h>
 #include <sys/sysmacros.h>
-#if defined(__xpv)
-#include <sys/hypervisor.h>
-#else
 #include <sys/hma.h>
-#endif
 #include <sys/cpu_module.h>
 #include <sys/ontrap.h>
 
@@ -176,7 +172,6 @@ init_cpu_syscall(struct cpu *cp)
 	    is_x86_feature(x86_featureset, X86FSET_ASYSC)) {
 		uint64_t flags;
 
-#if !defined(__xpv)
 		/*
 		 * The syscall instruction imposes a certain ordering on
 		 * segment selectors, so we double-check that ordering
@@ -185,7 +180,6 @@ init_cpu_syscall(struct cpu *cp)
 		CTASSERT(KDS_SEL == KCS_SEL + 8);
 		CTASSERT(UDS_SEL == U32CS_SEL + 8);
 		CTASSERT(UCS_SEL == U32CS_SEL + 16);
-#endif
 
 		/*
 		 * Turn syscall/sysret extensions on.
@@ -226,7 +220,6 @@ init_cpu_syscall(struct cpu *cp)
 	if (is_x86_feature(x86_featureset, X86FSET_MSR) &&
 	    is_x86_feature(x86_featureset, X86FSET_SEP)) {
 
-#if !defined(__xpv)
 		/*
 		 * The sysenter instruction imposes a certain ordering on
 		 * segment selectors, so we double-check that ordering
@@ -238,7 +231,6 @@ init_cpu_syscall(struct cpu *cp)
 
 		CTASSERT(U32CS_SEL == ((KCS_SEL + 16) | 3));
 		CTASSERT(UDS_SEL == U32CS_SEL + 8);
-#endif
 
 		cpu_sep_enable();
 
@@ -260,7 +252,6 @@ init_cpu_syscall(struct cpu *cp)
 	kpreempt_enable();
 }
 
-#if !defined(__xpv)
 /*
  * Configure per-cpu ID GDT
  */
@@ -271,7 +262,6 @@ init_cpu_id_gdt(struct cpu *cp)
 	set_usegd(&cp->cpu_gdt[GDT_CPUID], SDP_SHORT, NULL, cp->cpu_id,
 	    SDT_MEMRODA, SEL_UPL, SDP_BYTES, SDP_OP32);
 }
-#endif /* !defined(__xpv) */
 
 /*
  * Multiprocessor initialization.
@@ -288,10 +278,8 @@ mp_cpu_configure_common(int cpun, boolean_t boot)
 	kthread_id_t tp;
 	caddr_t	sp;
 	proc_t *procp;
-#if !defined(__xpv)
 	extern int idle_cpu_prefer_mwait;
 	extern void cpu_idle_mwait();
-#endif
 	extern void idle();
 	extern void cpu_idle();
 
@@ -436,20 +424,16 @@ mp_cpu_configure_common(int cpun, boolean_t boot)
 	 * alloc space for cpuid info
 	 */
 	cpuid_alloc_space(cp);
-#if !defined(__xpv)
 	if (is_x86_feature(x86_featureset, X86FSET_MWAIT) &&
 	    idle_cpu_prefer_mwait) {
 		cp->cpu_m.mcpu_mwait = cpuid_mwait_alloc(cp);
 		cp->cpu_m.mcpu_idle_cpu = cpu_idle_mwait;
 	} else
-#endif
 		cp->cpu_m.mcpu_idle_cpu = cpu_idle;
 
 	init_cpu_info(cp);
 
-#if !defined(__xpv)
 	init_cpu_id_gdt(cp);
-#endif
 
 	/*
 	 * alloc space for ucode_info
@@ -556,12 +540,10 @@ mp_cpu_unconfigure_common(struct cpu *cp, int error)
 		cp->cpu_brandstr = NULL;
 	}
 
-#if !defined(__xpv)
 	if (cp->cpu_m.mcpu_mwait != NULL) {
 		cpuid_mwait_free(cp);
 		cp->cpu_m.mcpu_mwait = NULL;
 	}
-#endif
 	cpuid_free_space(cp);
 
 	if (cp->cpu_idt != CPU->cpu_idt)
@@ -989,16 +971,9 @@ workaround_errata(struct cpu *cpu)
 		 * Erratum 122 is only present in MP configurations (multi-core
 		 * or multi-processor).
 		 */
-#if defined(__xpv)
-		if (!DOMAIN_IS_INITDOMAIN(xen_info))
-			break;
-		if (!opteron_erratum_122 && xpv_nr_phys_cpus() == 1)
-			break;
-#else
 		if (!opteron_erratum_122 && opteron_get_nnodes() == 1 &&
 		    cpuid_get_ncpu_per_chip(cpu) == 1)
 			break;
-#endif
 		/* disable TLB Flush Filter */
 
 		if ((error = checked_rdmsr(msr, &value)) != 0) {
@@ -1037,10 +1012,6 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if (cpuid_get_ncpu_per_chip(cpu) < 2)
 			break;
-#if defined(__xpv)
-		if (!DOMAIN_IS_INITDOMAIN(xen_info))
-			break;
-#endif
 		/*
 		 * The "workaround" is to print a warning to upgrade the BIOS
 		 */
@@ -1077,15 +1048,8 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if (opteron_erratum_131)
 			break;
-#if defined(__xpv)
-		if (!DOMAIN_IS_INITDOMAIN(xen_info))
-			break;
-		if (xpv_nr_phys_cpus() < 4)
-			break;
-#else
 		if (opteron_get_nnodes() * cpuid_get_ncpu_per_chip(cpu) < 4)
 			break;
-#endif
 		/*
 		 * Print a warning if neither of the workarounds for
 		 * erratum 131 is present.
@@ -1122,19 +1086,6 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if (opteron_workaround_6336786) {
 			opteron_workaround_6336786++;
-#if defined(__xpv)
-		} else if ((DOMAIN_IS_INITDOMAIN(xen_info) &&
-		    xpv_nr_phys_cpus() > 1) ||
-		    opteron_workaround_6336786_UP) {
-			/*
-			 * XXPV	Hmm.  We can't walk the Northbridges on
-			 *	the hypervisor; so just complain and drive
-			 *	on.  This probably needs to be fixed in
-			 *	the hypervisor itself.
-			 */
-			opteron_workaround_6336786++;
-			workaround_warning(cpu, 6336786);
-#else	/* __xpv */
 		} else if ((opteron_get_nnodes() *
 		    cpuid_get_ncpu_per_chip(cpu) > 1) ||
 		    opteron_workaround_6336786_UP) {
@@ -1153,7 +1104,6 @@ workaround_errata(struct cpu *cpu)
 				pci_putb_func(0, node + 24, 3, 0x87, data);
 			}
 			opteron_workaround_6336786++;
-#endif	/* __xpv */
 		}
 #else
 		workaround_warning(cpu, 6336786);
@@ -1181,31 +1131,11 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if (opteron_erratum_147) {
 			opteron_erratum_147++;
-#if defined(__xpv)
-		} else if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
-			if (DOMAIN_IS_INITDOMAIN(xen_info)) {
-				/*
-				 * XXPV	Use dom0_msr here when extended
-				 *	operations are supported?
-				 */
-				if (xpv_nr_phys_cpus() > 1)
-					opteron_erratum_147++;
-			} else {
-				/*
-				 * We have no way to tell how many physical
-				 * cpus there are, or even if this processor
-				 * has the problem, so enable the workaround
-				 * unconditionally (at some performance cost).
-				 */
-				opteron_erratum_147++;
-			}
-#else	/* __xpv */
 		} else if (is_x86_feature(x86_featureset, X86FSET_SSE2) &&
 		    ((opteron_get_nnodes() *
 		    cpuid_get_ncpu_per_chip(cpu)) > 1)) {
 			if ((xrdmsr(MSR_AMD_BU_CFG) & (UINT64_C(1) << 33)) == 0)
 				opteron_erratum_147++;
-#endif	/* __xpv */
 		}
 #else
 		workaround_warning(cpu, 147);
@@ -1231,11 +1161,7 @@ workaround_errata(struct cpu *cpu)
 #endif
 	}
 
-#ifdef __xpv
-	return (0);
-#else
 	return (missing);
-#endif
 }
 
 void
@@ -1367,9 +1293,7 @@ mp_start_cpu_common(cpu_t *cp, boolean_t boot)
 	int error = 0;
 	cpuset_t tempset;
 	processorid_t cpuid;
-#ifndef __xpv
 	extern void cpupm_init(cpu_t *);
-#endif
 
 	ASSERT(cp != NULL);
 	cpuid = cp->cpu_id;
@@ -1416,10 +1340,8 @@ mp_start_cpu_common(cpu_t *cp, boolean_t boot)
 
 	mach_cpucontext_free(cp, ctx, 0);
 
-#ifndef __xpv
 	if (tsc_gethrtime_enable)
 		tsc_sync_master(cpuid);
-#endif
 
 	/*
 	 * At this point, the CPU in question is past the IDENT cpuid phase and
@@ -1449,9 +1371,7 @@ mp_start_cpu_common(cpu_t *cp, boolean_t boot)
 	 * to signal that cpuid probing is done.
 	 */
 	mp_startup_wait(&procset_slave, cpuid);
-#ifndef __xpv
 	cpupm_init(cp);
-#endif
 	(void) pg_cpu_init(cp, B_FALSE);
 	cpu_set_state(cp);
 	mp_startup_signal(&procset_master, cpuid);
@@ -1527,9 +1447,7 @@ start_other_cpus(int cprboot)
 	 */
 	init_cpu_info(CPU);
 
-#if !defined(__xpv)
 	init_cpu_id_gdt(CPU);
-#endif
 
 	cmn_err(CE_CONT, "?cpu%d: %s\n", CPU->cpu_id, CPU->cpu_idstr);
 	cmn_err(CE_CONT, "?cpu%d: %s\n", CPU->cpu_id, CPU->cpu_brandstr);
@@ -1615,13 +1533,11 @@ done:
 		workaround_errata_end();
 	cmi_post_mpstartup();
 
-#if !defined(__xpv)
 	/*
 	 * Once other CPUs have completed startup procedures, perform
 	 * initialization of hypervisor resources for HMA.
 	 */
 	hma_init();
-#endif
 
 	if (use_mp && ncpus != boot_max_ncpus) {
 		cmn_err(CE_NOTE,
@@ -1737,10 +1653,8 @@ mp_startup_common(boolean_t boot)
 	/* Let the control CPU continue into tsc_sync_master() */
 	mp_startup_signal(&procset_slave, cp->cpu_id);
 
-#ifndef __xpv
 	if (tsc_gethrtime_enable)
 		tsc_sync_slave();
-#endif
 
 	/*
 	 * As with the boot CPU, we may have a more recent update compared to
@@ -1770,12 +1684,10 @@ mp_startup_common(boolean_t boot)
 	 */
 	(void) (*ap_mlsetup)();
 
-#ifndef __xpv
 	/*
 	 * Program this cpu's PAT
 	 */
 	pat_sync();
-#endif
 
 	/*
 	 * Set up TSC_AUX to contain the cpuid for this processor
@@ -1923,7 +1835,6 @@ mp_startup_common(boolean_t boot)
 		cmn_err(CE_WARN, "cpu%d feature mismatch", cp->cpu_id);
 	}
 
-#ifndef __xpv
 	{
 		/*
 		 * Set up the CPU module for this CPU.  This can't be done
@@ -1941,7 +1852,6 @@ mp_startup_common(boolean_t boot)
 			cp->cpu_m.mcpu_cmi_hdl = hdl;
 		}
 	}
-#endif /* __xpv */
 
 	if (boothowto & RB_DEBUG)
 		kdi_cpu_init();
@@ -2005,13 +1915,6 @@ mp_cpu_stop(struct cpu *cp)
 	extern int cbe_psm_timer_mode;
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
-#ifdef __xpv
-	/*
-	 * We can't offline vcpu0.
-	 */
-	if (cp->cpu_id == 0)
-		return (EBUSY);
-#endif
 
 	/*
 	 * If TIMER_PERIODIC mode is used, CPU0 is the one running it;
@@ -2057,9 +1960,6 @@ cpu_enable_intr(struct cpu *cp)
 void
 mp_cpu_faulted_enter(struct cpu *cp)
 {
-#ifdef __xpv
-	_NOTE(ARGUNUSED(cp));
-#else
 	cmi_hdl_t hdl = cp->cpu_m.mcpu_cmi_hdl;
 
 	if (hdl != NULL) {
@@ -2072,15 +1972,11 @@ mp_cpu_faulted_enter(struct cpu *cp)
 		cmi_faulted_enter(hdl);
 		cmi_hdl_rele(hdl);
 	}
-#endif
 }
 
 void
 mp_cpu_faulted_exit(struct cpu *cp)
 {
-#ifdef __xpv
-	_NOTE(ARGUNUSED(cp));
-#else
 	cmi_hdl_t hdl = cp->cpu_m.mcpu_cmi_hdl;
 
 	if (hdl != NULL) {
@@ -2093,7 +1989,6 @@ mp_cpu_faulted_exit(struct cpu *cp)
 		cmi_faulted_exit(hdl);
 		cmi_hdl_rele(hdl);
 	}
-#endif
 }
 
 /*

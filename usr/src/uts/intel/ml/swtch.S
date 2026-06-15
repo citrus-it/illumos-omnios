@@ -305,7 +305,6 @@
 	 * value at all (since all the interrupts have an IST set).
 	 */
 	movq	CPU_TSS(%r13), %r14
-#if !defined(__xpv)
 	cmpq	$1, kpti_enable
 	jne	1f
 	leaq	CPU_KPTI_TR_RSP(%r13), %rax
@@ -315,13 +314,6 @@
 	addq	$REGSIZE+MINFRAME, %rax	/* to the bottom of thread stack */
 2:
 	movq	%rax, TSS_RSP0(%r14)
-#else
-	movq	T_STACK(%r12), %rax
-	addq	$REGSIZE+MINFRAME, %rax	/* to the bottom of thread stack */
-	movl	$KDS_SEL, %edi
-	movq	%rax, %rsi
-	call	HYPERVISOR_stack_switch
-#endif	/* __xpv */
 
 	movq	%r12, CPU_THREAD(%r13)	/* set CPU's thread pointer */
 	mfence				/* synchronize with mutex_exit() */
@@ -404,13 +396,6 @@ resume_return:
 
 	/* clean up the fp unit. It might be left enabled */
 
-#if defined(__xpv)		/* XXPV XXtclayton */
-	/*
-	 * Remove this after bringup.
-	 * (Too many #gp's for an instrumented hypervisor.)
-	 */
-	STTS(%rax)
-#else
 	movq	%cr0, %rax
 	testq	$CR0_TS, %rax
 	jnz	.zfpu_disabled		/* if TS already set, nothing to do */
@@ -418,8 +403,6 @@ resume_return:
 	orq	$CR0_TS, %rax
 	movq	%rax, %cr0
 .zfpu_disabled:
-
-#endif	/* __xpv */
 
 	/*
 	 * Temporarily switch to the idle thread's stack so that the zombie

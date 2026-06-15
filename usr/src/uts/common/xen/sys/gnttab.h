@@ -79,7 +79,7 @@ struct gnttab_free_callback {
 };
 
 /*
- * For i86xpv the "frames" in grant table terminology are really MFNs.
+ * The "frames" in grant table terminology are really MFNs.
  */
 typedef mfn_t gnttab_frame_t;
 #define	FRAME_TO_MA(f)	((maddr_t)(f) << PAGESHIFT)

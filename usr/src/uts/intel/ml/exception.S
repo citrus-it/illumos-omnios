@@ -65,25 +65,6 @@
  * it get saved as is running native.
  */
 
-#if defined(__xpv)
-
-#define	NPTRAP_NOERR(trapno)	\
-	pushq	$0;		\
-	pushq	$trapno
-
-#define	TRAP_NOERR(trapno)	\
-	XPV_TRAP_POP;		\
-	NPTRAP_NOERR(trapno)
-
-/*
- * error code already pushed by hw
- * onto stack.
- */
-#define	TRAP_ERR(trapno)	\
-	XPV_TRAP_POP;		\
-	pushq	$trapno
-
-#else /* __xpv */
 
 #define	TRAP_NOERR(trapno)	\
 	push	$0;		\
@@ -98,7 +79,6 @@
 #define	TRAP_ERR(trapno)	\
 	push	$trapno
 
-#endif	/* __xpv */
 
 	/*
 	 * These are the stacks used on cpu0 for taking double faults,
@@ -132,7 +112,6 @@
 	ENTRY_NP(dbgtrap)
 	TRAP_NOERR(T_SGLSTP)	/* $1 */
 
-#if !defined(__xpv)		/* no sysenter support yet */
 	/*
 	 * If we get here as a result of single-stepping a sysenter
 	 * instruction, we suddenly find ourselves taking a #db
@@ -174,26 +153,15 @@
 1:	swapgs
 2:	lfence /* swapgs mitigation */
 	popq	%r11
-#endif	/* !__xpv */
 
 	INTR_PUSH
-#if defined(__xpv)
-	movl	$6, %edi
-	call	kdi_dreg_get
-	movq	%rax, %r15		/* %db6 -> %r15 */
-	movl	$6, %edi
-	movl	$0, %esi
-	call	kdi_dreg_set		/* 0 -> %db6 */
-#else
 	movq	%db6, %r15
 	xorl	%eax, %eax
 	movq	%rax, %db6
-#endif
 
 	jmp	cmntrap_pushed
 	SET_SIZE(dbgtrap)
 
-#if !defined(__xpv)
 
 /*
  * Macro to set the gsbase or kgsbase to the address of the struct cpu
@@ -249,11 +217,6 @@
 	movq	REGOFF_RBP(%rsp), %rbp;					\
 	addq	$REGOFF_TRAPNO, %rsp	/* pop stack */
 
-#else	/* __xpv */
-
-#define	SET_CPU_GSBASE	/* noop on the hypervisor */
-
-#endif	/* __xpv */
 
 
 	/*
@@ -338,9 +301,6 @@ bp_user:
 	cmpw	$KCS_SEL, 8(%rsp)
 	jne	ud_user
 
-#if defined(__xpv)
-	movb	$0, 12(%rsp)		/* clear saved upcall_mask from %cs */
-#endif
 	push	$0			/* error code -- zero for #UD */
 ud_kernel:
 	push	$0xdddd			/* a dummy trap number */
@@ -463,7 +423,6 @@ ud_user:
 	jmp	cmntrap
 	SET_SIZE(ndptrap)
 
-#if !defined(__xpv)
 
 	/*
 	 * #DF
@@ -516,7 +475,6 @@ ud_user:
 
 	SET_SIZE(syserrtrap)
 
-#endif	/* !__xpv */
 
 	/*
 	 * #TS
@@ -559,16 +517,9 @@ ud_user:
 	ENTRY_NP(pftrap)
 	TRAP_ERR(T_PGFLT)	/* $14 already have error code on stack */
 	INTR_PUSH
-#if defined(__xpv)
-
-	movq	%gs:CPU_VCPU_INFO, %r15
-	movq	VCPU_INFO_ARCH_CR2(%r15), %r15	/* vcpu[].arch.cr2 */
-
-#else	/* __xpv */
 
 	movq	%cr2, %r15
 
-#endif	/* __xpv */
 	jmp	cmntrap_pushed
 	SET_SIZE(pftrap)
 
@@ -656,10 +607,6 @@ ud_user:
 	subq	$2, (%rsp)	/* XXX int insn 2-bytes */
 	pushq	$_CONST(_MUL(T_FASTTRAP, GATE_DESC_SIZE) + 2)
 
-#if defined(__xpv)
-	pushq	%r11
-	pushq	%rcx
-#endif
 	jmp	gptrap
 	SET_SIZE(fasttrap)
 

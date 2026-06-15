@@ -498,8 +498,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 	/*
 	 * On supported kernels (x86_64) make room in the auxv for the
-	 * AT_SUN_COMMPAGE entry.  This will go unpopulated on i86xpv systems
-	 * which do not provide such functionality.
+	 * AT_SUN_COMMPAGE entry.
 	 *
 	 * Additionally cover the floating point information AT_SUN_FPSIZE and
 	 * AT_SUN_FPTYPE.

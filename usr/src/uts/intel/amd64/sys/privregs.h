@@ -131,7 +131,7 @@ struct regs {
  * will kill the domain. We could use something different than INTR_PUSH
  * in xen_failsafe_callback but for now we will not sample them.
  */
-#if defined(DEBUG) && !defined(__xpv)
+#if defined(DEBUG)
 #define	__SAVE_BASES				\
 	movl    $MSR_AMD_FSBASE, %ecx;          \
 	rdmsr;                                  \

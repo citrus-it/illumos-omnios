@@ -66,7 +66,7 @@
 #include <sys/instance.h>
 #include <sys/sysevent/eventdefs.h>
 
-#if defined(__amd64) && !defined(__xpv)
+#if defined(__amd64)
 #include <sys/iommulib.h>
 #endif
 
@@ -1418,7 +1418,7 @@ detach_node(dev_info_t *dip, uint_t flag)
 	DEVI_CLR_NEED_RESET(dip);
 	mutex_exit(&(DEVI(dip)->devi_lock));
 
-#if defined(__amd64) && !defined(__xpv)
+#if defined(__amd64)
 	/*
 	 * Close any iommulib mediated linkage to an IOMMU
 	 */
@@ -9354,7 +9354,7 @@ ddi_err(ddi_err_t ade, dev_info_t *rdip, const char *fmt, ...)
 void
 ddi_mem_update(uint64_t addr, uint64_t size)
 {
-#if defined(__x86) && !defined(__xpv)
+#if defined(__x86)
 	extern void immu_physmem_update(uint64_t addr, uint64_t size);
 	immu_physmem_update(addr, size);
 #else

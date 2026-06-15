@@ -37,9 +37,6 @@
 #include <sys/machparam.h>
 #include <sys/controlregs.h>
 #include <sys/mach_mmu.h>
-#ifdef __xpv
-#include <sys/hypervisor.h>
-#endif
 #include <vm/as.h>
 
 #include <mdb/mdb_modapi.h>
@@ -166,15 +163,6 @@ struct hat_mmu_info mmu;
 uintptr_t kernelbase;
 
 /*
- * stuff for i86xpv images
- */
-static int is_xpv;
-static uintptr_t mfn_list_addr; /* kernel MFN list address */
-uintptr_t xen_virt_start; /* address of mfn_to_pfn[] table */
-ulong_t mfn_count;	/* number of pfn's in the MFN list */
-pfn_t *mfn_list;	/* local MFN list copy */
-
-/*
  * read mmu parameters from kernel
  */
 static void
@@ -192,154 +180,18 @@ init_mmu(void)
 	if (mdb_readsym(&kernelbase, sizeof (kernelbase), "kernelbase") == -1)
 		mdb_warn("Couldn't find kernelbase\n");
 	khat = kas.a_hat;
-
-	/*
-	 * Is this a paravirtualized domain image?
-	 */
-	if (mdb_readsym(&mfn_list_addr, sizeof (mfn_list_addr),
-	    "mfn_list") == -1 ||
-	    mdb_readsym(&xen_virt_start, sizeof (xen_virt_start),
-	    "xen_virt_start") == -1 ||
-	    mdb_readsym(&mfn_count, sizeof (mfn_count), "mfn_count") == -1) {
-		mfn_list_addr = 0;
-	}
-
-	is_xpv = mfn_list_addr != 0;
-
-#ifndef _KMDB
-	/*
-	 * recreate the local mfn_list
-	 */
-	if (is_xpv) {
-		size_t sz = mfn_count * sizeof (pfn_t);
-		mfn_list = mdb_zalloc(sz, UM_SLEEP);
-
-		if (mdb_vread(mfn_list, sz, (uintptr_t)mfn_list_addr) == -1) {
-			mdb_warn("Failed to read MFN list\n");
-			mdb_free(mfn_list, sz);
-			mfn_list = NULL;
-		}
-	}
-#endif
 }
 
 void
 free_mmu(void)
 {
-#ifdef __xpv
-	if (mfn_list != NULL)
-		mdb_free(mfn_list, mfn_count * sizeof (mfn_t));
-#endif
 }
 
-#ifdef __xpv
-
-#ifdef _KMDB
-
-/*
- * Convert between MFNs and PFNs.  Since we're in kmdb we can go directly
- * through the machine to phys mapping and the MFN list.
- */
-
-pfn_t
-mdb_mfn_to_pfn(mfn_t mfn)
-{
-	pfn_t pfn;
-	mfn_t tmp;
-	pfn_t *pfn_list;
-
-	if (mfn_list_addr == 0)
-		return (-(pfn_t)1);
-
-	pfn_list = (pfn_t *)xen_virt_start;
-	if (mdb_vread(&pfn, sizeof (pfn), (uintptr_t)(pfn_list + mfn)) == -1)
-		return (-(pfn_t)1);
-
-	if (mdb_vread(&tmp, sizeof (tmp),
-	    (uintptr_t)(mfn_list_addr + (pfn * sizeof (mfn_t)))) == -1)
-		return (-(pfn_t)1);
-
-	if (pfn >= mfn_count || tmp != mfn)
-		return (-(pfn_t)1);
-
-	return (pfn);
-}
-
-mfn_t
-mdb_pfn_to_mfn(pfn_t pfn)
-{
-	mfn_t mfn;
-
-	init_mmu();
-
-	if (mfn_list_addr == 0 || pfn >= mfn_count)
-		return (-(mfn_t)1);
-
-	if (mdb_vread(&mfn, sizeof (mfn),
-	    (uintptr_t)(mfn_list_addr + (pfn * sizeof (mfn_t)))) == -1)
-		return (-(mfn_t)1);
-
-	return (mfn);
-}
-
-#else /* _KMDB */
-
-/*
- * Convert between MFNs and PFNs.  Since a crash dump doesn't include the
- * MFN->PFN translation table (it's part of the hypervisor, not our image)
- * we do the MFN->PFN translation by searching the PFN->MFN (mfn_list)
- * table, if it's there.
- */
-
-pfn_t
-mdb_mfn_to_pfn(mfn_t mfn)
-{
-	pfn_t pfn;
-
-	init_mmu();
-
-	if (mfn_list == NULL)
-		return (-(pfn_t)1);
-
-	for (pfn = 0; pfn < mfn_count; ++pfn) {
-		if (mfn_list[pfn] != mfn)
-			continue;
-		return (pfn);
-	}
-
-	return (-(pfn_t)1);
-}
-
-mfn_t
-mdb_pfn_to_mfn(pfn_t pfn)
-{
-	init_mmu();
-
-	if (mfn_list == NULL || pfn >= mfn_count)
-		return (-(mfn_t)1);
-
-	return (mfn_list[pfn]);
-}
-
-#endif /* _KMDB */
-
-static paddr_t
-mdb_ma_to_pa(uint64_t ma)
-{
-	pfn_t pfn = mdb_mfn_to_pfn(mmu_btop(ma));
-	if (pfn == -(pfn_t)1)
-		return (-(paddr_t)1);
-
-	return (mmu_ptob((paddr_t)pfn) | (ma & (MMU_PAGESIZE - 1)));
-}
-
-#else /* __xpv */
 
 #define	mdb_ma_to_pa(ma) (ma)
 #define	mdb_mfn_to_pfn(mfn) (mfn)
 #define	mdb_pfn_to_mfn(pfn) (pfn)
 
-#endif /* __xpv */
 
 /*
  * ::mfntopfn dcmd translates hypervisor machine page number
@@ -416,7 +268,7 @@ do_pte_dcmd(int level, uint64_t pte)
 	mdb_printf("pte=0x%llr: ", pte);
 
 	mfn = pte2mfn(pte, level);
-	mdb_printf("%s=0x%lr ", is_xpv ? "mfn" : "pfn", mfn);
+	mdb_printf("pfn=0x%lr ", mfn);
 
 	if (PTE_GET(pte, mmu.pt_nx))
 		mdb_printf("noexec ");
@@ -676,12 +528,7 @@ va2pfn_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	mdb_printf("Virtual address 0x%p maps pfn 0x%lr", addr, pfn);
-
-	if (is_xpv)
-		mdb_printf(" (mfn 0x%lr)", mfn);
-
-	mdb_printf("\n");
+	mdb_printf("Virtual address 0x%p maps pfn 0x%lr\n", addr, pfn);
 
 	return (DCMD_OK);
 }

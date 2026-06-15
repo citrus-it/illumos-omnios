@@ -132,25 +132,9 @@
 #include <sys/tsc.h>
 #include <sys/clock.h>
 
-#ifdef	__xpv
-
-#include <sys/hypervisor.h>
-#include <sys/xen_mmu.h>
-#include <sys/evtchn_impl.h>
-#include <sys/gnttab.h>
-#include <sys/xpv_panic.h>
-#include <xen/sys/xenbus_comms.h>
-#include <xen/public/physdev.h>
-
-extern void xen_late_startup(void);
-
-struct xen_evt_data cpu0_evt_data;
-
-#else	/* __xpv */
 #include <sys/memlist_impl.h>
 
 extern void mem_config_init(void);
-#endif /* __xpv */
 
 extern void progressbar_init(void);
 extern void brand_init(void);
@@ -169,9 +153,7 @@ static char hostid_file[] = "/etc/hostid";
 
 void *gfx_devinfo_list;
 
-#if !defined(__xpv)
 extern void immu_startup(void);
-#endif
 
 /*
  * XXX make declaration below "static" when drivers no longer use this
@@ -190,9 +172,7 @@ static void startup_memlist(void);
 static void startup_kmem(void);
 static void startup_modules(void);
 static void startup_vm(void);
-#ifndef __xpv
 static void startup_tsc(void);
-#endif
 static void startup_end(void);
 static void layout_kernel_va(void);
 static void setx86isalist(void);
@@ -682,9 +662,7 @@ startup_smap(void)
 void
 startup(void)
 {
-#if !defined(__xpv)
 	extern void startup_pci_bios(void);
-#endif
 	extern cpuset_t cpu_ready_set;
 
 	/*
@@ -695,22 +673,12 @@ startup(void)
 	kpm_enable = 0;
 	CPUSET_ONLY(cpu_ready_set, 0);	/* cpu 0 is boot cpu */
 
-#if defined(__xpv)	/* XXPV fix me! */
-	{
-		extern int segvn_use_regions;
-		segvn_use_regions = 0;
-	}
-#endif
 	ssp_init();
 	progressbar_init();
 	startup_init();
-#if defined(__xpv)
-	startup_xen_version();
-#endif
 	startup_memlist();
 	startup_kmem();
 	startup_vm();
-#if !defined(__xpv)
 	/*
 	 * Up until this point, we cannot use any time delay functions
 	 * (e.g. tenmicrosec()). Once the TSC is setup, we can. This is
@@ -728,10 +696,6 @@ startup(void)
 	 */
 	startup_pci_bios();
 	startup_smap();
-#endif
-#if defined(__xpv)
-	startup_xen_mca();
-#endif
 	startup_modules();
 
 	startup_end();
@@ -1229,7 +1193,6 @@ startup_memlist(void)
 		panic("physavail was too big!");
 	if (prom_debug)
 		print_memlist("phys_avail", phys_avail);
-#ifndef	__xpv
 	/*
 	 * Free unused memlist items, which may be used by memory DR driver
 	 * at runtime.
@@ -1238,7 +1201,6 @@ startup_memlist(void)
 		memlist_free_block((caddr_t)current,
 		    (caddr_t)memlist + memlist_sz - (caddr_t)current);
 	}
-#endif
 
 	/*
 	 * Build bios reserved memspace
@@ -1249,7 +1211,6 @@ startup_memlist(void)
 		panic("bios_rsvd was too big!");
 	if (prom_debug)
 		print_memlist("bios_rsvd", bios_rsvd);
-#ifndef	__xpv
 	/*
 	 * Free unused memlist items, which may be used by memory DR driver
 	 * at runtime.
@@ -1258,7 +1219,6 @@ startup_memlist(void)
 		memlist_free_block((caddr_t)current,
 		    (caddr_t)bios_rsvd + rsvdmemlist_sz - (caddr_t)current);
 	}
-#endif
 
 	/*
 	 * setup page coloring
@@ -1312,9 +1272,7 @@ startup_memlist(void)
 static void
 startup_kmem(void)
 {
-#if !defined(__xpv)
 	extern uint64_t kpti_kbase;
-#endif
 
 	PRM_POINT("startup_kmem() starting...");
 
@@ -1346,9 +1304,7 @@ startup_kmem(void)
 	*(uintptr_t *)&_kernelbase = kernelbase;
 	*(uintptr_t *)&_userlimit = kernelbase;
 	*(uintptr_t *)&_userlimit -= KERNELBASE - USERLIMIT;
-#if !defined(__xpv)
 	kpti_kbase = kernelbase;
-#endif
 	PRM_DEBUG(_kernelbase);
 	PRM_DEBUG(_userlimit);
 	PRM_DEBUG(_userlimit32);
@@ -1365,12 +1321,6 @@ startup_kmem(void)
 	    kernelheap + MMU_PAGESIZE,
 	    (void *)core_base, (void *)(core_base + core_size));
 
-#if defined(__xpv)
-	/*
-	 * Link pending events struct into cpu struct
-	 */
-	CPU->cpu_m.mcpu_evt_pend = &cpu0_evt_data;
-#endif
 	/*
 	 * Initialize kernel memory allocator.
 	 */
@@ -1408,26 +1358,9 @@ startup_kmem(void)
 	}
 #endif
 
-#ifndef __xpv
 	if (plat_dr_support_memory()) {
 		mem_config_init();
 	}
-#else	/* __xpv */
-	/*
-	 * Some of the xen start information has to be relocated up
-	 * into the kernel's permanent address space.
-	 */
-	PRM_POINT("calling xen_relocate_start_info()");
-	xen_relocate_start_info();
-	PRM_POINT("xen_relocate_start_info() done");
-
-	/*
-	 * (Update the vcpu pointer in our cpu structure to point into
-	 * the relocated shared info.)
-	 */
-	CPU->cpu_m.mcpu_vcpu_info =
-	    &HYPERVISOR_shared_info->vcpu_info[CPU->cpu_id];
-#endif	/* __xpv */
 
 	PRM_POINT("startup_kmem() done");
 }
@@ -1496,11 +1429,6 @@ startup_modules(void)
 	/* Read cluster configuration data. */
 	clconf_init();
 
-#if defined(__xpv)
-	(void) ec_init();
-	gnttab_init();
-	(void) xs_early_init();
-#endif /* __xpv */
 
 	/*
 	 * Create a kernel device tree. First, create rootnex and
@@ -1508,9 +1436,6 @@ startup_modules(void)
 	 */
 	setup_ddi();
 
-#ifdef __xpv
-	if (DOMAIN_IS_INITDOMAIN(xen_info))
-#endif
 	{
 		id_t smid;
 		smbios_system_t smsys;
@@ -1569,25 +1494,6 @@ startup_modules(void)
 	 * Modifies the device tree, so this must be done after
 	 * setup_ddi().
 	 */
-#ifdef __xpv
-	/*
-	 * If paravirtualized and on dom0 then we initialize all physical
-	 * cpu handles now;  if paravirtualized on a domU then do not
-	 * initialize.
-	 */
-	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
-		xen_mc_lcpu_cookie_t cpi;
-
-		for (cpi = xen_physcpu_next(NULL); cpi != NULL;
-		    cpi = xen_physcpu_next(cpi)) {
-			if ((hdl = cmi_init(CMI_HDL_SOLARIS_xVM_MCA,
-			    xen_physcpu_chipid(cpi), xen_physcpu_coreid(cpi),
-			    xen_physcpu_strandid(cpi))) != NULL &&
-			    is_x86_feature(x86_featureset, X86FSET_MCA))
-				cmi_mca_init(hdl);
-		}
-	}
-#else
 	/*
 	 * Initialize a handle for the boot cpu - others will initialize
 	 * as they startup.
@@ -1598,7 +1504,6 @@ startup_modules(void)
 			cmi_mca_init(hdl);
 		CPU->cpu_m.mcpu_cmi_hdl = hdl;
 	}
-#endif	/* __xpv */
 
 	/*
 	 * Fake a prom tree such that /dev/openprom continues to work
@@ -1809,12 +1714,10 @@ startup_vm(void)
 	hat_kern_alloc((caddr_t)segmap_start, segmapsize, ekernelheap);
 	PRM_POINT("hat_kern_alloc() done");
 
-#ifndef __xpv
 	/*
 	 * Setup Page Attribute Table
 	 */
 	pat_sync();
-#endif
 
 	/*
 	 * The next two loops are done in distinct steps in order
@@ -1868,19 +1771,6 @@ startup_vm(void)
 	if (boothowto & RB_DEBUG)
 		kdi_dvec_vmready();
 
-#if defined(__xpv)
-	/*
-	 * Populate the I/O pool on domain 0
-	 */
-	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
-		extern long populate_io_pool(void);
-		long init_io_pool_cnt;
-
-		PRM_POINT("Populating reserve I/O page pool");
-		init_io_pool_cnt = populate_io_pool();
-		PRM_DEBUG(init_io_pool_cnt);
-	}
-#endif
 	/*
 	 * Mangle the brand string etc.
 	 */
@@ -1899,7 +1789,6 @@ startup_vm(void)
 	if (boothowto & RB_DEBUG)
 		kdi_dvec_memavail();
 
-#if !defined(__xpv)
 	/*
 	 * Map page pfn=0 for drivers, such as kd, that need to pick up
 	 * parameters left there by controllers/BIOS.
@@ -1907,7 +1796,6 @@ startup_vm(void)
 	PRM_POINT("setup up p0_va");
 	p0_va = i86devmap(0, 1, PROT_READ);
 	PRM_DEBUG(p0_va);
-#endif
 
 	cmn_err(CE_CONT, "?mem = %luK (0x%lx)\n",
 	    physinstalled << (MMU_PAGESHIFT - 10), ptob(physinstalled));
@@ -1985,10 +1873,7 @@ startup_vm(void)
 	setup_vaddr_for_ppcopy(CPU);
 
 	segdev_init();
-#if defined(__xpv)
-	if (DOMAIN_IS_INITDOMAIN(xen_info))
-#endif
-		pmem_init();
+	pmem_init();
 
 	PRM_POINT("startup_vm() done");
 }
@@ -2003,7 +1888,6 @@ load_tod_module(char *todmod)
 		halt("Can't load TOD module");
 }
 
-#ifndef __xpv
 static void
 startup_tsc(void)
 {
@@ -2016,7 +1900,6 @@ startup_tsc(void)
 
 	tsc_hrtimeinit(tsc_freq);
 }
-#endif
 
 static void
 startup_end(void)
@@ -2056,13 +1939,6 @@ startup_end(void)
 		load_tod_module(tod_module_name);
 	}
 
-#if defined(__xpv)
-	/*
-	 * Forceload interposing TOD module for the hypervisor.
-	 */
-	PRM_POINT("load_tod_module()");
-	load_tod_module("xpvtod");
-#endif
 
 	/*
 	 * Configure the system.
@@ -2111,12 +1987,7 @@ startup_end(void)
 	*bootopsp = (struct bootops *)NULL;
 	bootops = (struct bootops *)NULL;
 
-#if defined(__xpv)
-	ec_init_debug_irq();
-	xs_domu_init();
-#endif
 
-#if !defined(__xpv)
 	/*
 	 * Intel IOMMU has been setup/initialized in ddi_impl.c
 	 * Start it up now.
@@ -2128,15 +1999,10 @@ startup_end(void)
 	 * via bootops, we can enable PCID (which requires CR0.PG).
 	 */
 	enable_pcid();
-#endif
 
 	PRM_POINT("Enabling interrupts");
 	(*picinitf)();
 	sti();
-#if defined(__xpv)
-	ASSERT(CPU->cpu_m.mcpu_vcpu_info->evtchn_upcall_mask == 0);
-	xen_late_startup();
-#endif
 
 	(void) add_avsoftintr((void *)&softlevel1_hdl, 1, softlevel1,
 	    "softlevel1", NULL, NULL); /* XXX to be moved later */
@@ -2151,14 +2017,12 @@ startup_end(void)
 		    (caddr_t)(uintptr_t)i, NULL);
 	}
 
-#if !defined(__xpv)
 	if (modload("drv", "amd_iommu") < 0) {
 		PRM_POINT("No AMD IOMMU present\n");
 	} else if (ddi_hold_installed_driver(ddi_name_to_major(
 	    "amd_iommu")) == NULL) {
 		PRM_POINT("AMD IOMMU failed to attach\n");
 	}
-#endif
 	post_startup_cpu_fixups();
 
 	PRM_POINT("startup_end() done");
@@ -2184,20 +2048,13 @@ post_startup(void)
 	 */
 	bind_hwcap();
 
-#ifdef __xpv
-	if (DOMAIN_IS_INITDOMAIN(xen_info))
-#endif
 	{
-#if defined(__xpv)
-		xpv_panic_init();
-#else
 		/*
 		 * Startup the memory scrubber.
 		 * XXPV	This should be running somewhere ..
 		 */
 		if ((get_hwenv() & HW_VIRTUAL) == 0)
 			memscrub_init();
-#endif
 	}
 
 	/*
@@ -2258,9 +2115,7 @@ release_bootstrap(void)
 	uint_t i;
 	char propname[32];
 	rd_existing_t *modranges;
-#if !defined(__xpv)
 	pfn_t	pfn;
-#endif
 
 	/*
 	 * Save the bootfs module ranges so that we can reserve them below
@@ -2344,7 +2199,6 @@ release_bootstrap(void)
 
 	kmem_free(modranges, sizeof (rd_existing_t) * 99);
 
-#if !defined(__xpv)
 /* XXPV -- note this following bunch of code needs to be revisited in Xen 3.0 */
 	/*
 	 * Find 1 page below 1 MB so that other processors can boot up or
@@ -2368,7 +2222,6 @@ release_bootstrap(void)
 	if (pfn == btop(1*1024*1024) && use_mp)
 		panic("No page below 1M available for starting "
 		    "other processors or for resuming from system-suspend");
-#endif	/* !__xpv */
 }
 
 /*
@@ -2610,7 +2463,6 @@ kvm_init(void)
 	    PROT_READ | PROT_WRITE | PROT_EXEC);
 }
 
-#ifndef __xpv
 /*
  * Solaris adds an entry for Write Combining caching to the PAT
  */
@@ -2652,7 +2504,6 @@ pat_sync(void)
 	setcr0(cr0_orig);
 }
 
-#endif /* !__xpv */
 
 #if defined(_SOFT_HOSTID)
 /*
