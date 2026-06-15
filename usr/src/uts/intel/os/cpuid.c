@@ -1552,23 +1552,14 @@
 #include <sys/asm_misc.h>
 #include <sys/bitmap.h>
 
-#ifdef __xpv
-#include <sys/hypervisor.h>
-#else
 #include <sys/ontrap.h>
-#endif
 
 uint_t x86_vendor = X86_VENDOR_IntelClone;
 uint_t x86_type = X86_TYPE_OTHER;
 uint_t x86_clflush_size = 0;
 
-#if defined(__xpv)
-int x86_use_pcid = 0;
-int x86_use_invpcid = 0;
-#else
 int x86_use_pcid = -1;
 int x86_use_invpcid = -1;
-#endif
 
 typedef enum {
 	X86_SPECTREV2_RETPOLINE,
@@ -1781,13 +1772,11 @@ extern int disable_smap;
  */
 static int platform_type = -1;
 
-#if !defined(__xpv)
 /*
  * Variable to patch if hypervisor platform detection needs to be
  * disabled (e.g. platform_type will always be HW_NATIVE if this is 0).
  */
 int enable_platform_detection = 1;
-#endif
 
 /*
  * monitor/mwait info.
@@ -2072,77 +2061,7 @@ extern uint_t _cpuid_vendorstr_to_vendorcode(char *);
  * underlying platform restrictions mean the CPU can be marked
  * as less capable than its cpuid instruction would imply.
  */
-#if defined(__xpv)
-static void
-platform_cpuid_mangle(uint_t vendor, uint32_t eax, struct cpuid_regs *cp)
-{
-	switch (eax) {
-	case 1: {
-		uint32_t mcamask = DOMAIN_IS_INITDOMAIN(xen_info) ?
-		    0 : CPUID_INTC_EDX_MCA;
-		cp->cp_edx &=
-		    ~(mcamask |
-		    CPUID_INTC_EDX_PSE |
-		    CPUID_INTC_EDX_VME | CPUID_INTC_EDX_DE |
-		    CPUID_INTC_EDX_SEP | CPUID_INTC_EDX_MTRR |
-		    CPUID_INTC_EDX_PGE | CPUID_INTC_EDX_PAT |
-		    CPUID_AMD_EDX_SYSC | CPUID_INTC_EDX_SEP |
-		    CPUID_INTC_EDX_PSE36 | CPUID_INTC_EDX_HTT);
-		break;
-	}
-
-	case 0x80000001:
-		cp->cp_edx &=
-		    ~(CPUID_AMD_EDX_PSE |
-		    CPUID_INTC_EDX_VME | CPUID_INTC_EDX_DE |
-		    CPUID_AMD_EDX_MTRR | CPUID_AMD_EDX_PGE |
-		    CPUID_AMD_EDX_PAT | CPUID_AMD_EDX_PSE36 |
-		    CPUID_AMD_EDX_SYSC | CPUID_INTC_EDX_SEP |
-		    CPUID_AMD_EDX_TSCP);
-		cp->cp_ecx &= ~CPUID_AMD_ECX_CMP_LGCY;
-		break;
-	default:
-		break;
-	}
-
-	switch (vendor) {
-	case X86_VENDOR_Intel:
-		switch (eax) {
-		case 4:
-			/*
-			 * Zero out the (ncores-per-chip - 1) field
-			 */
-			cp->cp_eax &= 0x03fffffff;
-			break;
-		default:
-			break;
-		}
-		break;
-	case X86_VENDOR_AMD:
-	case X86_VENDOR_HYGON:
-		switch (eax) {
-
-		case 0x80000001:
-			cp->cp_ecx &= ~CPUID_AMD_ECX_CR8D;
-			break;
-
-		case CPUID_LEAF_EXT_8:
-			/*
-			 * Zero out the (ncores-per-chip - 1) field
-			 */
-			cp->cp_ecx &= 0xffffff00;
-			break;
-		default:
-			break;
-		}
-		break;
-	default:
-		break;
-	}
-}
-#else
 #define	platform_cpuid_mangle(vendor, eax, cp)	/* nothing */
-#endif
 
 /*
  *  Some undocumented ways of patching the results of the cpuid
@@ -2196,7 +2115,6 @@ cpuid_free_space(cpu_t *cpu)
 	cpu->cpu_m.mcpu_cpi = NULL;
 }
 
-#if !defined(__xpv)
 /*
  * Determine the type of the underlying platform. This is used to customize
  * initialization of various subsystems (e.g. TSC). determine_platform() must
@@ -2323,21 +2241,6 @@ is_controldom(void)
 	return (0);
 }
 
-#else
-
-int
-get_hwenv(void)
-{
-	return (HW_XEN_PV);
-}
-
-int
-is_controldom(void)
-{
-	return (DOMAIN_IS_INITDOMAIN(xen_info));
-}
-
-#endif	/* __xpv */
 
 /*
  * Gather the extended topology information. This should be the same for both
@@ -3327,7 +3230,6 @@ cpuid_evaluate_amd_rdseed(cpu_t *cpu, uchar_t *featureset)
 	 * Some hypervisors that expose RDSEED do not emulate this MSR and so
 	 * we guard against a trap here.
 	 */
-#ifndef __xpv
 	on_trap_data_t otd;
 
 	if (!on_trap(&otd, OT_DATA_ACCESS)) {
@@ -3338,7 +3240,6 @@ cpuid_evaluate_amd_rdseed(cpu_t *cpu, uchar_t *featureset)
 		wrmsr(MSR_AMD_CPUID7_FEATURES, val);
 	}
 	no_trap();
-#endif
 }
 
 /*
@@ -3503,7 +3404,6 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 		 * Don't read the arch caps MSR on xpv where we lack the
 		 * on_trap().
 		 */
-#ifndef __xpv
 		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_ARCH_CAPS) {
 			on_trap_data_t otd;
 
@@ -3565,7 +3465,6 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 			}
 			no_trap();
 		}
-#endif	/* !__xpv */
 
 		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_SSBD)
 			add_x86_feature(featureset, X86FSET_SSBD);
@@ -3947,7 +3846,6 @@ cpuid_basic_avx(cpu_t *cpu, uchar_t *featureset)
  * feature bit. However, on Intel systems we need to read the platform
  * information MSR if we're on a specific model.
  */
-#if !defined(__xpv)
 static void
 cpuid_basic_ppin(cpu_t *cpu, uchar_t *featureset)
 {
@@ -3995,7 +3893,6 @@ cpuid_basic_ppin(cpu_t *cpu, uchar_t *featureset)
 		break;
 	}
 }
-#endif	/* ! __xpv */
 
 static void
 cpuid_pass_prelude(cpu_t *cpu, void *arg)
@@ -4020,9 +3917,7 @@ cpuid_pass_ident(cpu_t *cpu, void *arg __unused)
 	 * config space access has been set up; at present there is no reliable
 	 * way to determine the latter.
 	 */
-#if !defined(__xpv)
 	ASSERT3S(platform_type, !=, -1);
-#endif	/* !__xpv */
 
 	cpi = cpu->cpu_m.mcpu_cpi;
 	ASSERT(cpi != NULL);
@@ -4110,9 +4005,7 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 	struct cpuid_info *cpi;
 	struct cpuid_regs *cp;
 	int xcpuid;
-#if !defined(__xpv)
 	extern int idle_cpu_prefer_mwait;
-#endif
 
 	cpi = cpu->cpu_m.mcpu_cpi;
 	ASSERT(cpi != NULL);
@@ -4216,7 +4109,6 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 		if (cpi->cpi_maxeax < 5)
 			mask_ecx &= ~CPUID_INTC_ECX_MON;
 
-#if !defined(__xpv)
 		/*
 		 * AMD has not historically used MWAIT in the CPU's idle loop.
 		 * Pre-family-10h Opterons do not have the MWAIT instruction. We
@@ -4226,7 +4118,6 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 		if (cpi->cpi_family < 0x17) {
 			idle_cpu_prefer_mwait = 0;
 		}
-#endif
 
 		break;
 	case X86_VENDOR_HYGON:
@@ -4301,17 +4192,6 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 		break;
 	}
 
-#if defined(__xpv)
-	/*
-	 * Do not support MONITOR/MWAIT under a hypervisor
-	 */
-	mask_ecx &= ~CPUID_INTC_ECX_MON;
-	/*
-	 * Do not support XSAVE under a hypervisor for now
-	 */
-	xsave_force_disable = B_TRUE;
-
-#endif	/* __xpv */
 
 	if (xsave_force_disable) {
 		mask_ecx &= ~CPUID_INTC_ECX_XSAVE;
@@ -4539,7 +4419,6 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 	if (cp->cp_edx & CPUID_INTC_EDX_DE) {
 		add_x86_feature(featureset, X86FSET_DE);
 	}
-#if !defined(__xpv)
 	if (cp->cp_ecx & CPUID_INTC_ECX_MON) {
 
 		/*
@@ -4562,7 +4441,6 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 			}
 		}
 	}
-#endif	/* __xpv */
 
 	if (cp->cp_ecx & CPUID_INTC_ECX_VMX) {
 		add_x86_feature(featureset, X86FSET_VMX);
@@ -4856,9 +4734,7 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 	 */
 	cpuid_basic_topology(cpu, featureset);
 	cpuid_basic_thermal(cpu, featureset);
-#if !defined(__xpv)
 	cpuid_basic_ppin(cpu, featureset);
-#endif
 
 	if (cpi->cpi_vendor == X86_VENDOR_AMD ||
 	    cpi->cpi_vendor == X86_VENDOR_HYGON) {
@@ -4891,7 +4767,6 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 		if (cpi->cpi_family == 0xf || cpi->cpi_family == 0x11) {
 			add_x86_feature(featureset, X86FSET_LFENCE_SER);
 		} else if (cpi->cpi_family >= 0x10) {
-#if !defined(__xpv)
 			uint64_t val;
 
 			/*
@@ -4914,7 +4789,6 @@ cpuid_pass_basic(cpu_t *cpu, void *arg)
 			if ((val & AMD_DE_CFG_LFENCE_DISPATCH) != 0) {
 				add_x86_feature(featureset, X86FSET_LFENCE_SER);
 			}
-#endif
 		}
 	} else if (cpi->cpi_vendor == X86_VENDOR_Intel &&
 	    is_x86_feature(featureset, X86FSET_SSE2)) {
@@ -6256,7 +6130,6 @@ cpuid_syscall32_insn(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass((cpu == NULL ? CPU : cpu), CPUID_PASS_BASIC));
 
-#if !defined(__xpv)
 	if (cpu == NULL)
 		cpu = CPU;
 
@@ -6270,7 +6143,6 @@ cpuid_syscall32_insn(cpu_t *cpu)
 		    (CPI_FEATURES_XTD_EDX(cpi) & CPUID_AMD_EDX_SYSC))
 			return (1);
 	}
-#endif
 	return (0);
 }
 
@@ -7865,7 +7737,6 @@ getl2cacheinfo(cpu_t *cpu, int *csz, int *lsz, int *assoc)
 	return (l2i->l2i_ret);
 }
 
-#if !defined(__xpv)
 
 uint32_t *
 cpuid_mwait_alloc(cpu_t *cpu)
@@ -7983,12 +7854,10 @@ cpuid_deep_cstates_supported(void)
 	}
 }
 
-#endif	/* !__xpv */
 
 void
 post_startup_cpu_fixups(void)
 {
-#ifndef __xpv
 	/*
 	 * Some AMD processors support C1E state. Entering this state will
 	 * cause the local APIC timer to stop, which we can't deal with at
@@ -8010,7 +7879,6 @@ post_startup_cpu_fixups(void)
 		}
 		no_trap();
 	}
-#endif	/* !__xpv */
 }
 
 void
@@ -8158,7 +8026,6 @@ cpuid_deadline_tsc_supported(void)
 	}
 }
 
-#if !defined(__xpv)
 /*
  * Patch in versions of bcopy for high performance Intel Nhm processors
  * and later...
@@ -8179,7 +8046,6 @@ patch_memops(uint_t vendor)
 		}
 	}
 }
-#endif  /*  !__xpv */
 
 /*
  * We're being asked to tell the system how many bits are required to represent

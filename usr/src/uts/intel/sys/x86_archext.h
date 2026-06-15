@@ -523,14 +523,12 @@ extern "C" {
 #define	REG_APIC_BASE_MSR	0x1b
 #define	REG_X2APIC_BASE_MSR	0x800	/* The MSR address offset of x2APIC */
 
-#if !defined(__xpv)
 /*
  * AMD C1E
  */
 #define	MSR_AMD_INT_PENDING_CMP_HALT	0xC0010055
 #define	AMD_ACTONCMPHALT_SHIFT	27
 #define	AMD_ACTONCMPHALT_MASK	3
-#endif
 
 #define	MSR_DEBUGCTL		0x1d9
 
@@ -1841,7 +1839,6 @@ extern void cpuid_post_ucodeadm(void);
 extern void cpuid_get_addrsize(struct cpu *, uint_t *, uint_t *);
 extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);
 
-#if !defined(__xpv)
 extern uint32_t *cpuid_mwait_alloc(struct cpu *);
 extern void cpuid_mwait_free(struct cpu *);
 extern int cpuid_deep_cstates_supported(void);
@@ -1849,7 +1846,6 @@ extern int cpuid_arat_supported(void);
 extern int cpuid_iepb_supported(struct cpu *);
 extern int cpuid_deadline_tsc_supported(void);
 extern void vmware_port(int, uint32_t *);
-#endif
 
 extern x86_processor_family_t chiprev_family(const x86_chiprev_t);
 extern boolean_t chiprev_matches(const x86_chiprev_t, const x86_chiprev_t);
@@ -1900,7 +1896,6 @@ extern void ucode_apply(struct cpu *);
 extern void ucode_finish(struct cpu *);
 extern void ucode_cleanup();
 
-#if !defined(__xpv)
 extern	char _tsc_mfence_start;
 extern	char _tsc_mfence_end;
 extern	char _tscp_start;
@@ -1909,13 +1904,10 @@ extern	char _no_rdtsc_start;
 extern	char _no_rdtsc_end;
 extern	char _tsc_lfence_start;
 extern	char _tsc_lfence_end;
-#endif
 
-#if !defined(__xpv)
 extern	char bcopy_patch_start;
 extern	char bcopy_patch_end;
 extern	char bcopy_ck_size;
-#endif
 
 extern void post_startup_cpu_fixups(void);
 
@@ -1942,9 +1934,7 @@ extern int opteron_erratum_147;
 extern void patch_erratum_147(void);
 #endif
 
-#if !defined(__xpv)
 extern void determine_platform(void);
-#endif
 extern int get_hwenv(void);
 extern int is_controldom(void);
 
@@ -1952,9 +1942,7 @@ extern void enable_pcid(void);
 
 extern void xsave_setup_msr(struct cpu *);
 
-#if !defined(__xpv)
 extern void reset_gdtr_limit(void);
-#endif
 
 extern int enable_platform_detection;
 

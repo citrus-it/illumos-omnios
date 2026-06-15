@@ -141,7 +141,6 @@
 #else
 #include <sys/hypervisor.h>
 #include <sys/evtchn_impl.h>
-#include <sys/balloon_impl.h>
 #endif
 #include <xen/public/io/netif.h>
 #include <sys/gnttab.h>

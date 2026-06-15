@@ -99,23 +99,8 @@ gcm_mul_pclmulqdq(uint64_t *x_in, uint64_t *y, uint64_t *res) {
 #endif
 
 #ifdef _KERNEL
-	/*
-	 * Note: the CLTS macro clobbers P2 (%rsi) under i86xpv.  That is,
-	 * it calls HYPERVISOR_fpu_taskswitch() which modifies %rsi when it
-	 * uses it to pass P2 to syscall.
-	 * This also occurs with the STTS macro, but we don't care if
-	 * P2 (%rsi) is modified just before function exit.
-	 * The CLTS and STTS macros push and pop P1 (%rdi) already.
-	 */
-#ifdef __xpv
-#define	PROTECTED_CLTS \
-	push	%rsi; \
-	CLTS; \
-	pop	%rsi
-#else
 #define	PROTECTED_CLTS \
 	CLTS
-#endif	/* __xpv */
 
 	/*
 	 * If CR0_TS is not set, align stack (with push %rbp) and push

@@ -123,7 +123,6 @@ _init(void)
 {
 	int error = ENOTSUP;
 
-#if !defined(__xpv)
 
 	if (get_hwenv() != HW_NATIVE)
 		return (ENOTSUP);
@@ -178,7 +177,6 @@ _init(void)
 		return (error);
 	}
 	error = 0;
-#endif
 
 	return (error);
 }
