@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2025 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd April 29, 2025
+.Dd June 17, 2026
 .Dt UHSMP 4D
 .Os
 .Sh NAME
@@ -30,6 +30,43 @@ on AMD Family 19h
 and AMD Family 1ah
 .Pq Zen 5
 processors.
+.Pp
+The
+.Nm
+driver also exports a selection of HSMP telemetry through the
+.Xr kstat 8
+facility, refreshed periodically.
+For each data fabric it publishes a named kstat with module
+.Sy uhsmp ,
+instance set to the data fabric number, and name
+.Sy metrics .
+Depending on the processor, the members include the socket power consumption,
+the data fabric and memory clock frequencies, the core clock throttle limit,
+the average C0 residency, and the current socket frequency and its limiting
+source.
+The
+.Sy last_sample
+member records the time of the most recent successful sample, on the same time
+base as
+.Xr gethrtime 3C ,
+and
+.Sy sample_errors
+counts samples that did not complete.
+.Pp
+On processors that maintain an SMU metric table, a decoded socket-wide subset of
+that table is published as additional
+.Sy mt_
+prefixed members of the
+.Sy metrics
+kstat, and the complete table is published as a raw kstat with name
+.Sy metric_table .
+The layout of the raw table is described by the structures in
+.In sys/amdzen/hsmp.h
+and the
+.Sy metric_table_version
+member identifies which layout applies.
 .Sh SEE ALSO
+.Xr gethrtime 3C ,
 .Xr amdzen 4D ,
-.Xr zen_udf 4D
+.Xr zen_udf 4D ,
+.Xr kstat 8
