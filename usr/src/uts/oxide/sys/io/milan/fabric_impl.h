@@ -99,6 +99,8 @@ extern const zen_iohc_nbif_ports_t milan_pcie_int_ports[MILAN_IOHC_PER_IODIE];
 extern uint8_t milan_fabric_ioms_nbio_num(uint8_t);
 extern bool milan_fabric_smu_pptable_init(zen_fabric_t *, void *, size_t *);
 extern void milan_fabric_smu_misc_init(zen_iodie_t *);
+extern void milan_fabric_pm_table_init(zen_iodie_t *);
+extern void milan_smu_pm_table_refresh(void);
 extern void milan_fabric_nbio_init(zen_nbio_t *);
 extern void milan_fabric_ioms_init(zen_ioms_t *);
 extern void milan_fabric_ioms_pcie_init(zen_ioms_t *);

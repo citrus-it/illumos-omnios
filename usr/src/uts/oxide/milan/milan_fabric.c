@@ -1755,42 +1755,190 @@ milan_report_dxio_fw_version(const zen_iodie_t *iodie)
 	    socno, iodie->zi_dxio_fw[0], iodie->zi_dxio_fw[1]);
 }
 
+/*
+ * The full set of SMU features we run with.  Not all combinations of SMU
+ * features result in correct system behavior, so we err on the side of matching
+ * stock platform enablement -- even where that means enabling features with
+ * unknown functionality.
+ *
+ * Note: it is possible to send time calibration messages to the SMU at boot
+ * time, but we do not currently do that.  Should we decide to send those
+ * messages, however, we would have to remove the core C6 feature from the set
+ * here, and then enable it after.
+ */
+#define	MILAN_SMU_FEATURE_SET ( \
+	MILAN_SMU_FEATURE_DATA_CALCULATION | \
+	MILAN_SMU_FEATURE_PPT | \
+	MILAN_SMU_FEATURE_THERMAL_DESIGN_CURRENT | \
+	MILAN_SMU_FEATURE_THERMAL | \
+	MILAN_SMU_FEATURE_PRECISION_BOOST_OVERDRIVE | \
+	MILAN_SMU_FEATURE_ELECTRICAL_DESIGN_CURRENT | \
+	MILAN_SMU_FEATURE_CSTATE_BOOST | \
+	MILAN_SMU_FEATURE_PROCESSOR_THROTTLING_TEMPERATURE | \
+	MILAN_SMU_FEATURE_CORE_CLOCK_DPM | \
+	MILAN_SMU_FEATURE_FABRIC_CLOCK_DPM | \
+	MILAN_SMU_FEATURE_LCLK_DPM | \
+	MILAN_SMU_FEATURE_XGMI_DYNAMIC_LINK_WIDTH_MANAGEMENT | \
+	MILAN_SMU_FEATURE_DIGITAL_LDO | \
+	MILAN_SMU_FEATURE_SOCCLK_DEEP_SLEEP | \
+	MILAN_SMU_FEATURE_LCLK_DEEP_SLEEP | \
+	MILAN_SMU_FEATURE_SYSHUBCLK_DEEP_SLEEP | \
+	MILAN_SMU_FEATURE_CORE_C6 | \
+	MILAN_SMU_FEATURE_DF_CSTATES | \
+	MILAN_SMU_FEATURE_CLOCK_GATING | \
+	MILAN_SMU_FEATURE_CPPC | \
+	MILAN_SMU_FEATURE_DYNAMIC_LDO_DROPOUT_LIMITER | \
+	MILAN_SMU_FEATURE_DYNAMIC_VID_OPTIMIZER | \
+	MILAN_SMU_FEATURE_AGE)
+
 static bool
 milan_smu_features_init(zen_iodie_t *iodie)
 {
-	/*
-	 * Not all combinations of SMU features will result in correct system
-	 * behavior, so we therefore err on the side of matching stock platform
-	 * enablement -- even where that means enabling features with unknown
-	 * functionality.
-	 *
-	 * Note: it is possible to send time calibration messages to the SMU at
-	 * boot time, but we do not currently do that.  Should we decide to send
-	 * those messages, however, we would have to remove the core C6 feature
-	 * from the set here, and then enable it after.
-	 */
-	const uint32_t features = MILAN_SMU_FEATURE_DATA_CALCULATION |
-	    MILAN_SMU_FEATURE_THERMAL_DESIGN_CURRENT |
-	    MILAN_SMU_FEATURE_THERMAL |
-	    MILAN_SMU_FEATURE_PRECISION_BOOST_OVERDRIVE |
-	    MILAN_SMU_FEATURE_ELECTRICAL_DESIGN_CURRENT |
-	    MILAN_SMU_FEATURE_CSTATE_BOOST |
-	    MILAN_SMU_FEATURE_PROCESSOR_THROTTLING_TEMPERATURE |
-	    MILAN_SMU_FEATURE_CORE_CLOCK_DPM |
-	    MILAN_SMU_FEATURE_FABRIC_CLOCK_DPM |
-	    MILAN_SMU_FEATURE_XGMI_DYNAMIC_LINK_WIDTH_MANAGEMENT |
-	    MILAN_SMU_FEATURE_DIGITAL_LDO |
-	    MILAN_SMU_FEATURE_SOCCLK_DEEP_SLEEP |
-	    MILAN_SMU_FEATURE_LCLK_DEEP_SLEEP |
-	    MILAN_SMU_FEATURE_SYSHUBCLK_DEEP_SLEEP |
-	    MILAN_SMU_FEATURE_CORE_C6 |
-	    MILAN_SMU_FEATURE_DF_CSTATES |
-	    MILAN_SMU_FEATURE_CLOCK_GATING |
-	    MILAN_SMU_FEATURE_DYNAMIC_LDO_DROPOUT_LIMITER |
-	    MILAN_SMU_FEATURE_DYNAMIC_VID_OPTIMIZER |
-	    MILAN_SMU_FEATURE_AGE;
+	return (zen_smu_set_features(iodie, MILAN_SMU_FEATURE_SET, 0));
+}
 
-	return (zen_smu_set_features(iodie, features, 0));
+#define	MILAN_PM_TABLE_SIZE	(4 * MMU_PAGESIZE)
+#define	MILAN_PM_DBG_SIZE	(4 * 1024 * 1024)
+static zen_iodie_t *milan_pm_table_iodie[ZEN_FABRIC_MAX_SOCS];
+
+static bool
+milan_smu_rpc_set_tools_address(zen_iodie_t *iodie, uint64_t pa)
+{
+	zen_smu_rpc_t rpc = { 0 };
+	zen_smu_rpc_res_t res;
+
+	rpc.zsr_req = MILAN_SMU_OP_TOOLS_ADDRESS;
+	rpc.zsr_args[0] = bitx64(pa, 31, 0);
+	rpc.zsr_args[1] = bitx64(pa, 63, 32);
+
+	res = zen_smu_rpc(iodie, &rpc);
+	if (res != ZEN_SMU_RPC_OK) {
+		cmn_err(CE_WARN, "Socket %u IO die %u: "
+		    "SMU tools-address RPC failed: pa 0x%lx, %s (SMU 0x%x)",
+		    iodie->zi_soc->zs_num, iodie->zi_num, pa,
+		    zen_smu_rpc_res_str(res), rpc.zsr_resp);
+		return (false);
+	}
+
+	cmn_err(CE_CONT, "?Socket %u IO die %u: SMU tools-address reply "
+	    "args %08x %08x %08x %08x %08x %08x\n",
+	    iodie->zi_soc->zs_num, iodie->zi_num,
+	    rpc.zsr_args[0], rpc.zsr_args[1], rpc.zsr_args[2],
+	    rpc.zsr_args[3], rpc.zsr_args[4], rpc.zsr_args[5]);
+
+	return (true);
+}
+
+static bool
+milan_smu_rpc_set_debug_address(zen_iodie_t *iodie, uint64_t pa, size_t size)
+{
+	zen_smu_rpc_t rpc = { 0 };
+	zen_smu_rpc_res_t res;
+
+	rpc.zsr_req = MILAN_SMU_OP_DEBUG_ADDRESS;
+	rpc.zsr_args[0] = bitx64(pa, 31, 0);
+	rpc.zsr_args[1] = bitx64(pa, 63, 32);
+	rpc.zsr_args[2] = (uint32_t)size;
+
+	res = zen_smu_rpc(iodie, &rpc);
+	if (res != ZEN_SMU_RPC_OK) {
+		cmn_err(CE_WARN, "Socket %u IO die %u: "
+		    "SMU debug-address RPC failed: pa 0x%lx, %s (SMU 0x%x)",
+		    iodie->zi_soc->zs_num, iodie->zi_num, pa,
+		    zen_smu_rpc_res_str(res), rpc.zsr_resp);
+		return (false);
+	}
+
+	cmn_err(CE_CONT, "?Socket %u IO die %u: SMU debug-address reply "
+	    "args %08x %08x %08x %08x %08x %08x\n",
+	    iodie->zi_soc->zs_num, iodie->zi_num,
+	    rpc.zsr_args[0], rpc.zsr_args[1], rpc.zsr_args[2],
+	    rpc.zsr_args[3], rpc.zsr_args[4], rpc.zsr_args[5]);
+
+	return (true);
+}
+
+void
+milan_fabric_pm_table_init(zen_iodie_t *iodie)
+{
+	ddi_dma_attr_t attr;
+	pfn_t pfn;
+	void *buf;
+	const uint8_t socno = iodie->zi_soc->zs_num;
+
+	zen_fabric_dma_attr(&attr);
+	attr.dma_attr_addr_lo = 0x80000000;
+	buf = contig_alloc(MILAN_PM_TABLE_SIZE, &attr, MMU_PAGESIZE, 1);
+	if (buf == NULL) {
+		cmn_err(CE_WARN, "Socket %u IO die %u: "
+		    "failed to allocate SMU PM table buffer", socno,
+		    iodie->zi_num);
+		return;
+	}
+	bzero(buf, MILAN_PM_TABLE_SIZE);
+
+	pfn = hat_getpfnum(kas.a_hat, (caddr_t)buf);
+
+	iodie->zi_pmtable = buf;
+	iodie->zi_pmtable_pa = mmu_ptob((uint64_t)pfn);
+	iodie->zi_pmtable_len = MILAN_PM_TABLE_SIZE;
+
+	if (!milan_smu_rpc_set_tools_address(iodie, iodie->zi_pmtable_pa)) {
+		contig_free(buf, MILAN_PM_TABLE_SIZE);
+		iodie->zi_pmtable = NULL;
+		iodie->zi_pmtable_pa = 0;
+		iodie->zi_pmtable_len = 0;
+		return;
+	}
+
+	if (socno < ZEN_FABRIC_MAX_SOCS)
+		milan_pm_table_iodie[socno] = iodie;
+
+	cmn_err(CE_CONT, "?Socket %u IO die %u: "
+	    "SMU PM table registered at pa 0x%lx (kva %p, %u bytes)\n",
+	    socno, iodie->zi_num, iodie->zi_pmtable_pa, buf,
+	    (uint_t)MILAN_PM_TABLE_SIZE);
+
+	buf = contig_alloc(MILAN_PM_DBG_SIZE, &attr, MMU_PAGESIZE, 1);
+	if (buf == NULL) {
+		cmn_err(CE_WARN, "Socket %u IO die %u: "
+		    "failed to allocate SMU debug buffer", socno, iodie->zi_num);
+		return;
+	}
+	bzero(buf, MILAN_PM_DBG_SIZE);
+
+	pfn = hat_getpfnum(kas.a_hat, (caddr_t)buf);
+
+	iodie->zi_pmdbg = buf;
+	iodie->zi_pmdbg_pa = mmu_ptob((uint64_t)pfn);
+	iodie->zi_pmdbg_len = MILAN_PM_DBG_SIZE;
+
+	if (!milan_smu_rpc_set_debug_address(iodie, iodie->zi_pmdbg_pa,
+	    MILAN_PM_DBG_SIZE)) {
+		contig_free(buf, MILAN_PM_DBG_SIZE);
+		iodie->zi_pmdbg = NULL;
+		iodie->zi_pmdbg_pa = 0;
+		iodie->zi_pmdbg_len = 0;
+		return;
+	}
+
+	cmn_err(CE_CONT, "?Socket %u IO die %u: "
+	    "SMU debug buffer registered at pa 0x%lx (kva %p, %u bytes)\n",
+	    socno, iodie->zi_num, iodie->zi_pmdbg_pa, buf,
+	    (uint_t)MILAN_PM_DBG_SIZE);
+}
+
+void
+milan_smu_pm_table_refresh(void)
+{
+	for (uint_t i = 0; i < ZEN_FABRIC_MAX_SOCS; i++) {
+		zen_iodie_t *iodie = milan_pm_table_iodie[i];
+
+		if (iodie == NULL || iodie->zi_pmtable == NULL)
+			continue;
+
+		(void) milan_smu_features_init(iodie);
+	}
 }
 
 bool

@@ -275,6 +275,18 @@ struct zen_iodie {
 	 */
 	char			zi_brandstr[CPUID_BRANDSTR_STRLEN + 1];
 
+	/*
+	 * DRAM buffer handed to the SMU so that it will DMA its internal PM
+	 * (metrics) table to us, used for PMFW debugging.
+	 */
+	void			*zi_pmtable;
+	uint64_t		zi_pmtable_pa;
+	size_t			zi_pmtable_len;
+
+	void			*zi_pmdbg;
+	uint64_t		zi_pmdbg_pa;
+	size_t			zi_pmdbg_len;
+
 	zen_soc_t		*zi_soc;
 };
 
