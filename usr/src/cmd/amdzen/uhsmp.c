@@ -31,7 +31,7 @@
 #include <uhsmp.h>
 #include <sys/amdzen/hsmp.h>
 
-#define	EXIT_USAGE	2
+#include "amdzen_common.h"
 
 static const char *
 uhsmp_response_str(uint32_t resp)
@@ -115,8 +115,8 @@ main(int argc, char **argv)
 			return (EXIT_FAILURE);
 	}
 
-	if ((fd = open(device, O_RDWR)) < 0)
-		err(EXIT_FAILURE, "failed to open %s", device);
+	if ((fd = amdzen_open_device("uhsmp", device, O_RDWR)) < 0)
+		return (EXIT_FAILURE);
 
 	ret = EXIT_SUCCESS;
 	if (ioctl(fd, UHSMP_GENERIC_COMMAND, &cmd) != 0) {

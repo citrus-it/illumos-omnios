@@ -28,6 +28,8 @@
 #include <strings.h>
 #include <zen_udf.h>
 
+#include "amdzen_common.h"
+
 static void
 udf_readone(int fd, uint8_t inst, uint8_t func, uint16_t reg,
     zen_udf_flags_t flags)
@@ -124,9 +126,8 @@ main(int argc, char *argv[])
 	}
 	reg = (uint16_t)lval;
 
-	if ((fd = open(device, O_RDONLY)) < 0) {
-		err(EXIT_FAILURE, "failed to open %s", device);
-	}
+	if ((fd = amdzen_open_device("udf", device, O_RDONLY)) < 0)
+		return (EXIT_FAILURE);
 
 	udf_readone(fd, inst, func, reg, flags);
 	(void) close(fd);
