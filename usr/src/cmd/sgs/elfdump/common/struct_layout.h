@@ -28,6 +28,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_STRUCT_LAYOUT_H
@@ -210,6 +211,7 @@ typedef struct {
 	sl_field_t		pr_projid;
 	sl_field_t		pr_nzomb;
 	sl_field_t		pr_zoneid;
+	sl_field_t		pr_fdrlimit;
 	sl_field_t		pr_lwp;
 } sl_pstatus_layout_t;
 

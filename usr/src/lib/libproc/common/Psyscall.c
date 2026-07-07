@@ -58,6 +58,25 @@
 extern sigset_t blockable_sigs;
 extern int _libproc_test_fail_copyinargs;
 
+/*
+ * Abort the pending system call of an agent lwp.
+ *
+ * An agent is not always at a clean stop when libproc needs to make use of
+ * it or tear it down. At creation it inherits the register context of the
+ * representative lwp, and so can be asleep in, or stopped on entry to,
+ * whatever system call that lwp was executing. At destruction, an injected
+ * system call which had to be abandoned part-way through leaves the agent
+ * stopped at the entry to that call, with the call still pending.
+ *
+ * In both situations the pending call must be aborted first. If it is not,
+ * setting the agent running executes the pending call rather than the one
+ * being injected, the stop-on-completion which libproc arranged for the
+ * injected call never fires, and the agent runs uncontrolled beyond the
+ * system call instruction, corrupting or crashing the process.
+ *
+ * For this reason, Pcreate_agent() and Pdestroy_agent() must agree on the
+ * conditions under which a pending system call is aborted.
+ */
 static void
 Pabort_agent(struct ps_prochandle *P)
 {
@@ -152,7 +171,8 @@ Pcreate_agent(struct ps_prochandle *P)
 	/*
 	 * If the agent is currently asleep in a system call or stopped on
 	 * system call entry, attempt to abort the system call so it's ready to
-	 * serve.
+	 * serve. This condition must be kept in agreement with the equivalent
+	 * check in Pdestroy_agent(). See the comment above Pabort_agent().
 	 */
 	if ((P->status.pr_lwp.pr_flags & PR_ASLEEP) ||
 	    ((P->status.pr_lwp.pr_flags & PR_STOPPED) &&
@@ -204,7 +224,9 @@ Pdestroy_agent(struct ps_prochandle *P)
 		/*
 		 * If the agent is currently asleep in a system call or stopped
 		 * on system call entry, attempt to abort the system call so we
-		 * can terminate the agent.
+		 * can terminate the agent. This condition must be kept in
+		 * agreement with the equivalent check in Pcreate_agent(). See
+		 * the comment above Pabort_agent().
 		 */
 		if ((flags & PR_AGENT) && ((flags & PR_ASLEEP) ||
 		    ((flags & PR_STOPPED) &&
@@ -301,6 +323,9 @@ bad:
 
 /*
  * Perform system call in controlled process.
+ * Returns 0 if the injected call succeeded, the errno reported by the call if
+ * it was executed and failed, or -1 if the injection itself failed, in which
+ * case errno is that of the operation which failed locally.
  */
 int
 Psyscall(struct ps_prochandle *P,

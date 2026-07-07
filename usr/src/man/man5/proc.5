@@ -2,7 +2,7 @@
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2019, Joyent, Inc.
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-.\" Copyright 2023 Oxide computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\"
 .\" The contents of this file are subject to the terms of the
 .\" Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd July 13, 2025
+.Dd July 7, 2026
 .Dt PROC 5
 .Os
 .Sh NAME
@@ -417,7 +417,7 @@ typedef struct pstatus {
      uintptr_t pr_brkbase;    /* virtual address of the process heap */
      size_t pr_brksize;       /* size of the process heap, in bytes */
      uintptr_t pr_stkbase;    /* virtual address of the process stack */
-     size_tpr_stksize;        /* size of the process stack, in bytes */
+     size_t pr_stksize;       /* size of the process stack, in bytes */
      timestruc_t pr_utime;    /* process user cpu time */
      timestruc_t pr_stime;    /* process system cpu time */
      timestruc_t pr_cutime;   /* sum of children's user times */
@@ -430,6 +430,7 @@ typedef struct pstatus {
      taskid_t pr_taskid;      /* task id */
      projid_t pr_projid;      /* project id */
      zoneid_t pr_zoneid;      /* zone id */
+     int pr_fdrlimit;         /* current file descriptor limit */
      lwpstatus_t pr_lwp;      /* status of the representative lwp */
 } pstatus_t;
 .Ed
@@ -578,6 +579,13 @@ and
 fields contain respectively, the numeric
 .Sy ID Ns s
 of the task, project, and zone in which the process was running.
+.Pp
+.Sy pr_fdrlimit
+is the process's current limit on the number of open file descriptors, that
+is, its
+.Dv RLIMIT_NOFILE
+resource limit as described in
+.Xr getrlimit 2 .
 .Pp
 The constant
 .Sy PR_MODEL_NATIVE

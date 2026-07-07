@@ -24,7 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 MNX Cloud, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -938,6 +938,7 @@ prgetstatus(proc_t *p, pstatus_t *sp, zone_t *zp)
 	sp->pr_taskid = p->p_task->tk_tkid;
 	sp->pr_projid = p->p_task->tk_proj->kpj_id;
 	sp->pr_zoneid = p->p_zone->zone_id;
+	sp->pr_fdrlimit = (int)MIN(p->p_fno_ctl, INT_MAX);
 	hrt2ts(mstate_aggr_state(p, LMS_USER), &sp->pr_utime);
 	hrt2ts(mstate_aggr_state(p, LMS_SYSTEM), &sp->pr_stime);
 	TICK_TO_TIMESTRUC(p->p_cutime, &sp->pr_cutime);
@@ -1184,6 +1185,7 @@ prgetstatus32(proc_t *p, pstatus32_t *sp, zone_t *zp)
 	sp->pr_taskid = p->p_task->tk_tkid;
 	sp->pr_projid = p->p_task->tk_proj->kpj_id;
 	sp->pr_zoneid = p->p_zone->zone_id;
+	sp->pr_fdrlimit = (int)MIN(p->p_fno_ctl, INT_MAX);
 	hrt2ts32(mstate_aggr_state(p, LMS_USER), &sp->pr_utime);
 	hrt2ts32(mstate_aggr_state(p, LMS_SYSTEM), &sp->pr_stime);
 	TICK_TO_TIMESTRUC32(p->p_cutime, &sp->pr_cutime);

@@ -26,7 +26,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdlib.h>
@@ -1185,6 +1185,7 @@ dump_pstatus(note_state_t *state, const char *title)
 	    MSG_ORIG(MSG_CNOTE_T_PR_PROJID), pr_projid);
 	PRINT_DEC_2UP(MSG_ORIG(MSG_CNOTE_T_PR_NZOMB), pr_nzomb,
 	    MSG_ORIG(MSG_CNOTE_T_PR_ZONEID), pr_zoneid);
+	PRINT_DEC(MSG_ORIG(MSG_CNOTE_T_PR_FDRLIMIT), pr_fdrlimit);
 
 	/*
 	 * In order to line up all the values in a single column,

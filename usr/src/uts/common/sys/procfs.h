@@ -27,7 +27,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_PROCFS_H
@@ -185,7 +185,8 @@ typedef struct pstatus {
 	projid_t pr_projid;	/* project id */
 	int	pr_nzomb;	/* number of zombie lwps in the process */
 	zoneid_t pr_zoneid;	/* zone id */
-	int	pr_filler[15];	/* reserved for future use */
+	int	pr_fdrlimit;	/* current file descriptor limit */
+	int	pr_filler[14];	/* reserved for future use */
 	lwpstatus_t pr_lwp;	/* status of the representative lwp */
 } pstatus_t;
 
@@ -778,7 +779,8 @@ typedef struct pstatus32 {
 	id32_t	pr_projid;	/* project id */
 	int	pr_nzomb;	/* number of zombie lwps in the process */
 	id32_t	pr_zoneid;	/* zone id */
-	int	pr_filler[15];	/* reserved for future use */
+	int	pr_fdrlimit;	/* current file descriptor limit */
+	int	pr_filler[14];	/* reserved for future use */
 	lwpstatus32_t pr_lwp;	/* status of the representative lwp */
 } pstatus32_t;
 

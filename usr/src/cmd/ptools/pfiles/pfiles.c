@@ -26,11 +26,12 @@
 /*
  * Copyright (c) 2017 Joyent, Inc.  All Rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -159,18 +160,10 @@ main(int argc, char **argv)
 			Prelease(Pr, 0);
 
 		} else if ((Pr = Pgrab(pid, Fflag, &gret)) != NULL) {
-			if (Pcreate_agent(Pr) == 0) {
-				proc_unctrl_psinfo(&psinfo);
-				(void) printf("%d:\t%.70s\n",
-				    (int)pid, psinfo.pr_psargs);
-				show_files(Pr);
-				Pdestroy_agent(Pr);
-			} else {
-				(void) fprintf(stderr,
-				    "%s: cannot control process %d\n",
-				    command, (int)pid);
-				retc++;
-			}
+			proc_unctrl_psinfo(&psinfo);
+			(void) printf("%d:\t%.70s\n",
+			    (int)pid, psinfo.pr_psargs);
+			show_files(Pr);
 			Prelease(Pr, 0);
 			Pr = NULL;
 		} else {
@@ -205,6 +198,41 @@ intr(int sig)
 }
 
 /* ------ begin specific code ------ */
+
+static enum {
+	AGENT_UNUSED,
+	AGENT_CREATED,
+	AGENT_FAILED
+} agentstate;
+
+/*
+ * Most of the information that pfiles displays is gathered from the fdinfo
+ * files in /proc, but door and socket filter details are obtained by
+ * injecting system calls into the target process, which requires an agent
+ * lwp. The agent is created on first use so that processes which have no
+ * such file descriptors can be examined without one, and it is then
+ * retained until the file descriptor walk is complete rather than being
+ * repeatedly created and destroyed by each injected system call.
+ */
+static bool
+agent_grab(struct ps_prochandle *Pr)
+{
+	if (Pstate(Pr) == PS_DEAD)
+		return (false);
+
+	if (agentstate == AGENT_UNUSED) {
+		if (Pcreate_agent(Pr) == 0) {
+			agentstate = AGENT_CREATED;
+		} else {
+			(void) fprintf(stderr, "%s: warning: cannot control "
+			    "process %d, some details will be unavailable\n",
+			    command, (int)Pstatus(Pr)->pr_pid);
+			agentstate = AGENT_FAILED;
+		}
+	}
+
+	return (agentstate == AGENT_CREATED);
+}
 
 static int
 show_paths(uint_t type, const void *data, size_t len, void *arg __unused)
@@ -304,19 +332,25 @@ show_file(void *data, const prfdinfo_t *info)
 static void
 show_files(struct ps_prochandle *Pr)
 {
-	struct rlimit rlim;
+	const pstatus_t *psp = Pstatus(Pr);
 
-	if (pr_getrlimit(Pr, RLIMIT_NOFILE, &rlim) == 0) {
-		ulong_t nfd = rlim.rlim_cur;
-		if (nfd == RLIM_INFINITY)
-			(void) printf(
-			    "  Current rlimit: unlimited file descriptors\n");
-		else
-			(void) printf(
-			    "  Current rlimit: %lu file descriptors\n", nfd);
+	agentstate = AGENT_UNUSED;
+
+	/*
+	 * The current file descriptor limit is found in the pstatus data.
+	 * In a core file, a value of zero means that the core was
+	 * generated before the limit was recorded there, and so the line
+	 * is suppressed.
+	 */
+	if (Pstate(Pr) != PS_DEAD || psp->pr_fdrlimit > 0) {
+		(void) printf("  Current rlimit: %d file descriptors\n",
+		    psp->pr_fdrlimit);
 	}
 
 	(void) Pfdinfo_iter(Pr, show_file, Pr);
+
+	if (agentstate == AGENT_CREATED)
+		Pdestroy_agent(Pr);
 }
 
 static void
@@ -462,6 +496,9 @@ static void
 show_door(struct ps_prochandle *Pr, const prfdinfo_t *info)
 {
 	door_info_t door_info;
+
+	if (!agent_grab(Pr))
+		return;
 
 	if (pr_door_info(Pr, info->pr_fd, &door_info) != 0)
 		return;
@@ -664,6 +701,9 @@ show_sockfilters(struct ps_prochandle *Pr, const prfdinfo_t *info)
 	int i = 0, nalloc = 2, len = nalloc * sizeof (*fi);
 	boolean_t printhdr = B_TRUE;
 	int fd = info->pr_fd;
+
+	if (!agent_grab(Pr))
+		return;
 
 	fi = calloc(nalloc, sizeof (*fi));
 	if (fi == NULL) {

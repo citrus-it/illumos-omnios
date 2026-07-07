@@ -24,7 +24,7 @@
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright 2018 Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 @ _START_
@@ -534,6 +534,7 @@
 @ MSG_CNOTE_T_PR_ERRNO			"pr_errno:"
 @ MSG_CNOTE_T_PR_ERRPRIV		"pr_errpriv:"
 @ MSG_CNOTE_T_PR_EUID			"pr_euid:"
+@ MSG_CNOTE_T_PR_FDRLIMIT		"pr_fdrlimit:"
 @ MSG_CNOTE_T_PR_FLAG			"pr_flag:"
 @ MSG_CNOTE_T_PR_FLAGS			"pr_flags:"
 @ MSG_CNOTE_T_PR_FLTTRACE		"pr_flttrace:"

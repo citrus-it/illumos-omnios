@@ -27,6 +27,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <struct_layout.h>
@@ -106,6 +107,7 @@ static const sl_pstatus_layout_t pstatus_layout = {
 	{ 264,	4,	0,	1 },		/* pr_projid */
 	{ 268,	4,	0,	1 },		/* pr_nzomb */
 	{ 272,	4,	0,	1 },		/* pr_zoneid */
+	{ 276,	4,	0,	1 },		/* pr_fdrlimit */
 	{ 336,	896,	0,	0 },		/* pr_lwp */
 };
 

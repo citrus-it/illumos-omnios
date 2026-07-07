@@ -23,6 +23,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
 
 #include <sys/types.h>
 #include <sys/mkdev.h>
@@ -350,6 +353,7 @@ pstatus_32_to_n(const pstatus32_t *src, pstatus_t *dst)
 	dst->pr_taskid = src->pr_taskid;
 	dst->pr_projid = src->pr_projid;
 	dst->pr_zoneid = src->pr_zoneid;
+	dst->pr_fdrlimit = src->pr_fdrlimit;
 	dst->pr_aslwpid = src->pr_aslwpid;
 	dst->pr_agentid = src->pr_agentid;
 	dst->pr_sigpend = src->pr_sigpend;
@@ -723,6 +727,7 @@ pstatus_n_to_32(const pstatus_t *src, pstatus32_t *dst)
 	dst->pr_taskid = (id32_t)src->pr_taskid;
 	dst->pr_projid = (id32_t)src->pr_projid;
 	dst->pr_zoneid = (id32_t)src->pr_zoneid;
+	dst->pr_fdrlimit = src->pr_fdrlimit;
 	dst->pr_aslwpid = (id32_t)src->pr_aslwpid;
 	dst->pr_agentid = (id32_t)src->pr_agentid;
 	dst->pr_sigpend = src->pr_sigpend;

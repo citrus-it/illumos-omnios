@@ -26,6 +26,7 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -203,6 +204,7 @@ gen_pstatus(void)
 	SCALAR_FIELD(pstatus_t,		pr_projid,	1);
 	SCALAR_FIELD(pstatus_t,		pr_nzomb,	1);
 	SCALAR_FIELD(pstatus_t,		pr_zoneid,	1);
+	SCALAR_FIELD(pstatus_t,		pr_fdrlimit,	1);
 	SCALAR_FIELD(pstatus_t,		pr_lwp,		0);
 
 	END;
