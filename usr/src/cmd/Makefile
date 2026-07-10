@@ -497,6 +497,7 @@ i386_SUBDIRS=		\
 	cxgbetool	\
 	diskscan	\
 	ficl		\
+	hsmp		\
 	mc		\
 	nvmeadm		\
 	osrotc		\
