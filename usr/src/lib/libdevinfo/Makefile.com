@@ -37,7 +37,8 @@ include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lnvpair -lsec -lc -lgen
+LDLIBS +=	-lnvpair -lsec -lz -lc -lgen
+NATIVE_LIBS +=  libz.so
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I..
