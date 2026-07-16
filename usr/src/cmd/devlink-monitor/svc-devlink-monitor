@@ -15,17 +15,19 @@
 #
 
 #
-# Method script and daemon for svc:/system/devlink-monitor.
+# Method script and daemon for svc:/system/devlink-monitor and
+# svc:/system/devlink-canary.
 #
 # The monitor watches for evidence of devlink database corruption. A
 # quarantined database placed in /etc/dev by libdevinfo when its integrity
-# checks trip. When one appears, it gathers supporting evidence into a
-# timestamped directory.
+# checks trip, or a report file placed in the spool directory by
+# devlink-canary. When either appears, it gathers supporting evidence
+# into a timestamped directory.
 #
 
 . /lib/svc/share/smf_include.sh
 
-# This service is only applicable in the global zone.
+# These services are only applicable in the global zone.
 if smf_is_nonglobalzone; then
 	echo "$0 is not applicable in a non-global zone"
 	/usr/sbin/svcadm disable -t "$SMF_FMRI"
@@ -116,15 +118,22 @@ function collect {
 function monitor {
 	typeset -a hits
 
+	mkdir -p "$SPOOL" 2>/dev/null
 	[[ -f $STAMP ]] || touch $STAMP
 
 	while :; do
 		set -A hits -- $DEVDB_DIR/.devlink_db_corrupt.*
 		[[ -f "${hits[0]}" ]] && collect db "${hits[@]}"
 
+		set -A hits -- "$SPOOL"/canary.report.*
+		[[ -f "${hits[0]}" ]] && collect canary "${hits[@]}"
+
 		sleep $INTERVAL
 	done
 }
+
+SPOOL=$(getprop config/spool)
+: "${SPOOL:=/var/tmp/devlink-monitor}"
 
 case "$1" in
 monitor)
@@ -136,8 +145,22 @@ monitor)
 	: "${INTERVAL:=10}"
 	monitor &
 	;;
+canary)
+	SIZE=$(getprop config/size)
+	: "${SIZE:=16777216}"
+	INTERVAL=$(getprop config/interval)
+	: "${INTERVAL:=5}"
+	DIRS=$(getprop config/dirs)
+	: "${DIRS:=/etc/dev /var/run}"
+	set -A args --
+	for d in $DIRS; do
+		args+=(-d "$d")
+	done
+	/usr/lib/devlink-monitor/devlink-canary "${args[@]}" \
+	    -s "$SIZE" -i "$INTERVAL" -S "$SPOOL" &
+	;;
 *)
-	print -u2 "Usage: $0 monitor"
+	print -u2 "Usage: $0 monitor|canary"
 	exit $SMF_EXIT_ERR_CONFIG
 	;;
 esac

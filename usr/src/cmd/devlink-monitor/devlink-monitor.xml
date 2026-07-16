@@ -46,6 +46,8 @@
 
 	<property_group name='config' type='application'>
 		<propval name='destdir' type='astring' value='' />
+		<propval name='spool' type='astring'
+			value='/var/tmp/devlink-monitor' />
 		<propval name='live_dump' type='boolean' value='true' />
 		<propval name='interval' type='count' value='10' />
 	</property_group>
@@ -56,6 +58,55 @@
 		<common_name>
 			<loctext xml:lang='C'>
 			devlink database corruption monitor
+			</loctext>
+		</common_name>
+	</template>
+</service>
+
+<service
+	name='system/devlink-canary'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<dependency
+		name='filesystem-local'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/svc-devlink-monitor canary'
+		timeout_seconds='60' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='30' />
+
+	<property_group name='config' type='application'>
+		<propval name='dirs' type='astring'
+			value='/etc/dev /var/run' />
+		<propval name='size' type='count' value='16777216' />
+		<propval name='interval' type='count' value='5' />
+		<propval name='spool' type='astring'
+			value='/var/tmp/devlink-monitor' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			memory corruption canary
 			</loctext>
 		</common_name>
 	</template>
