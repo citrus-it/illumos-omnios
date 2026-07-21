@@ -26,6 +26,7 @@
  * Copyright 2021 Joyent, Inc.
  * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -191,6 +192,15 @@ static	int	apic_cmos_ssb_set = 0;
 
 /* use to make sure only one cpu handles the nmi */
 lock_t	apic_nmi_lock;
+/*
+ * The TSC value at which apic_nmi_lock was last acquired, and the number of
+ * TSC ticks after which a subsequent NMI concludes that the lock holder has
+ * become stuck and barges past the lock. An NMI handler that enters the
+ * debugger or panics can block indefinitely, and without a limit here every
+ * subsequent NMI would be silently ignored.
+ */
+static hrtime_t apic_nmi_enter_tsc;
+hrtime_t apic_nmi_barge_ticks = 1LL << 34;
 /* use to make sure only one cpu handles the error interrupt */
 lock_t	apic_error_lock;
 
@@ -833,8 +843,18 @@ apic_nmi_intr(caddr_t arg __unused, caddr_t arg1 __unused)
 
 	apic_error |= APIC_ERR_NMI;
 
-	if (!lock_try(&apic_nmi_lock))
-		return (DDI_INTR_CLAIMED);
+	if (!lock_try(&apic_nmi_lock)) {
+		/*
+		 * Another CPU is already handling an NMI. If the lock has been
+		 * held for a long time, assume the holder is stuck and carry
+		 * on regardless; both kmdb entry and panic tolerate concurrent
+		 * callers.
+		 */
+		if (tsc_read() - apic_nmi_enter_tsc < apic_nmi_barge_ticks)
+			return (DDI_INTR_CLAIMED);
+	} else {
+		apic_nmi_enter_tsc = tsc_read();
+	}
 	apic_num_nmis++;
 
 	/*
