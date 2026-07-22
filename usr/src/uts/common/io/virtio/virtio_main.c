@@ -377,6 +377,13 @@ virtio_init_features(virtio_t *vio, uint64_t driver_features,
 	if (virtio_modern(vio))
 		driver_features |= VIRTIO_F_VERSION_1;
 
+	/*
+	 * The ring event index mechanism is implemented entirely within the
+	 * framework so negotiate it on behalf of every client driver whenever
+	 * the device offers it.
+	 */
+	driver_features |= VIRTIO_F_RING_EVENT_IDX;
+
 	vio->vio_features &= driver_features;
 
 	if (!vio->vio_ops->vop_device_set_features(vio, vio->vio_features)) {
@@ -888,6 +895,9 @@ virtio_queue_alloc(virtio_t *vio, uint16_t qidx, const char *name,
 		viq->viq_indirect = B_TRUE;
 	}
 
+	if (virtio_features_present(vio, VIRTIO_F_RING_EVENT_IDX))
+		viq->viq_event_idx = B_TRUE;
+
 	/*
 	 * Track descriptor usage in an identifier space.
 	 */
@@ -910,13 +920,21 @@ virtio_queue_alloc(virtio_t *vio, uint16_t qidx, const char *name,
 	const uint_t align = virtio_modern(vio) ? MODERN_VQ_ALIGN :
 	    VIRTIO_PAGE_SIZE;
 
+	/*
+	 * The driver and device areas are each followed by a single 16-bit
+	 * value holding, respectively, the "used_event" and "avail_event"
+	 * values for the ring event index mechanism. The layout includes them
+	 * whether or not the feature was negotiated. They are only written or
+	 * read when it was.
+	 */
 	const size_t sz_descs = sizeof (virtio_vq_desc_t) * qsz;
 	const size_t sz_driver = P2ROUNDUP_TYPED(sz_descs +
 	    sizeof (virtio_vq_driver_t) +
-	    sizeof (uint16_t) * qsz,
+	    sizeof (uint16_t) * (qsz + 1u),
 	    align, size_t);
 	const size_t sz_device = P2ROUNDUP_TYPED(sizeof (virtio_vq_device_t) +
-	    sizeof (virtio_vq_elem_t) * qsz,
+	    sizeof (virtio_vq_elem_t) * qsz +
+	    sizeof (uint16_t),
 	    align, size_t);
 
 	if (virtio_dma_init(vio, &viq->viq_dma, sz_driver + sz_device,
@@ -1007,12 +1025,71 @@ virtio_queue_free(virtio_queue_t *viq)
 	kmem_free(viq, sizeof (*viq));
 }
 
+static inline uint16_t *
+virtio_queue_used_event(const virtio_queue_t *viq)
+{
+	const uintptr_t used_event =
+	    (uintptr_t)&viq->viq_dma_driver->vqdr_ring[viq->viq_size];
+
+	return ((uint16_t *)used_event);
+}
+
+static inline const uint16_t *
+virtio_queue_avail_event(const virtio_queue_t *viq)
+{
+	const uintptr_t avail_event =
+	    (uintptr_t)&viq->viq_dma_device->vqde_ring[viq->viq_size];
+
+	return ((const uint16_t *)avail_event);
+}
+
+static inline boolean_t
+virtio_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old_idx)
+{
+	return ((uint16_t)(new_idx - event_idx - 1) <
+	    (uint16_t)(new_idx - old_idx));
+}
+
 void
 virtio_queue_no_interrupt(virtio_queue_t *viq, boolean_t stop_interrupts)
 {
 	mutex_enter(&viq->viq_mutex);
 
-	if (stop_interrupts) {
+	viq->viq_no_interrupt = stop_interrupts;
+
+	if (viq->viq_event_idx) {
+		uint16_t *used_event = virtio_queue_used_event(viq);
+
+		/*
+		 * Base the value on the index the device has most recently
+		 * published, which may be ahead of the index we have
+		 * collected up to.
+		 */
+		VIRTQ_DMA_SYNC_FORKERNEL(viq);
+		const uint16_t dindex = viq_htog16(viq,
+		    viq->viq_dma_device->vqde_index);
+
+		if (stop_interrupts) {
+			/*
+			 * The event index mechanism has no way to directly
+			 * suppress interrupts. Request an event for the index
+			 * the device has just moved past, which the
+			 * free-running index cannot reach again until it has
+			 * completed a full lap. The value is refreshed as
+			 * chains are collected, so a lap can only complete
+			 * once collection has stopped entirely.
+			 */
+			*used_event = viq_gtoh16(viq, dindex - 1);
+		} else {
+			/*
+			 * Request an event for the next chain the device
+			 * returns. Chains that it has already returned raise
+			 * no interrupt, and the caller must check for and
+			 * collect those itself.
+			 */
+			*used_event = viq_gtoh16(viq, dindex);
+		}
+	} else if (stop_interrupts) {
 		viq->viq_dma_driver->vqdr_flags |=
 		    viq_gtoh16(viq, VIRTQ_AVAIL_F_NO_INTERRUPT);
 	} else {
@@ -1061,11 +1138,11 @@ virtio_queue_nactive(virtio_queue_t *viq)
 
 /*
  * Check whether the device has returned descriptor chains that have not yet
- * been collected with virtio_queue_poll(). The device consults the
- * NO_INTERRUPT flag only at the moment it returns a chain, so no interrupt is
- * generated for chains returned while the flag was set and clearing it is not
- * retroactive. A driver that clears the flag should use this to discover
- * outstanding work and process the queue itself.
+ * been collected with virtio_queue_poll(). The device decides whether to send
+ * an interrupt only at the moment it returns a chain, so no interrupt is
+ * generated for chains returned while interrupts were suppressed and
+ * re-enabling them is not retroactive. A driver that re-enables interrupts
+ * should use this to discover outstanding work and process the queue itself.
  */
 boolean_t
 virtio_queue_pending(virtio_queue_t *viq)
@@ -1076,11 +1153,10 @@ virtio_queue_pending(virtio_queue_t *viq)
 	if (!viq->viq_shutdown) {
 		/*
 		 * Taking the queue mutex provides the store-load barrier
-		 * needed when the caller has just cleared the NO_INTERRUPT
-		 * flag. The flag update is globally visible before we read
-		 * the device index, so a chain that the check misses was
-		 * returned after the flag was cleared and will have raised
-		 * an interrupt.
+		 * needed when the caller has just re-enabled interrupts.
+		 * That update is globally visible before we read the device
+		 * index, so a chain that the check misses was returned after
+		 * interrupts were re-enabled and will have raised one.
 		 */
 		VIRTQ_DMA_SYNC_FORKERNEL(viq);
 		pending = (viq_htog16(viq, viq->viq_dma_device->vqde_index) !=
@@ -1149,6 +1225,34 @@ virtio_queue_poll(virtio_queue_t *viq)
 	    viq->viq_dma_device->vqde_ring[index].vqe_start);
 	uint32_t len = viq_htog32(viq,
 	    viq->viq_dma_device->vqde_ring[index].vqe_len);
+
+	if (viq->viq_event_idx) {
+		/*
+		 * Track our collection through the used event entry. While
+		 * interrupts are enabled, request an event for the next
+		 * chain the device returns beyond those already collected.
+		 * While they are suppressed, keep the parked value moving
+		 * with collection so that the free-running index can never
+		 * lap it.
+		 */
+		*virtio_queue_used_event(viq) = viq_gtoh16(viq,
+		    viq->viq_no_interrupt ?
+		    (uint16_t)(viq->viq_device_index - 1) :
+		    viq->viq_device_index);
+		VIRTQ_DMA_SYNC_FORDEV(viq);
+
+		/*
+		 * When interrupts are enabled, the store above must be
+		 * globally visible before the device index is next loaded,
+		 * whether by the next call here or by virtio_queue_pending().
+		 * Without the barrier, that store and the device's next index
+		 * update could each miss the other, and the chain the device
+		 * returned would neither raise an interrupt nor be visible to
+		 * the load.
+		 */
+		if (!viq->viq_no_interrupt)
+			membar_enter();
+	}
 
 	virtio_chain_t *vic;
 	if ((vic = virtio_queue_complete(viq, start)) == NULL) {
@@ -1482,8 +1586,16 @@ static void
 virtio_queue_flush_locked(virtio_queue_t *viq)
 {
 	virtio_t *vio = viq->viq_virtio;
+	boolean_t notify;
 
 	VERIFY(MUTEX_HELD(&viq->viq_mutex));
+
+	/*
+	 * The ring index value most recently made visible to the device,
+	 * needed below for the event index comparison.
+	 */
+	const uint16_t old_index = viq_htog16(viq,
+	    viq->viq_dma_driver->vqdr_index);
 
 	/*
 	 * Make sure any writes we have just made to the descriptors
@@ -1497,13 +1609,27 @@ virtio_queue_flush_locked(virtio_queue_t *viq)
 
 	/*
 	 * Determine whether the device expects us to notify it of new
-	 * descriptors.
+	 * descriptors. For either mechanism, the store publishing the new
+	 * ring index must be globally visible before we load the
+	 * suppression state that the device maintains, or each side could
+	 * see a stale view of the other and a notification the device is
+	 * relying on would never be sent.
 	 */
+	membar_enter();
 	VIRTQ_DMA_SYNC_FORKERNEL(viq);
-	if (!(viq->viq_dma_device->vqde_flags &
-	    viq_gtoh16(viq, VIRTQ_USED_F_NO_NOTIFY))) {
-		vio->vio_ops->vop_queue_notify(viq);
+	if (viq->viq_event_idx) {
+		const uint16_t avail_event = viq_htog16(viq,
+		    *virtio_queue_avail_event(viq));
+
+		notify = virtio_need_event(avail_event,
+		    viq->viq_driver_index, old_index);
+	} else {
+		notify = (viq->viq_dma_device->vqde_flags &
+		    viq_gtoh16(viq, VIRTQ_USED_F_NO_NOTIFY)) == 0;
 	}
+
+	if (notify)
+		vio->vio_ops->vop_queue_notify(viq);
 }
 
 void
