@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
  Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ Copyright 2026 Oxide Computer Company
 
  CDDL HEADER START
 
@@ -541,6 +542,65 @@
 	project			CDATA #IMPLIED
 	resource_pool		CDATA #IMPLIED >
 
+<!-- Managed path definitions -->
+
+<!--
+  directory
+
+    This element describes a directory that the restarter ensures exists,
+    and optionally empties, on behalf of the service before its start
+    method runs. See smf_method(7) for details of how these entries are
+    processed.
+
+    Its attributes are
+
+	path	The path of the directory. The path is subject to the
+		method token expansion described in smf_method(7).
+
+	user	The user that owns the directory, in numeric or text
+		form. If absent, the user from the method credential
+		which applies to the start method is used.
+
+	group	The group that owns the directory, in numeric or text
+		form. If absent, the group from the method credential
+		which applies to the start method is used.
+
+	mode	The access permissions for the directory, as an octal
+		string. If absent, 0770 is used.
+
+	env	The name of an environment variable in which the
+		expanded path is placed in the environment of the
+		service's methods. If the variable is already present in
+		the method environment, the path is appended, separated
+		by a colon.
+
+	empty	[boolean] Whether the contents of the directory are
+		removed before the service starts.
+-->
+
+<!ELEMENT directory EMPTY>
+
+<!ATTLIST directory
+	path		CDATA #REQUIRED
+	user		CDATA #IMPLIED
+	group		CDATA #IMPLIED
+	mode		CDATA #IMPLIED
+	env		CDATA #IMPLIED
+	empty		( true | false ) "false" >
+
+<!--
+  managed_paths
+
+    This element defines a set of paths that the restarter manages on
+    behalf of the service or instance. It has no attributes, and one or
+    more directory child elements, which are processed in the order in
+    which they appear.
+-->
+
+<!ELEMENT managed_paths (directory+) >
+
+<!ATTLIST managed_paths>
+
 <!-- Restarter delegation, methods, and monitors -->
 
 <!--
@@ -1030,8 +1090,8 @@
 
 <!ELEMENT instance
 	( restarter?, dependency*, dependent*, method_context?,
-	exec_method*, notification_parameters*, property_group*,
-	template? ) >
+	managed_paths*, exec_method*, notification_parameters*,
+	property_group*, template? ) >
 
 <!ATTLIST instance
 	name		CDATA #REQUIRED
@@ -1060,9 +1120,9 @@
 
 <!ELEMENT service
 	( create_default_instance?, single_instance?, restarter?,
-	dependency*, dependent*, method_context?, exec_method*,
-	notification_parameters*, property_group*, instance*,
-	stability?, template? ) >
+	dependency*, dependent*, method_context?, managed_paths*,
+	exec_method*, notification_parameters*, property_group*,
+	instance*, stability?, template? ) >
 
 <!ATTLIST service
 	name		CDATA #REQUIRED

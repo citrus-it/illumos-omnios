@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -170,6 +171,25 @@ find_dup(const char *var, char **env, const restarter_inst_t *inst)
 	}
 
 	return (p);
+}
+
+/*
+ * Return the value of the named variable from the global environment
+ * that set_smf_env() merges into every method environment, or NULL if it
+ * is not present. The returned string remains owned by this file.
+ */
+const char *
+global_env_value(const char *name)
+{
+	size_t len = strlen(name);
+	char **p;
+
+	for (p = glob_envp; *p != NULL; p++) {
+		if (strncmp(*p, name, len) == 0 && (*p)[len] == '=')
+			return (*p + len + 1);
+	}
+
+	return (NULL);
 }
 
 /*

@@ -51,6 +51,7 @@ SUBDIRS =		\
 	sed		\
 	sleep		\
 	smbios		\
+	svccfg		\
 	svr4pkg		\
 	workq		\
 	xargs

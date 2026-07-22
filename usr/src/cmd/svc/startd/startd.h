@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_STARTD_H
@@ -594,6 +595,7 @@ int expand_method_tokens(const char *, scf_instance_t *,
 void init_env(void);
 char **set_smf_env(char **, size_t, const char *,
     const restarter_inst_t *, const char *);
+const char *global_env_value(const char *);
 
 /* file.c */
 int file_ready(graph_vertex_t *);
@@ -727,6 +729,10 @@ int fmri_canonify(const char *, char **, boolean_t);
 int fs_is_read_only(char *, ulong_t *);
 int fs_remount(char *);
 void xstr_sanitize(char *);
+
+/* paths.c */
+int managed_paths_apply(const restarter_inst_t *, scf_snapshot_t *,
+    const char *, const char *, struct method_context **);
 
 /* restarter.c */
 void restarter_init(void);

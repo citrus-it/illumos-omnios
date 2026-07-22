@@ -24,6 +24,7 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Oxide Computer Company
 #
 
 PROG = svc.startd
@@ -40,6 +41,7 @@ OBJS = \
 	log.o \
 	method.o \
 	misc.o \
+	paths.o \
 	protocol.o \
 	restarter.o \
 	specials.o \

@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+-->
+
+<!--
+ Copyright 2026 Oxide Computer Company
+-->
+
+<service_bundle type='manifest' name='mpathstest'>
+
+<service name='test/mpaths' type='service' version='1'>
+
+	<method_context>
+		<method_credential user='daemon' group='sys' />
+	</method_context>
+
+	<managed_paths>
+		<directory path='/var/run/mpaths' empty='true' />
+		<directory path='/var/run/mpaths/sub' user='root'
+		    group='root' mode='0700' />
+	</managed_paths>
+
+	<managed_paths>
+		<directory path='/var/tmp/mpaths-%i' env='MPATHS_DIR' />
+	</managed_paths>
+
+	<exec_method type='method' name='start' exec=':true'
+	    timeout_seconds='0' />
+	<exec_method type='method' name='stop' exec=':true'
+	    timeout_seconds='0' />
+
+	<instance name='default' enabled='false'>
+		<managed_paths>
+			<directory path='/var/tmp/mpaths-inst'
+			    env='MPATHS_DIR' />
+		</managed_paths>
+	</instance>
+
+</service>
+
+</service_bundle>

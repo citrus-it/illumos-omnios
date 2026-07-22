@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_CMD_SVCCFG_H
@@ -96,6 +96,7 @@ typedef enum element {
 	SC_DEPENDENCY,
 	SC_DEPENDENT,
 	SC_DESCRIPTION,
+	SC_DIRECTORY,
 	SC_DOC_LINK,
 	SC_DOCUMENTATION,
 	SC_ENABLED,
@@ -109,6 +110,7 @@ typedef enum element {
 	SC_INTEGER,
 	SC_INTERNAL_SEPARATORS,
 	SC_LOCTEXT,
+	SC_MANAGED_PATHS,
 	SC_MANPAGE,
 	SC_METHOD_CONTEXT,
 	SC_METHOD_CREDENTIAL,
