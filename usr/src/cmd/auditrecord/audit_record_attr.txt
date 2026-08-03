@@ -2006,6 +2006,14 @@ syscall=putmsg
     comment=4, priority, "pri"
 # see AUE_SOCKACCEPT
 
+label=AUE_SPAWN
+  format=[arg]1:[path]2:[attr]3:[exec_args]4:[exec_env]5
+    comment=0, pid, "child PID":
+    comment=omitted if the child failed before exec:
+    comment=omitted if the file attributes could not be read:
+    comment=output if argv policy is set:
+    comment=output if arge policy is set
+
 label=AUE_STAT
   format=path:[attr]
 
