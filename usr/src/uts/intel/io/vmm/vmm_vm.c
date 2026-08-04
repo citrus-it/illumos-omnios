@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -858,21 +858,33 @@ vmspace_unmap(vmspace_t *vms, uintptr_t addr, uintptr_t len)
 		vmc_space_unmap(vmc, addr, len, vmsm->vmsm_object);
 	}
 
-	/* Clear all PTEs for region */
-	if (vmm_gpt_unmap_region(vms->vms_gpt, addr, len) != 0) {
+	/*
+	 * Clear the leaf PTEs for the region, then unlink any now-empty
+	 * intermediate (directory) page-table pages, staging them for a
+	 * deferred free.
+	 *
+	 * The page-table generation must be bumped (and clients invalidated) if
+	 * either step removed anything from the GPT. A region which was mapped
+	 * but never faulted in has no present leaf PTEs, so the unmapped-page
+	 * count alone does not catch that case.
+	 */
+	const size_t unmapped = vmm_gpt_unmap_region(vms->vms_gpt, addr, len);
+	const size_t vacated = vmm_gpt_vacate_region(vms->vms_gpt, addr, len);
+	if (unmapped != 0 || vacated != 0) {
 		vms->vms_pt_gen++;
 		gen = vms->vms_pt_gen;
 	}
-	/* ... and the intermediate (directory) PTEs as well */
-	vmm_gpt_vacate_region(vms->vms_gpt, addr, len);
+
+	if (gen != 0)
+		vmspace_clients_invalidate(vms, addr, len);
 
 	/*
-	 * If pages were actually unmapped from the GPT, provide clients with
-	 * an invalidation notice.
+	 * Only now, with every vcpu fenced off the old page-table generation
+	 * by vmspace_clients_invalidate(), is it safe to return the unlinked
+	 * intermediate pages to the general pool.
 	 */
-	if (gen != 0) {
-		vmspace_clients_invalidate(vms, addr, len);
-	}
+	if (vacated != 0)
+		vmm_gpt_free_pending(vms->vms_gpt);
 
 	vm_mapping_remove(vms, vmsm);
 	vmspace_hold_exit(vms, true);
@@ -1237,7 +1249,7 @@ vmc_space_unmap(vm_client_t *vmc, uintptr_t addr, size_t size,
 	 */
 	for (vm_page_t *vmp = list_head(&vmc->vmc_held_pages);
 	    vmp != NULL;
-	    vmp = list_next(&vmc->vmc_held_pages, vmc)) {
+	    vmp = list_next(&vmc->vmc_held_pages, vmp)) {
 		if (vmp->vmp_gpa < addr ||
 		    vmp->vmp_gpa >= (addr + size)) {
 			/* Hold outside region in question */
