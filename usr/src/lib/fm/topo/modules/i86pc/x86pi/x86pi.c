@@ -39,6 +39,7 @@
 #include <sys/smbios.h>
 #include <sys/smbios_impl.h>
 #include <sys/fm/protocol.h>
+#include <topo_zen.h>
 #include <x86pi_impl.h>
 
 
@@ -456,10 +457,12 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent)
 			/* make sure the chip enum is loaded */
 			topo_mod_dprintf(mod, "%s: loading chip enum\n", f);
 
-			if (topo_mod_load(mod, CHIP, TOPO_VERSION) == NULL) {
+			if (topo_mod_load(mod, TOPO_MOD_ZEN,
+			    TOPO_VERSION) == NULL) {
 				topo_mod_dprintf(mod,
 				    "%s: Failed to load %s module: %s\n", f,
-				    CHIP, topo_strerror(topo_mod_errno(mod)));
+				    TOPO_MOD_ZEN,
+				    topo_strerror(topo_mod_errno(mod)));
 			} else {
 				/* create node range */
 				topo_mod_dprintf(mod,
@@ -473,18 +476,22 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent)
 					    "%s\n", f,
 					    topo_strerror(topo_mod_errno(mod)));
 				} else {
-					/* call the chip enumerator */
-					topo_mod_dprintf(mod, "%s: calling"
-					    " chip enum\n", f);
-					rv =
-					    topo_mod_enumerate(mod, basebd_node,
-					    CHIP, CHIP, min, max,
-					    &x86pi_smbios);
+					topo_instance_t ci;
+					topo_zen_chip_t zc;
+
+					for (ci = min; ci <= max; ci++) {
+						zc.tzc_sockid =
+						    (uint32_t)(ci - min);
+						rv = topo_mod_enumerate(mod,
+						    basebd_node, TOPO_MOD_ZEN,
+						    CHIP, ci, ci, &zc);
+						if (rv != 0) {
+							topo_mod_dprintf(mod,
+							    "%s: zen enum "
+							    "failed\n", f);
+						}
+					}
 					min = max + 1;
-					if (rv != 0)
-						topo_mod_dprintf(mod, "%s:%s"
-						    "enumeration failed: \n",
-						    f, CHIP);
 				}
 			}
 		}
