@@ -23,7 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2023 Oxide Computer Co.
+ * Copyright 2026 Oxide Computer Co.
  */
 
 #include <sys/types.h>
@@ -49,6 +49,7 @@
 #include <sys/archsystm.h>
 #include <sys/bootconf.h>
 #include <sys/dumphdr.h>
+#include <sys/taskq.h>
 #include <vm/seg_kmem.h>
 #include <vm/seg_kpm.h>
 #include <vm/hat.h>
@@ -120,6 +121,379 @@ uint32_t htable_dont_cache = 0;
  * Track the number of active pagetables, so we can know how many to reap
  */
 static uint32_t active_ptables = 0;
+
+/*
+ * Optional diagnostic quarantine ("bait") for freed pagetable pages.
+ *
+ * When enabled, pages released by ptable_free() are held on a FIFO ring
+ * instead of returning to the free list, after being filled with entries
+ * that look present to the hardware page table walker and point at a
+ * permanently zeroed sink page. Nothing maps a held page, so no software
+ * can touch it; if a CPU nevertheless sets the Accessed bit in one of its
+ * entries, the walker must have reached the page through a stale cached
+ * reference retained from the page's previous life as a pagetable. A
+ * periodic scan looks for such writes and reports them.
+ *
+ * This is a bench diagnostic and is off by default. Enable by setting
+ * ptable_bait_enable to 1 with mdb. The pool grows to ptable_bait_max
+ * pages (evaluated once, at first capture, and clamped to an eighth of
+ * physical memory), after which the oldest page makes way for each new
+ * arrival: it is examined first, then either retained as evidence or
+ * scrubbed and released. Clearing ptable_bait_enable drains the pool
+ * over subsequent scan passes. Pages are scrubbed back to zero before
+ * release since a zeroed entry is not-present and immune to further
+ * Accessed-bit writes.
+ */
+uint_t ptable_bait_enable = 0;
+uint_t ptable_bait_max = 0x40000;	/* pool cap in pages (1 GiB) */
+uint_t ptable_bait_scan_secs = 30;	/* scan interval */
+uint_t ptable_bait_panic = 0;		/* panic on a hit, for a dump */
+
+uint64_t ptable_bait_hits = 0;		/* deviating entries seen */
+uint64_t ptable_bait_cycled = 0;	/* pages scrubbed and released */
+uint64_t ptable_bait_skipped = 0;	/* frees not captured */
+uint64_t ptable_bait_sink_writes = 0;	/* scans finding a dirty sink */
+uint_t ptable_bait_inuse = 0;
+pfn_t ptable_bait_last_pfn = PFN_INVALID;
+uint_t ptable_bait_last_index = 0;
+x86pte_t ptable_bait_last_value = 0;
+
+static kmutex_t ptable_bait_lock;
+static page_t **ptable_bait_ring;
+static uint_t ptable_bait_ring_size;
+static uint_t ptable_bait_head;		/* next insertion slot */
+static uint_t ptable_bait_tail;		/* oldest occupied slot */
+static x86pte_t ptable_bait_pte;
+static caddr_t ptable_bait_sink;
+static timeout_id_t ptable_bait_tid;
+static uint_t ptable_bait_busy;		/* scan task outstanding */
+static hrtime_t ptable_bait_init_fail;	/* last failed initialisation */
+
+/* Pages which took a hit are retained as evidence, up to this many. */
+#define	PTABLE_BAIT_NHELD	64
+static page_t *ptable_bait_held[PTABLE_BAIT_NHELD];
+static uint_t ptable_bait_nheld;
+
+static void ptable_bait_tick(void *);
+
+static clock_t
+ptable_bait_interval(void)
+{
+	uint_t secs = ptable_bait_scan_secs;
+
+	return ((clock_t)(secs == 0 ? 1 : secs) * hz);
+}
+
+/*
+ * Fill a captured page with bait entries through its kpm mapping.
+ */
+static void
+ptable_bait_fill(pfn_t pfn)
+{
+	x86pte_t *ptep = (x86pte_t *)hat_kpm_pfn2va(pfn);
+	uint_t i;
+
+	for (i = 0; i < MMU_PAGESIZE / sizeof (x86pte_t); i++)
+		ptep[i] = ptable_bait_pte;
+}
+
+/*
+ * Examine a page for deviation from the bait pattern, recording and
+ * reporting anything found. Returns the number of deviating entries.
+ * The report is bounded to two lines per page regardless of how many
+ * entries deviated.
+ */
+static uint_t
+ptable_bait_check_locked(page_t *pp)
+{
+	x86pte_t *ptep = (x86pte_t *)hat_kpm_pfn2va(pp->p_pagenum);
+	uint_t i, ndev = 0;
+
+	ASSERT(MUTEX_HELD(&ptable_bait_lock));
+
+	for (i = 0; i < MMU_PAGESIZE / sizeof (x86pte_t); i++) {
+		if (ptep[i] == ptable_bait_pte)
+			continue;
+		if (ndev == 0) {
+			ptable_bait_last_pfn = pp->p_pagenum;
+			ptable_bait_last_index = i;
+			ptable_bait_last_value = ptep[i];
+			cmn_err(CE_NOTE, "ptable bait hit: pfn 0x%lx "
+			    "entry %u value 0x%llx (bait 0x%llx)",
+			    pp->p_pagenum, i, (u_longlong_t)ptep[i],
+			    (u_longlong_t)ptable_bait_pte);
+		}
+		ndev++;
+		ptable_bait_hits++;
+	}
+	if (ndev > 1) {
+		cmn_err(CE_NOTE, "ptable bait: pfn 0x%lx deviates in %u "
+		    "entries", pp->p_pagenum, ndev);
+	}
+	if (ndev != 0 && ptable_bait_panic != 0) {
+		panic("ptable bait hit: pfn 0x%lx entry %u",
+		    ptable_bait_last_pfn, ptable_bait_last_index);
+	}
+	return (ndev);
+}
+
+/*
+ * Take the oldest held page out of the ring, skipping over holes left
+ * by pages promoted to the evidence list. The page is examined before
+ * it goes, so that pages recycled between scan passes cannot carry a
+ * hit away unseen; a deviating page is promoted instead of freed while
+ * there is evidence space.
+ */
+static void
+ptable_bait_release_locked(void)
+{
+	page_t *pp;
+	uint_t skips = 0;
+
+	ASSERT(MUTEX_HELD(&ptable_bait_lock));
+	ASSERT(ptable_bait_inuse > 0);
+
+	while (ptable_bait_ring[ptable_bait_tail] == NULL) {
+		ptable_bait_tail = (ptable_bait_tail + 1) %
+		    ptable_bait_ring_size;
+		if (++skips > ptable_bait_ring_size)
+			panic("ptable bait: ring accounting lost");
+	}
+	pp = ptable_bait_ring[ptable_bait_tail];
+	ptable_bait_ring[ptable_bait_tail] = NULL;
+	ptable_bait_tail = (ptable_bait_tail + 1) % ptable_bait_ring_size;
+	ptable_bait_inuse--;
+
+	/*
+	 * With the pool empty, collapse any trailing holes so that the
+	 * insertion point never laps into them.
+	 */
+	if (ptable_bait_inuse == 0)
+		ptable_bait_tail = ptable_bait_head;
+
+	if (ptable_bait_check_locked(pp) != 0 &&
+	    ptable_bait_nheld < PTABLE_BAIT_NHELD) {
+		ptable_bait_held[ptable_bait_nheld++] = pp;
+		return;
+	}
+
+	ptable_bait_cycled++;
+	bzero(hat_kpm_pfn2va(pp->p_pagenum), MMU_PAGESIZE);
+	page_free(pp, 1);
+	page_unresv(1);
+}
+
+/*
+ * One-time construction of the ring, the sink page and the bait
+ * template. Runs in ptable_free() context, so allocations must not
+ * sleep; on failure the capture is simply skipped and a later free
+ * retries.
+ */
+static boolean_t
+ptable_bait_init_locked(void)
+{
+	page_t **ring;
+	caddr_t sink;
+	uint_t nslots;
+
+	ASSERT(MUTEX_HELD(&ptable_bait_lock));
+
+	if (ptable_bait_ring != NULL)
+		return (B_TRUE);
+
+	/*
+	 * Failed initialisation is retried at most once a second, since
+	 * the allocation below is sizeable and this is reached from
+	 * every ptable_free() while enabled.
+	 */
+	if (ptable_bait_init_fail != 0 &&
+	    gethrtime() - ptable_bait_init_fail < NANOSEC)
+		return (B_FALSE);
+
+	nslots = MIN(ptable_bait_max, (uint_t)(physmem / 8));
+	if (nslots == 0)
+		return (B_FALSE);
+
+	ring = kmem_zalloc(nslots * sizeof (page_t *), KM_NOSLEEP);
+	if (ring == NULL) {
+		ptable_bait_init_fail = gethrtime();
+		return (B_FALSE);
+	}
+	sink = kmem_zalloc(MMU_PAGESIZE, KM_NOSLEEP);
+	if (sink == NULL) {
+		kmem_free(ring, nslots * sizeof (page_t *));
+		ptable_bait_init_fail = gethrtime();
+		return (B_FALSE);
+	}
+
+	/*
+	 * The sink page is expected to stay zeroed. A walk through a
+	 * bait entry finds only not-present entries there and stops.
+	 * Bait entries are valid and user-accessible but deliberately
+	 * not writable: a stale leaf-level interpretation of a bait
+	 * entry can still take the Accessed-bit write we are hunting,
+	 * while the errant store itself faults rather than landing
+	 * silently in the sink. The scan verifies the sink regardless
+	 * and reports if anything reaches it.
+	 */
+	ptable_bait_sink = sink;
+	ptable_bait_pte =
+	    ((x86pte_t)hat_getpfnum(kas.a_hat, sink) << MMU_PAGESHIFT) |
+	    PT_VALID | PT_USER;
+	ptable_bait_ring = ring;
+	ptable_bait_ring_size = nslots;
+	ptable_bait_head = 0;
+	ptable_bait_tail = 0;
+	return (B_TRUE);
+}
+
+/*
+ * Offered every page leaving ptable_free(), exclusively locked and
+ * hashed out. Returns B_TRUE if the page has been captured into the
+ * pool, B_FALSE if the caller should free it normally.
+ */
+static boolean_t
+ptable_bait_capture(page_t *pp)
+{
+	if (ptable_bait_enable == 0)
+		return (B_FALSE);
+
+	mutex_enter(&ptable_bait_lock);
+	if (!ptable_bait_init_locked()) {
+		ptable_bait_skipped++;
+		mutex_exit(&ptable_bait_lock);
+		return (B_FALSE);
+	}
+
+	/*
+	 * Make room by testing the insertion slot itself rather than
+	 * the occupancy count; holes left by evidence promotion mean
+	 * the window between tail and head can be wider than the
+	 * count of occupied slots.
+	 */
+	while (ptable_bait_ring[ptable_bait_head] != NULL)
+		ptable_bait_release_locked();
+
+	ptable_bait_fill(pp->p_pagenum);
+	ptable_bait_ring[ptable_bait_head] = pp;
+	ptable_bait_head = (ptable_bait_head + 1) % ptable_bait_ring_size;
+	ptable_bait_inuse++;
+
+	if (ptable_bait_tid == 0) {
+		ptable_bait_tid = timeout(ptable_bait_tick, NULL,
+		    ptable_bait_interval());
+	}
+	mutex_exit(&ptable_bait_lock);
+	return (B_TRUE);
+}
+
+/*
+ * Scan the pool for deviation from the bait pattern. The lock is
+ * dropped between batches so that ptable_free() callers are not held
+ * up behind a full-pool scan. Both ends can move while it is dropped,
+ * but releases leave NULL holes behind the advancing tail which the
+ * scan skips harmlessly, and newly captured pages ahead of the cursor
+ * are simply scanned in the same pass.
+ */
+static void
+ptable_bait_scan(void *arg __unused)
+{
+	uint_t slot, batch, i;
+
+	mutex_enter(&ptable_bait_lock);
+	slot = ptable_bait_tail;
+	while (slot != ptable_bait_head && ptable_bait_inuse != 0) {
+		for (batch = 0; batch < 512 && slot != ptable_bait_head;
+		    batch++, slot = (slot + 1) % ptable_bait_ring_size) {
+			page_t *pp = ptable_bait_ring[slot];
+
+			if (pp == NULL)
+				continue;
+			if (ptable_bait_check_locked(pp) == 0)
+				continue;
+
+			/*
+			 * A deviating page leaves the ring either way:
+			 * retained as evidence while there is space, or
+			 * scrubbed and freed so that it is not counted
+			 * and reported again on every pass.
+			 */
+			ptable_bait_ring[slot] = NULL;
+			ptable_bait_inuse--;
+			if (ptable_bait_inuse == 0)
+				ptable_bait_tail = ptable_bait_head;
+			if (ptable_bait_nheld < PTABLE_BAIT_NHELD) {
+				ptable_bait_held[ptable_bait_nheld++] = pp;
+			} else {
+				ptable_bait_cycled++;
+				bzero(hat_kpm_pfn2va(pp->p_pagenum),
+				    MMU_PAGESIZE);
+				page_free(pp, 1);
+				page_unresv(1);
+			}
+		}
+		mutex_exit(&ptable_bait_lock);
+		mutex_enter(&ptable_bait_lock);
+		if (ptable_bait_inuse == 0)
+			slot = ptable_bait_head;
+	}
+
+	/*
+	 * The sink should never be written. If a stale leaf-level
+	 * interpretation of a bait entry has managed a store despite
+	 * the entries being read-only, report it and reinstate the
+	 * containment property.
+	 */
+	if (ptable_bait_sink != NULL) {
+		uint64_t *sp = (uint64_t *)ptable_bait_sink;
+
+		for (i = 0; i < MMU_PAGESIZE / sizeof (uint64_t); i++) {
+			if (sp[i] == 0)
+				continue;
+			ptable_bait_sink_writes++;
+			cmn_err(CE_WARN, "ptable bait: sink written: "
+			    "word %u value 0x%llx", i,
+			    (u_longlong_t)sp[i]);
+			bzero(ptable_bait_sink, MMU_PAGESIZE);
+			break;
+		}
+	}
+
+	/* When disabled, drain the pool in small chunks. */
+	while (ptable_bait_enable == 0 && ptable_bait_inuse != 0) {
+		for (batch = 0; batch < 64 && ptable_bait_inuse != 0;
+		    batch++) {
+			ptable_bait_release_locked();
+		}
+		mutex_exit(&ptable_bait_lock);
+		mutex_enter(&ptable_bait_lock);
+	}
+	ptable_bait_busy = 0;
+	mutex_exit(&ptable_bait_lock);
+}
+
+static void
+ptable_bait_tick(void *arg __unused)
+{
+	mutex_enter(&ptable_bait_lock);
+	if (ptable_bait_enable != 0 || ptable_bait_inuse != 0) {
+		ptable_bait_tid = timeout(ptable_bait_tick, NULL,
+		    ptable_bait_interval());
+	} else {
+		ptable_bait_tid = 0;
+	}
+	if (ptable_bait_busy == 0 && ptable_bait_inuse != 0) {
+		ptable_bait_busy = 1;
+		mutex_exit(&ptable_bait_lock);
+		if (taskq_dispatch(system_taskq, ptable_bait_scan,
+		    NULL, TQ_NOSLEEP) == TASKQID_INVALID) {
+			/* Try again on the next tick. */
+			ptable_bait_busy = 0;
+		}
+		return;
+	}
+	mutex_exit(&ptable_bait_lock);
+}
 
 /*
  * Allocate a memory page for a hardware page table.
@@ -204,8 +578,10 @@ ptable_free(pfn_t pfn)
 			panic("page not found");
 	}
 	page_hashout(pp, NULL);
-	page_free(pp, 1);
-	page_unresv(1);
+	if (!ptable_bait_capture(pp)) {
+		page_free(pp, 1);
+		page_unresv(1);
+	}
 }
 
 /*
