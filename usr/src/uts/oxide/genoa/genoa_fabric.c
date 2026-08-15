@@ -48,6 +48,110 @@
 #include <sys/io/genoa/smu.h>
 
 /*
+ * Various routines and things to access, initialize, understand, and manage
+ * Genoa's I/O fabric. This consists of both the data fabric and the
+ * northbridges.
+ *
+ * --------------------------------------
+ * Physical Organization and Nomenclature
+ * --------------------------------------
+ *
+ * In AMD's Zen 4 designs, the CPU socket is organized as a series of chiplets
+ * with a series of compute complexes and then a central I/O die. Critically,
+ * this I/O die is the major device that we are concerned with here as it
+ * bridges the cores to basically the outside world through a combination of
+ * different devices and I/O paths. The part of the I/O die that we will spend
+ * most of our time dealing with is the IOM (I/O master) and IOS (I/O slave)
+ * units. These are represented together in our fabric data structures as
+ * combined IOMS units subordinate to an I/O die. On Genoa processors, each
+ * I/O die has 4 IOMS that are grouped together into higher level NBIO
+ * (northbridge I/O) units. There are two NBIOs per I/O die which results in
+ * each having 2 IOMS.
+ *
+ *                                 data fabric
+ *                                     |
+ *         +---------------------------|---------------------------+
+ *         |  I/O Die                  |                           |
+ *         |                           |                           |
+ *         |  +-------------------+    |    +-------------------+  |
+ *         |  |       NBIO0       |    |    |       NBIO1       |  |
+ *         |  |                   |    |    |                   |  |
+ *         |  |  +-------------+  |    |    |  +-------------+  |  |
+ *     P0 PPPPPPP|  IOMS0      |-------+    |  |  IOMS2      |PPPPPPP P2
+ *     G0 PPPPPPP|  IOHUB0     |  |    |    |  |  IOHUB0     |PPPPPPP G2
+ *     P5 PPPPPPP|  IOHC0      |  |    +-------|  IOHC2      |PPPPPPP P4
+ *         |  |  +-------------+  |    |    |  +-------------+  |  |
+ *         |  |                   |    |    |                   |  |
+ *         |  |  +-------------+  |    |    |  +-------------+  |  |
+ *         |  |  |  IOMS1      |-------+    |  |  IOMS3      |  |  |
+ *     P1 PPPPPPP|  IOHUB1     |  |    |    |  |  IOHUB1     |PPPPPPP P3
+ *     G1 PPPPPPP|  IOHC1      |  |    +-------|  IOHC3      |PPPPPPP G3
+ *         |  |  +-------------+  |    |    |  +------+------+  |  |
+ *         |  +-------------------+    |    +---------|---------+  |
+ *         |                           |              |            |
+ *         |                           |          +---+---+        |
+ *         |                           |          |  FCH  |        |
+ *         |                           |          +-------+        |
+ *         +---------------------------|---------------------------+
+ *                                     |
+ *                                     |
+ *
+ * Each IOMS instance implements, among other things, a PCIe root complex (RC),
+ * consisting of two major components: an I/O hub core (IOHC) that implements
+ * the host side of the RC, and an I/O hub with two or three PCIe cores that
+ * implement the PCIe side. These components are accessible via the system
+ * management network (SMN, also called the scalable control fabric) and that
+ * is the primary way in which they are configured. The IOHC also appears in
+ * PCI configuration space as a root complex and is the attachment point for
+ * npe(4D). The PCIe cores do not themselves appear in config space; however,
+ * each implements up to 9 PCIe root ports, and each root port has an
+ * associated host bridge that appears in configuration space.
+ * Externally-attached PCIe devices are enumerated under these bridges, and the
+ * bridge provides the standard PCIe interface to the downstream port including
+ * link status and control.
+ *
+ * Each NBIO has 4 x16 PCIe Gen5 cores split across its two IOHUBs, and
+ * additionally a bonus x4 PCIe Gen3 core attached to its first IOHUB. This
+ * means that IOMS0 and IOMS2 each have three PCIe cores while IOMS1 and IOMS3
+ * have two. Somewhat confusingly, the bonus core on IOMS0 is P5 (phy lanes
+ * 0x84-0x87) while the one on IOMS2 is P4 (phy lanes 0x80-0x83).
+ *
+ * One further IOMS instance is somewhat special and merits brief additional
+ * discussion. Instance 3 has the Fusion Controller Hub (FCH) attached to it;
+ * the FCH doesn't contain any real PCIe devices, but it does contain some
+ * fake ones and from what we can tell the IOMS is the DF endpoint where MMIO
+ * transactions targeting the FCH are directed.
+ *
+ * -----------------------
+ * IOHC Instance Numbering
+ * -----------------------
+ *
+ * Genoa is simpler than some other processor families in this area. All of
+ * the IOHC instances are of the same (large) type, and there is a 1:1 mapping
+ * between IOHCs and IOMS instances which are identically numbered. The IOHUBs
+ * are numbered relative to their containing NBIO, so each NBIO has an IOHUB0
+ * and an IOHUB1.
+ *
+ * --------------
+ * Representation
+ * --------------
+ *
+ * We represent the IOMS entities described above in a hierarchical fashion:
+ *
+ * zen_fabric_t (DF -- root)
+ * |
+ * \-- zen_soc_t (qty 1 or 2)
+ *     |
+ *     \-- zen_iodie_t (qty 1)
+ *         |
+ *         \-- zen_ioms_t (qty 4, two per NBIO)
+ *             |
+ *             \-- zen_pcie_core_t (qty 2, except 3 for IOMS0 and IOMS2)
+ *                 |
+ *                 \-- zen_pcie_port_t (qty 9, except 4 for the bonus cores)
+ */
+
+/*
  * This table encodes knowledge about how the SoC assigns devices and functions
  * to root ports.
  */
