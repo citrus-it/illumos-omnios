@@ -24,7 +24,7 @@
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 RackTop Systems.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Peter Tribble
 #
 
@@ -143,6 +143,16 @@ PKGVERS_BRANCH= $(ONNV_BUILDNUM).0
 PKGVERS= $(PKGVERS_COMPONENT),$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 
 #
+# All packages published by a single build share one timestamp so that
+# they carry a single version string. The value may be provided in the
+# environment so that separate make invocations can share it; by
+# default it is generated once per invocation. It is applied to
+# pkg.fmri by the final transforms, after dependency generation, so
+# that generated depend actions do not embed it.
+#
+PKGVERS_TIMESTAMP :sh= echo ${PKGVERS_TIMESTAMP:-`date -u +%Y%m%dT%H%M%SZ`}
+
+#
 # The ARCH32 and ARCH64 macros are used in the manifests to express
 # architecture-specific subdirectories in the installation paths
 # for isaexec'd commands.
@@ -165,7 +175,7 @@ i386_ARCH64= amd64
 #
 PM_TRANSFORMS= common_actions publish restart_fmri facets defaults \
 	extract_metadata
-PM_FINAL_TRANSFORMS= strip_dependinfo
+PM_FINAL_TRANSFORMS= strip_dependinfo timestamp
 PM_INC= transforms manifests
 
 JAVA_8_ONLY=
@@ -568,6 +578,7 @@ $(PDIR)/%.fin: $(PDIR)/%.res
 	$(PKGDEBUG)if [ -s $(<) ]; then \
 		print "Running final transforms for $(<F)"; \
 		$(PKGMOGRIFY) $(PKGMOG_VERBOSE) $(PM_INC:%= -I %) -O $(@) \
+		    -D PKGVERS_TIMESTAMP=$(PKGVERS_TIMESTAMP) \
 		    $(<) $(PM_FINAL_TRANSFORMS); \
 	else \
 		$(TOUCH) $(@); \
@@ -578,7 +589,8 @@ $(PDIR)/%.pub: $(PDIR)/%.fin
 	r=$${m#$(@F:%.pub=%.metadata.)+(?).}; \
 	if [ -s $(<) ]; then \
 		print "Publishing $(@F:%.pub=%) to $$r repository"; \
-		pkgsend -s file://$(PKGDEST)/repo.$$r publish \
+		pkgsend -D allow-timestamp \
+		    -s file://$(PKGDEST)/repo.$$r publish \
 		    -d $(PKGROOT) -d $(TOOLSROOT) \
 		    -d license_files -d $(PKGROOT)/licenses \
 		    --fmri-in-manifest --no-index --no-catalog $(<) \

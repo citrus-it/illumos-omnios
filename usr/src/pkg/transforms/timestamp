@@ -1,0 +1,24 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"). You may
+# only use this file in accordance with the terms of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source. A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+#
+
+#
+# Publish every package with an explicit timestamp, shared by all of
+# the packages from a single build, rather than letting the packaging
+# repository record the time at which each package's publication
+# transaction happened to open. Packages within a build already share
+# the rest of their version; with a shared timestamp the full version
+# string is identical across the build. That provides some optimisation
+# opportunities.
+#
+<transform set name=pkg.fmri -> edit value $ :$(PKGVERS_TIMESTAMP)>
