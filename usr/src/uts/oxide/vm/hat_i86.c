@@ -30,6 +30,7 @@
  * Copyright 2018 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -630,6 +631,20 @@ hat_free_start(hat_t *hat)
 		cv_wait(&hat_list_cv, &hat_list_lock);
 	hat->hat_flags |= HAT_FREEING;
 	mutex_exit(&hat_list_lock);
+
+	/*
+	 * With HAT_FREEING set, mappings and pagetables are torn down with
+	 * no further TLB invalidation, on the premise that no CPU can be
+	 * using this hat. Every caller ensures that before as_free(). The
+	 * process is single-threaded after exitlwps() and every LWP left
+	 * this address space via hat_thread_exit(), whose hat_switch() only
+	 * removes a CPU from the active set once its translations for this
+	 * context have been flushed. The per-CPU HAT_PCP hats are never a
+	 * hat_switch() target and keep their owning CPU in hat_cpus for
+	 * life.
+	 */
+	ASSERT((hat->hat_flags & HAT_PCP) != 0 ||
+	    CPUSET_ISNULL(hat->hat_cpus));
 }
 
 /*
@@ -1391,19 +1406,41 @@ hat_switch(hat_t *hat)
 {
 	cpu_t *cpu = CPU;
 	hat_t *old = cpu->cpu_current_hat;
+	ulong_t flag;
+
+	if (old == hat)
+		return;
 
 	/*
-	 * set up this information first, so we don't miss any cross calls
+	 * Switching context involves multiple steps. This CPU:
+	 *
+	 *  o joins the new HAT's active set;
+	 *  o updates `cpu_hurrent_hat`;
+	 *  o installs any per-CPU pagetable copies;
+	 *  o loads %cr3;
+	 *  o retires the old context's cached translations;
+	 *  o and only then leaves the old HAT's active set.
+	 *
+	 * Until the final step completes, the old HAT's bookkeeping and this
+	 * CPU's hardware state disagree, and a cross call delivered
+	 * mid-transition would be checked against that inconsistent state.
+	 * For example `hati_demap_func()` consults cpu_current_hat, and KPTI
+	 * invpcid emulation reads kf_user_cr3. We disable interrupts across
+	 * the whole transmission to close that window, leaving the departure
+	 * flush below as the single point before which this CPU is visible
+	 * to shootdowns against the old context and after which it holds
+	 * none of its translations.
 	 */
-	if (old != NULL) {
-		if (old == hat)
-			return;
-		if (old != kas.a_hat)
-			CPUSET_ATOMIC_DEL(old->hat_cpus, cpu->cpu_id);
-	}
+	flag = intr_clear();
 
 	/*
-	 * Add this CPU to the active set for this HAT.
+	 * Add this CPU to the active set for the new HAT and make it current
+	 * before the new top level is loaded, so that no cross call for the
+	 * new context is missed once translations for it can be cached. The
+	 * old HAT's active set is not touched here as this CPU must remain
+	 * visible to shootdowns against the old context until the flush
+	 * below has retired every translation this CPU may hold for it. See
+	 * the matching removal at the end of this function.
 	 */
 	if (hat != kas.a_hat) {
 		CPUSET_ATOMIC_ADD(hat->hat_cpus, cpu->cpu_id);
@@ -1414,7 +1451,6 @@ hat_switch(hat_t *hat)
 	uint64_t pcide = getcr4() & CR4_PCIDE;
 	uint64_t kcr3, ucr3;
 	pfn_t tl_kpfn;
-	ulong_t	flag;
 
 	EQUIV(kpti_enable, !mmu.pt_global);
 
@@ -1446,21 +1482,26 @@ hat_switch(hat_t *hat)
 	}
 
 	/*
-	 * We will already be taking shootdowns for our new HAT, and as KPTI
-	 * invpcid emulation needs to use kf_user_cr3, make sure we don't get
-	 * any cross calls while we're inconsistent.  Note that it's harmless to
-	 * have a *stale* kf_user_cr3 (we just did a FLUSH_TLB_ALL), but a
-	 * *zero* kf_user_cr3 is not going to go very well.
+	 * KPTI invpcid emulation needs to use kf_user_cr3. A *stale*
+	 * kf_user_cr3 would be harmless (we just did a FLUSH_TLB_ALL) but a
+	 * *zero* kf_user_cr3 would not.
 	 */
-	if (pcide)
-		flag = intr_clear();
-
 	reset_kpti(&cpu->cpu_m.mcpu_kpti, kcr3, ucr3);
 	reset_kpti(&cpu->cpu_m.mcpu_kpti_flt, kcr3, ucr3);
 	reset_kpti(&cpu->cpu_m.mcpu_kpti_dbg, kcr3, ucr3);
 
-	if (pcide)
-		intr_restore(flag);
+	/*
+	 * Only now that the old context's translations have been flushed
+	 * may this CPU leave the old HAT's active set. Removing it any
+	 * earlier opens a window in which a concurrent unload of the old
+	 * HAT's mappings finds no CPU left to cross call, completes, and
+	 * frees pagetable pages while this CPU's translation caches still
+	 * hold references to them.
+	 */
+	if (old != NULL && old != kas.a_hat)
+		CPUSET_ATOMIC_DEL(old->hat_cpus, cpu->cpu_id);
+
+	intr_restore(flag);
 
 	ASSERT(cpu == CPU);
 }
@@ -2343,7 +2384,9 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 
 	/*
 	 * If the target hat isn't the kernel and this CPU isn't operating
-	 * in the target hat, we can ignore the cross call.
+	 * in the target hat, we can ignore the cross call. This test is
+	 * only trustworthy because hat_switch() disables interrupts while
+	 * switching things around.
 	 */
 	if (hat != kas.a_hat && hat != CPU->cpu_current_hat)
 		return (0);
