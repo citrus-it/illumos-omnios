@@ -258,6 +258,69 @@ static oxide_board_def_t oxide_board_defs[] = {
 		}
 	}, {
 		.obdef_board_data = {
+			.obd_board = OXIDE_BOARD_METRO,
+			.obd_rootnexus = "Oxide,Metro",
+			.obd_bsu_slot = { 17, 18 },
+			.obd_ipccmode = IPCC_MODE_ESPI0,
+			.obd_ipccspintr = IPCC_SPINTR_SP5_AGPIO2,
+			.obd_ipccemcr = true,
+			.obd_measure_root = true,
+			.obd_startupopts = IPCC_STARTUP_KMDB_BOOT |
+			    IPCC_STARTUP_VERBOSE | IPCC_STARTUP_PROM,
+			.obd_engines = { oxio_metro },
+			.obd_nengines = { &oxio_metro_nengines },
+			.obd_tdp = 500, /* W */
+			.obd_ppt = 500, /* W */
+			.obd_edc = 330, /* A */
+			.obd_tdc = 235,	/* A */
+			.obd_pcie_gen5_eq_preset_mask =
+			    PCIE_PORT_LC_PRST_MASK_CTL_P(4) |
+			    PCIE_PORT_LC_PRST_MASK_CTL_P(5),
+			.obd_wd = IOMUX_CFG_ENTRY(22,
+			    TURIN_FCH_IOMUX_22_AGPIO22)
+		},
+		.obdef_iomux = {
+			/* UART0 - Console */
+			IOMUX_CFG_ENTRY(135, TURIN_FCH_IOMUX_135_UART0_CTS_L),
+			IOMUX_CFG_ENTRY(136, TURIN_FCH_IOMUX_136_UART0_RXD),
+			IOMUX_CFG_ENTRY(137, TURIN_FCH_IOMUX_137_UART0_RTS_L),
+			IOMUX_CFG_ENTRY(138, TURIN_FCH_IOMUX_138_UART0_TXD),
+			/* SP_TO_SP5_INT_L_V1P8 */
+			IOMUX_CFG_ENTRY(2, TURIN_FCH_IOMUX_2_AGPIO2),
+		},
+		.obdef_tests = {
+			{
+				.obt_func = eb_eval_socket,
+				.obt_socket = X86_SOCKET_SP5
+			}, {
+				.obt_func = eb_eval_chiprev,
+				.obt_chiprev = {
+					X86_CHIPREV_AMD_TURIN_ANY,
+					X86_CHIPREV_AMD_DENSE_TURIN_ANY
+				}
+			}, {
+				.obt_func = eb_eval_romtype,
+				.obt_romtype =
+				    FCH_MISC_A_STRAPSTATUS_ROMTYPE_ESPI_SAFS
+			}, {
+				/*
+				 * XXX - what can we do here to differentiate?
+				 */
+				.obt_func = eb_eval_gpio_tristate,
+				.obt_tristate = {
+					.otgt_gpionum = 21,
+					.otgt_iomux = IOMUX_CFG_ENTRY(21,
+					    TURIN_FCH_IOMUX_21_AGPIO21),
+					.otgt_expect = {
+						.ogt_floating = OGS_LOW,
+						.ogt_pulledup = OGS_LOW,
+						.ogt_pulleddown = OGS_LOW
+					}
+				}
+			}
+		}
+	}, {
+		.obdef_board_data = {
 			.obd_board = OXIDE_BOARD_COSMO,
 			.obd_rootnexus = "Oxide,Cosmo",
 			.obd_bsu_slot = { 17, 18 },

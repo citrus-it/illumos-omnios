@@ -128,6 +128,23 @@ static slotmap_t cosmo_slotmap[] = {
 	{ 0x13,	"J3",		slot13_substrate }, /* ExaMax connector */
 };
 
+static slotmap_t metro_slotmap[] = {
+	{ 0x20,	"N0",		slot20_substrate },
+	{ 0x21,	"N1",		slot21_substrate },
+	{ 0x22,	"N2",		slot22_substrate },
+	{ 0x23,	"N3",		slot23_substrate },
+	{ 0x24,	"N4",		slot24_substrate },
+	{ 0x25,	"N5",		slot25_substrate },
+	{ 0x26,	"N6",		slot26_substrate },
+	{ 0x27,	"N7",		slot27_substrate },
+	{ 0x28,	"N8",		slot28_substrate },
+	{ 0x29,	"N9",		slot29_substrate },
+	//{ 0x10,	"U17",		board_substrate }, /* Chip-down Chelsio T6 */
+	{ 0x11,	"M.2 (East)",	board_substrate },
+	{ 0x12,	"M.2 (West)",	board_substrate },
+	{ 0x13,	"J3",		slot13_substrate }, /* ExaMax connector */
+};
+
 typedef struct {
 	const char		*em_product;
 	const slotmap_t		*em_enum;
@@ -137,6 +154,7 @@ typedef struct {
 static const enum_map_t enum_map[] = {
 	{ "Oxide,Gimlet", gimlet_slotmap, ARRAY_SIZE(gimlet_slotmap) },
 	{ "Oxide,Cosmo", cosmo_slotmap, ARRAY_SIZE(cosmo_slotmap) }
+	{ "Oxide,Metro", metro_slotmap, ARRAY_SIZE(metro_slotmap) }
 };
 
 typedef struct {

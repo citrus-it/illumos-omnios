@@ -36,6 +36,7 @@ typedef enum {
 	OXIDE_BOARD_COSMO,
 	OXIDE_BOARD_RUBY,
 	OXIDE_BOARD_RUBYRED,	/* Ruby + Grapefruit */
+	OXIDE_BOARD_METRO,
 } oxide_board_t;
 
 typedef enum {
