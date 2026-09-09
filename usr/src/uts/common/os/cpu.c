@@ -133,7 +133,9 @@ int boot_max_ncpus = -1;
 int boot_ncpus = -1;
 /*
  * Maximum possible CPU id.  This can never be >= NCPU since NCPU is
- * used to size arrays that are indexed by CPU id.
+ * used to size arrays that are indexed by CPU id.  Platforms which assign
+ * CPU ids densely may lower this once the number of possible CPUs is known,
+ * so that per-CPU state indexed by CPU id can be sized by it instead.
  */
 processorid_t max_cpuid = NCPU - 1;
 
@@ -1819,6 +1821,7 @@ cpu_add_unit(cpu_t *cp)
 		max_cpu_seqid_ever = seqid;
 
 	ASSERT(ncpus < max_ncpus);
+	VERIFY3S(cp->cpu_id, <=, max_cpuid);
 	ncpus++;
 	cp->cpu_cache_offset = KMEM_CPU_CACHE_OFFSET(cp->cpu_seqid);
 	cpu[cp->cpu_id] = cp;

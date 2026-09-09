@@ -23,7 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -192,6 +192,7 @@ static dtrace_enabling_t *dtrace_retained;	/* list of retained enablings */
 static dtrace_genid_t	dtrace_retained_gen;	/* current retained enab gen */
 static dtrace_dynvar_t	dtrace_dynhash_sink;	/* end of dynamic hash chains */
 static int		dtrace_dynvar_failclean; /* dynvars failed to clean */
+static int		dtrace_ncpus;		/* per-CPU slots per state */
 
 /*
  * DTrace Locking
@@ -626,7 +627,7 @@ dtrace_canstore_statvar(uint64_t addr, size_t sz, size_t *remain,
 		return (0);
 
 	maxglobalsize = dtrace_statvar_maxsize + sizeof (uint64_t);
-	maxlocalsize = maxglobalsize * NCPU;
+	maxlocalsize = maxglobalsize * dtrace_ncpus;
 
 	for (i = 0; i < nsvars; i++) {
 		dtrace_statvar_t *svar = svars[i];
@@ -1628,7 +1629,7 @@ dtrace_dynvar_clean(dtrace_dstate_t *dstate)
 	dtrace_dynvar_t **rinsep;
 	int i, j, work = 0;
 
-	for (i = 0; i < NCPU; i++) {
+	for (i = 0; i < dtrace_ncpus; i++) {
 		dcpu = &dstate->dtds_percpu[i];
 		rinsep = &dcpu->dtdsc_rinsing;
 
@@ -1666,7 +1667,7 @@ dtrace_dynvar_clean(dtrace_dstate_t *dstate)
 			 * rinsing list -- and then we borrow this CPU to
 			 * rinse our dirty list.
 			 */
-			for (j = 0; j < NCPU; j++) {
+			for (j = 0; j < dtrace_ncpus; j++) {
 				dtrace_dstate_percpu_t *rinser;
 
 				rinser = &dstate->dtds_percpu[j];
@@ -1684,7 +1685,7 @@ dtrace_dynvar_clean(dtrace_dstate_t *dstate)
 				break;
 			}
 
-			if (j == NCPU) {
+			if (j == dtrace_ncpus) {
 				/*
 				 * We were unable to find another CPU that
 				 * could accept this dirty list -- we are
@@ -1725,7 +1726,7 @@ dtrace_dynvar_clean(dtrace_dstate_t *dstate)
 
 	dtrace_sync();
 
-	for (i = 0; i < NCPU; i++) {
+	for (i = 0; i < dtrace_ncpus; i++) {
 		dcpu = &dstate->dtds_percpu[i];
 
 		if (dcpu->dtdsc_rinsing == NULL)
@@ -2074,7 +2075,7 @@ retry:
 				case DTRACE_DSTATE_CLEAN: {
 					void *sp = &dstate->dtds_state;
 
-					if (++cpu >= NCPU)
+					if (++cpu >= dtrace_ncpus)
 						cpu = 0;
 
 					if (dcpu->dtdsc_dirty != NULL &&
@@ -6169,7 +6170,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				size_t sz = v->dtdv_type.dtdt_size;
 
 				sz += sizeof (uint64_t);
-				ASSERT(svar->dtsv_size == NCPU * sz);
+				ASSERT(svar->dtsv_size == dtrace_ncpus * sz);
 				a += CPU->cpu_id * sz;
 
 				if (*(uint8_t *)a == UINT8_MAX) {
@@ -6186,7 +6187,8 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				break;
 			}
 
-			ASSERT(svar->dtsv_size == NCPU * sizeof (uint64_t));
+			ASSERT(svar->dtsv_size ==
+			    dtrace_ncpus * sizeof (uint64_t));
 			tmp = (uint64_t *)(uintptr_t)svar->dtsv_data;
 			regs[rd] = tmp[CPU->cpu_id];
 			break;
@@ -6209,7 +6211,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				size_t lim;
 
 				sz += sizeof (uint64_t);
-				ASSERT(svar->dtsv_size == NCPU * sz);
+				ASSERT(svar->dtsv_size == dtrace_ncpus * sz);
 				a += CPU->cpu_id * sz;
 
 				if (regs[rd] == 0) {
@@ -6230,7 +6232,8 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				break;
 			}
 
-			ASSERT(svar->dtsv_size == NCPU * sizeof (uint64_t));
+			ASSERT(svar->dtsv_size ==
+			    dtrace_ncpus * sizeof (uint64_t));
 			tmp = (uint64_t *)(uintptr_t)svar->dtsv_data;
 			tmp[CPU->cpu_id] = regs[rd];
 			break;
@@ -10166,10 +10169,10 @@ dtrace_difo_init(dtrace_difo_t *dp, dtrace_vstate_t *vstate)
 			svarp = &vstate->dtvs_locals;
 
 			if (v->dtdv_type.dtdt_flags & DIF_TF_BYREF)
-				dsize = NCPU * (v->dtdv_type.dtdt_size +
-				    sizeof (uint64_t));
+				dsize = (v->dtdv_type.dtdt_size +
+				    sizeof (uint64_t)) * dtrace_ncpus;
 			else
-				dsize = NCPU * sizeof (uint64_t);
+				dsize = dtrace_ncpus * sizeof (uint64_t);
 
 			break;
 
@@ -12004,7 +12007,7 @@ dtrace_buffer_consumed(dtrace_buffer_t *bufs, hrtime_t when)
 {
 	int i;
 
-	for (i = 0; i < NCPU; i++) {
+	for (i = 0; i < dtrace_ncpus; i++) {
 		dtrace_buffer_t *buf = &bufs[i];
 
 		if (buf->dtb_size == 0)
@@ -12028,7 +12031,7 @@ dtrace_buffer_free(dtrace_buffer_t *bufs)
 {
 	int i;
 
-	for (i = 0; i < NCPU; i++) {
+	for (i = 0; i < dtrace_ncpus; i++) {
 		dtrace_buffer_t *buf = &bufs[i];
 
 		if (buf->dtb_tomax == NULL) {
@@ -13616,7 +13619,8 @@ dtrace_dstate_init(dtrace_dstate_t *dstate, size_t size)
 	dstate->dtds_size = size;
 	dstate->dtds_base = base;
 	dstate->dtds_percpu = kmem_cache_alloc(dtrace_state_cache, KM_SLEEP);
-	bzero(dstate->dtds_percpu, NCPU * sizeof (dtrace_dstate_percpu_t));
+	bzero(dstate->dtds_percpu,
+	    dtrace_ncpus * sizeof (dtrace_dstate_percpu_t));
 
 	hashsize = size / (dstate->dtds_chunksize + sizeof (dtrace_dynhash_t));
 
@@ -13650,10 +13654,10 @@ dtrace_dstate_init(dtrace_dstate_t *dstate, size_t size)
 	VERIFY((uintptr_t)start < limit);
 	VERIFY((uintptr_t)start >= (uintptr_t)base);
 
-	maxper = (limit - (uintptr_t)start) / NCPU;
+	maxper = (limit - (uintptr_t)start) / dtrace_ncpus;
 	maxper = (maxper / dstate->dtds_chunksize) * dstate->dtds_chunksize;
 
-	for (i = 0; i < NCPU; i++) {
+	for (i = 0; i < dtrace_ncpus; i++) {
 		dstate->dtds_percpu[i].dtdsc_free = dvar = start;
 
 		/*
@@ -13663,7 +13667,7 @@ dtrace_dstate_init(dtrace_dstate_t *dstate, size_t size)
 		 * whatever is left over.  In either case, we set the limit to
 		 * be the limit of the dynamic variable space.
 		 */
-		if (maxper == 0 || i == NCPU - 1) {
+		if (maxper == 0 || i == dtrace_ncpus - 1) {
 			limit = (uintptr_t)base + size;
 			start = NULL;
 		} else {
@@ -13776,7 +13780,7 @@ dtrace_state_create(dev_t *devp, cred_t *cr)
 	char c[30];
 	dtrace_state_t *state;
 	dtrace_optval_t *opt;
-	int bufsize = NCPU * sizeof (dtrace_buffer_t), i;
+	int bufsize = dtrace_ncpus * sizeof (dtrace_buffer_t), i;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
 	ASSERT(MUTEX_HELD(&cpu_lock));
@@ -13808,7 +13812,7 @@ dtrace_state_create(dev_t *devp, cred_t *cr)
 		*devp = state->dts_dev;
 
 	/*
-	 * We allocate NCPU buffers.  On the one hand, this can be quite
+	 * We allocate a buffer per CPU.  On the one hand, this can be quite
 	 * a bit of memory per instance (nearly 36K on a Starcat).  On the
 	 * other hand, it saves an additional memory reference in the probe
 	 * path.
@@ -14099,7 +14103,7 @@ dtrace_state_go(dtrace_state_t *state, processorid_t *cpu)
 	dtrace_buffer_t *buf;
 	cyc_handler_t hdlr;
 	cyc_time_t when;
-	int rval = 0, i, j, bufsize = NCPU * sizeof (dtrace_buffer_t);
+	int rval = 0, i, j, bufsize = dtrace_ncpus * sizeof (dtrace_buffer_t);
 	dtrace_icookie_t cookie;
 
 	mutex_enter(&cpu_lock);
@@ -14569,7 +14573,7 @@ dtrace_state_destroy(dtrace_state_t *state)
 	dtrace_ecb_t *ecb;
 	dtrace_vstate_t *vstate = &state->dts_vstate;
 	minor_t minor = getminor(state->dts_dev);
-	int i, pass, bufsize = NCPU * sizeof (dtrace_buffer_t);
+	int i, pass, bufsize = dtrace_ncpus * sizeof (dtrace_buffer_t);
 	dtrace_speculation_t *spec = state->dts_speculations;
 	int nspec = state->dts_nspeculations;
 
@@ -14882,7 +14886,7 @@ dtrace_helper_trace(dtrace_helper_action_t *helper,
 		if ((svar = vstate->dtvs_locals[i]) == NULL)
 			continue;
 
-		ASSERT(svar->dtsv_size >= NCPU * sizeof (uint64_t));
+		ASSERT(svar->dtsv_size >= dtrace_ncpus * sizeof (uint64_t));
 		ent->dtht_locals[i] =
 		    ((uint64_t *)(uintptr_t)svar->dtsv_data)[CPU->cpu_id];
 	}
@@ -16182,8 +16186,15 @@ dtrace_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	dtrace_taskq = taskq_create("dtrace_taskq", 1, maxclsyspri,
 	    1, INT_MAX, 0);
 
+	/*
+	 * Per-CPU state is indexed by CPU id, so size it, and the loops that
+	 * walk it, by the highest possible CPU id rather than by NCPU. On
+	 * platforms that never lower max_cpuid the two are the same.
+	 */
+	dtrace_ncpus = max_cpuid + 1;
+
 	dtrace_state_cache = kmem_cache_create("dtrace_state_cache",
-	    sizeof (dtrace_dstate_percpu_t) * NCPU, DTRACE_STATE_ALIGN,
+	    sizeof (dtrace_dstate_percpu_t) * dtrace_ncpus, DTRACE_STATE_ALIGN,
 	    NULL, NULL, NULL, NULL, NULL, 0);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
@@ -16969,7 +16980,7 @@ dtrace_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		if (copyin((void *)arg, &desc, sizeof (desc)) != 0)
 			return (EFAULT);
 
-		if (desc.dtbd_cpu < 0 || desc.dtbd_cpu >= NCPU)
+		if (desc.dtbd_cpu < 0 || desc.dtbd_cpu >= dtrace_ncpus)
 			return (EINVAL);
 
 		mutex_enter(&dtrace_lock);
@@ -17137,7 +17148,7 @@ dtrace_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		nerrs = state->dts_errors;
 		dstate = &state->dts_vstate.dtvs_dynvars;
 
-		for (i = 0; i < NCPU; i++) {
+		for (i = 0; i < dtrace_ncpus; i++) {
 			dtrace_dstate_percpu_t *dcpu = &dstate->dtds_percpu[i];
 
 			stat.dtst_dyndrops += dcpu->dtdsc_drops;

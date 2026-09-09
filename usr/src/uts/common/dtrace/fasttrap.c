@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/atomic.h>
@@ -259,7 +260,7 @@ fasttrap_mod_barrier(uint64_t gen)
 
 	fasttrap_mod_gen++;
 
-	for (i = 0; i < NCPU; i++) {
+	for (i = 0; i <= max_cpuid; i++) {
 		mutex_enter(&cpu_core[i].cpuc_pid_lock);
 		mutex_exit(&cpu_core[i].cpuc_pid_lock);
 	}
