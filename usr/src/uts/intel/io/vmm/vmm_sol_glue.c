@@ -40,7 +40,7 @@
 /*
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -119,24 +119,17 @@ vtophys(void *va)
 int
 cpusetobj_ffs(const cpuset_t *set)
 {
-	uint_t large, small;
+	uint_t cpu = cpuset_find(set);
 
-	/*
-	 * Rather than reaching into the cpuset_t ourselves, leave that task to
-	 * cpuset_bounds().  The simplicity is worth the extra wasted work to
-	 * find the upper bound.
-	 */
-	cpuset_bounds(set, &small, &large);
-
-	if (small == CPUSET_NOTINSET) {
-		/* The FreeBSD version returns 0 if it find nothing */
+	if (cpu == CPUSET_NOTINSET) {
+		/* The FreeBSD version returns 0 if it finds nothing */
 		return (0);
 	}
 
-	ASSERT3U(small, <=, INT_MAX);
+	ASSERT3U(cpu, <=, INT_MAX);
 
 	/* Least significant bit index starts at 1 for valid results */
-	return (small + 1);
+	return (cpu + 1);
 }
 
 struct vmm_ptp_item {
