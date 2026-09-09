@@ -197,7 +197,7 @@ value to indicate that it is not used as part of the matching criteria.
 The
 .Ar search_flag
 controls the matching criteria:
-.Bl -tag -width GET_ONE -offset Ds
+.Bl -tag -width GET_AUTHPROF -offset Ds
 .It Dv GET_ONE
 The function returns the first match, setting the
 .Fa next
@@ -207,7 +207,43 @@ pointer to
 The function returns all matching entries, using the
 .Fa next
 pointer to create a linked list of all entries that meet the search criteria.
+.It Dv GET_PROF
+Restrict the search to the unauthenticated profile list.
+That is, profiles assigned via
+.Dv PROFS_GRANTED
+in
+.Xr policy.conf 5
+and via the
+.Sy profiles
+keyword in
+.Xr user_attr 5 .
+This flag applies only to
+.Fn getexecuser .
+.It Dv GET_AUTHPROF
+Restrict the search to the authenticated profile list.
+That is, profiles assigned via
+.Dv AUTHPROFS_GRANTED
+in
+.Xr policy.conf 5
+and via the
+.Sy auth_profiles
+keyword in
+.Xr user_attr 5 .
+This flag applies only to
+.Fn getexecuser .
 .El
+.Pp
+If both
+.Dv GET_PROF
+and
+.Dv GET_AUTHPROF
+are specified together, then both the authenticated and unauthenticated
+profile lists are searched.
+The user's assigned authenticated profiles are searched first, followed by
+the user's assigned profiles, and then the default authenticated and
+unauthenticated profiles from
+.Xr policy.conf 5 ,
+in that order.
 .Pp
 Once a list of entries is returned by
 .Fn getexecuser
@@ -303,14 +339,14 @@ if ((execprof = getexecprof("Filesystem Security", NULL, NULL,
 .Pp
 .Sy Example 4 No Check if the
 .Xr tar 1
-utility is in a profile assigned to user
+utility is in an authenticated profile assigned to user
 .Sq wetmore .
 If there is no exact profile entry, the wildcard
 .Pq \&* ,
 if defined, is returned.
 .Bd -literal -offset 4n
 if ((execprof = getexecuser("wetmore", KV_COMMAND, "/usr/bin/tar",
-    GET_ONE)) == NULL) {
+    GET_ONE|GET_AUTHPROF)) == NULL) {
 	 /* do error */
 }
 .Ed

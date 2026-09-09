@@ -29,7 +29,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+/*
+ * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #define	_SYSCALL32	/* make 32-bit compat headers visible */
 
@@ -2663,7 +2666,8 @@ prt_pfl(private_t *pri, int raw, long val)
 		case PRIV_XPOLICY:	s = "PRIV_XPOLICY";	break;
 		case PRIV_AWARE_RESET:  s = "PRIV_AWARE_RESET"; break;
 		case PRIV_PFEXEC:	s = "PRIV_PFEXEC";	break;
-		case NET_MAC_AWARE:	s =  "NET_MAC_AWARE";	break;
+		case PRIV_PFEXEC_AUTH:	s = "PRIV_PFEXEC_AUTH";	break;
+		case NET_MAC_AWARE:	s = "NET_MAC_AWARE";	break;
 		case NET_MAC_AWARE_INHERIT:
 			s = "NET_MAC_AWARE_INHERIT";
 			break;

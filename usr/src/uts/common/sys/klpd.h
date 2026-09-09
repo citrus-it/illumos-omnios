@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_SYS_KLPD_H
@@ -66,6 +67,7 @@ void crklpd_rele(struct credklpd *);
 int pfexec_reg(int);
 int pfexec_unreg(int);
 int pfexec_call(const cred_t *, struct pathname *, cred_t **, boolean_t *);
+int pfexec_auth_drop(void);
 int get_forced_privs(const cred_t *, const char *, priv_set_t *);
 int check_user_privs(const cred_t *, const priv_set_t *);
 
@@ -97,24 +99,31 @@ typedef struct klpd_arg {
 #define	kla_int		kla_data.__idata
 #define	kla_uint	kla_data.__uidata
 
-#define	PFEXEC_ARG_VERS			0x1
+#define	PFEXEC_ARG_VERS			0x2
 #define	PFEXEC_EXEC_ATTRS		0x1	/* pfexec_reply_t */
 #define	PFEXEC_FORCED_PRIVS		0x2	/* priv_set_t */
 #define	PFEXEC_USER_PRIVS		0x3	/* uint32_t */
+#define	PFEXEC_AUTH_DROP		0x4	/* uint32_t */
 
 #define	PFEXEC_ARG_SIZE(bufsize)	\
 	(offsetof(pfexec_arg_t, pfa_data) + (bufsize))
 
 typedef struct pfexec_arg {
-	uint_t	pfa_vers;		/* Caller version */
-	uint_t	pfa_call;		/* Call type */
-	uint_t	pfa_len;		/* Length of data */
-	uid_t	pfa_uid;		/* Real uid of subject */
+	uint_t		pfa_vers;	/* Caller version */
+	uint_t		pfa_call;	/* Call type */
+	uint_t		pfa_len;	/* Length of data */
+	uid_t		pfa_uid;	/* Real uid of subject */
+	pid_t		pfa_pid;	/* Pid of subject */
+	uint_t		pfa_flags;	/* PFA_* flags below */
 	union {
 		char		__pfa_path[1];
 		uint32_t	__pfa_buf[1];
 	} pfa_data;
 } pfexec_arg_t;
+
+#define	PFA_AUTHENTICATED	0x1	/* Subject has PRIV_PFEXEC_AUTH set */
+#define	PFA_HASTTY		0x2	/* Subject has a controlling terminal */
+#define	PFA_TTYFD		0x4	/* Terminal descriptor is attached */
 
 #define	pfa_path	pfa_data.__pfa_path
 #define	pfa_buf		pfa_data.__pfa_buf
@@ -130,6 +139,8 @@ typedef struct pfexec_reply {
 	boolean_t	pfr_scrubenv;
 	boolean_t	pfr_clearflag;
 	boolean_t	pfr_allowed;
+	boolean_t	pfr_authreq;	/* Retry with a terminal descriptor */
+	boolean_t	pfr_setauth;	/* Authenticated; set the flag */
 	uint_t		pfr_ioff;
 	uint_t		pfr_loff;
 } pfexec_reply_t;

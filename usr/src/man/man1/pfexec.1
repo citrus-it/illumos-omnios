@@ -32,6 +32,8 @@
 .Fl P Ar privspec
 .Ar command
 .Op Ar arg Ns ...
+.Nm pfexec
+.Fl k
 .Nm pfsh
 .Op Ar options
 .Op Ar argument Ns ...
@@ -75,6 +77,31 @@ keyword in
 .Xr prof_attr 5
 for all the user's profiles and added to the inheritable set before executing
 the command.
+.Pp
+If the command matches an entry in a profile assigned to the user's
+authenticated profile list
+.Po the
+.Dq Sy auth_profiles
+keyword in
+.Xr user_attr 5
+.Pc ,
+the user is first required to authenticate on the controlling terminal, by
+default with their own password.
+A process without a controlling terminal cannot use the authenticated profile
+list.
+Successful authentication is recorded in the new process and is inherited
+until the real user ID changes, so authenticating once for a command which is
+itself a profile shell provides an authenticated session.
+The authentication conversation may additionally be cached for a limited time
+if the
+.Dq Sy pfexec
+PAM service is configured with a caching module such as
+.Xr pam_timestamp 7 .
+.Pp
+The third form,
+.Nm pfexec Fl k ,
+discards any cached authentication state held for the invoking user and
+controlling terminal.
 .Pp
 For
 .Nm pfexec
@@ -124,4 +151,5 @@ privileges.
 .Xr prof_attr 5 ,
 .Xr user_attr 5 ,
 .Xr attributes 7 ,
+.Xr pam_timestamp 7 ,
 .Xr smf 7

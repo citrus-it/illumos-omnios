@@ -21,7 +21,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_USER_ATTR_H
@@ -75,6 +75,7 @@ struct __FILE;		/* structure tag for type FILE defined in stdio.h */
 #define	USERATTR_GEN_MANUAL_KW		"manual"
 #define	USERATTR_GEN_SYSDEF_KW		"sysdef"
 #define	USERATTR_PROFILES_KW		"profiles"
+#define	USERATTR_AUTHPROFILES_KW	"auth_profiles"
 #define	USERATTR_PROFILES_NONE_KW	"none"
 #define	USERATTR_ROLES_KW		"roles"
 #define	USERATTR_ROLES_NONE_KW		"none"
