@@ -79,6 +79,7 @@ static struct {
 	{ PRIV_AWARE_RESET,		'\0',	"PRIV_AWARE_RESET" },
 	{ PRIV_XPOLICY,			'X',	"PRIV_XPOLICY" },
 	{ PRIV_PFEXEC,			'P',	"PRIV_PFEXEC" },
+	{ PRIV_PFEXEC_AUTH,		'A',	"PRIV_PFEXEC_AUTH" },
 	{ NET_MAC_AWARE,		'M',	"NET_MAC_AWARE" },
 	{ NET_MAC_AWARE_INHERIT,	'M',	"NET_MAC_AWARE_INHERIT" },
 };
@@ -346,9 +347,9 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "usage:\t%s [-vS] [-D|-N] [-f {+-}{DMPX}] [-s spec] "
+	    "usage:\t%s [-vS] [-D|-N] [-f {+-}{ADMPX}] [-s spec] "
 	    "{ pid | core } ...\n"
-	    "\t%s -e [-D|-N] [-M] [-f {+-}{DMPX}] [-s spec] cmd [args ...]\n"
+	    "\t%s -e [-D|-N] [-M] [-f {+-}{ADMPX}] [-s spec] cmd [args ...]\n"
 	    "\t%s -l [-v] [privilege ...]\n"
 	    "  (report, set or list process privileges)\n", command,
 	    command, command);
