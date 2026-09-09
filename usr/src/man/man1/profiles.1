@@ -24,7 +24,9 @@
 .Nd print execution profiles for a user
 .Sh SYNOPSIS
 .Nm
-.Op Fl l
+.Op Fl hlv
+.Op Fl x | X
+.Op Fl c Ar command
 .Op Ar user Ns ...
 .Sh DESCRIPTION
 The
@@ -69,9 +71,21 @@ provide the commands list.
 .Sh OPTIONS
 The following options are supported:
 .Bl -tag -width Ds
+.It Fl c Ar command
+Limit the search to execution profiles which match the provided command.
+.It Fl h
+Display brief syntax help.
 .It Fl l
 Lists the commands in each profile followed by the special process attributes
 such as user and group IDs.
+.It Fl v
+Display more verbose output.
+Profiles which require authentication are annotated with
+.Qq Authentication required .
+.It Fl x
+Restrict the displayed profiles to those which require authentication.
+.It Fl X
+Restrict the displayed profiles to those which do not require authentication.
 .El
 .Sh FILES
 .Bl -item
@@ -132,6 +146,17 @@ tester02:
       Basic Solaris User
           /usr/lib/fs/smbfs/mount    privs=sys_mount
           /usr/lib/fs/smbfs/umount   privs=sys_mount
+      All
+          *
+.Ed
+.Pp
+.Sy Example 3 No Requesting output for a specific command
+.Bd -literal -offset 4n
+% profiles -c /sbin/beadm -l tester02
+tester02:
+      Software Installation
+          /sbin/beadm                uid=0
+                                     gid=bin
       All
           *
 .Ed

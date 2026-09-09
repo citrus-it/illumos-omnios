@@ -27,6 +27,7 @@
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2022 Garrett D'Amore <garrett@damore.org>
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -408,6 +409,7 @@ const struct ioc tioc[] = { /* ('t'<<8) */
 	{ (uint_t)TIOCLBIS,	"TIOCLBIS",	NULL }, /* 127 */
 
 	{ (uint_t)TIOCSCTTY,	"TIOCSCTTY",	NULL }, /* 132 */
+	{ (uint_t)TIOCGRAFT,	"TIOCGRAFT",	NULL }, /* 133 */
 };
 
 const struct ioc pty_ioc[] = { /* ('t'<<8) */

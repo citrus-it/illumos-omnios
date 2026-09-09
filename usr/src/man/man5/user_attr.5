@@ -51,6 +51,7 @@ database consists of a single line with five fields separated by colons
 Line continuations using the backslash
 .Pq \e
 character are permitted.
+Any leading whitespace is stripped from a continuation line.
 Each entry has the form:
 .Pp
 .Sm off
@@ -95,6 +96,13 @@ via
 if the
 .Dv PRIV_PFEXEC
 process flag is set.
+The profiles are evaluated in the order listed, including any profiles which
+they in turn include, and the first entry matching a command determines the
+attributes applied.
+In particular, some of the stock profiles include helper profiles which list
+commands with no attributes in order to trigger authentication; a profile
+which assigns attributes to one of those commands must appear before them in
+the list.
 See
 .Xr pfexec 1 .
 The profile shells such as
@@ -106,6 +114,19 @@ A default profile is assigned in
 .Xr policy.conf 5 .
 If no profiles are assigned, the profile shells do not allow the user to
 execute any commands.
+.It Sy auth_profiles
+Contains an ordered, comma-separated list of profile names chosen from
+.Xr prof_attr 5 .
+The user must authenticate prior to using the rights afforded by these
+profiles.
+This attribute takes precedence over profiles assigned using the
+.Sy profiles
+keyword.
+.Pp
+A list of auth_profiles can also be defined in the
+.Xr policy.conf 5
+file.
+Profiles assigned here will be granted to all users.
 .It Sy roleauth
 Specifies whether a user assuming a role is required to use the role password
 or their own password.

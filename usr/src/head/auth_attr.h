@@ -21,6 +21,7 @@
  */
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  * Copyright (c) 1999 by Sun Microsystems, Inc. All rights reserved.
  */
 
@@ -33,6 +34,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <secdb.h>
+#include <ucred.h>
 
 /*
  * Some macros used internally by the nsswitch code
@@ -95,6 +97,17 @@ extern void setauthattr(void);
 extern void endauthattr(void);
 extern void free_authattr(authattr_t *);
 extern int chkauthattr(const char *, const char *);
+extern int chkauthattr_ucred(const char *, const char *, const ucred_t *);
+extern int chkauthattr_flags(const char *, const char *, uint_t);
+
+/*
+ * Flags for chkauthattr_flags(), selecting the profile sets which are
+ * considered. Unlike chkauthattr() and chkauthattr_ucred(), which decide
+ * whether to include the authenticated profiles from the subject's
+ * credentials, chkauthattr_flags() consults nothing beyond its arguments.
+ */
+#define	CHKAUTHATTR_PROFILES		0x1	/* assigned profiles */
+#define	CHKAUTHATTR_AUTHPROFILES	0x2	/* authenticated profiles */
 
 #ifdef	__cplusplus
 }

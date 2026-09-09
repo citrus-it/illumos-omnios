@@ -42,6 +42,7 @@
 .Op Fl R Ar role Ns Oo \&, Ns Ar role Oc Ns \&...
 .Op Fl s Ar shell
 .Op Fl u Ar uid Op Fl o
+.Op Fl X Ar profile Ns Oo \&, Ns Ar profile Oc Ns \&...
 .Ar login
 .Pp
 .Nm
@@ -57,6 +58,7 @@
 .Op Fl P Ar profile Ns Oo \&, Ns Ar profile Oc Ns \&...
 .Op Fl R Ar role Ns Oo \&, Ns Ar role Oc Ns \&...
 .Op Fl s Ar shell
+.Op Fl X Ar profile Ns Oo \&, Ns Ar profile Oc Ns \&...
 .Sh DESCRIPTION
 .Nm
 adds a new user to the
@@ -67,10 +69,12 @@ and
 .Xr user_attr 5
 files.
 The
-.Fl A
-and
+.Fl A ,
 .Fl P
-options respectively assign authorizations and profiles to the user.
+and
+.Fl X
+options respectively assign authorizations, profiles and authenticated profiles
+to the user.
 The
 .Fl R
 option assigns roles to the user.
@@ -115,9 +119,10 @@ with the
 .Fl K ,
 .Fl p ,
 .Fl P ,
-.Fl R
-or
+.Fl R ,
 .Fl s
+or
+.Fl X
 option
 .Pq or any combination of these options
 sets the default values for the respective fields.
@@ -205,9 +210,10 @@ When used with the
 .Fl g ,
 .Fl P ,
 .Fl p ,
-.Fl R
-or
+.Fl R ,
 .Fl K
+or
+.Fl X
 options, the
 .Fl D
 option sets the default values for the specified fields.
@@ -232,6 +238,8 @@ null
 .It Sy auths
 null
 .It Sy profiles
+null
+.It Sy auth_profiles
 null
 .It Sy proj
 .Sy 3
@@ -319,7 +327,8 @@ options
 .Fl A ,
 .Fl p ,
 .Fl P ,
-.Fl R
+.Fl R ,
+.Fl X
 .Pc .
 See
 .Xr user_attr 5
@@ -372,6 +381,9 @@ field as defined in
 .It Fl P Ar profile
 One or more comma-separated execution profiles defined in
 .Xr prof_attr 5 .
+These profiles are assigned to the user's unauthenticated profile list.
+See also
+.Fl X .
 .It Fl R Ar role
 One or more comma-separated roles defined in
 .Xr user_attr 5 .
@@ -407,6 +419,12 @@ number will be 201.
 .Sy UID Ns No s
 .Sy 0 - Sy 99
 are reserved for allocation by the Operating System.
+.It Fl X Ar profile
+One or more comma-separated execution profiles defined in
+.Xr prof_attr 5 .
+These profiles are assigned to the user's authenticated profile list.
+See also
+.Fl P .
 .El
 .Sh FILES
 .Bl -item
