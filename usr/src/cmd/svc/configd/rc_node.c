@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -194,12 +195,12 @@
  *
  * The software associated with SMF audit events falls into three
  * categories:
- * 	- collecting information to be written to the audit
+ *	- collecting information to be written to the audit
  *	  records
  *	- using the adt_* functions in
  *	  usr/src/lib/libbsm/common/adt.c to generate the audit
  *	  records.
- * 	- handling special cases
+ *	- handling special cases
  *
  * Collecting Information:
  * ----------------------
@@ -269,11 +270,11 @@
  * called.
  *
  * smf_audit_event() takes 4 parameters:
- * 	- the event ID which is one of the ADT_smf_* symbols from
+ *	- the event ID which is one of the ADT_smf_* symbols from
  *	  adt_event.h.
- * 	- status to pass to adt_put_event()
- * 	- return value to pass to adt_put_event()
- * 	- the event data (see audit_event_data structure)
+ *	- status to pass to adt_put_event()
+ *	- return value to pass to adt_put_event()
+ *	- the event data (see audit_event_data structure)
  *
  * All interactions with the auditing software require an audit
  * session.  We use one audit session per configd client.  We keep
@@ -291,12 +292,12 @@
  *
  * There are three major types of special cases:
  *
- * 	- gathering event information for each action in a
+ *	- gathering event information for each action in a
  *	  transaction
- * 	- Higher level events represented by special property
+ *	- Higher level events represented by special property
  *	  group/property name combinations.  Many of these are
  *	  restarter actions.
- * 	- ADT_smf_annotation event
+ *	- ADT_smf_annotation event
  *
  * Processing Transaction Actions:
  * ------------------------------
@@ -1560,7 +1561,7 @@ perm_granted(permcheck_t *pcp)
 	 * Enumerate all the auths defined for the user and return the
 	 * result in ret.
 	 */
-	if (_enum_auths(pw.pw_name, auth_cb, pcp, &ret) < 0)
+	if (_enum_auths(pw.pw_name, uc, auth_cb, pcp, &ret) < 0)
 		return (PERM_FAIL);
 
 	return (ret);
@@ -2872,7 +2873,7 @@ rc_node_ptr_check_and_lock(rc_node_ptr_t *npp, int *res)
 
 #define	RC_NODE_PTR_CHECK_LOCK_OR_FREE_RETURN(np, npp, mem) {		\
 	int rc__res;							\
-	if (((np) = rc_node_ptr_check_and_lock(npp, &rc__res)) == 	\
+	if (((np) = rc_node_ptr_check_and_lock(npp, &rc__res)) ==	\
 	    NULL) {							\
 		if ((mem) != NULL)					\
 			free((mem));					\

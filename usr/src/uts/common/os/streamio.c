@@ -25,7 +25,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Joyent, Inc.
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -5795,6 +5795,11 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 	case TIOCSCTTY:
 	{
 		return (strctty(stp));
+	}
+
+	case TIOCGRAFT:
+	{
+		return (strgraftctty(stp, flag));
 	}
 
 	case TIOCNOTTY:

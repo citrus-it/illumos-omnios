@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -34,6 +35,7 @@
 #include <sys/param.h>
 #include <sys/cmn_err.h>
 #include <sys/cred.h>
+#include <sys/cred_impl.h>
 #include <sys/policy.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
@@ -2354,6 +2356,13 @@ pr_scred(proc_t *p, prcred_t *prcred, cred_t *cr, boolean_t dogrps)
 	    prcred->pr_suid);
 	(void) crsetresgid(newcred, prcred->pr_rgid, prcred->pr_egid,
 	    prcred->pr_sgid);
+
+	/*
+	 * A change of real user ID ends any profile shell and any pfexec
+	 * authentication, as it does in setuid(2).
+	 */
+	if (oldruid != prcred->pr_ruid)
+		CR_FLAGS(newcred) &= ~(PRIV_PFEXEC|PRIV_PFEXEC_AUTH);
 
 	if (dogrps) {
 		(void) crsetgroups(newcred, prcred->pr_ngroups,

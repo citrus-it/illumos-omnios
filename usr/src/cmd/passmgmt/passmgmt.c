@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -85,6 +85,7 @@ typedef struct kvopts {
 kvopts_t ua_opts[] =  {
 { 'A',	USERATTR_AUTHS_KW },
 { 'P',	USERATTR_PROFILES_KW },
+{ 'X',	USERATTR_AUTHPROFILES_KW },
 { 'R',	USERATTR_ROLES_KW },
 { 'T',	USERATTR_TYPE_KW },
 { '\0', USERATTR_DEFAULTPROJ_KW },
@@ -367,7 +368,7 @@ main(int argc, char **argv)
 	/* parse the command line */
 
 	while ((c = getopt(argc, argv,
-	    "ml:c:h:u:g:s:f:e:k:A:P:R:T:oadK:")) != -1) {
+	    "ml:c:h:u:g:s:f:e:k:A:P:R:T:X:oadK:")) != -1) {
 
 		switch (c) {
 		case 'm':
