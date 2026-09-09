@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * Implementation of the vscan statistics interface
  */
 
@@ -125,7 +129,7 @@ vs_stats_check_auth()
 
 	if (((uid = ucred_getsuid(uc)) == (uid_t)-1) ||
 	    ((pw = getpwuid(uid)) == NULL) ||
-	    (chkauthattr(VS_VALUE_AUTH, pw->pw_name) != 1)) {
+	    (chkauthattr_ucred(VS_VALUE_AUTH, pw->pw_name, uc) != 1)) {
 		ucred_free(uc);
 		return (-1);
 	}
@@ -141,7 +145,7 @@ vs_stats_check_auth()
 /* ARGSUSED */
 static void
 vs_stats_door_call(void *cookie, char *ptr, size_t size, door_desc_t *dp,
-		uint_t n_desc)
+    uint_t n_desc)
 {
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	vs_stats_req_t *req = (vs_stats_req_t *)ptr;

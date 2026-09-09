@@ -22,6 +22,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc. All rights reserved.
  * Copyright 2023 RackTop Systems, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_SYS_POLICY_H
@@ -88,6 +89,7 @@ int secpolicy_contract_event(const cred_t *);
 boolean_t secpolicy_contract_event_choice(const cred_t *);
 int secpolicy_coreadm(const cred_t *);
 int secpolicy_cpc_cpu(const cred_t *);
+int secpolicy_ctty_graft(const cred_t *);
 int secpolicy_dispadm(const cred_t *);
 int secpolicy_error_inject(const cred_t *);
 int secpolicy_excl_open(const cred_t *);

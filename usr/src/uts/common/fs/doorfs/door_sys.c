@@ -101,9 +101,6 @@ struct __door_handle {
 	file_t dh_file;
 };
 
-#define	DHTOF(dh) ((file_t *)(dh))
-#define	FTODH(fp) ((door_handle_t)(fp))
-
 static int doorfs(long, long, long, long, long, long);
 
 static struct sysent door_sysent = {
