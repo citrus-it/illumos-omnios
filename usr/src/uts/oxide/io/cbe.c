@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2023 Oxide Computer Co.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/systm.h>
@@ -102,10 +102,11 @@ cbe_fire(caddr_t arg1 __unused, caddr_t arg2 __unused)
 	cyclic_fire(cpu);
 
 	if (cbe_psm_timer_mode != TIMER_ONESHOT && me == 0 && !cross_call) {
-		for (i = 1; i < NCPU; i++) {
-			if (CPU_IN_SET(cbe_enabled, i)) {
-				send_dirint(i, CBE_HIGH_PIL);
-			}
+		ulong_t *bv = CPUSET2BV(cbe_enabled);
+
+		for (i = bt_getlowbit(bv, 1, max_ncpus - 1); i != -1;
+		    i = bt_getlowbit(bv, i + 1, max_ncpus - 1)) {
+			send_dirint(i, CBE_HIGH_PIL);
 		}
 	}
 
