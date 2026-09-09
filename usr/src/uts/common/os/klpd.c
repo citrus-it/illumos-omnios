@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/atomic.h>
@@ -915,9 +916,9 @@ pfexec_call(const cred_t *cr, struct pathname *rpnp, cred_t **pfcr,
 	 * Check the size of the result and the alignment of the
 	 * privilege sets.
 	 */
-	if (da.rsize < sizeof (pr) ||
-	    prp->pfr_ioff > da.rsize - sizeof (priv_set_t) ||
-	    prp->pfr_loff > da.rsize - sizeof (priv_set_t) ||
+	if (da.data_size < sizeof (pr) ||
+	    prp->pfr_ioff > da.data_size - sizeof (priv_set_t) ||
+	    prp->pfr_loff > da.data_size - sizeof (priv_set_t) ||
 	    (prp->pfr_loff & (sizeof (priv_chunk_t) - 1)) != 0 ||
 	    (prp->pfr_ioff & (sizeof (priv_chunk_t) - 1)) != 0)
 		goto out;
@@ -1054,7 +1055,7 @@ get_forced_privs(const cred_t *cr, const char *respn, priv_set_t *set)
 	/*
 	 * Check the size of the result, it's a privilege set.
 	 */
-	if (da.rsize != sizeof (priv_set_t))
+	if (da.data_size != sizeof (priv_set_t))
 		goto out;
 
 	fset = (priv_set_t *)da.rbuf;
@@ -1142,7 +1143,7 @@ check_user_privs(const cred_t *cr, const priv_set_t *set)
 	/*
 	 * Check the size of the result.
 	 */
-	if (da.rsize != sizeof (res))
+	if (da.data_size != sizeof (res))
 		goto out;
 
 	if (*(uint32_t *)da.rbuf == 1)
