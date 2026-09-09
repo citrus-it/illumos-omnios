@@ -39,6 +39,7 @@
 .Op Fl A Ar authorization Ns Oo \&, Ns Ar authorization Ns Oc Ns \&...
 .Op Fl P Ar profile Ns Oo \&, Ns Ar profile Oc Ns \&...
 .Op Fl R Ar role Ns Oo \&, Ns Ar role Oc Ns \&...
+.Op Fl X Ar profile Ns Oo \&, Ns Ar profile Oc Ns \&...
 .Op Fl K Ar key Ns \&= Ns Ar value
 .Ar login
 .Sh DESCRIPTION
@@ -140,6 +141,7 @@ options
 .Fl A ,
 .Fl P ,
 .Fl R ,
+.Fl X ,
 .Fl p
 .Pc .
 See
@@ -243,6 +245,8 @@ One or more comma-separated execution profiles defined in
 This replaces any existing profile setting in
 .Xr user_attr 5 .
 If an empty profile list is specified, the existing setting is removed.
+This option applies to the user's unauthenticated profile list; see also
+.Fl X .
 .It Fl R Ar role
 One or more comma-separated roles
 .Po
@@ -272,6 +276,14 @@ user will not have access to their home directory until the
 .Sy UID
 is manually reassigned using
 .Xr chown 1 .
+.It Fl X Ar profile
+One or more comma-separated execution profiles defined in
+.Xr prof_attr 5 .
+This replaces any existing authenticated profile setting in
+.Xr user_attr 5 .
+If an empty profile list is specified, the existing setting is removed.
+This option applies to the user's authenticated profile list; see also
+.Fl P .
 .El
 .Sh OPERANDS
 The following operands are supported:

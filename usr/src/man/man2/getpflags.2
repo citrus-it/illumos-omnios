@@ -94,6 +94,22 @@ trigger lookups in the
 .Xr exec_attr 5
 database for the current user's profiles and the returned attributes will be
 applied to the new process image.
+If matches are found in the current user's authenticated profile set, and the
+.Dv PRIV_PFEXEC_AUTH
+flag is not also set, the user will be prompted to authenticate in order to
+proceed.
+This flag is inherited by the new process image unless the returned attributes
+cause a real user ID change.
+.It Dv PRIV_PFEXEC_AUTH
+This one bit flag takes the value of 0
+.Pq unset
+or 1
+.Pq set .
+If this flag is set then authentication is not required to apply attributes
+from the current user's authenticated profile set.
+The
+.Dv PRIV_PROC_SETID
+privilege is required to set this flag.
 This flag is inherited by the new process image unless the returned attributes
 cause a real user ID change.
 .It Dv PRIV_DEBUG
@@ -172,6 +188,12 @@ will fail if:
 An attempt was made to unset
 .Dv PRIV_AWARE
 but the observed set invariance condition was not met.
+.It Er EPERM
+An attempt was made to set the
+.Dv PRIV_PFEXEC_AUTH
+flag without the necessary
+.Dv PRIV_PROC_SETID
+privilege.
 .It Er EPERM
 An attempt was made to set one of the
 .Dv NET_MAC_AWARE

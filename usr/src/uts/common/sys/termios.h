@@ -26,6 +26,7 @@
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  *
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_TERMIOS_H
@@ -439,6 +440,7 @@ struct ppsclockev32 {
 #define	TIOCOUTQ	(tIOC|115)	/* driver output queue size */
 #define	TIOCNOTTY	(tIOC|113)	/* void tty association */
 #define	TIOCSCTTY	(tIOC|132)	/* get a ctty */
+#define	TIOCGRAFT	(tIOC|133)	/* graft another session's ctty */
 #define	TIOCSTOP	(tIOC|111)	/* stop output, like ^S */
 #define	TIOCSTART	(tIOC|110)	/* start output, like ^Q */
 #define	TIOCSILOOP	(tIOC|109)	/* private to Sun; do not use */

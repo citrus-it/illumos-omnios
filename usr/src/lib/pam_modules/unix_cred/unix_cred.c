@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <nss_dbdefs.h>
@@ -154,7 +154,7 @@ finddeflim(const char *name, kva_t *kva, void *ctxt, void *pres)
 /*
  *	unix_cred - pam_sm_setcred
  *
- *	Entry flags = 	PAM_ESTABLISH_CRED, set up Solaris Unix cred.
+ *	Entry flags =	PAM_ESTABLISH_CRED, set up Solaris Unix cred.
  *			PAM_DELETE_CRED, NOP, return PAM_SUCCESS.
  *			PAM_REINITIALIZE_CRED, set up Solaris Unix cred,
  *				or merge the current context with the new
@@ -579,7 +579,7 @@ adt_done:
 	tset = def = lim = NULL;
 	deflim.def = deflim.lim = NULL;
 
-	(void) _enum_attrs(user, finddeflim, NULL, &deflim);
+	(void) _enum_attrs(user, NULL, finddeflim, NULL, &deflim);
 
 	if (getset(deflim.lim, &lim) != 0 || getset(deflim.def, &def) != 0) {
 		ret = PAM_SYSTEM_ERR;

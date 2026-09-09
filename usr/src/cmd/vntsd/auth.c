@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * Authorization checking:
  *
  * These functions check 'vntsd' authorization to access guest consoles.
@@ -67,41 +71,6 @@
 #define	VNTSD_AUTH_PREFIXLEN	32			 /* max len of prefix */
 
 /*
- * socket_peer_euid()
- *
- * Return the effective UID (EUID) of the socket peer.
- * If none, return -1.
- *
- * Parameters:
- * sock_fd	The socket fd of a locally-connected socket (mapped to a pid)
- *
- * Returns:
- * EUID if OK
- * -1 on failure or unknown EUID (passed on from ucred_geteuid()).
- */
-static uid_t
-socket_peer_euid(int sock_fd)
-{
-	int		rc;
-	uid_t		peer_euid;
-	ucred_t		*ucredp = NULL;
-
-	/* Get info on the peer on the other side of the socket */
-	rc = getpeerucred(sock_fd, &ucredp);
-	if (rc == -1) {
-		/* If errno is EINVAL, it's probably a non-local socket peer */
-		return ((uid_t)-1);
-	}
-
-	/* Extract effective UID (EUID) info for the socket peer process */
-	peer_euid = ucred_geteuid(ucredp);
-	ucred_free(ucredp);
-
-	/* Return EUID */
-	return (peer_euid);
-}
-
-/*
  * auth_check_username()
  *
  * Check vntsd console authorization, given a user account.
@@ -115,7 +84,7 @@ socket_peer_euid(int sock_fd)
  * 0 if OK (authorized), 1 on authorization failure.
  */
 static int
-auth_check_username(char *username, char *group_name)
+auth_check_username(char *username, const ucred_t *ucredp, char *group_name)
 {
 	int	auth_granted = 0;
 	char	authname[VNTSD_AUTH_PREFIXLEN + MAXPATHLEN];
@@ -134,11 +103,11 @@ auth_check_username(char *username, char *group_name)
 	 * First, check if the user is authorized access to all consoles. If it
 	 * fails, check authorization to the specific console group.
 	 */
-	auth_granted = chkauthattr(VNTSD_AUTH_ALLCONS, username);
+	auth_granted = chkauthattr_ucred(VNTSD_AUTH_ALLCONS, username, ucredp);
 	if (auth_granted)
 		return (0);
 
-	auth_granted = chkauthattr(authname, username);
+	auth_granted = chkauthattr_ucred(authname, username, ucredp);
 	if (auth_granted)
 		return (0);
 
@@ -146,23 +115,25 @@ auth_check_username(char *username, char *group_name)
 }
 
 /*
- * auth_check_euid()
+ * auth_check_ucred()
  *
- * Check vntsd console authorization, given a EUID.
+ * Check vntsd console authorization, given a user credential.
  *
  * Parameters:
- * euid		The effective UID of a user account to check authorization
+ * ucredp	The credential of the user account to check
  * group_name	The name of the console group to check authorization
  *
  * Returns:
  * 0 if OK (authorized), 1 on authorization failure.
  */
 static int
-auth_check_euid(uid_t euid, char *group_name)
+auth_check_ucred(const ucred_t *ucredp, char *group_name)
 {
 	struct passwd	*passwdp = NULL;
 	char		*username = NULL;
+	uid_t		euid;
 
+	euid = ucred_geteuid(ucredp);
 	/* If EUID is -1, then it's unknown, so fail */
 	if (euid == (uid_t)-1) {
 		return (1);
@@ -176,7 +147,7 @@ auth_check_euid(uid_t euid, char *group_name)
 	username = passwdp->pw_name;
 
 	/* Do authorization check: */
-	return (auth_check_username(username, group_name));
+	return (auth_check_username(username, ucredp, group_name));
 }
 
 /*
@@ -195,18 +166,18 @@ auth_check_euid(uid_t euid, char *group_name)
 boolean_t
 auth_check_fd(int sock_fd, char *group_name)
 {
-	uid_t	peer_euid;
 	int	rv;
+	ucred_t	*ucredp = NULL;
 
-	peer_euid = socket_peer_euid(sock_fd);
-	if (peer_euid == (uid_t)-1) { /* unknown EUID */
+	if (getpeerucred(sock_fd, &ucredp) == -1)
 		return (B_FALSE);
-	}
 
 	/* Do authorization check: */
-	rv = auth_check_euid(peer_euid, group_name);
-	if (rv != 0) {
+	rv = auth_check_ucred(ucredp, group_name);
+
+	ucred_free(ucredp);
+
+	if (rv != 0)
 		return (B_FALSE);
-	}
 	return (B_TRUE);
 }

@@ -25,7 +25,9 @@
 .Nm free_authattr ,
 .Nm setauthattr ,
 .Nm endauthattr ,
-.Nm chkauthattr
+.Nm chkauthattr ,
+.Nm chkauthattr_flags ,
+.Nm chkauthattr_ucred
 .Nd get authorization entry
 .Sh LIBRARY
 .Lb libsecdb
@@ -56,6 +58,18 @@
 .Fo chkauthattr
 .Fa "const char *authname"
 .Fa "const char *username"
+.Fc
+.Ft int
+.Fo chkauthattr_flags
+.Fa "const char *authname"
+.Fa "const char *username"
+.Fa "uint_t flags"
+.Fc
+.Ft int
+.Fo chkauthattr_ucred
+.Fa "const char *authname"
+.Fa "const char *username"
+.Fa "const ucred_t *cred"
 .Fc
 .Sh DESCRIPTION
 The
@@ -153,6 +167,15 @@ and returns 1 if the given authorization is in any profiles specified with
 the
 .Sy PROFS_GRANTED
 keyword.
+If the current process has the
+.Dv PRIV_PFEXEC_AUTH
+property set, and its real user ID matches
+.Fa username ,
+then the
+.Sy AUTHPROFS_GRANTED
+key in
+.Xr policy.conf 5
+is also checked.
 If a match is not found from the default authorizations and default profiles,
 .Fn chkauthattr
 reads the
@@ -164,10 +187,53 @@ it reads the
 .Xr prof_attr 5
 database, using the list of profiles assigned to the user, and checks if any of
 the profiles assigned to the user has the given authorization.
+If the current process has the
+.Dv PRIV_PFEXEC_AUTH
+property set, and its real user ID matches
+.Fa username ,
+then the authenticated profiles assigned to the user are also checked.
 The
 .Fn chkauthattr
 function returns 0 if it does not find a match in any of the three sources or
 if the user does not exist.
+.Pp
+.Fn chkauthattr_ucred
+is a variant of
+.Fn chkauthattr
+that uses the provided
+.Fa ucred
+when determining whether the
+.Sy AUTHPROFS_GRANTED
+key in
+.Xr policy.conf 5
+and the user's assigned authenticated profiles are checked.
+.Pp
+.Fn chkauthattr_flags
+is a variant of
+.Fn chkauthattr
+for callers which check the authorizations of users other than the owner of
+the current process.
+It consults nothing beyond its arguments; the credentials of the calling
+process play no part.
+The profile sets to be searched are selected by
+.Fa flags :
+.Bl -tag -width CHKAUTHATTR_AUTHPROFILES -offset Ds
+.It Dv CHKAUTHATTR_PROFILES
+Search the user's assigned profiles and the profiles granted through the
+.Sy PROFS_GRANTED
+and
+.Sy CONSOLE_USER
+keys in
+.Xr policy.conf 5 .
+.It Dv CHKAUTHATTR_AUTHPROFILES
+Search the user's assigned authenticated profiles and the profiles granted
+through the
+.Sy AUTHPROFS_GRANTED
+key in
+.Xr policy.conf 5 .
+This should only be included by a caller which has itself authenticated the
+user.
+.El
 .Pp
 A user is considered to have been assigned an authorization if either of the
 following are true:
