@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
@@ -51,7 +55,7 @@ extern "C" {
  * to modify the contents of a session structure it must hold multiple
  * locks.  The locking order for all the locks that may need to be
  * acquired is:
- * 	sd_lock -> pidlock -> p_splock -> s_lock
+ *	sd_lock -> pidlock -> p_splock -> s_lock
  *
  * If a caller requires access to a session structure for long
  * periods of time or across operations that may block it should
@@ -84,7 +88,7 @@ typedef struct sess {
 	struct pid *s_sidp;		/* session ID info, never changes */
 
 	kmutex_t s_lock;		/* protects everything below */
-	uint_t s_ref; 			/* reference count */
+	uint_t s_ref;			/* reference count */
 	boolean_t s_sighuped;		/* ctty had sighup sent to it */
 
 	boolean_t s_exit;		/* sesion leader is exiting */
@@ -100,6 +104,7 @@ typedef struct sess {
 	dev_t s_dev;			/* tty's device number */
 	struct vnode *s_vp;		/* tty's vnode */
 	struct cred *s_cred;		/* allocation credentials */
+	boolean_t s_graft;		/* ctty grafted from another session */
 } sess_t;
 
 #define	s_sid s_sidp->pid_id
@@ -121,6 +126,7 @@ extern void tty_rele(sess_t *sp);
 
 extern void sess_create(void);
 extern int strctty(struct stdata *);
+extern int strgraftctty(struct stdata *, int);
 extern int freectty(boolean_t);
 extern dev_t cttydev(struct proc *);
 extern void ctty_clear_sighuped(void);
