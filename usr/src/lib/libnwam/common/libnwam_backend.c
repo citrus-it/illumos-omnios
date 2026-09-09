@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <assert.h>
 #include <auth_attr.h>
 #include <auth_list.h>
@@ -59,7 +63,7 @@ static int backend_door_client_fd = -1;
  * enable/disable of profiles and manipulation of Known WLANs.
  */
 static nwam_error_t
-nwam_check_auths(uid_t uid, boolean_t write, uint64_t flags)
+nwam_check_auths(uid_t uid, ucred_t *cr, boolean_t write, uint64_t flags)
 {
 	struct passwd *pwd;
 	nwam_error_t err = NWAM_SUCCESS;
@@ -71,13 +75,17 @@ nwam_check_auths(uid_t uid, boolean_t write, uint64_t flags)
 
 	if (flags & NWAM_FLAG_ENTITY_ENABLE) {
 		/* Enabling/disabling profile - need SELECT auth */
-		if (chkauthattr(AUTOCONF_SELECT_AUTH, pwd->pw_name) == 0)
+		if (chkauthattr_ucred(AUTOCONF_SELECT_AUTH, pwd->pw_name,
+		    cr) == 0) {
 			err = NWAM_PERMISSION_DENIED;
+		}
 
 	} else if (flags & NWAM_FLAG_ENTITY_KNOWN_WLAN) {
 		/* Known WLAN activity - need WLAN auth */
-		if (chkauthattr(AUTOCONF_WLAN_AUTH, pwd->pw_name) == 0)
+		if (chkauthattr_ucred(AUTOCONF_WLAN_AUTH, pwd->pw_name,
+		    cr) == 0) {
 			err = NWAM_PERMISSION_DENIED;
+		}
 
 	} else {
 		/*
@@ -85,12 +93,13 @@ nwam_check_auths(uid_t uid, boolean_t write, uint64_t flags)
 		 * auth is not present, and write is true, fail, otherwise
 		 * check for READ.
 		 */
-		if (chkauthattr(AUTOCONF_WRITE_AUTH, pwd->pw_name) == 0) {
+		if (chkauthattr_ucred(AUTOCONF_WRITE_AUTH, pwd->pw_name,
+		    cr) == 0) {
 			if (write) {
 				err = NWAM_PERMISSION_DENIED;
 			} else {
-				if (chkauthattr(AUTOCONF_READ_AUTH,
-				    pwd->pw_name) == 0)
+				if (chkauthattr_ucred(AUTOCONF_READ_AUTH,
+				    pwd->pw_name, cr) == 0)
 					err = NWAM_PERMISSION_DENIED;
 			}
 		}
@@ -232,7 +241,7 @@ nwam_backend_door_server(void *cookie, char *arg, size_t arg_size,
 
 	if (req->nwbda_cmd == NWAM_BACKEND_DOOR_CMD_READ_REQ)
 		write = B_FALSE;
-	if ((err = nwam_check_auths(uid, write, req->nwbda_flags))
+	if ((err = nwam_check_auths(uid, ucr, write, req->nwbda_flags))
 	    != NWAM_SUCCESS) {
 		if (write) {
 			nwam_record_audit_event(ucr,
@@ -420,7 +429,7 @@ nwam_error_t
 nwam_read_object_from_backend(char *dbname, char *objname,
     uint64_t flags, void *obj)
 {
-	nwam_error_t err = nwam_check_auths(getuid(), B_FALSE, flags);
+	nwam_error_t err = nwam_check_auths(getuid(), NULL, B_FALSE, flags);
 
 	if (err != NWAM_SUCCESS)
 		return (err);
@@ -438,7 +447,7 @@ nwam_error_t
 nwam_update_object_in_backend(char *dbname, char *objname,
     uint64_t flags, void *obj)
 {
-	nwam_error_t err = nwam_check_auths(getuid(), B_TRUE, flags);
+	nwam_error_t err = nwam_check_auths(getuid(), NULL, B_TRUE, flags);
 
 	if (err != NWAM_SUCCESS)
 		return (err);
@@ -456,7 +465,7 @@ nwam_update_object_in_backend(char *dbname, char *objname,
 nwam_error_t
 nwam_remove_object_from_backend(char *dbname, char *objname, uint64_t flags)
 {
-	nwam_error_t err = nwam_check_auths(getuid(), B_TRUE, flags);
+	nwam_error_t err = nwam_check_auths(getuid(), NULL, B_TRUE, flags);
 
 	if (err != NWAM_SUCCESS)
 		return (err);

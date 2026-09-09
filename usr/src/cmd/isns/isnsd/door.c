@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2025 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include    <libxml/xmlreader.h>
@@ -946,7 +946,7 @@ process_mgmt_request(xmlDocPtr x_doc, request_t *req, ucred_t *uc)
 
 	/* write operations are restricted. */
 	if ((op == delete_op) || (op == createModify_op)) {
-	    if (!chkauthattr(ISNS_ADMIN_WRITE_AUTH, pwd->pw_name)) {
+	    if (!chkauthattr_ucred(ISNS_ADMIN_WRITE_AUTH, pwd->pw_name, uc)) {
 		if (ctext) xmlXPathFreeContext(ctext);
 		return (ERR_DOOR_SERVER_DETECTED_NOT_AUTHORIZED_USER);
 	    }

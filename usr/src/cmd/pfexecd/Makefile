@@ -21,20 +21,22 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-#
-# Makefile for the pfexec daemon.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG=		pfexecd
 MANIFEST=	pfexecd.xml
-SRCS=		$(PROG:%=%.c)
+OBJS=		pfexecd.o isapath.o
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
 
-TARGET=	all
+CSTD = $(CSTD_GNU17)
 
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 
+LDFLAGS += $(ZASLR)
 LDLIBS += -lsecdb
 
 # install macros and rule
@@ -47,15 +49,22 @@ $(ROOTPROG)	:= FILEMODE= 555
 
 all: $(PROG)
 
+$(PROG): $(SRCS) $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDFLAGS) $(LDLIBS)
+	$(POST_PROCESS)
+
 install: all .WAIT $(ROOTPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 clean:
+	$(RM) $(OBJS)
 
 check:	$(CHKMANIFEST)
 
 ${ROOTLIB}/%: %
 	${INS.file}
 
-lint: lint_SRCS
+%.o: %.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 include ../Makefile.targ
