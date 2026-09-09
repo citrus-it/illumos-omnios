@@ -24,7 +24,7 @@
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -495,6 +495,12 @@ mlsetup(struct regs *rp)
 			}
 		}
 	}
+
+	/*
+	 * CPU ids are assigned below max_ncpus, so record the highest possible
+	 * id for the benefit of code which sizes per-CPU state by it.
+	 */
+	max_cpuid = max_ncpus - 1;
 
 	/*
 	 * Initialize the lgrp framework
