@@ -13,7 +13,7 @@
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2026 Oxide Computer Company
 #
 
@@ -68,6 +68,7 @@ SUBDIRS =       \
 
 PROGS = \
 	clock_gettime \
+	door_kernel_only \
 	eventfd \
 	fifo-tvnsec \
 	odirectory \
