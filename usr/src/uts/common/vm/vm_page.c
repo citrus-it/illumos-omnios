@@ -23,7 +23,7 @@
  * Copyright (c) 2015, Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2024 MNX Cloud, Inc.
  */
 
@@ -360,16 +360,13 @@ pcf_init(void)
 #endif /* sun4v */
 
 	/*
-	 * Round up to the nearest power of 2.
+	 * Round down to a power of 2. The fanout gains nothing from exceeding
+	 * the number of CPUs, and every sweep of the pcf array, including the
+	 * one made by set_freemem() on each clock tick, scales with it.
 	 */
 	pcf_fanout = MIN(pcf_fanout, MAX_PCF_FANOUT);
-	if (!ISP2(pcf_fanout)) {
-		pcf_fanout = 1 << highbit(pcf_fanout);
-
-		if (pcf_fanout > MAX_PCF_FANOUT) {
-			pcf_fanout = 1 << (highbit(MAX_PCF_FANOUT) - 1);
-		}
-	}
+	if (!ISP2(pcf_fanout))
+		pcf_fanout = 1 << (highbit(pcf_fanout) - 1);
 	pcf_fanout_mask = pcf_fanout - 1;
 }
 
