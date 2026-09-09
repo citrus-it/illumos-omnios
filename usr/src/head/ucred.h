@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -31,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/priv.h>
 #include <sys/tsol/label.h>
+#include <stdbool.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -58,6 +60,7 @@ extern const priv_set_t *ucred_getprivset(const ucred_t *, priv_ptype_t);
 extern uint_t ucred_getpflags(const ucred_t *, uint_t);
 
 extern pid_t ucred_getpid(const ucred_t *); /* for door_cred compatibility */
+extern bool ucred_iskernel(const ucred_t *);
 
 extern size_t ucred_size(void);
 

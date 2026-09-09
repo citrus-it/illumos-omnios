@@ -26,6 +26,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -34,6 +35,7 @@
 
 #include <stdio.h>
 #include <stdio_ext.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -220,20 +222,18 @@ reparsed_doorfunc(void *cookie, char *argp, size_t arg_size,
 	char *cp, *buf, *sbuf, res_buf[DOOR_RESULT_BUFSZ];
 	reparsed_door_res_t *resp;
 	ucred_t *uc = NULL;
-	pid_t pid;
+	bool kernel;
 
 	/*
 	 * The only legitimate caller is the kernel, via reparse_kderef().
-	 * Kernel upcalls are reported with a pid of 0, which no user process
-	 * can have.
 	 */
 	if (door_ucred(&uc) != 0) {
 		reparsed_door_call_error(EPERM, 0);
 		/* NOTREACHED */
 	}
-	pid = ucred_getpid(uc);
+	kernel = ucred_iskernel(uc);
 	ucred_free(uc);
-	if (pid != 0) {
+	if (!kernel) {
 		reparsed_door_call_error(EPERM, 0);
 		/* NOTREACHED */
 	}

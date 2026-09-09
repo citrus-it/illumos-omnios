@@ -64,6 +64,12 @@ PID.
 The credential information associated with the client refers to the
 information from the immediate caller, not necessarily from the first thread
 in a chain of door calls.
+.Pp
+A door server can determine whether the current invocation was made by the
+kernel, rather than by a process calling
+.Xr door_call 3C ,
+by passing the credential to
+.Xr ucred_iskernel 3C .
 .Sh RETURN VALUES
 Upon successful completion,
 .Fn door_ucred
@@ -106,4 +112,5 @@ and allocating memory sufficient to hold a ucred failed.
 .Xr door_call 3C ,
 .Xr door_create 3C ,
 .Xr ucred_get 3C ,
+.Xr ucred_iskernel 3C ,
 .Xr attributes 7

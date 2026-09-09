@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 
 #pragma weak _ucred_free = ucred_free
 #pragma weak _ucred_get = ucred_get
@@ -54,6 +58,7 @@
 #include <errno.h>
 #include <priv.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -237,6 +242,18 @@ ucred_getpid(const ucred_t *uc)
 		errno = EINVAL;
 
 	return (uc->uc_pid);
+}
+
+/*
+ * A credential obtained for a request made from within the kernel, such as a
+ * door upcall, carries a process ID of 0. That is the only indication that
+ * the kernel provides today and it may become more specific in future, so
+ * this function is the one place that should know about it.
+ */
+bool
+ucred_iskernel(const ucred_t *uc)
+{
+	return (uc->uc_pid == 0);
 }
 
 projid_t
