@@ -26,6 +26,7 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -485,12 +486,13 @@ xc_common(
 	data->xc_a3 = arg3;
 
 	/*
-	 * Post messages to all CPUs involved that are CPU_READY
+	 * Post messages to all CPUs involved that are CPU_READY. The set is
+	 * walked a word at a time so that the cost is proportional to the
+	 * number of CPUs in it rather than to the number of possible CPU ids.
 	 */
 	CPU->cpu_m.xc_wait_cnt = 0;
-	for (c = 0; c < max_ncpus; ++c) {
-		if (!BT_TEST(set, c))
-			continue;
+	for (c = bt_getlowbit(set, 0, max_ncpus - 1); c != -1;
+	    c = bt_getlowbit(set, c + 1, max_ncpus - 1)) {
 		cpup = cpu[c];
 		if (cpup == NULL || !(cpup->cpu_flags & CPU_READY))
 			continue;
@@ -599,9 +601,8 @@ xc_priority_common(
 	 * Post messages to all CPUs involved that are CPU_READY
 	 * We'll always IPI, plus bang on the xc_msgbox for i86_mwait()
 	 */
-	for (c = 0; c < max_ncpus; ++c) {
-		if (!BT_TEST(set, c))
-			continue;
+	for (c = bt_getlowbit(set, 0, max_ncpus - 1); c != -1;
+	    c = bt_getlowbit(set, c + 1, max_ncpus - 1)) {
 		cpup = cpu[c];
 		if (cpup == NULL || !(cpup->cpu_flags & CPU_READY) ||
 		    cpup == CPU)
