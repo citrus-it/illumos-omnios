@@ -23,6 +23,10 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <errno.h>
 #include <nss.h>
 #include <secdb.h>
@@ -85,7 +89,7 @@ au_user_mask(char *user, au_mask_t *mask)
 	/*
 	 * Get per-user audit flags.
 	 */
-	(void) _enum_attrs(user, audit_flags, &user_flags, NULL);
+	(void) _enum_attrs(user, NULL, audit_flags, &user_flags, NULL);
 	if (user_flags != NULL) {
 		au_user_ent_t  per_user;
 
