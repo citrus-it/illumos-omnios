@@ -25,7 +25,7 @@
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright (c) 2020 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright (c) 2020 Carlos Neira <cneirabustos@gmail.com>
  * Copyright 2025 Edgecast Cloud LLC.
  */
@@ -154,6 +154,13 @@ extern int size_pse_array(pgcnt_t, int);
  * segkp
  */
 extern int segkp_fromheap;
+
+/*
+ * Multi-threaded clock tick accounting (see clock_tick.c) engages when the
+ * system has more CPUs than this at boot. It may be overridden in /etc/system.
+ */
+#define	OXIDE_CLOCK_TICK_THRESHOLD	64
+extern int clock_tick_threshold;
 
 static void kvm_init(void);
 static void startup_init(void);
@@ -1853,6 +1860,13 @@ startup_end(void)
 	 * Initialize cpu event framework.
 	 */
 	cpu_event_init();
+
+	/*
+	 * Engage multi-threaded clock tick accounting on larger systems unless
+	 * /etc/system, which has been read by now, says otherwise.
+	 */
+	if (clock_tick_threshold == 0)
+		clock_tick_threshold = OXIDE_CLOCK_TICK_THRESHOLD;
 
 	/* XXX Torch this probably */
 #if defined(OPTERON_ERRATUM_147)
