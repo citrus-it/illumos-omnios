@@ -26,7 +26,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright (c) 2020 Carlos Neira <cneirabustos@gmail.com>
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2025 Edgecast Cloud LLC.
  */
 /*
@@ -177,6 +177,13 @@ extern void immu_startup(void);
  * segkp
  */
 extern int segkp_fromheap;
+
+/*
+ * Multi-threaded clock tick accounting (see clock_tick.c) engages when the
+ * system has more CPUs than this at boot. It may be overridden in /etc/system.
+ */
+#define	I86PC_CLOCK_TICK_THRESHOLD	64
+extern int clock_tick_threshold;
 
 static void kvm_init(void);
 static void startup_init(void);
@@ -2061,6 +2068,13 @@ startup_end(void)
 	 * Initialize cpu event framework.
 	 */
 	cpu_event_init();
+
+	/*
+	 * Engage multi-threaded clock tick accounting on larger systems unless
+	 * /etc/system, which has been read by now, says otherwise.
+	 */
+	if (clock_tick_threshold == 0)
+		clock_tick_threshold = I86PC_CLOCK_TICK_THRESHOLD;
 
 #if defined(OPTERON_ERRATUM_147)
 	if (opteron_erratum_147)

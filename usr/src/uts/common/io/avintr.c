@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * Autovectored Interrupt Configuration and Deconfiguration
  */
 
@@ -674,6 +678,45 @@ siron_poke_cpu(cpuset_t poke)
 	}
 
 	xc_call(0, 0, 0, CPUSET2BV(poke), (xc_func_t)siron_poke_intr);
+}
+
+/*
+ * Software interrupt hooks for multi-threaded clock tick accounting (see
+ * clock_tick.c). create_softint() registers a handler at the given PIL and
+ * returns an opaque handle for it, which invoke_softint() then uses to
+ * trigger that handler on a specific CPU. For a remote CPU, the handle's
+ * per-CPU pending bit and the target CPU's pending PIL bit are set directly
+ * and the CPU is poked so that it notices the pending soft interrupt on its
+ * return from the poke. A soft interrupt posted this way cannot be lost, so
+ * no sync_softint() counterpart is needed here.
+ */
+ulong_t
+create_softint(uint_t pil, uint_t (*func)(caddr_t, caddr_t), caddr_t arg1)
+{
+	ddi_softint_hdl_impl_t *hdlp;
+
+	hdlp = kmem_zalloc(sizeof (*hdlp), KM_SLEEP);
+	hdlp->ih_pri = pil;
+	VERIFY(add_avsoftintr(hdlp, pil, func, "softint", arg1, NULL) != 0);
+
+	return ((ulong_t)hdlp);
+}
+
+void
+invoke_softint(processorid_t cpuid, ulong_t hdl)
+{
+	ddi_softint_hdl_impl_t *hdlp = (ddi_softint_hdl_impl_t *)hdl;
+	cpu_t *cp = cpu[cpuid];
+
+	if (cp == CPU) {
+		(*setsoftint)(hdlp->ih_pri, hdlp->ih_pending);
+		return;
+	}
+
+	CPUSET_ATOMIC_ADD(hdlp->ih_pending->av_pending, cp->cpu_seqid);
+	atomic_or_32((uint32_t *)&cp->cpu_softinfo.st_pending,
+	    1 << hdlp->ih_pri);
+	poke_cpu(cpuid);
 }
 
 /*
