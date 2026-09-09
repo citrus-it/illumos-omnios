@@ -222,14 +222,37 @@ get_uid(const char *v, boolean_t *ok, char *path)
 	return ((uid_t)-1);
 }
 
-static uid_t
+static gid_t
 get_gid(const char *v, boolean_t *ok, char *path)
 {
 	struct group *grp, grpm;
-	char buf[1024];
+	size_t bufsz = 1024;
+	gid_t gid = (gid_t)-1;
+	bool found = false;
 
-	if (getgrnam_r(v, &grpm, buf, sizeof (buf), &grp) == 0 && grp != NULL)
-		return (grp->gr_gid);
+	/*
+	 * The group entry, including the member pointer array which is
+	 * constructed inside the caller's buffer, can be arbitrarily
+	 * large, so retry with a bigger buffer as necessary.
+	 */
+	for (;;) {
+		char *buf;
+		int ret;
+
+		if ((buf = malloc(bufsz)) == NULL)
+			break;
+		ret = getgrnam_r(v, &grpm, buf, bufsz, &grp);
+		if (ret == 0 && grp != NULL) {
+			found = true;
+			gid = grp->gr_gid;
+		}
+		free(buf);
+		if (ret != ERANGE || (bufsz <<= 1) > (1 << 20))
+			break;
+	}
+
+	if (found)
+		return (gid);
 
 	if (alldigits(v))
 		return (atoi(v));
