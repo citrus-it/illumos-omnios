@@ -40,14 +40,17 @@ provides the public interfaces defined below.
 See
 .Xr Intro 3
 for additional information on shared object interfaces.
-.Bl -column -offset 4n match_execattr match_execattr match_execattr match_execattr
-.It chkauthattr Ta endauthattr Ta endexecattr Ta endprofattr
-.It enduserattr Ta fgetuserattr Ta free_authattr Ta free_execattr
-.It free_profattr Ta free_proflist Ta free_userattr Ta getauthattr
-.It getauthnam Ta getexecattr Ta getexecprof Ta getexecuser
-.It getprofattr Ta getproflist Ta getprofnam Ta getuserattr
-.It getusernam Ta getuseruid Ta kva_match Ta match_execattr
-.It setauthattr Ta setexecattr Ta setprofattr Ta setuserattr
+.Bl -column -offset 4n chkauthattr_ucred chkauthattr_ucred chkauthattr_ucred
+.It chkauthattr Ta chkauthattr_flags Ta chkauthattr_ucred
+.It endauthattr Ta endexecattr Ta endprofattr
+.It enduserattr Ta fgetuserattr Ta free_authattr
+.It free_execattr Ta free_profattr Ta free_proflist
+.It free_userattr Ta getauthattr Ta getauthnam
+.It getexecattr Ta getexecprof Ta getexecuser
+.It getprofattr Ta getproflist Ta getprofnam
+.It getuserattr Ta getusernam Ta getuseruid
+.It kva_match Ta match_execattr Ta setauthattr
+.It setexecattr Ta setprofattr Ta setuserattr
 .El
 .Sh FILES
 .Bl -tag -width /lib/64/libsecdb.so.1

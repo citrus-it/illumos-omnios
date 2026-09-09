@@ -144,6 +144,11 @@ tests = ['ldt', 'badseg']
 [/opt/os-tests/tests/door_kernel_only.32]
 [/opt/os-tests/tests/door_kernel_only.64]
 
+[/opt/os-tests/tests/tiocgraft.32]
+user = root
+[/opt/os-tests/tests/tiocgraft.64]
+user = root
+
 [/opt/os-tests/tests/imc_test]
 arch = i86pc
 

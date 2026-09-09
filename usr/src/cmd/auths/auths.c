@@ -22,6 +22,10 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -109,7 +113,7 @@ show_auths(char *username, int print_name)
 		return (status);
 	}
 
-	(void) _enum_auths(username, add_auth, NULL, &cbs);
+	(void) _enum_auths(username, NULL, add_auth, NULL, &cbs);
 
 	if (cbs.auth_cnt == 0)
 		status = EXIT_NON_FATAL;

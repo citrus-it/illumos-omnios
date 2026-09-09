@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG= profiles
@@ -30,6 +30,8 @@ SRCS= $(PROG:%=%.c)
 PROFILES= profiles
 
 include ../Makefile.cmd
+
+CSTD = $(CSTD_GNU17)
 
 ROOTBINPROFILES = $(PROFILES:%=$(ROOTBIN)/%)
 

@@ -73,6 +73,14 @@ typedef	unsigned int	   door_attr_t;	/* Door attributes */
 #ifdef _KERNEL
 struct __door_handle;
 typedef struct __door_handle *door_handle_t;	/* opaque kernel door handle */
+
+/*
+ * A door handle is a file pointer under the covers. These converters are
+ * also used for passing an arbitrary held file_t through a door as a
+ * DOOR_HANDLE descriptor.
+ */
+#define	DHTOF(dh) ((struct file *)(dh))
+#define	FTODH(fp) ((door_handle_t)(fp))
 #endif
 
 #define	DOOR_INVAL -1			/* An invalid door descriptor */
@@ -256,7 +264,7 @@ typedef struct door_return_desc32 {
  */
 typedef struct door_node {
 	vnode_t		*door_vnode;
-	struct proc 	*door_target;	/* Proc handling this doors invoc's. */
+	struct proc	*door_target;	/* Proc handling this doors invoc's. */
 	struct door_node *door_list;	/* List of active doors in proc */
 	struct door_node *door_ulist;	/* Unref list */
 	void		(*door_pc)();	/* Door server entry point */

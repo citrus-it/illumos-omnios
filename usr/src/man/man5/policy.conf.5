@@ -50,6 +50,14 @@ and
 .Xr getexecuser 3SECDB .
 The value is zero or more comma-separated profiles defined in
 .Xr prof_attr 5 .
+.It Sy AUTHPROFS_GRANTED
+Specify the default set of authenticated profiles granted to all users.
+This entry is interpreted by
+.Xr chkauthattr 3SECDB
+and
+.Xr getexecuser 3SECDB .
+The value is zero or more comma-separated profiles defined in
+.Xr prof_attr 5 .
 .It Sy CONSOLE_USER
 Specify an additional default set of profiles granted to the owner of
 .Pa /dev/console .
