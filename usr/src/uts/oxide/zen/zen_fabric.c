@@ -1579,6 +1579,12 @@ zen_fabric_topo_init(void)
 		nthreads = NCPU;
 	}
 	boot_max_ncpus = max_ncpus = boot_ncpus = nthreads;
+
+	/*
+	 * CPU ids are assigned densely from 0, so record the highest possible
+	 * id for the benefit of code which sizes per-CPU state by it.
+	 */
+	max_cpuid = nthreads - 1;
 }
 
 static int
