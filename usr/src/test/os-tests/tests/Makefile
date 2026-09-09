@@ -73,6 +73,7 @@ PROGS = \
 	eventfd \
 	fifo-tvnsec \
 	odirectory \
+	tiocgraft \
 	ucontext \
 	getcontext_extd \
 	writev

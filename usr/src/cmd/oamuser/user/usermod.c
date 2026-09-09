@@ -26,10 +26,11 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 2013 RackTop Systems.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -56,6 +57,7 @@
  *		| -f inactive | -e expire ]
  *		[ -A authorization [, authorization ...]]
  *		[ -P profile [, profile ...]]
+ *		[ -X profile [, profile ...]]
  *		[ -R role [, role ...]]
  *		[ -K key=value ]
  *		[ -p project [, project]] login
@@ -108,17 +110,16 @@ static char gidstring[32], uidstring[32];
 char inactstring[10];
 
 char *
-strcpmalloc(str)
-char *str;
+strcpmalloc(char *str)
 {
 	if (str == NULL)
 		return (NULL);
 
 	return (strdup(str));
 }
+
 struct passwd *
-passwd_cpmalloc(opw)
-struct passwd *opw;
+passwd_cpmalloc(struct passwd *opw)
 {
 	struct passwd *npw;
 
@@ -142,9 +143,7 @@ struct passwd *opw;
 }
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
 	int ch, ret = EX_SUCCESS, call_pass = 0, oflag = 0, zfs_flags = 0;
 	int tries, mflag = 0, inact, **gidlist, flag = 0, zflag = 0, Zflag = 0;
@@ -177,7 +176,7 @@ char **argv;
 	usertype = getusertype(argv[0]);
 
 	while ((ch = getopt(argc, argv,
-				"c:d:e:f:G:g:l:mzZop:s:u:A:P:R:K:")) != EOF)
+	    "c:d:e:f:G:g:l:mzZop:s:u:A:P:R:K:X:")) != EOF)
 		switch (ch) {
 		case 'c':
 			comment = optarg;
@@ -245,6 +244,10 @@ char **argv;
 			break;
 		case 'P':
 			change_key(USERATTR_PROFILES_KW, optarg);
+			flag++;
+			break;
+		case 'X':
+			change_key(USERATTR_AUTHPROFILES_KW, optarg);
 			flag++;
 			break;
 		case 'R':
@@ -379,7 +382,7 @@ char **argv;
 
 	if (new_logname && strcmp(new_logname, logname)) {
 		switch (valid_login(new_logname, (struct passwd **)NULL,
-			&warning)) {
+		    &warning)) {
 		case INVALID:
 			errmsg(M_INVALID, new_logname, "login name");
 			exit(EX_BADARG);
@@ -624,7 +627,7 @@ char **argv;
 		nargv[argindex++] = gidstring;
 	}
 
-	if (shell) { 	/* shell */
+	if (shell) {	/* shell */
 		nargv[argindex++] = "-s";
 		nargv[argindex++] = shell;
 	}
