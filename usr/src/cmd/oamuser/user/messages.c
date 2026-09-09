@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
  * Copyright (c) 2013 Gary Mills
  *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  * Use is subject to license terms.
  */
 
@@ -38,11 +39,13 @@ char *errmsgs[] = {
 	    "\t\t-s shell | -c comment | -m [-z|Z] [-k skel_dir] |"
 	    "-f inactive |\n"
 	    "\t\t-e expire | -A authorization [, authorization ...] |\n"
-	    "\t\t-P profile [, profile ...] | -R role [, role ...] |\n"
+	    "\t\t-P profile [, profile ...] | -X profile [, profile ...] |\n"
+	    "\t\t-R role [, role ...] |\n"
 	    "\t\t-K key=value | -p project [, project ...]] login\n"
 	    "\tuseradd -D [-g group | -b base_dir | -f inactive | -e expire\n"
 	    "\t\t-A authorization [, authorization ...] |\n"
-	    "\t\t-P profile [, profile ...] | -R role [, role ...] |\n"
+	    "\t\t-P profile [, profile ...] | -X profile [, profile ...] |\n"
+	    "\t\t-R role [, role ...] |\n"
 	    "\t\t-K key=value ... -p project] | [-s shell] | [-k skel_dir]\n",
 	"ERROR: Invalid syntax.\nusage:  userdel [-r] login\n",
 	"ERROR: Invalid syntax.\n"
@@ -50,7 +53,8 @@ char *errmsgs[] = {
 	    "\t\t-d dir [-m [-z|Z]] | -s shell | -c comment |\n"
 	    "\t\t-l new_logname | -f inactive | -e expire |\n"
 	    "\t\t-A authorization [, authorization ...] | -K key=value ... |\n"
-	    "\t\t-P profile [, profile ...] | -R role [, role ...] login\n",
+	    "\t\t-P profile [, profile ...] | -X profile [, profile ...] |\n"
+	    "\t\t-R role [, role ...] login\n",
 	"ERROR: Unexpected failure.  Defaults unchanged.\n",
 	"ERROR: Unable to remove files from home directory.\n",
 	"ERROR: Unable to remove home directory.\n",
@@ -77,17 +81,19 @@ char *errmsgs[] = {
 	    "-d dir |\n"
 	    "\t\t-s shell | -c comment | -m [-k skel_dir] | -f inactive |\n"
 	    "\t\t-e expire | -A authorization [, authorization ...] |\n"
-	    "\t\t-P profile [, profile ...] | -K key=value ] login\n"
+	    "\t\t-P profile [, profile ...] | -X profile [, profile ...] |\n"
+	    "\t\t-K key=value ] login\n"
 	    "\troleadd -D [-g group | -b base_dir | -f inactive | -e expire\n"
 	    "\t\t-A authorization [, authorization ...] |\n"
-	    "\t\t-P profile [, profile ...]]\n",
+	    "\t\t-P profile [, profile ...] | -X profile [, profile ...]]\n",
 	"ERROR: Invalid syntax.\nusage:  roledel [-r] login\n",
 	"ERROR: Invalid syntax.\n"
 	    "usage:  rolemod -u uid [-o] | -g group | -G group[[,group]...] |\n"
 	    "\t\t-d dir [-m] | -s shell | -c comment |\n"
 	    "\t\t-l new_logname | -f inactive | -e expire |\n"
 	    "\t\t-A authorization [, authorization ...] | -K key=value |\n"
-	    "\t\t-P profile [, profile ...] login\n",
+	    "\t\t-P profile [, profile ...] | -X profile [, profile ...]\n"
+	    "\t\tlogin\n",
 	"ERROR: project %s does not exist.  Choose another.\n",
 	"WARNING: more than NPROJECTS_MAX(%d) projects specified.\n",
 	"WARNING: Project entry exceeds %d char: /etc/project entry truncated."

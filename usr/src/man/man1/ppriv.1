@@ -24,13 +24,13 @@
 .Sh SYNOPSIS
 .Nm
 .Fl e
-.Op Fl f Bro +- Brc Ns Brq DMPX
+.Op Fl f Bro +- Brc Ns Brq ADMPX
 .Op Fl s Ar spec
 .Ar command
 .Op Ar arg Ns ...
 .Nm
 .Op Fl vS
-.Op Fl f Bro +- Brc Ns Brq DMPX
+.Op Fl f Bro +- Brc Ns Brq ADMPX
 .Op Fl s Ar spec
 .Brq pid | core
 .No ...
@@ -61,7 +61,7 @@ Equivalent to
 .It Fl e
 Interprets the remainder of the arguments as a command line and runs the
 command line with specified privilege attributes and sets.
-.It Fl f Bro +- Brc Ns Brq DMPX
+.It Fl f Bro +- Brc Ns Brq ADMPX
 Set or unset process flags.
 With
 .Sq \&+
@@ -70,6 +70,8 @@ the listed flags are set, and with
 the flags are unset.
 Available flags are:
 .Bl -tag -width 4n -offset 4n
+.It Sy A
+PRIV_PFEXEC_AUTH
 .It Sy D
 PRIV_DEBUG
 .It Sy M

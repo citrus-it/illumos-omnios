@@ -77,21 +77,35 @@ authorizations with the same prefix and functional area to other users.
 .Ss Creating Authorization Checks
 To check authorizations, use the
 .Xr chkauthattr 3SECDB
-library function, which verifies whether or not a user has a given
+or
+.Xr chkauthattr_ucred 3SECDB
+library functions, which verify whether or not a user has a given
 authorization.
-The synopsis is:
-.Bd -literal -offset 4n
-int chkauthattr(const char *authname, const char *username);
-.Ed
-.Pp
-The
 .Fn chkauthattr
-function checks the
+and
+.Fn chkauthattr_ucred
+check the
 .Xr policy.conf 5 ,
 .Xr user_attr 5 ,
 and
 .Xr prof_attr 5
 databases in order for a match to the given authorization.
+Authorizations which are granted via a profile which is assigned to the
+user's authenticated profile list will only be satisfied if the current
+process has the
+.Dv PRIV_PFEXEC_AUTH
+process flag, such as assigned by
+.Xr pfexec 1 ,
+and its real user ID is the same as the requested user's.
+A caller which has authenticated a user through some other means can request
+that the authenticated profiles be considered using
+.Fn chkauthattr_flags .
+For
+.Fn chkauthattr_ucred ,
+the provided
+.Vt ucred
+is checked for this flag instead, allowing servers to check whether a
+connecting client has access to the authenticated profiles.
 .Pp
 If you are modifying existing code that tests for root UID, you should find the
 test in the code and replace it with the
@@ -256,6 +270,7 @@ fi
 .Ed
 .Sh SEE ALSO
 .Xr ld.so.1 1 ,
+.Xr pfexec 1 ,
 .Xr chkauthattr 3SECDB ,
 .Xr auth_attr 5 ,
 .Xr policy.conf 5 ,
