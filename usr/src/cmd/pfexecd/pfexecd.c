@@ -21,6 +21,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #define	_POSIX_PTHREAD_SEMANTICS 1
@@ -44,10 +45,12 @@
 #include <regex.h>
 #include <secdb.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <ucred.h>
 #include <unistd.h>
 
 #include <auth_attr.h>
@@ -297,6 +300,27 @@ get_granted_privs(uid_t uid)
 	return (res);
 }
 
+/*
+ * The pfexec door only has one legitimate client, the kernel. Upcalls
+ * from the kernel are attributed to pid 0 in the client ucred, and no
+ * process can present that pid in a door call, so this cannot be forged.
+ */
+static bool
+caller_is_kernel(void)
+{
+	ucred_t *uc = NULL;
+	bool res;
+
+	if (door_ucred(&uc) != 0) {
+		syslog(LOG_DEBUG, "door_ucred failed: %m");
+		return (false);
+	}
+	res = ucred_getpid(uc) == 0;
+	ucred_free(uc);
+
+	return (res);
+}
+
 static void
 callback_forced_privs(pfexec_arg_t *pap)
 {
@@ -482,7 +506,8 @@ callback(void *cookie __unused, char *argp, size_t asz,
 {
 	pfexec_arg_t *pap = (pfexec_arg_t *)argp;
 
-	if (asz < sizeof (pfexec_arg_t) || pap->pfa_vers != PFEXEC_ARG_VERS) {
+	if (!caller_is_kernel() ||
+	    asz < sizeof (pfexec_arg_t) || pap->pfa_vers != PFEXEC_ARG_VERS) {
 		(void) door_return(NULL, 0, NULL, 0);
 		return;
 	}

@@ -64,6 +64,14 @@ PID.
 The credential information associated with the client refers to the
 information from the immediate caller, not necessarily from the first thread
 in a chain of door calls.
+.Pp
+For a door invocation made by the kernel on behalf of a process, the
+credential reflects that process, with the exception of the calling PID, which
+is reported as 0.
+Since no user process can make a door call from PID 0, a door server which is
+only intended to be called by the kernel can verify that by checking that
+.Xr ucred_getpid 3C
+returns 0.
 .Sh RETURN VALUES
 Upon successful completion,
 .Fn door_ucred
