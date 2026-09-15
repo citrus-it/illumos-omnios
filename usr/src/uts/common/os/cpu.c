@@ -2750,13 +2750,53 @@ cpuset_free(cpuset_t *s)
 	kmem_free(s, sizeof (cpuset_t));
 }
 
+/*
+ * The highest bit ever set in any cpuset_t. Every operation which sets a bit
+ * raises this first, so no cpuset_t can hold a bit above it and the
+ * operations which examine whole sets need only visit the words up to it
+ * rather than all CPUSET_WORDS. This matters when NCPU is much larger than
+ * the number of CPUs present, and it also accommodates users such as bhyve
+ * which keep guest vCPU ids in a cpuset_t regardless of the host CPU count.
+ * The value only ever grows. Initialising a set clears its full width so
+ * that stale bits above the bound cannot exist.
+ */
+static uint_t cpuset_maxbit;
+
+static inline void
+cpuset_raise_maxbit(const uint_t bit)
+{
+	uint_t cur;
+
+	while ((cur = cpuset_maxbit) < bit) {
+		if (atomic_cas_uint(&cpuset_maxbit, cur, bit) == cur)
+			break;
+	}
+}
+
+static inline uint_t
+cpuset_nwords(void)
+{
+	return (BT_BITOUL(cpuset_maxbit + 1));
+}
+
+/*
+ * "All" means every CPU id which can exist on this system, not every bit in
+ * the set.
+ */
 void
 cpuset_all(cpuset_t *s)
 {
-	int i;
+	const uint_t nbits = (uint_t)max_cpuid + 1;
+	const uint_t nwords = BT_BITOUL(nbits);
+	uint_t i;
 
-	for (i = 0; i < CPUSET_WORDS; i++)
+	cpuset_raise_maxbit((uint_t)max_cpuid);
+	for (i = 0; i < nwords; i++)
 		s->cpub[i] = ~0UL;
+	if ((nbits & BT_ULMASK) != 0)
+		s->cpub[nwords - 1] = (1UL << (nbits & BT_ULMASK)) - 1;
+	for (i = nwords; i < CPUSET_WORDS; i++)
+		s->cpub[i] = 0;
 }
 
 void
@@ -2784,6 +2824,7 @@ void
 cpuset_add(cpuset_t *s, const uint_t cpu)
 {
 	VERIFY(cpu < NCPU);
+	cpuset_raise_maxbit(cpu);
 	BT_SET(s->cpub, cpu);
 }
 
@@ -2797,9 +2838,10 @@ cpuset_del(cpuset_t *s, const uint_t cpu)
 int
 cpuset_isnull(const cpuset_t *s)
 {
-	int i;
+	const uint_t nwords = cpuset_nwords();
+	uint_t i;
 
-	for (i = 0; i < CPUSET_WORDS; i++) {
+	for (i = 0; i < nwords; i++) {
 		if (s->cpub[i] != 0)
 			return (0);
 	}
@@ -2809,9 +2851,10 @@ cpuset_isnull(const cpuset_t *s)
 int
 cpuset_isequal(const cpuset_t *s1, const cpuset_t *s2)
 {
-	int i;
+	const uint_t nwords = cpuset_nwords();
+	uint_t i;
 
-	for (i = 0; i < CPUSET_WORDS; i++) {
+	for (i = 0; i < nwords; i++) {
 		if (s1->cpub[i] != s2->cpub[i])
 			return (0);
 	}
@@ -2821,14 +2864,14 @@ cpuset_isequal(const cpuset_t *s1, const cpuset_t *s2)
 uint_t
 cpuset_find(const cpuset_t *s)
 {
-
+	const uint_t nwords = cpuset_nwords();
 	uint_t	i;
 	uint_t	cpu = (uint_t)-1;
 
 	/*
 	 * Find a cpu in the cpuset
 	 */
-	for (i = 0; i < CPUSET_WORDS; i++) {
+	for (i = 0; i < nwords; i++) {
 		cpu = (uint_t)(lowbit(s->cpub[i]) - 1);
 		if (cpu != (uint_t)-1) {
 			cpu += i * BT_NBIPUL;
@@ -2841,13 +2884,14 @@ cpuset_find(const cpuset_t *s)
 void
 cpuset_bounds(const cpuset_t *s, uint_t *smallestid, uint_t *largestid)
 {
+	const int nwords = (int)cpuset_nwords();
 	int	i, j;
 	uint_t	bit;
 
 	/*
 	 * First, find the smallest cpu id in the set.
 	 */
-	for (i = 0; i < CPUSET_WORDS; i++) {
+	for (i = 0; i < nwords; i++) {
 		if (s->cpub[i] != 0) {
 			bit = (uint_t)(lowbit(s->cpub[i]) - 1);
 			ASSERT(bit != (uint_t)-1);
@@ -2860,7 +2904,7 @@ cpuset_bounds(const cpuset_t *s, uint_t *smallestid, uint_t *largestid)
 			 * having to break out of the first
 			 * loop.
 			 */
-			for (j = CPUSET_WORDS - 1; j >= i; j--) {
+			for (j = nwords - 1; j >= i; j--) {
 				if (s->cpub[j] != 0) {
 					bit = (uint_t)(highbit(s->cpub[j]) - 1);
 					ASSERT(bit != (uint_t)-1);
@@ -2894,6 +2938,7 @@ void
 cpuset_atomic_add(cpuset_t *s, const uint_t cpu)
 {
 	VERIFY(cpu < NCPU);
+	cpuset_raise_maxbit(cpu);
 	BT_ATOMIC_SET(s->cpub, (cpu))
 }
 
@@ -2903,6 +2948,7 @@ cpuset_atomic_xadd(cpuset_t *s, const uint_t cpu)
 	long res;
 
 	VERIFY(cpu < NCPU);
+	cpuset_raise_maxbit(cpu);
 	BT_ATOMIC_SET_EXCL(s->cpub, cpu, res);
 	return (res);
 }
@@ -2920,7 +2966,9 @@ cpuset_atomic_xdel(cpuset_t *s, const uint_t cpu)
 void
 cpuset_or(cpuset_t *dst, const cpuset_t *src)
 {
-	for (int i = 0; i < CPUSET_WORDS; i++) {
+	const uint_t nwords = cpuset_nwords();
+
+	for (uint_t i = 0; i < nwords; i++) {
 		dst->cpub[i] |= src->cpub[i];
 	}
 }
@@ -2928,7 +2976,9 @@ cpuset_or(cpuset_t *dst, const cpuset_t *src)
 void
 cpuset_xor(cpuset_t *dst, const cpuset_t *src)
 {
-	for (int i = 0; i < CPUSET_WORDS; i++) {
+	const uint_t nwords = cpuset_nwords();
+
+	for (uint_t i = 0; i < nwords; i++) {
 		dst->cpub[i] ^= src->cpub[i];
 	}
 }
@@ -2936,7 +2986,9 @@ cpuset_xor(cpuset_t *dst, const cpuset_t *src)
 void
 cpuset_and(cpuset_t *dst, const cpuset_t *src)
 {
-	for (int i = 0; i < CPUSET_WORDS; i++) {
+	const uint_t nwords = cpuset_nwords();
+
+	for (uint_t i = 0; i < nwords; i++) {
 		dst->cpub[i] &= src->cpub[i];
 	}
 }

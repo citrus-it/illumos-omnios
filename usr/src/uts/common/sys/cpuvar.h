@@ -25,7 +25,7 @@
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
  * Copyright 2017 RackTop Systems.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_CPUVAR_H
@@ -403,6 +403,14 @@ extern cpu_core_t cpu_core[];
 
 #define	CPUSET_WORDS	BT_BITOUL(NCPU)
 #define	CPUSET_NOTINSET	((uint_t)-1)
+
+/*
+ * Bits are only ever set through the functions declared below, which track
+ * the highest bit set in any cpuset_t so that the operations which examine
+ * whole sets can stop at the words which may be populated rather than
+ * visiting all CPUSET_WORDS. Code which reads the words directly must not set
+ * bits behind the back of those functions.
+ */
 
 #if defined(_MACHDEP)
 struct cpuset {
