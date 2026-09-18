@@ -149,6 +149,8 @@
 #include <sys/io/zen/ccx.h>
 #include <sys/io/zen/fabric.h>
 #include <sys/io/zen/ras_impl.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 struct cpu	cpus[1] __aligned(MMU_PAGESIZE);
 struct cpu	*cpu[NCPU] = {&cpus[0]};
@@ -1371,6 +1373,7 @@ mp_start_cpu_common(cpu_t *cp)
 		cmn_err(CE_WARN,
 		    "cpu%d: failed to start, error %d", cp->cpu_id, error);
 		mach_cpucontext_free(cp, ctx, error);
+		outl(0x80, 0x1def500 + cp->cpu_id);
 		return (error);
 	}
 
