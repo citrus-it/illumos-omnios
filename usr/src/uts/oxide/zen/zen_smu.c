@@ -94,7 +94,7 @@ zen_smu_rpc_res_str(const zen_smu_rpc_res_t res)
  * Empirically, this number takes enough time on every system that we've tried
  * that it should account for any reasonable amount of time required by any RPC.
  */
-#define	RPC_DONE_MAX_SPIN	(1U << 20)
+#define	RPC_DONE_MAX_SPIN	(1U << 22)
 
 /*
  * This is a pseudo-response code.  We write this to the result register before
