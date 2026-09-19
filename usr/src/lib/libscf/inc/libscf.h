@@ -310,6 +310,7 @@ typedef struct {
 #define	SCF_PG_STARTD_PRIVATE		"svc-startd-private"
 #define	SCF_PG_DEATHROW			"deathrow"
 #define	SCF_PG_MANIFESTFILES		"manifestfiles"
+#define	SCF_PG_MANAGED_PATHS		"managed_paths"
 
 /*
  * Template property group names and prefixes
@@ -382,6 +383,20 @@ typedef struct {
 #define	SCF_PROPERTY_USER			"user"
 #define	SCF_PROPERTY_UTMPX_PREFIX		"utmpx_prefix"
 #define	SCF_PROPERTY_WORKING_DIRECTORY		"working_directory"
+
+/*
+ * Property name formats for the managed_paths property group. Each
+ * managed directory entry is stored as a set of numbered properties
+ * sharing the same index, which starts at zero and increases
+ * contiguously. These macros take the entry index as an unsigned integer
+ * argument.
+ */
+#define	SCF_PROPERTY_MP_PATH_FMT		"path_%u"
+#define	SCF_PROPERTY_MP_USER_FMT		"user_%u"
+#define	SCF_PROPERTY_MP_GROUP_FMT		"group_%u"
+#define	SCF_PROPERTY_MP_MODE_FMT		"mode_%u"
+#define	SCF_PROPERTY_MP_ENV_FMT			"env_%u"
+#define	SCF_PROPERTY_MP_EMPTY_FMT		"empty_%u"
 
 /*
  * Template property names

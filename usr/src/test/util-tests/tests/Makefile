@@ -17,6 +17,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2025 Edgecast Cloud LLC
+# Copyright 2026 Oxide Computer Company
 #
 
 SUBDIRS =		\
@@ -51,6 +52,7 @@ SUBDIRS =		\
 	sed		\
 	sleep		\
 	smbios		\
+	svccfg		\
 	svr4pkg		\
 	workq		\
 	xargs

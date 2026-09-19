@@ -24,6 +24,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -47,6 +48,7 @@
 #include <libscf_priv.h>
 #include <libuutil.h>
 #include <sasl/saslutil.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
@@ -122,6 +124,7 @@ static const char *lxml_elements[] = {
 	"dependency",			/* SC_DEPENDENCY */
 	"dependent",			/* SC_DEPENDENT */
 	"description",			/* SC_DESCRIPTION */
+	"directory",			/* SC_DIRECTORY */
 	"doc_link",			/* SC_DOC_LINK */
 	"documentation",		/* SC_DOCUMENTATION */
 	"enabled",			/* SC_ENABLED */
@@ -135,6 +138,7 @@ static const char *lxml_elements[] = {
 	"integer_list",			/* SC_INTEGER */
 	"internal_separators",		/* SC_INTERNAL_SEPARATORS */
 	"loctext",			/* SC_LOCTEXT */
+	"managed_paths",		/* SC_MANAGED_PATHS */
 	"manpage",			/* SC_MANPAGE */
 	"method_context",		/* SC_METHOD_CONTEXT */
 	"method_credential",		/* SC_METHOD_CREDENTIAL */
@@ -190,6 +194,7 @@ static const char *lxml_prop_types[] = {
 	"",				/* SC_DEPENDENCY */
 	"",				/* SC_DEPENDENT */
 	"",				/* SC_DESCRIPTION */
+	"",				/* SC_DIRECTORY */
 	"",				/* SC_DOC_LINK */
 	"",				/* SC_DOCUMENTATION */
 	"",				/* SC_ENABLED */
@@ -203,6 +208,7 @@ static const char *lxml_prop_types[] = {
 	"integer",			/* SC_INTEGER */
 	"",				/* SC_INTERNAL_SEPARATORS */
 	"",				/* SC_LOCTEXT */
+	"",				/* SC_MANAGED_PATHS */
 	"",				/* SC_MANPAGE */
 	"",				/* SC_METHOD_CONTEXT */
 	"",				/* SC_METHOD_CREDENTIAL */
@@ -1053,6 +1059,221 @@ lxml_get_entity_method_context(entity_t *entity, xmlNodePtr ctx)
 	    (char *)scf_group_framework);
 
 	return (lxml_get_method_context(pg, ctx));
+}
+
+/*
+ * Attach a single-valued property to pg. The property name is constructed
+ * from the provided fmt and the managed path entry index. The
+ * name is allocated and remains referenced by the property for the
+ * lifetime of the process. A property collision from a manifest which
+ * also defines the property directly is fatal. Continuing would import
+ * a partial directory entry which the restarter would then act on.
+ */
+static void
+lxml_managed_paths_prop(pgroup_t *pg, const char *fmt, uint_t index,
+    scf_type_t ty, ...)
+{
+	property_t *p;
+	value_t *v;
+	char *pname;
+	va_list args;
+
+	if ((pname = uu_msprintf(fmt, index)) == NULL)
+		uu_die(gettext("Out of memory\n"));
+
+	p = internal_property_create(pname, ty, 0);
+
+	v = internal_value_new();
+	v->sc_type = ty;
+	va_start(args, ty);
+	if (ty == SCF_TYPE_BOOLEAN)
+		v->sc_u.sc_count = va_arg(args, uint64_t);
+	else
+		v->sc_u.sc_string = va_arg(args, char *);
+	va_end(args);
+	internal_attach_value(p, v);
+
+	if (internal_attach_property(pg, p) != 0) {
+		uu_die(gettext("Could not add managed path property \"%s\".\n"),
+		    pname);
+	}
+}
+
+/*
+ * Check that str is a mode, expressed as an octal string which is no
+ * greater than 07777. Returns a description of the problem, or NULL when
+ * the mode is valid.
+ *
+ * Native builds are done using the build machine's standard include files
+ * and libc, which may not yet have strtounumx(3C).
+ */
+static const char *
+lxml_check_mode(const char *str)
+{
+#ifdef	NATIVE_BUILD
+	const char *c;
+
+	for (c = str; *c != '\0'; c++) {
+		if (*c < '0' || *c > '7')
+			return ("invalid");
+	}
+
+	if (c == str)
+		return ("invalid");
+	if (strtoul(str, NULL, 8) > 07777)
+		return ("too large");
+
+	return (NULL);
+#else
+	const char *errstr;
+
+	(void) strtounumx(str, 0, 07777, &errstr, 8);
+
+	return (errstr);
+#endif
+}
+
+/*
+ * Process one directory element from a managed_paths block, creating the
+ * numbered properties which describe it in the entity's managed_paths
+ * property group. The index is the position of this entry across all of
+ * the entity's managed_paths blocks.
+ */
+static void
+lxml_get_directory(pgroup_t *pg, xmlNodePtr dir, uint_t index)
+{
+	xmlChar *path, *user, *group, *mode, *env, *empty;
+
+	path = xmlGetProp(dir, (xmlChar *)"path");
+	if (path == NULL || *path == '\0') {
+		uu_die(gettext(
+		    "directory element missing \"path\" attribute in \"%s\"\n"),
+		    pg->sc_parent->sc_name);
+	}
+
+	lxml_managed_paths_prop(pg, SCF_PROPERTY_MP_PATH_FMT, index,
+	    SCF_TYPE_ASTRING, path);
+
+	user = xmlGetProp(dir, (xmlChar *)"user");
+	if (user != NULL) {
+		if (*user == '\0') {
+			uu_die(gettext("Empty user for directory \"%s\".\n"),
+			    path);
+		}
+		lxml_managed_paths_prop(pg, SCF_PROPERTY_MP_USER_FMT,
+		    index, SCF_TYPE_ASTRING, user);
+	}
+
+	group = xmlGetProp(dir, (xmlChar *)"group");
+	if (group != NULL) {
+		if (*group == '\0') {
+			uu_die(gettext("Empty group for directory \"%s\".\n"),
+			    path);
+		}
+		lxml_managed_paths_prop(pg, SCF_PROPERTY_MP_GROUP_FMT,
+		    index, SCF_TYPE_ASTRING, group);
+	}
+
+	mode = xmlGetProp(dir, (xmlChar *)"mode");
+	if (mode != NULL) {
+		const char *errstr = lxml_check_mode((const char *)mode);
+
+		if (errstr != NULL) {
+			uu_die(gettext(
+			    "Mode \"%s\" for directory \"%s\" is %s.\n"),
+			    mode, path, errstr);
+		}
+		lxml_managed_paths_prop(pg, SCF_PROPERTY_MP_MODE_FMT,
+		    index, SCF_TYPE_ASTRING, mode);
+	}
+
+	/*
+	 * We don't place anything in the environment if the env attribute is
+	 * empty.
+	 */
+	env = xmlGetProp(dir, (xmlChar *)"env");
+	if (env != NULL && *env != '\0') {
+		if (strchr((const char *)env, '=') != NULL) {
+			uu_die(gettext(
+			    "Invalid environment variable \"%s\".\n"), env);
+		}
+		if (strstr((const char *)env, "SMF_") == (const char *)env) {
+			uu_die(gettext("Invalid environment variable "
+			    "\"%s\"; \"SMF_\" prefix is reserved.\n"), env);
+		}
+		lxml_managed_paths_prop(pg, SCF_PROPERTY_MP_ENV_FMT,
+		    index, SCF_TYPE_ASTRING, env);
+	}
+
+	empty = xmlGetProp(dir, (xmlChar *)"empty");
+	if (empty != NULL) {
+		uint64_t val;
+
+		if (xmlStrcmp(empty, (xmlChar *)false) == 0) {
+			val = 0;
+		} else if (xmlStrcmp(empty, (xmlChar *)true) == 0) {
+			val = 1;
+		} else {
+			uu_die(gettext("Invalid empty value \"%s\" for "
+			    "directory \"%s\".\n"), empty, path);
+		}
+		xmlFree(empty);
+
+		if (val != 0) {
+			lxml_managed_paths_prop(pg,
+			    SCF_PROPERTY_MP_EMPTY_FMT, index,
+			    SCF_TYPE_BOOLEAN, val);
+		}
+	}
+}
+
+static int
+lxml_get_managed_paths(entity_t *entity, xmlNodePtr mp)
+{
+	pgroup_t *pg;
+	xmlNodePtr cursor;
+	uint_t index;
+
+	if (entity->sc_op == SVCCFG_OP_APPLY)
+		lxml_validate_element(mp);
+
+	pg = internal_pgroup_find_or_create(entity, SCF_PG_MANAGED_PATHS,
+	    (char *)scf_group_framework);
+
+	/*
+	 * Multiple managed_paths blocks within an entity are concatenated.
+	 * Continue numbering after any entries from an earlier block.
+	 */
+	for (index = 0; ; index++) {
+		char *pname;
+		property_t *p;
+
+		if ((pname = uu_msprintf(SCF_PROPERTY_MP_PATH_FMT,
+		    index)) == NULL) {
+			uu_die(gettext("Out of memory\n"));
+		}
+		p = internal_property_find(pg, pname);
+		uu_free(pname);
+		if (p == NULL)
+			break;
+	}
+
+	for (cursor = mp->xmlChildrenNode; cursor != NULL;
+	    cursor = cursor->next) {
+		if (lxml_ignorable_block(cursor))
+			continue;
+
+		if (lxml_xlate_element(cursor->name) != SC_DIRECTORY) {
+			uu_die(gettext("illegal element \"%s\" in "
+			    "managed_paths for \"%s\"\n"), cursor->name,
+			    entity->sc_name);
+		}
+
+		lxml_get_directory(pg, cursor, index);
+		index++;
+	}
+
+	return (0);
 }
 
 static int
@@ -3285,6 +3506,9 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, bundle_type_t bt,
 		case SC_METHOD_CONTEXT:
 			(void) lxml_get_entity_method_context(i, cursor);
 			break;
+		case SC_MANAGED_PATHS:
+			(void) lxml_get_managed_paths(i, cursor);
+			break;
 		case SC_EXEC_METHOD:
 			(void) lxml_get_exec_method(i, cursor);
 			break;
@@ -3558,6 +3782,9 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 			break;
 		case SC_METHOD_CONTEXT:
 			(void) lxml_get_entity_method_context(s, cursor);
+			break;
+		case SC_MANAGED_PATHS:
+			(void) lxml_get_managed_paths(s, cursor);
 			break;
 		case SC_PROPERTY_GROUP:
 			(void) lxml_get_pgroup(s, cursor);

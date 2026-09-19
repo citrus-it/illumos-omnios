@@ -25,7 +25,7 @@
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2017 RackTop Systems.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -112,6 +112,7 @@ struct entity_elts {
 	xmlNodePtr	dependencies;
 	xmlNodePtr	dependents;
 	xmlNodePtr	method_context;
+	xmlNodePtr	managed_paths;
 	xmlNodePtr	exec_methods;
 	xmlNodePtr	notify_params;
 	xmlNodePtr	property_groups;
@@ -9922,6 +9923,116 @@ export_method_context(scf_propertygroup_t *pg, struct entity_elts *elts)
 }
 
 /*
+ * Create a managed_paths element for the given property group and add it
+ * to eelts. The property group is expected to contain only the numbered
+ * properties which describe managed directory entries. If anything else
+ * is found, a generic property_group element is created instead.
+ */
+static void
+export_managed_paths(scf_propertygroup_t *pg, struct entity_elts *eelts)
+{
+	static const struct {
+		const char *fmt;
+		const char *attr;
+	} optattrs[] = {
+		{ SCF_PROPERTY_MP_USER_FMT,	"user" },
+		{ SCF_PROPERTY_MP_GROUP_FMT,	"group" },
+		{ SCF_PROPERTY_MP_MODE_FMT,	"mode" },
+		{ SCF_PROPERTY_MP_ENV_FMT,	"env" },
+	};
+	xmlNodePtr n;
+	uint_t index, consumed = 0, total = 0;
+	int err = 0, ret;
+
+	n = xmlNewNode(NULL, (xmlChar *)"managed_paths");
+	if (n == NULL)
+		uu_die(emsg_create_xml);
+
+	for (index = 0; ; index++) {
+		xmlNodePtr d;
+		char pname[32];
+		uint8_t b;
+		uint_t i;
+
+		ret = snprintf(pname, sizeof (pname),
+		    SCF_PROPERTY_MP_PATH_FMT, index);
+		if (ret < 0 || (size_t)ret >= sizeof (pname))
+			bad_error("snprintf", errno);
+		if (scf_pg_get_property(pg, pname, exp_prop) != 0) {
+			if (scf_error() != SCF_ERROR_NOT_FOUND)
+				scfdie();
+			break;
+		}
+
+		d = xmlNewChild(n, NULL, (xmlChar *)"directory", NULL);
+		if (d == NULL)
+			uu_die(emsg_create_xml);
+
+		if (set_attr_from_prop(exp_prop, d, "path") != 0)
+			err = 1;
+		consumed++;
+
+		for (i = 0; i < sizeof (optattrs) / sizeof (optattrs[0]);
+		    i++) {
+			ret = snprintf(pname, sizeof (pname),
+			    optattrs[i].fmt, index);
+			if (ret < 0 || (size_t)ret >= sizeof (pname))
+				bad_error("snprintf", errno);
+			if (scf_pg_get_property(pg, pname, exp_prop) == 0) {
+				if (set_attr_from_prop(exp_prop, d,
+				    optattrs[i].attr) != 0) {
+					err = 1;
+				}
+				consumed++;
+			} else if (scf_error() != SCF_ERROR_NOT_FOUND) {
+				scfdie();
+			}
+		}
+
+		ret = snprintf(pname, sizeof (pname),
+		    SCF_PROPERTY_MP_EMPTY_FMT, index);
+		if (ret < 0 || (size_t)ret >= sizeof (pname))
+			bad_error("snprintf", errno);
+		if (scf_pg_get_property(pg, pname, exp_prop) == 0) {
+			if (prop_check_type(exp_prop, SCF_TYPE_BOOLEAN) != 0 ||
+			    prop_get_val(exp_prop, exp_val) != 0) {
+				err = 1;
+			} else {
+				if (scf_value_get_boolean(exp_val, &b) !=
+				    SCF_SUCCESS) {
+					scfdie();
+				}
+				if (b)
+					safe_setprop(d, "empty", true);
+			}
+			consumed++;
+		} else if (scf_error() != SCF_ERROR_NOT_FOUND) {
+			scfdie();
+		}
+	}
+
+	/*
+	 * Check that every property in the group was consumed by the
+	 * entries above. Anything left over means that this group was not
+	 * created from a managed_paths element.
+	 */
+	if (scf_iter_pg_properties(exp_prop_iter, pg) != SCF_SUCCESS)
+		scfdie();
+	while ((ret = scf_iter_next_property(exp_prop_iter, exp_prop)) == 1)
+		total++;
+	if (ret == -1)
+		scfdie();
+
+	if (err != 0 || consumed == 0 || total != consumed) {
+		xmlFreeNode(n);
+		export_pg(pg, eelts, SCE_ALL_VALUES);
+		return;
+	}
+
+	eelts->managed_paths = n;
+}
+
+/*
  * Given a dependency property group in the tfmri entity (target fmri), return
  * a dependent element which represents it.
  */
@@ -10656,6 +10767,10 @@ export_instance(scf_instance_t *inst, struct entity_elts *selts, int flags)
 			    0) {
 				export_method_context(exp_pg, &elts);
 				continue;
+			} else if (strcmp(exp_str, SCF_PG_MANAGED_PATHS) ==
+			    0) {
+				export_managed_paths(exp_pg, &elts);
+				continue;
 			} else if (strcmp(exp_str, SCF_PG_DEPENDENTS) == 0) {
 				export_dependents(exp_pg, &elts);
 				continue;
@@ -10686,8 +10801,9 @@ export_instance(scf_instance_t *inst, struct entity_elts *selts, int flags)
 
 	if (isdefault && elts.restarter == NULL &&
 	    elts.dependencies == NULL && elts.method_context == NULL &&
-	    elts.exec_methods == NULL && elts.notify_params == NULL &&
-	    elts.property_groups == NULL && elts.template == NULL) {
+	    elts.managed_paths == NULL && elts.exec_methods == NULL &&
+	    elts.notify_params == NULL && elts.property_groups == NULL &&
+	    elts.template == NULL) {
 		xmlChar *eval;
 
 		/* This is a default instance */
@@ -10709,6 +10825,7 @@ export_instance(scf_instance_t *inst, struct entity_elts *selts, int flags)
 		(void) xmlAddChildList(n, elts.dependencies);
 		(void) xmlAddChildList(n, elts.dependents);
 		(void) xmlAddChild(n, elts.method_context);
+		(void) xmlAddChild(n, elts.managed_paths);
 		(void) xmlAddChildList(n, elts.exec_methods);
 		(void) xmlAddChildList(n, elts.notify_params);
 		(void) xmlAddChildList(n, elts.property_groups);
@@ -10781,6 +10898,10 @@ export_service(scf_service_t *svc, int flags)
 			    0) {
 				export_method_context(exp_pg, &elts);
 				continue;
+			} else if (strcmp(exp_str, SCF_PG_MANAGED_PATHS) ==
+			    0) {
+				export_managed_paths(exp_pg, &elts);
+				continue;
 			} else if (strcmp(exp_str, SCF_PG_DEPENDENTS) == 0) {
 				export_dependents(exp_pg, &elts);
 				continue;
@@ -10826,6 +10947,7 @@ export_service(scf_service_t *svc, int flags)
 	(void) xmlAddChildList(snode, elts.dependencies);
 	(void) xmlAddChildList(snode, elts.dependents);
 	(void) xmlAddChild(snode, elts.method_context);
+	(void) xmlAddChild(snode, elts.managed_paths);
 	(void) xmlAddChildList(snode, elts.exec_methods);
 	(void) xmlAddChildList(snode, elts.notify_params);
 	(void) xmlAddChildList(snode, elts.property_groups);

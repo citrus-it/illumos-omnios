@@ -670,7 +670,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	scf_snapshot_t *snap;
 	const char *mname;
 	mc_error_t *m_error;
-	struct method_context *mcp;
+	struct method_context *mcp = NULL;
 	int result = 0, timeout_fired = 0;
 	int sig, r;
 	boolean_t transient;
@@ -773,6 +773,19 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		}
 	}
 
+	/*
+	 * A service which is transitioning to online has any managed paths
+	 * applied before its start method runs. When the service defines
+	 * managed paths, this also gathers the method context into mcp, which
+	 * provides the default directory ownership and receives any
+	 * environment variable additions.
+	 */
+	if (type == METHOD_START &&
+	    managed_paths_apply(inst, snap, mname, method, &mcp) != 0) {
+		result = EINVAL;
+		goto out;
+	}
+
 	if (restarter_is_null_method(method)) {
 		log_framework(LOG_DEBUG, "%s: null method succeeds\n",
 		    inst->ri_i.i_fmri);
@@ -815,21 +828,23 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	log_framework(LOG_DEBUG, "%s: forking to run method %s\n",
 	    inst->ri_i.i_fmri, method);
 
-	m_error = restarter_get_method_context(RESTARTER_METHOD_CONTEXT_VERSION,
-	    inst->ri_m_inst, snap, mname, method, &mcp);
+	if (mcp == NULL) {
+		m_error = restarter_get_method_context(
+		    RESTARTER_METHOD_CONTEXT_VERSION, inst->ri_m_inst, snap,
+		    mname, method, &mcp);
 
-	if (m_error != NULL) {
-		log_instance(inst, B_TRUE, "%s", m_error->msg);
-		restarter_mc_error_destroy(m_error);
-		result = EINVAL;
-		goto out;
+		if (m_error != NULL) {
+			log_instance(inst, B_TRUE, "%s", m_error->msg);
+			restarter_mc_error_destroy(m_error);
+			result = EINVAL;
+			goto out;
+		}
 	}
 
 	r = method_ready_contract(inst, type, restart_on, cte_mask);
 	if (r != 0) {
 		assert(r == ECANCELED);
 		assert(inst->ri_mi_deleted);
-		restarter_free_method_context(mcp);
 		result = ECANCELED;
 		goto out;
 	}
@@ -860,7 +875,6 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		    errno == ENOENT) {
 			log_instance(inst, B_TRUE, "Missing start method (%s), "
 			    "changing state to maintenance.", method);
-			restarter_free_method_context(mcp);
 			result = ENOENT;
 			goto out;
 		}
@@ -879,7 +893,6 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 			log_instance(inst, B_TRUE, "Restarting too quickly, "
 			    "changing state to maintenance.");
 			result = ELOOP;
-			restarter_free_method_context(mcp);
 			goto out;
 		}
 	}
@@ -900,7 +913,6 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		    "%s: Couldn't fork to execute method %s: %s\n",
 		    inst->ri_i.i_fmri, method, strerror(forkerr));
 
-		restarter_free_method_context(mcp);
 		goto out;
 	}
 
@@ -911,8 +923,6 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	 */
 	method_store_contract(inst, type, &ctid);
 	atomic_add_16(&storing_contract, -1);
-
-	restarter_free_method_context(mcp);
 
 	/*
 	 * Similarly for the start method PID.
@@ -1103,6 +1113,8 @@ contract_out:
 	}
 
 out:
+	if (mcp != NULL)
+		restarter_free_method_context(mcp);
 	if (ctfd >= 0)
 		(void) close(ctfd);
 	scf_snapshot_destroy(snap);

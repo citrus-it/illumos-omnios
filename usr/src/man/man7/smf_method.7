@@ -18,7 +18,7 @@
 .\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd July 18, 2026
+.Dd July 22, 2026
 .Dt SMF_METHOD 7
 .Os
 .Sh NAME
@@ -499,6 +499,108 @@ and
 .Sy 2
 are recommended to be a per-service log file.
 .El
+.Ss Managed Paths
+A service can ask its restarter to ensure that one or more directories exist
+before its start method runs by including
+.Sy managed_paths
+blocks in its manifest, at either or both of the service and instance level.
+Each block contains one or more
+.Sy directory
+elements with the following attributes:
+.Bl -tag -width group
+.It Sy path
+The path of the directory.
+The path is subject to the method token expansion described above and must
+expand to an absolute path.
+.It Sy user
+The user that owns the directory, in numeric or text form.
+If absent, the user from the method credential which applies to the start
+method is used.
+.It Sy group
+The group that owns the directory, in numeric or text form.
+If absent, the group from the method credential which applies to the start
+method is used.
+.It Sy mode
+The access permissions for the directory, as an octal string.
+If absent,
+.Sy 0770
+is used.
+.It Sy env
+The name of an environment variable in which the expanded path is placed in
+the environment of the service's methods.
+If no value is provided, then nothing is placed in the environent.
+.It Sy empty
+A boolean that specifies whether the contents of the directory are removed
+before the service starts.
+The default is
+.Sy false .
+.El
+.Pp
+For example:
+.Bd -literal -offset indent
+<managed_paths>
+	<directory path='/var/run/foo' empty='true' />
+	<directory path='/var/db/foo-%i' env='FOO_DB_DIR' />
+</managed_paths>
+.Ed
+.Pp
+Directories are processed in the order in which they appear in the manifest,
+which allows a directory to be created inside one that appears earlier.
+Entries at the service level are processed before those at the instance
+level.
+Processing occurs when a service instance is about to transition to the
+online state, before the start method runs.
+.Pp
+Each directory is created if it does not already exist, together with any
+missing intermediate directories.
+Intermediate directories are created with the user and group
+.Sy root
+and mode
+.Sy 0755 ,
+and are never modified if they already exist.
+The ownership and permissions of the final directory are always applied, even
+when the directory already existed.
+Symbolic links are not permitted at any component of a managed path, and are
+never followed while a directory is being emptied.
+Emptying a directory is best effort in the face of concurrent activity.
+Anything present when processing begins is removed, but entries added by
+others while cleaning is in progress may remain.
+A mounted filesystem below the directory is not emptied, and causes the
+service to enter maintenance.
+.Pp
+When
+.Sy env
+is set, the expanded path is placed in the named environment variable in the
+environment of the service's methods.
+If the variable is already present, whether from the
+.Sy environment
+method context property or from an earlier managed path entry, the path is
+appended to the existing value, separated by a colon.
+This allows a directory to be added to a variable such as
+.Ev PATH ,
+or several directories to be collected under one name.
+Names with the reserved
+.Sy SMF_
+prefix are not permitted.
+.Pp
+A failure to process a managed path entry causes the service to be placed in
+the maintenance state.
+.Pp
+The entries are stored in a framework property group named
+.Sy managed_paths
+on the service or instance.
+As with other framework property groups, modifying it requires the
+.Sy solaris.smf.modify.framework
+authorization.
+See
+.Xr smf_security 7 .
+.Pp
+Managed paths are currently processed by
+.Xr svc.startd 8
+only.
+Delegated restarters such as
+.Xr inetd 8
+do not process them.
 .Sh FILES
 .Bl -tag -width Ds
 .It Pa /lib/svc/share/smf_include.sh
@@ -521,6 +623,7 @@ Definitions of exit status codes.
 .Xr security-flags 7 ,
 .Xr smf 7 ,
 .Xr smf_bootstrap 7 ,
+.Xr smf_security 7 ,
 .Xr zones 7 ,
 .Xr coreadm 8 ,
 .Xr inetd 8 ,
