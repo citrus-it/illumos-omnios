@@ -40,7 +40,7 @@
 /*
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -132,6 +132,8 @@ struct vcpu {
 	/* (o) protects state, run_state, hostcpu, sipi_vector */
 	kmutex_t	lock;
 
+	struct vm	*vm;		/* (o) owning vm */
+	int		vcpuid;		/* (o) id within the vm */
 	enum vcpu_state	state;		/* (o) vcpu state */
 	enum vcpu_run_state run_state;	/* (i) vcpu init/sipi/run state */
 	kcondvar_t	vcpu_cv;	/* (o) cpu waiter cv */
@@ -407,6 +409,8 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 	if (create) {
 		mutex_init(&vcpu->lock, NULL, MUTEX_ADAPTIVE, NULL);
 
+		vcpu->vm = vm;
+		vcpu->vcpuid = vcpu_id;
 		vcpu->state = VCPU_IDLE;
 		vcpu->hostcpu = NOCPU;
 		vcpu->lastloccpu = NOCPU;
@@ -669,6 +673,27 @@ uint16_t
 vm_get_maxcpus(struct vm *vm)
 {
 	return (vm->maxcpus);
+}
+
+struct vcpu *
+vm_vcpu(struct vm *vm, int vcpuid)
+{
+	ASSERT3S(vcpuid, >=, 0);
+	ASSERT3S(vcpuid, <, vm->maxcpus);
+
+	return (&vm->vcpu[vcpuid]);
+}
+
+struct vm *
+vcpu_vm(struct vcpu *vcpu)
+{
+	return (vcpu->vm);
+}
+
+int
+vcpu_vcpuid(struct vcpu *vcpu)
+{
+	return (vcpu->vcpuid);
 }
 
 int
