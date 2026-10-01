@@ -14,7 +14,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -1542,6 +1542,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		size = vm_cpuset.cpusetsize;
 		if (size <= 0 || size > sizeof (cpuset_t)) {
 			error = ERANGE;
+			break;
 		}
 		/*
 		 * If they want a ulong_t or less, make sure they receive the
