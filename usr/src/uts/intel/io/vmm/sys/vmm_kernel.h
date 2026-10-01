@@ -40,7 +40,7 @@
 /*
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -56,6 +56,7 @@
 SDT_PROVIDER_DECLARE(vmm);
 
 struct vm;
+struct vcpu;
 struct vm_exception;
 struct seg_desc;
 struct vm_exit;
@@ -141,6 +142,9 @@ int vm_create(uint64_t flags, struct vm **retvm);
 void vm_destroy(struct vm *vm);
 int vm_reinit(struct vm *vm, uint64_t);
 uint16_t vm_get_maxcpus(struct vm *vm);
+struct vcpu *vm_vcpu(struct vm *vm, int vcpuid);
+struct vm *vcpu_vm(struct vcpu *vcpu);
+int vcpu_vcpuid(struct vcpu *vcpu);
 void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
     uint16_t *threads, uint16_t *maxcpus);
 int vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
