@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -20,36 +20,46 @@
 #include <sys/io/zen/oxio.h>
 #include <sys/sysmacros.h>
 
+/*
+ * The fixed ports use the slot numbers that AMD's reference firmware assigns
+ * on Ruby when a UBM backplane is present. The UBM engines use their own range
+ * starting at 0x10, which does not overlap.
+ */
 const oxio_engine_t oxio_ruby[] = { {
 	.oe_name = "Ruby Riser 1",
 	.oe_type = OXIO_ENGINE_T_PCIE,
 	.oe_tile = OXIO_TILE_P1,
 	.oe_lane = 0,
-	.oe_nlanes = 16
+	.oe_nlanes = 16,
+	.oe_slot = 0x7
 }, {
 	.oe_name = "Ruby Riser 2",
 	.oe_type = OXIO_ENGINE_T_PCIE,
 	.oe_tile = OXIO_TILE_P0,
 	.oe_lane = 8,
-	.oe_nlanes = 8
+	.oe_nlanes = 8,
+	.oe_slot = 0x6
 }, {
 	.oe_name = "Ruby Riser 3",
 	.oe_type = OXIO_ENGINE_T_PCIE,
 	.oe_tile = OXIO_TILE_P3,
 	.oe_lane = 0,
-	.oe_nlanes = 16
+	.oe_nlanes = 16,
+	.oe_slot = 0x8
 },  {
 	.oe_name = "OCP 3.0",
 	.oe_type = OXIO_ENGINE_T_PCIE,
 	.oe_tile = OXIO_TILE_P2,
 	.oe_lane = 0,
-	.oe_nlanes = 16
+	.oe_nlanes = 16,
+	.oe_slot = 0x1
 }, {
 	.oe_name = "M.2 0 (x4)",
 	.oe_type = OXIO_ENGINE_T_PCIE,
 	.oe_tile = OXIO_TILE_P4,
 	.oe_lane = 0,
 	.oe_nlanes = 4,
+	.oe_slot = 0x2,
 	.oe_tuning = {
 		.ot_hw_limit = OXIO_SPEED_GEN_4,
 		.ot_hw_target = OXIO_SPEED_GEN_3
@@ -60,6 +70,7 @@ const oxio_engine_t oxio_ruby[] = { {
 	.oe_tile = OXIO_TILE_P5,
 	.oe_lane = 0,
 	.oe_nlanes = 1,
+	.oe_slot = 0x3,
 	.oe_tuning = {
 		.ot_hw_limit = OXIO_SPEED_GEN_4,
 		.ot_hw_target = OXIO_SPEED_GEN_3
@@ -70,6 +81,7 @@ const oxio_engine_t oxio_ruby[] = { {
 	.oe_tile = OXIO_TILE_P5,
 	.oe_lane = 1,
 	.oe_nlanes = 1,
+	.oe_slot = 0x4,
 	.oe_tuning = {
 		.ot_hw_limit = OXIO_SPEED_GEN_4,
 		.ot_hw_target = OXIO_SPEED_GEN_3
@@ -80,6 +92,7 @@ const oxio_engine_t oxio_ruby[] = { {
 	.oe_tile = OXIO_TILE_P5,
 	.oe_lane = 3,
 	.oe_nlanes = 1,
+	.oe_slot = 0x5,
 	.oe_tuning = {
 		.ot_hw_limit = OXIO_SPEED_GEN_4,
 		.ot_hw_target = OXIO_SPEED_GEN_3
