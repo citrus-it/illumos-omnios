@@ -11,7 +11,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/kernel.h>
@@ -374,7 +374,7 @@ svm_pmu_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	struct vdi_pmu_amd_v1 *out = req->vdr_data;
 
 	if (!svm_pmu_is_active(pmu)) {
-		bzero(out, sizeof (out));
+		bzero(out, sizeof (*out));
 		return (0);
 	}
 
