@@ -105,8 +105,8 @@ static VMM_STAT_AMD(VCPU_EXITINTINFO, "VM exits during event delivery");
 static VMM_STAT_AMD(VCPU_INTINFO_INJECTED, "Events pending at VM entry");
 static VMM_STAT_AMD(VMEXIT_VINTR, "VM exits due to interrupt window");
 
-static int svm_setreg(void *arg, int vcpu, int ident, uint64_t val);
-static int svm_getreg(void *arg, int vcpu, int ident, uint64_t *val);
+static int svm_setreg(void *vcpui, int ident, uint64_t val);
+static int svm_getreg(void *vcpui, int ident, uint64_t *val);
 static void flush_asid(struct svm_vcpu *vcpu);
 
 static __inline bool
@@ -485,6 +485,15 @@ svm_vminit(struct vm *vm)
 	return (svm_sc);
 }
 
+static void *
+svm_vcpu_init(void *arg, struct vcpu *vcpu1, int vcpuid)
+{
+	struct svm_vcpu *vcpu = svm_get_vcpu(arg, vcpuid);
+
+	vcpu->vcpu = vcpu1;
+	return (vcpu);
+}
+
 /*
  * Collateral for a generic SVM VM-exit.
  */
@@ -827,7 +836,7 @@ svm_handle_cr0_read(struct svm_vcpu *vcpu, enum vm_reg_name reg)
 	int err __maybe_unused;
 
 	svm_get_cr0(vcpu, &val);
-	err = svm_setreg(vcpu->sc, vcpu->vcpuid, reg, val);
+	err = svm_setreg(vcpu, reg, val);
 	ASSERT(err == 0);
 }
 
@@ -840,7 +849,7 @@ svm_handle_cr0_write(struct svm_vcpu *vcpu, enum vm_reg_name reg)
 
 	state = svm_get_vmcb_state(vcpu);
 
-	err = svm_getreg(vcpu->sc, vcpu->vcpuid, reg, &val);
+	err = svm_getreg(vcpu, reg, &val);
 	ASSERT(err == 0);
 
 	if ((val & CR0_NW) != 0 && (val & CR0_CD) == 0) {
@@ -1182,7 +1191,7 @@ svm_write_efer(struct svm_vcpu *vcpu, uint64_t newval)
 		return (VMR_GP);
 	}
 
-	error = svm_setreg(vcpu->sc, vcpu->vcpuid, VM_REG_GUEST_EFER, newval);
+	error = svm_setreg(vcpu, VM_REG_GUEST_EFER, newval);
 	VERIFY0(error);
 	return (VMR_OK);
 }
@@ -1416,8 +1425,7 @@ svm_vmexit(struct svm_vcpu *vcpu, struct vm_exit *vmexit)
 			vmm_call_trap(T_MCE);
 			break;
 		case IDT_PF:
-			VERIFY0(svm_setreg(vcpu->sc, vcpu->vcpuid,
-			    VM_REG_GUEST_CR2, info2));
+			VERIFY0(svm_setreg(vcpu, VM_REG_GUEST_CR2, info2));
 			/* fallthru */
 		case IDT_NP:
 		case IDT_SS:
@@ -1879,7 +1887,7 @@ svm_apply_tsc_adjust(struct svm_vcpu *vcpu)
  * Start vcpu with specified RIP.
  */
 static int
-svm_vmrun(void *arg, int vcpuid, uint64_t rip)
+svm_vmrun(void *vcpui, uint64_t rip)
 {
 	struct svm_regctx *gctx;
 	struct svm_softc *svm_sc;
@@ -1892,11 +1900,13 @@ svm_vmrun(void *arg, int vcpuid, uint64_t rip)
 	uint64_t vmcb_pa;
 	int handled;
 	uint16_t ldt_sel;
+	int vcpuid;
 
-	svm_sc = arg;
+	vcpu = vcpui;
+	svm_sc = vcpu->sc;
 	vm = svm_sc->vm;
+	vcpuid = vcpu->vcpuid;
 
-	vcpu = svm_get_vcpu(svm_sc, vcpuid);
 	state = svm_get_vmcb_state(vcpu);
 	vmexit = vm_exitinfo(vm, vcpuid);
 	vlapic = vm_lapic(vm, vcpuid);
@@ -2107,15 +2117,14 @@ swctx_regptr(struct svm_regctx *regctx, int reg)
 }
 
 static int
-svm_getreg(void *arg, int vcpuid, int ident, uint64_t *val)
+svm_getreg(void *vcpui, int ident, uint64_t *val)
 {
-	struct svm_vcpu *vcpu;
+	struct svm_vcpu *vcpu = vcpui;
 	struct vmcb *vmcb;
 	uint64_t *regp;
 	uint64_t *fieldp;
 	struct vmcb_segment *seg;
 
-	vcpu = svm_get_vcpu(arg, vcpuid);
 	vmcb = svm_get_vmcb(vcpu);
 
 	regp = swctx_regptr(svm_get_guest_regctx(vcpu), ident);
@@ -2188,16 +2197,15 @@ svm_getreg(void *arg, int vcpuid, int ident, uint64_t *val)
 }
 
 static int
-svm_setreg(void *arg, int vcpuid, int ident, uint64_t val)
+svm_setreg(void *vcpui, int ident, uint64_t val)
 {
-	struct svm_vcpu *vcpu;
+	struct svm_vcpu *vcpu = vcpui;
 	struct vmcb *vmcb;
 	uint64_t *regp;
 	uint64_t *fieldp;
 	uint32_t dirty;
 	struct vmcb_segment *seg;
 
-	vcpu = svm_get_vcpu(arg, vcpuid);
 	vmcb = svm_get_vmcb(vcpu);
 
 	regp = swctx_regptr(svm_get_guest_regctx(vcpu), ident);
@@ -2282,13 +2290,12 @@ svm_setreg(void *arg, int vcpuid, int ident, uint64_t val)
 }
 
 static int
-svm_setdesc(void *arg, int vcpuid, int reg, const struct seg_desc *desc)
+svm_setdesc(void *vcpui, int reg, const struct seg_desc *desc)
 {
+	struct svm_vcpu *vcpu = vcpui;
 	struct vmcb *vmcb;
-	struct svm_vcpu *vcpu;
 	struct vmcb_segment *seg;
 
-	vcpu = svm_get_vcpu(arg, vcpuid);
 	vmcb = svm_get_vmcb(vcpu);
 
 	switch (reg) {
@@ -2343,12 +2350,12 @@ svm_setdesc(void *arg, int vcpuid, int reg, const struct seg_desc *desc)
 }
 
 static int
-svm_getdesc(void *arg, int vcpuid, int reg, struct seg_desc *desc)
+svm_getdesc(void *vcpui, int reg, struct seg_desc *desc)
 {
 	struct vmcb *vmcb;
 	struct vmcb_segment *seg;
 
-	vmcb = svm_get_vmcb(svm_get_vcpu(arg, vcpuid));
+	vmcb = svm_get_vmcb(vcpui);
 
 	switch (reg) {
 	case VM_REG_GUEST_DS:
@@ -2416,9 +2423,9 @@ svm_getdesc(void *arg, int vcpuid, int reg, struct seg_desc *desc)
 }
 
 static int
-svm_get_msr(void *arg, int vcpuid, uint32_t msr, uint64_t *valp)
+svm_get_msr(void *vcpui, uint32_t msr, uint64_t *valp)
 {
-	struct vmcb *vmcb = svm_get_vmcb(svm_get_vcpu(arg, vcpuid));
+	struct vmcb *vmcb = svm_get_vmcb(vcpui);
 	const uint64_t *msrp = vmcb_msr_ptr(vmcb, msr, NULL);
 
 	if (msrp != NULL) {
@@ -2430,9 +2437,9 @@ svm_get_msr(void *arg, int vcpuid, uint32_t msr, uint64_t *valp)
 }
 
 static int
-svm_set_msr(void *arg, int vcpuid, uint32_t msr, uint64_t val)
+svm_set_msr(void *vcpui, uint32_t msr, uint64_t val)
 {
-	struct svm_vcpu *vcpu = svm_get_vcpu(arg, vcpuid);
+	struct svm_vcpu *vcpu = vcpui;
 	struct vmcb *vmcb = svm_get_vmcb(vcpu);
 
 	uint32_t dirty = 0;
@@ -2464,12 +2471,11 @@ svm_set_msr(void *arg, int vcpuid, uint32_t msr, uint64_t val)
 }
 
 static int
-svm_setcap(void *arg, int vcpuid, int type, int val)
+svm_setcap(void *vcpui, int type, int val)
 {
-	struct svm_vcpu *vcpu;
+	struct svm_vcpu *vcpu = vcpui;
 	int error;
 
-	vcpu = svm_get_vcpu(arg, vcpuid);
 	error = 0;
 	switch (type) {
 	case VM_CAP_HALT_EXIT:
@@ -2488,12 +2494,11 @@ svm_setcap(void *arg, int vcpuid, int type, int val)
 }
 
 static int
-svm_getcap(void *arg, int vcpuid, int type, int *retval)
+svm_getcap(void *vcpui, int type, int *retval)
 {
-	struct svm_vcpu *vcpu;
+	struct svm_vcpu *vcpu = vcpui;
 	int error;
 
-	vcpu = svm_get_vcpu(arg, vcpuid);
 	error = 0;
 
 	switch (type) {
@@ -2513,16 +2518,16 @@ svm_getcap(void *arg, int vcpuid, int type, int *retval)
 }
 
 static struct vlapic *
-svm_vlapic_init(void *arg, int vcpuid)
+svm_vlapic_init(void *vcpui)
 {
-	struct svm_softc *svm_sc;
+	struct svm_vcpu *vcpu = vcpui;
+	struct svm_softc *svm_sc = vcpu->sc;
 	struct vlapic *vlapic;
 
-	svm_sc = arg;
 	vlapic = kmem_zalloc(sizeof (struct vlapic), KM_SLEEP);
 	vlapic->vm = svm_sc->vm;
-	vlapic->vcpuid = vcpuid;
-	vlapic->apic_page = (struct LAPIC *)&svm_sc->apic_page[vcpuid];
+	vlapic->vcpuid = vcpu->vcpuid;
+	vlapic->apic_page = (struct LAPIC *)&svm_sc->apic_page[vcpu->vcpuid];
 
 	vlapic_init(vlapic);
 
@@ -2530,16 +2535,16 @@ svm_vlapic_init(void *arg, int vcpuid)
 }
 
 static void
-svm_vlapic_cleanup(void *arg, struct vlapic *vlapic)
+svm_vlapic_cleanup(void *vcpui, struct vlapic *vlapic)
 {
 	vlapic_cleanup(vlapic);
 	kmem_free(vlapic, sizeof (struct vlapic));
 }
 
 static void
-svm_pause(void *arg, int vcpuid)
+svm_pause(void *vcpui)
 {
-	struct svm_vcpu *vcpu = svm_get_vcpu(arg, vcpuid);
+	struct svm_vcpu *vcpu = vcpui;
 	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(vcpu);
 
 	/*
@@ -2563,9 +2568,9 @@ svm_pause(void *arg, int vcpuid)
 }
 
 static void
-svm_savectx(void *arg, int vcpuid)
+svm_savectx(void *vcpui)
 {
-	struct svm_vcpu *vcpu = svm_get_vcpu(arg, vcpuid);
+	struct svm_vcpu *vcpu = vcpui;
 
 	/* We should _never_ go off-CPU with the GIF disabled */
 	ASSERT(!hma_svm_gif_is_disabled());
@@ -2576,9 +2581,9 @@ svm_savectx(void *arg, int vcpuid)
 }
 
 static void
-svm_restorectx(void *arg, int vcpuid)
+svm_restorectx(void *vcpui)
 {
-	struct svm_vcpu *vcpu = svm_get_vcpu(arg, vcpuid);
+	struct svm_vcpu *vcpu = vcpui;
 
 	if (vcpu->loaded) {
 		svm_msr_guest_enter(vcpu);
@@ -2624,6 +2629,7 @@ struct vmm_ops vmm_ops_amd = {
 	.resume		= svm_restore,
 
 	.vminit		= svm_vminit,
+	.vcpu_init	= svm_vcpu_init,
 	.vmrun		= svm_vmrun,
 	.vmcleanup	= svm_vmcleanup,
 	.vmgetreg	= svm_getreg,

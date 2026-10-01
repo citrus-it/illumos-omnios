@@ -61,6 +61,7 @@ struct svm_vcpu {
 	boolean_t	loaded;
 	struct svm_pmu_vcpu pmu;
 	struct svm_softc *sc;	 /* owning softc */
+	struct vcpu	*vcpu;	 /* generic vcpu state */
 	int		vcpuid;	 /* id within the vm */
 } __aligned(PAGE_SIZE);
 

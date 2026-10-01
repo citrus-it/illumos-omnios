@@ -302,8 +302,8 @@ SDT_PROBE_DEFINE4(vmm, vmx, exit, return,
     "struct vmx *", "int", "struct vm_exit *", "int");
 /* END CSTYLED */
 
-static int vmx_getdesc(void *arg, int vcpuid, int reg, struct seg_desc *desc);
-static int vmx_getreg(void *arg, int vcpuid, int reg, uint64_t *retval);
+static int vmx_getdesc(void *vcpui, int reg, struct seg_desc *desc);
+static int vmx_getreg(void *vcpui, int reg, uint64_t *retval);
 static void vmx_apply_tsc_adjust(struct vmx_vcpu *);
 static void vmx_apicv_sync_tmr(struct vlapic *vlapic);
 static void vmx_tpr_shadow_enter(struct vlapic *vlapic);
@@ -901,6 +901,15 @@ vmx_vminit(struct vm *vm)
 	}
 
 	return (vmx);
+}
+
+static void *
+vmx_vcpu_init(void *arg, struct vcpu *vcpu1, int vcpuid)
+{
+	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+
+	vcpu->vcpu = vcpu1;
+	return (vcpu);
 }
 
 static VMM_STAT_INTEL(VCPU_INVVPID_SAVED, "Number of vpid invalidations saved");
@@ -2757,7 +2766,7 @@ vmx_dr_leave_guest(struct vmxctx *vmxctx)
 }
 
 static int
-vmx_run(void *arg, int vcpuid, uint64_t rip)
+vmx_run(void *vcpui, uint64_t rip)
 {
 	int rc, handled, launched;
 	struct vmx *vmx;
@@ -2770,10 +2779,12 @@ vmx_run(void *arg, int vcpuid, uint64_t rip)
 	uint32_t exit_reason;
 	bool tpr_shadow_active;
 	vm_client_t *vmc;
+	int vcpuid;
 
-	vmx = arg;
+	vcpu = vcpui;
+	vmx = vcpu->vmx;
 	vm = vmx->vm;
-	vcpu = vmx_get_vcpu(vmx, vcpuid);
+	vcpuid = vcpu->vcpuid;
 	vmcs_pa = vcpu->vmcs_pa;
 	vmxctx = &vcpu->ctx;
 	vlapic = vm_lapic(vm, vcpuid);
@@ -3101,9 +3112,9 @@ vmxctx_regptr(struct vmxctx *vmxctx, int reg)
 }
 
 static int
-vmx_getreg(void *arg, int vcpuid, int reg, uint64_t *retval)
+vmx_getreg(void *vcpui, int reg, uint64_t *retval)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 	uint64_t *regp;
 
 	/* VMCS access not required for ctx reads */
@@ -3149,10 +3160,9 @@ vmx_getreg(void *arg, int vcpuid, int reg, uint64_t *retval)
 }
 
 static int
-vmx_setreg(void *arg, int vcpuid, int reg, uint64_t val)
+vmx_setreg(void *vcpui, int reg, uint64_t val)
 {
-	struct vmx *vmx = arg;
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(vmx, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 	uint64_t *regp;
 
 	/* VMCS access not required for ctx writes */
@@ -3217,7 +3227,7 @@ vmx_setreg(void *arg, int vcpuid, int reg, uint64_t val)
 			 * is updated but vmx_invvpid() does not.
 			 */
 			vmx_invvpid(vcpu,
-			    vcpu_is_running(vmx->vm, vcpuid, NULL));
+			    vcpu_is_running(vcpu->vmx->vm, vcpu->vcpuid, NULL));
 			break;
 		case VMCS_INVALID_ENCODING:
 			err = EINVAL;
@@ -3235,9 +3245,9 @@ vmx_setreg(void *arg, int vcpuid, int reg, uint64_t val)
 }
 
 static int
-vmx_getdesc(void *arg, int vcpuid, int seg, struct seg_desc *desc)
+vmx_getdesc(void *vcpui, int seg, struct seg_desc *desc)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 	uint32_t base, limit, access;
 
 	bool vmcs_loaded = vmx_vmcs_access_ensure(vcpu);
@@ -3258,9 +3268,9 @@ vmx_getdesc(void *arg, int vcpuid, int seg, struct seg_desc *desc)
 }
 
 static int
-vmx_setdesc(void *arg, int vcpuid, int seg, const struct seg_desc *desc)
+vmx_setdesc(void *vcpui, int seg, const struct seg_desc *desc)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 	uint32_t base, limit, access;
 
 	bool vmcs_loaded = vmx_vmcs_access_ensure(vcpu);
@@ -3302,9 +3312,9 @@ vmx_msr_ptr(struct vmx_vcpu *vcpu, uint32_t msr)
 }
 
 static int
-vmx_msr_get(void *arg, int vcpuid, uint32_t msr, uint64_t *valp)
+vmx_msr_get(void *vcpui, uint32_t msr, uint64_t *valp)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 
 	ASSERT(valp != NULL);
 
@@ -3330,9 +3340,9 @@ vmx_msr_get(void *arg, int vcpuid, uint32_t msr, uint64_t *valp)
 }
 
 static int
-vmx_msr_set(void *arg, int vcpuid, uint32_t msr, uint64_t val)
+vmx_msr_set(void *vcpui, uint32_t msr, uint64_t val)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 
 	/* TODO: mask value */
 
@@ -3361,9 +3371,9 @@ vmx_msr_set(void *arg, int vcpuid, uint32_t msr, uint64_t val)
 }
 
 static int
-vmx_getcap(void *arg, int vcpuid, int type, int *retval)
+vmx_getcap(void *vcpui, int type, int *retval)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 	int vcap;
 	int ret;
 
@@ -3401,9 +3411,9 @@ vmx_getcap(void *arg, int vcpuid, int type, int *retval)
 }
 
 static int
-vmx_setcap(void *arg, int vcpuid, int type, int val)
+vmx_setcap(void *vcpui, int type, int val)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 	uint32_t baseval, reg, flag;
 	uint32_t *pptr;
 	int error;
@@ -3767,10 +3777,10 @@ vmx_tpr_shadow_exit(struct vlapic *vlapic)
 }
 
 static struct vlapic *
-vmx_vlapic_init(void *arg, int vcpuid)
+vmx_vlapic_init(void *vcpui)
 {
-	struct vmx *vmx = arg;
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(vmx, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
+	struct vmx *vmx = vcpu->vmx;
 	struct vlapic_vtx *vlapic_vtx;
 	struct vlapic *vlapic;
 
@@ -3780,7 +3790,7 @@ vmx_vlapic_init(void *arg, int vcpuid)
 
 	vlapic = &vlapic_vtx->vlapic;
 	vlapic->vm = vmx->vm;
-	vlapic->vcpuid = vcpuid;
+	vlapic->vcpuid = vcpu->vcpuid;
 	vlapic->apic_page = (struct LAPIC *)vcpu->apic_page;
 
 	if (vmx_cap_en(vmx, VMX_CAP_TPR_SHADOW)) {
@@ -3803,16 +3813,16 @@ vmx_vlapic_init(void *arg, int vcpuid)
 }
 
 static void
-vmx_vlapic_cleanup(void *arg, struct vlapic *vlapic)
+vmx_vlapic_cleanup(void *vcpui, struct vlapic *vlapic)
 {
 	vlapic_cleanup(vlapic);
 	kmem_free(vlapic, sizeof (struct vlapic_vtx));
 }
 
 static void
-vmx_pause(void *arg, int vcpuid)
+vmx_pause(void *vcpui)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 
 	VERIFY(vmx_vmcs_access_ensure(vcpu));
 
@@ -3832,9 +3842,9 @@ vmx_pause(void *arg, int vcpuid)
 }
 
 static void
-vmx_savectx(void *arg, int vcpuid)
+vmx_savectx(void *vcpui)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 
 	if ((vcpu->vmcs_state & VS_LOADED) != 0) {
 		vmcs_clear(vcpu->vmcs_pa);
@@ -3850,9 +3860,9 @@ vmx_savectx(void *arg, int vcpuid)
 }
 
 static void
-vmx_restorectx(void *arg, int vcpuid)
+vmx_restorectx(void *vcpui)
 {
-	struct vmx_vcpu *vcpu = vmx_get_vcpu(arg, vcpuid);
+	struct vmx_vcpu *vcpu = vcpui;
 
 	ASSERT0(vcpu->vmcs_state & VS_LAUNCHED);
 
@@ -3879,6 +3889,7 @@ struct vmm_ops vmm_ops_intel = {
 	.resume		= vmx_restore,
 
 	.vminit		= vmx_vminit,
+	.vcpu_init	= vmx_vcpu_init,
 	.vmrun		= vmx_run,
 	.vmcleanup	= vmx_vmcleanup,
 	.vmgetreg	= vmx_getreg,

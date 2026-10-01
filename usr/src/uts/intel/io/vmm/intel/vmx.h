@@ -131,6 +131,7 @@ struct vmx;
 /* per-vCPU state */
 struct vmx_vcpu {
 	struct vmx	*vmx;		/* owning softc */
+	struct vcpu	*vcpu;		/* generic vcpu state */
 	int		vcpuid;		/* id within the vm */
 	struct vmcs	*vmcs;
 	uintptr_t	vmcs_pa;
