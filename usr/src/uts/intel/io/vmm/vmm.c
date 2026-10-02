@@ -134,6 +134,7 @@ struct vcpu {
 
 	struct vm	*vm;		/* (o) owning vm */
 	int		vcpuid;		/* (o) id within the vm */
+	void		*cookie;	/* (i) cpu-specific data */
 	enum vcpu_state	state;		/* (o) vcpu state */
 	enum vcpu_run_state run_state;	/* (i) vcpu init/sipi/run state */
 	kcondvar_t	vcpu_cv;	/* (o) cpu waiter cv */
@@ -266,6 +267,7 @@ static struct vmm_ops vmm_ops_null = {
 	.init		= (vmm_init_func_t)nullop_panic,
 	.resume		= (vmm_resume_func_t)nullop_panic,
 	.vminit		= (vmi_init_func_t)nullop_panic,
+	.vcpu_init	= (vmi_vcpu_init_t)nullop_panic,
 	.vmrun		= (vmi_run_func_t)nullop_panic,
 	.vmcleanup	= (vmi_cleanup_func_t)nullop_panic,
 	.vmgetreg	= (vmi_get_register_t)nullop_panic,
@@ -292,17 +294,18 @@ static struct vmm_ops *ops = &vmm_ops_null;
 #define	VMM_RESUME()			((*ops->resume)())
 
 #define	VMINIT(vm)		((*ops->vminit)(vm))
-#define	VMRUN(vmi, vcpu, rip)	((*ops->vmrun)(vmi, vcpu, rip))
+#define	VMVCPUINIT(vmi, vcpu, id)	((*ops->vcpu_init)(vmi, vcpu, id))
+#define	VMRUN(vcpui, rip)	((*ops->vmrun)(vcpui, rip))
 #define	VMCLEANUP(vmi)			((*ops->vmcleanup)(vmi))
 
-#define	VMGETREG(vmi, vcpu, num, rv)	((*ops->vmgetreg)(vmi, vcpu, num, rv))
-#define	VMSETREG(vmi, vcpu, num, val)	((*ops->vmsetreg)(vmi, vcpu, num, val))
-#define	VMGETDESC(vmi, vcpu, num, dsc)	((*ops->vmgetdesc)(vmi, vcpu, num, dsc))
-#define	VMSETDESC(vmi, vcpu, num, dsc)	((*ops->vmsetdesc)(vmi, vcpu, num, dsc))
-#define	VMGETCAP(vmi, vcpu, num, rv)	((*ops->vmgetcap)(vmi, vcpu, num, rv))
-#define	VMSETCAP(vmi, vcpu, num, val)	((*ops->vmsetcap)(vmi, vcpu, num, val))
-#define	VLAPIC_INIT(vmi, vcpu)		((*ops->vlapic_init)(vmi, vcpu))
-#define	VLAPIC_CLEANUP(vmi, vlapic)	((*ops->vlapic_cleanup)(vmi, vlapic))
+#define	VMGETREG(vcpui, num, rv)	((*ops->vmgetreg)(vcpui, num, rv))
+#define	VMSETREG(vcpui, num, val)	((*ops->vmsetreg)(vcpui, num, val))
+#define	VMGETDESC(vcpui, num, dsc)	((*ops->vmgetdesc)(vcpui, num, dsc))
+#define	VMSETDESC(vcpui, num, dsc)	((*ops->vmsetdesc)(vcpui, num, dsc))
+#define	VMGETCAP(vcpui, num, rv)	((*ops->vmgetcap)(vcpui, num, rv))
+#define	VMSETCAP(vcpui, num, val)	((*ops->vmsetcap)(vcpui, num, val))
+#define	VLAPIC_INIT(vcpui)		((*ops->vlapic_init)(vcpui))
+#define	VLAPIC_CLEANUP(vcpui, vlapic)	((*ops->vlapic_cleanup)(vcpui, vlapic))
 
 #define	fpu_start_emulating()	load_cr0(rcr0() | CR0_TS)
 #define	fpu_stop_emulating()	clts()
@@ -376,7 +379,7 @@ vcpu_cleanup(struct vm *vm, int i, bool destroy)
 {
 	struct vcpu *vcpu = &vm->vcpu[i];
 
-	VLAPIC_CLEANUP(vm->cookie, vcpu->vlapic);
+	VLAPIC_CLEANUP(vcpu->cookie, vcpu->vlapic);
 	if (destroy) {
 		vmm_stat_free(vcpu->stats);
 
@@ -433,7 +436,8 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 	}
 
 	vcpu->run_state = VRS_HALT;
-	vcpu->vlapic = VLAPIC_INIT(vm->cookie, vcpu_id);
+	vcpu->cookie = VMVCPUINIT(vm->cookie, vcpu, vcpu_id);
+	vcpu->vlapic = VLAPIC_INIT(vcpu->cookie);
 	(void) vm_set_x2apic_state(vm, vcpu_id, X2APIC_DISABLED);
 	vcpu->reqidle = false;
 	vcpu->reqconsist = false;
@@ -821,7 +825,7 @@ vm_pause_instance(struct vm *vm)
 		 * to-be-injected events in exit_intinfo where it can be
 		 * accessed in a manner generic to the backend.
 		 */
-		ops->vmpause(vm->cookie, i);
+		ops->vmpause(vcpu->cookie);
 	}
 	vhpet_pause(vm->vhpet);
 	vatpit_pause(vm->vatpit);
@@ -1237,7 +1241,7 @@ vm_get_register(struct vm *vm, int vcpuid, int reg, uint64_t *retval)
 		*retval = vcpu->guest_xcr0;
 		return (0);
 	default:
-		return (VMGETREG(vm->cookie, vcpuid, reg, retval));
+		return (VMGETREG(vcpu->cookie, reg, retval));
 	}
 }
 
@@ -1254,7 +1258,7 @@ vm_set_register(struct vm *vm, int vcpuid, int reg, uint64_t val)
 	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 	switch (reg) {
 	case VM_REG_GUEST_RIP:
-		error = VMSETREG(vm->cookie, vcpuid, reg, val);
+		error = VMSETREG(vcpu->cookie, reg, val);
 		if (error == 0) {
 			vcpu->nextrip = val;
 		}
@@ -1266,7 +1270,7 @@ vm_set_register(struct vm *vm, int vcpuid, int reg, uint64_t val)
 		vcpu->guest_xcr0 = val;
 		return (0);
 	default:
-		return (VMSETREG(vm->cookie, vcpuid, reg, val));
+		return (VMSETREG(vcpu->cookie, reg, val));
 	}
 }
 
@@ -1310,7 +1314,7 @@ vm_get_seg_desc(struct vm *vm, int vcpu, int reg, struct seg_desc *desc)
 	if (!is_segment_register(reg) && !is_descriptor_table(reg))
 		return (EINVAL);
 
-	return (VMGETDESC(vm->cookie, vcpu, reg, desc));
+	return (VMGETDESC(vm->vcpu[vcpu].cookie, reg, desc));
 }
 
 int
@@ -1322,7 +1326,7 @@ vm_set_seg_desc(struct vm *vm, int vcpu, int reg, const struct seg_desc *desc)
 	if (!is_segment_register(reg) && !is_descriptor_table(reg))
 		return (EINVAL);
 
-	return (VMSETDESC(vm->cookie, vcpu, reg, desc));
+	return (VMSETDESC(vm->vcpu[vcpu].cookie, reg, desc));
 }
 
 static int
@@ -2374,7 +2378,7 @@ vmm_savectx(void *arg)
 	const int vcpuid = vtc->vtc_vcpuid;
 
 	if (ops->vmsavectx != NULL) {
-		ops->vmsavectx(vm->cookie, vcpuid);
+		ops->vmsavectx(vm->vcpu[vcpuid].cookie);
 	}
 
 	/*
@@ -2429,7 +2433,7 @@ vmm_restorectx(void *arg)
 	}
 
 	if (ops->vmrestorectx != NULL) {
-		ops->vmrestorectx(vm->cookie, vcpuid);
+		ops->vmrestorectx(vm->vcpu[vcpuid].cookie);
 	}
 
 }
@@ -2587,7 +2591,7 @@ restart:
 	vcpu->vtc.vtc_status |= VTCS_FPU_CTX_CRITICAL;
 
 	vcpu_require_state(vm, vcpuid, VCPU_RUNNING);
-	error = VMRUN(vm->cookie, vcpuid, vcpu->nextrip);
+	error = VMRUN(vcpu->cookie, vcpu->nextrip);
 	vcpu_require_state(vm, vcpuid, VCPU_FROZEN);
 
 	/*
@@ -3243,7 +3247,7 @@ vm_get_capability(struct vm *vm, int vcpu, int type, int *retval)
 	if (type < 0 || type >= VM_CAP_MAX)
 		return (EINVAL);
 
-	return (VMGETCAP(vm->cookie, vcpu, type, retval));
+	return (VMGETCAP(vm->vcpu[vcpu].cookie, type, retval));
 }
 
 int
@@ -3255,7 +3259,7 @@ vm_set_capability(struct vm *vm, int vcpu, int type, int val)
 	if (type < 0 || type >= VM_CAP_MAX)
 		return (EINVAL);
 
-	return (VMSETCAP(vm->cookie, vcpu, type, val));
+	return (VMSETCAP(vm->vcpu[vcpu].cookie, type, val));
 }
 
 vcpu_cpuid_config_t *
@@ -4170,7 +4174,8 @@ vmm_data_read_msr(struct vm *vm, int vcpuid, uint32_t msr, uint64_t *value)
 		if (is_mtrr_msr(msr)) {
 			err = vm_rdmtrr(&vm->vcpu[vcpuid].mtrr, msr, value);
 		} else {
-			err = ops->vmgetmsr(vm->cookie, vcpuid, msr, value);
+			err = ops->vmgetmsr(vm->vcpu[vcpuid].cookie, msr,
+			    value);
 		}
 		break;
 	}
@@ -4207,7 +4212,8 @@ vmm_data_write_msr(struct vm *vm, int vcpuid, uint32_t msr, uint64_t value)
 
 			err = vm_wrmtrr(&vm->vcpu[vcpuid].mtrr, msr, value);
 		} else {
-			err = ops->vmsetmsr(vm->cookie, vcpuid, msr, value);
+			err = ops->vmsetmsr(vm->vcpu[vcpuid].cookie, msr,
+			    value);
 		}
 		break;
 	}
