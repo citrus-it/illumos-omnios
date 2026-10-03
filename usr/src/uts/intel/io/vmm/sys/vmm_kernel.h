@@ -559,7 +559,7 @@ typedef struct vmm_data_version_entry {
 
 	/*
 	 * The vdve_vcpu_readf/writef handlers can rely on vcpuid to be within
-	 * the [0, VM_MAXCPU) bounds.  If they also can handle vcpuid == -1 (for
+	 * the [0, maxcpus) bounds.  If they also can handle vcpuid == -1 (for
 	 * VM-wide data), then they can opt into such cases by setting
 	 * vdve_vcpu_wildcard to true.
 	 *

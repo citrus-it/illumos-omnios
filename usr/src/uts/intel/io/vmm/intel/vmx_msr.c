@@ -150,7 +150,9 @@ vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
 void
 vmx_msr_bitmap_initialize(struct vmx *vmx)
 {
-	for (uint_t i = 0; i < VM_MAXCPU; i++) {
+	const uint16_t maxcpus = vm_get_maxcpus(vmx->vm);
+
+	for (uint_t i = 0; i < maxcpus; i++) {
 		uint8_t *bitmap;
 
 		bitmap = kmem_alloc(PAGESIZE, KM_SLEEP);
@@ -164,7 +166,9 @@ vmx_msr_bitmap_initialize(struct vmx *vmx)
 void
 vmx_msr_bitmap_destroy(struct vmx *vmx)
 {
-	for (uint_t i = 0; i < VM_MAXCPU; i++) {
+	const uint16_t maxcpus = vm_get_maxcpus(vmx->vm);
+
+	for (uint_t i = 0; i < maxcpus; i++) {
 		VERIFY3P(vmx->vcpus[i].msr_bitmap, !=, NULL);
 		kmem_free(vmx->vcpus[i].msr_bitmap, PAGESIZE);
 		vmx->vcpus[i].msr_bitmap = NULL;

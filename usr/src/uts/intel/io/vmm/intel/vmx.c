@@ -712,7 +712,8 @@ vmx_vminit(struct vm *vm)
 
 	vmx_msr_bitmap_initialize(vmx);
 
-	vpid_alloc(vpid, VM_MAXCPU);
+	maxcpus = vm_get_maxcpus(vm);
+	vpid_alloc(vpid, maxcpus);
 
 	/* Grab the established defaults */
 	proc_ctls = procbased_ctls;
@@ -768,7 +769,6 @@ vmx_vminit(struct vm *vm)
 		cap_defaults |= (1 << VM_CAP_ENABLE_INVPCID);
 	}
 
-	maxcpus = vm_get_maxcpus(vm);
 	datasel = vmm_get_host_datasel();
 	for (i = 0; i < maxcpus; i++) {
 		struct vmx_vcpu *vcpu = vmx_get_vcpu(vmx, i);

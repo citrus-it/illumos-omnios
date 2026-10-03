@@ -636,14 +636,14 @@ vm_create(uint64_t flags, struct vm **retvm)
 
 	vm->vmspace = vmspace;
 	vm->mem_transient = (flags & VCF_RESERVOIR_MEM) == 0;
-	for (uint_t i = 0; i < VM_MAXCPU; i++) {
-		vm->vcpu[i].vmclient = vmspace_client_alloc(vmspace);
-	}
-
 	vm->sockets = 1;
 	vm->cores = cores_per_package;	/* XXX backwards compatibility */
 	vm->threads = threads_per_core;	/* XXX backwards compatibility */
 	vm->maxcpus = VM_MAXCPU;	/* XXX temp to keep code working */
+
+	for (uint_t i = 0; i < vm->maxcpus; i++) {
+		vm->vcpu[i].vmclient = vmspace_client_alloc(vmspace);
+	}
 
 	vm_init(vm, true);
 
@@ -3809,7 +3809,7 @@ vmm_kstat_update_vcpu(struct kstat *ksp, int rw)
 	const int vcpuid = vvk->vvk_vcpu.value.ui32;
 	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 
-	ASSERT3U(vcpuid, <, VM_MAXCPU);
+	ASSERT3U(vcpuid, <, vm->maxcpus);
 
 	vvk->vvk_time_init.value.ui64 = vcpu->ustate_total[VU_INIT];
 	vvk->vvk_time_run.value.ui64 = vcpu->ustate_total[VU_RUN];
@@ -3824,7 +3824,8 @@ vmm_kstat_update_vcpu(struct kstat *ksp, int rw)
 SET_DECLARE(vmm_data_version_entries, const vmm_data_version_entry_t);
 
 static int
-vmm_data_find(const vmm_data_req_t *req, const vmm_data_version_entry_t **resp)
+vmm_data_find(struct vm *vm, const vmm_data_req_t *req,
+    const vmm_data_version_entry_t **resp)
 {
 	const vmm_data_version_entry_t **vdpp, *vdp;
 
@@ -3863,11 +3864,11 @@ vmm_data_find(const vmm_data_req_t *req, const vmm_data_version_entry_t **resp)
 			/*
 			 * Per-vCPU handlers which permit "wildcard" access will
 			 * accept a vcpuid of -1 (for VM-wide data), while all
-			 * others expect vcpuid [0, VM_MAXCPU).
+			 * others expect vcpuid [0, maxcpus).
 			 */
 			const int llimit = vdp->vdve_vcpu_wildcard ? -1 : 0;
 			if (req->vdr_vcpuid < llimit ||
-			    req->vdr_vcpuid >= VM_MAXCPU) {
+			    req->vdr_vcpuid >= vm->maxcpus) {
 				return (EINVAL);
 			}
 		} else {
@@ -4169,7 +4170,7 @@ vmm_read_arch_field(struct vm *vm, int vcpuid, uint32_t ident, uint64_t *valp)
 			break;
 		}
 	} else {
-		VERIFY(vcpuid >= 0 && vcpuid <= VM_MAXCPU);
+		VERIFY(vcpuid >= 0 && vcpuid < vm->maxcpus);
 
 		struct vcpu *vcpu = &vm->vcpu[vcpuid];
 		switch (ident) {
@@ -4199,7 +4200,7 @@ vmm_data_read_varch(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	VERIFY3U(req->vdr_version, ==, 1);
 
 	/* per-vCPU fields are handled separately from VM-wide ones */
-	if (vcpuid != -1 && (vcpuid < 0 || vcpuid >= VM_MAXCPU)) {
+	if (vcpuid != -1 && (vcpuid < 0 || vcpuid >= vm->maxcpus)) {
 		return (EINVAL);
 	}
 
@@ -4255,7 +4256,7 @@ vmm_data_write_varch_vcpu(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	VERIFY3U(req->vdr_class, ==, VDC_VMM_ARCH);
 	VERIFY3U(req->vdr_version, ==, 1);
 
-	if (vcpuid < 0 || vcpuid >= VM_MAXCPU) {
+	if (vcpuid < 0 || vcpuid >= vm->maxcpus) {
 		return (EINVAL);
 	}
 
@@ -4977,7 +4978,7 @@ vmm_data_read(struct vm *vm, const vmm_data_req_t *req)
 	int err = 0;
 
 	const vmm_data_version_entry_t *entry = NULL;
-	err = vmm_data_find(req, &entry);
+	err = vmm_data_find(vm, req, &entry);
 	if (err != 0) {
 		return (err);
 	}
@@ -5010,7 +5011,7 @@ vmm_data_write(struct vm *vm, const vmm_data_req_t *req)
 	int err = 0;
 
 	const vmm_data_version_entry_t *entry = NULL;
-	err = vmm_data_find(req, &entry);
+	err = vmm_data_find(vm, req, &entry);
 	if (err != 0) {
 		return (err);
 	}
