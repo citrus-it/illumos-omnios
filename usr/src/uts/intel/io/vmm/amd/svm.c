@@ -283,12 +283,6 @@ vmcb_init(struct svm_vcpu *vcpu, uint64_t iopm_base_pa,
 	uint32_t mask;
 	int n;
 
-	/*
-	 * This runs from svm_vminit(), before the generic vCPU state has been
-	 * handed to this vCPU, so it must be looked up by ID.
-	 */
-	struct vcpu *gvcpu = vm_vcpu(vcpu->sc->vm, vcpu->vcpuid);
-
 	ctrl = svm_get_vmcb_ctrl(vcpu);
 	state = svm_get_vmcb_state(vcpu);
 
@@ -322,7 +316,7 @@ vmcb_init(struct svm_vcpu *vcpu, uint64_t iopm_base_pa,
 	 * Intercept everything when tracing guest exceptions otherwise
 	 * just intercept machine check exception.
 	 */
-	if (vcpu_trace_exceptions(gvcpu)) {
+	if (vcpu_trace_exceptions(vcpu->vcpu)) {
 		for (n = 0; n < 32; n++) {
 			/*
 			 * Skip unimplemented vectors in the exception bitmap.
@@ -372,7 +366,7 @@ vmcb_init(struct svm_vcpu *vcpu, uint64_t iopm_base_pa,
 	svm_enable_intercept(vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_STGI);
 	svm_enable_intercept(vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_CLGI);
 	svm_enable_intercept(vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_SKINIT);
-	if (vcpu_trap_wbinvd(gvcpu) != 0) {
+	if (vcpu_trap_wbinvd(vcpu->vcpu) != 0) {
 		svm_enable_intercept(vcpu, VMCB_CTRL2_INTCPT,
 		    VMCB_INTCPT_WBINVD);
 	}
@@ -420,13 +414,8 @@ static void *
 svm_vminit(struct vm *vm)
 {
 	struct svm_softc *svm_sc;
-	struct svm_vcpu *vcpu;
-	vm_paddr_t msrpm_pa, iopm_pa, pml4_pa;
-	int i;
-	uint16_t maxcpus;
 
 	svm_sc = kmem_zalloc(sizeof (*svm_sc), KM_SLEEP);
-	VERIFY3U(((uintptr_t)svm_sc & PAGE_MASK),  ==,  0);
 
 	svm_sc->msr_bitmap = vmm_contig_alloc(SVM_MSR_BITMAP_SIZE);
 	if (svm_sc->msr_bitmap == NULL)
@@ -471,21 +460,6 @@ svm_vminit(struct vm *vm)
 	/* Intercept access to all I/O ports. */
 	memset(svm_sc->iopm_bitmap, 0xFF, SVM_IO_BITMAP_SIZE);
 
-	iopm_pa = vtophys(svm_sc->iopm_bitmap);
-	msrpm_pa = vtophys(svm_sc->msr_bitmap);
-	pml4_pa = svm_sc->nptp;
-	maxcpus = vm_get_maxcpus(svm_sc->vm);
-	for (i = 0; i < maxcpus; i++) {
-		vcpu = svm_get_vcpu(svm_sc, i);
-		vcpu->sc = svm_sc;
-		vcpu->vcpuid = i;
-		vcpu->nextrip = ~0;
-		vcpu->lastcpu = NOCPU;
-		vcpu->vmcb_pa = vtophys(&vcpu->vmcb);
-		vmcb_init(vcpu, iopm_pa, msrpm_pa, pml4_pa);
-		svm_msr_guest_init(vcpu);
-	}
-
 	svm_pmu_init(svm_sc);
 
 	return (svm_sc);
@@ -494,10 +468,39 @@ svm_vminit(struct vm *vm)
 static void *
 svm_vcpu_init(void *arg, struct vcpu *vcpu1, int vcpuid)
 {
-	struct svm_vcpu *vcpu = svm_get_vcpu(arg, vcpuid);
+	struct svm_softc *svm_sc = arg;
+	struct svm_vcpu *vcpu;
 
+	vcpu = kmem_zalloc(sizeof (*vcpu), KM_SLEEP);
+	vcpu->sc = svm_sc;
 	vcpu->vcpu = vcpu1;
+	vcpu->vcpuid = vcpuid;
+
+	/* The VMCB and the APIC page must each be page aligned */
+	vcpu->vmcb = kmem_zalloc(PAGESIZE, KM_SLEEP);
+	VERIFY3U((uintptr_t)vcpu->vmcb & PAGEOFFSET, ==, 0);
+	vcpu->vmcb_pa = vtophys(vcpu->vmcb);
+	vcpu->apic_page = kmem_zalloc(PAGESIZE, KM_SLEEP);
+	VERIFY3U((uintptr_t)vcpu->apic_page & PAGEOFFSET, ==, 0);
+
+	vcpu->nextrip = ~0;
+	vcpu->lastcpu = NOCPU;
+	vmcb_init(vcpu, vtophys(svm_sc->iopm_bitmap),
+	    vtophys(svm_sc->msr_bitmap), svm_sc->nptp);
+	svm_msr_guest_init(vcpu);
+	svm_pmu_vcpu_init(vcpu);
+
 	return (vcpu);
+}
+
+static void
+svm_vcpu_cleanup(void *vcpui)
+{
+	struct svm_vcpu *vcpu = vcpui;
+
+	kmem_free(vcpu->apic_page, PAGESIZE);
+	kmem_free(vcpu->vmcb, PAGESIZE);
+	kmem_free(vcpu, sizeof (*vcpu));
 }
 
 /*
@@ -2523,7 +2526,7 @@ svm_vlapic_init(void *vcpui)
 	vlapic->vm = svm_sc->vm;
 	vlapic->vcpu = vcpu->vcpu;
 	vlapic->vcpuid = vcpu->vcpuid;
-	vlapic->apic_page = (struct LAPIC *)&svm_sc->apic_page[vcpu->vcpuid];
+	vlapic->apic_page = vcpu->apic_page;
 
 	vlapic_init(vlapic);
 
@@ -2626,6 +2629,7 @@ struct vmm_ops vmm_ops_amd = {
 
 	.vminit		= svm_vminit,
 	.vcpu_init	= svm_vcpu_init,
+	.vcpu_cleanup	= svm_vcpu_cleanup,
 	.vmrun		= svm_vmrun,
 	.vmcleanup	= svm_vmcleanup,
 	.vmgetreg	= svm_getreg,

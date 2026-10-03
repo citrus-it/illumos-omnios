@@ -83,6 +83,7 @@ typedef int	(*vmm_init_func_t)(void);
 typedef void	(*vmm_resume_func_t)(void);
 typedef void *	(*vmi_init_func_t)(struct vm *vm);
 typedef void *	(*vmi_vcpu_init_t)(void *vmi, struct vcpu *vcpu, int vcpuid);
+typedef void	(*vmi_vcpu_cleanup_t)(void *vcpui);
 typedef int	(*vmi_run_func_t)(void *vcpui, uint64_t rip);
 typedef void	(*vmi_cleanup_func_t)(void *vmi);
 typedef int	(*vmi_get_register_t)(void *vcpui, int num, uint64_t *retval);
@@ -109,6 +110,7 @@ struct vmm_ops {
 
 	vmi_init_func_t		vminit;		/* vm-specific initialization */
 	vmi_vcpu_init_t		vcpu_init;
+	vmi_vcpu_cleanup_t	vcpu_cleanup;
 	vmi_run_func_t		vmrun;
 	vmi_cleanup_func_t	vmcleanup;
 	vmi_get_register_t	vmgetreg;
@@ -296,6 +298,7 @@ void *vcpu_stats(struct vcpu *vcpu);
 void vcpu_notify_event(struct vcpu *vcpu);
 void vcpu_notify_event_type(struct vcpu *vcpu, vcpu_notify_t);
 void *vm_get_cookie(struct vm *);
+void *vcpu_get_cookie(struct vcpu *);
 struct vmspace *vm_get_vmspace(struct vm *vm);
 struct vm_client *vm_get_vmclient(struct vcpu *vcpu);
 struct vatpic *vm_atpic(struct vm *vm);

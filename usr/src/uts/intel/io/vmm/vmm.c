@@ -266,6 +266,7 @@ static struct vmm_ops vmm_ops_null = {
 	.resume		= (vmm_resume_func_t)nullop_panic,
 	.vminit		= (vmi_init_func_t)nullop_panic,
 	.vcpu_init	= (vmi_vcpu_init_t)nullop_panic,
+	.vcpu_cleanup	= (vmi_vcpu_cleanup_t)nullop_panic,
 	.vmrun		= (vmi_run_func_t)nullop_panic,
 	.vmcleanup	= (vmi_cleanup_func_t)nullop_panic,
 	.vmgetreg	= (vmi_get_register_t)nullop_panic,
@@ -293,6 +294,7 @@ static struct vmm_ops *ops = &vmm_ops_null;
 
 #define	VMINIT(vm)		((*ops->vminit)(vm))
 #define	VMVCPUINIT(vmi, vcpu, id)	((*ops->vcpu_init)(vmi, vcpu, id))
+#define	VMVCPUCLEANUP(vcpui)		((*ops->vcpu_cleanup)(vcpui))
 #define	VMRUN(vcpui, rip)	((*ops->vmrun)(vcpui, rip))
 #define	VMCLEANUP(vmi)			((*ops->vmcleanup)(vmi))
 
@@ -378,6 +380,8 @@ vcpu_cleanup(struct vm *vm, int i, bool destroy)
 	struct vcpu *vcpu = &vm->vcpu[i];
 
 	VLAPIC_CLEANUP(vcpu->cookie, vcpu->vlapic);
+	VMVCPUCLEANUP(vcpu->cookie);
+	vcpu->cookie = NULL;
 	if (destroy) {
 		vmm_stat_free(vcpu->stats);
 
@@ -3534,6 +3538,12 @@ void *
 vm_get_cookie(struct vm *vm)
 {
 	return (vm->cookie);
+}
+
+void *
+vcpu_get_cookie(struct vcpu *vcpu)
+{
+	return (vcpu->cookie);
 }
 
 struct vmspace *

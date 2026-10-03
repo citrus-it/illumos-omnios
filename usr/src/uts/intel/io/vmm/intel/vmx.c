@@ -912,6 +912,11 @@ vmx_vcpu_init(void *arg, struct vcpu *vcpu1, int vcpuid)
 	return (vcpu);
 }
 
+static void
+vmx_vcpu_cleanup(void *vcpui)
+{
+}
+
 static VMM_STAT_INTEL(VCPU_INVVPID_SAVED, "Number of vpid invalidations saved");
 static VMM_STAT_INTEL(VCPU_INVVPID_DONE, "Number of vpid invalidations done");
 
@@ -3887,6 +3892,7 @@ struct vmm_ops vmm_ops_intel = {
 
 	.vminit		= vmx_vminit,
 	.vcpu_init	= vmx_vcpu_init,
+	.vcpu_cleanup	= vmx_vcpu_cleanup,
 	.vmrun		= vmx_run,
 	.vmcleanup	= vmx_vmcleanup,
 	.vmgetreg	= vmx_getreg,
