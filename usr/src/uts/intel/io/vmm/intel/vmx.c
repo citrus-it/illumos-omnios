@@ -833,7 +833,7 @@ vmx_vminit(struct vm *vm)
 		vmcs_write(VMCS_PRI_PROC_BASED_CTLS, proc_ctls);
 
 		uint32_t use_proc2_ctls = proc2_ctls;
-		if (cap_wbinvd_exit && vcpu_trap_wbinvd(vm, i) != 0)
+		if (cap_wbinvd_exit && vcpu_trap_wbinvd(vm_vcpu(vm, i)) != 0)
 			use_proc2_ctls |= PROCBASED2_WBINVD_EXITING;
 		vmcs_write(VMCS_SEC_PROC_BASED_CTLS, use_proc2_ctls);
 
@@ -852,7 +852,7 @@ vmx_vminit(struct vm *vm)
 		}
 
 		/* exception bitmap */
-		if (vcpu_trace_exceptions(vm, i))
+		if (vcpu_trace_exceptions(vm_vcpu(vm, i)))
 			exc_bitmap = 0xffffffff;
 		else
 			exc_bitmap = 1 << IDT_MC;
@@ -992,7 +992,7 @@ vmx_invvpid(struct vmx_vcpu *vcpu, int running)
 		};
 
 		invvpid(INVVPID_TYPE_SINGLE_CONTEXT, invvpid_desc);
-		vmm_stat_incr(vcpu->vmx->vm, vcpu->vcpuid, VCPU_INVVPID_DONE,
+		vmm_stat_incr(vcpu->vcpu, VCPU_INVVPID_DONE,
 		    1);
 	} else {
 		/*
@@ -1001,7 +1001,7 @@ vmx_invvpid(struct vmx_vcpu *vcpu, int running)
 		 * invalidate combined mappings for the EP4TA associated with
 		 * this guest, in all VPIDs.
 		 */
-		vmm_stat_incr(vcpu->vmx->vm, vcpu->vcpuid, VCPU_INVVPID_SAVED,
+		vmm_stat_incr(vcpu->vcpu, VCPU_INVVPID_SAVED,
 		    1);
 	}
 }
@@ -1053,7 +1053,7 @@ vmx_set_pcpu_defaults(struct vmx_vcpu *vcpu)
 
 	vmxstate->lastcpu = curcpu;
 
-	vmm_stat_incr(vcpu->vmx->vm, vcpu->vcpuid, VCPU_MIGRATIONS, 1);
+	vmm_stat_incr(vcpu->vcpu, VCPU_MIGRATIONS, 1);
 
 	/* Load the per-CPU IDT address */
 	vmcs_write(VMCS_HOST_IDTR_BASE, vmm_get_host_idtrbase());
@@ -1119,7 +1119,7 @@ vmx_clear_nmi_window_exiting(struct vmx_vcpu *vcpu)
 static void
 vmx_apply_tsc_adjust(struct vmx_vcpu *vcpu)
 {
-	const uint64_t offset = vcpu_tsc_offset(vcpu->vmx->vm, vcpu->vcpuid,
+	const uint64_t offset = vcpu_tsc_offset(vcpu->vcpu,
 	    true);
 
 	ASSERT(vcpu->cap.proc_ctls & PROCBASED_TSC_OFFSET);
@@ -1186,7 +1186,7 @@ vmx_stash_intinfo(struct vmx_vcpu *vcpu)
 			errcode = vmcs_read(VMCS_ENTRY_EXCEPTION_ERROR);
 		}
 
-		VERIFY0(vm_exit_intinfo(vcpu->vmx->vm, vcpu->vcpuid,
+		VERIFY0(vm_exit_intinfo(vcpu->vcpu,
 		    vmx_idtvec_to_intinfo(info, errcode)));
 
 		vmcs_write(VMCS_ENTRY_INTR_INFO, 0);
@@ -1245,7 +1245,7 @@ vmx_inject_nmi(struct vmx_vcpu *vcpu)
 	    IDT_NMI | VMCS_INTR_T_NMI | VMCS_INTR_VALID);
 
 	/* Clear the request */
-	vm_nmi_clear(vcpu->vmx->vm, vcpu->vcpuid);
+	vm_nmi_clear(vcpu->vcpu);
 }
 
 /*
@@ -1284,12 +1284,12 @@ vmx_inject_events(struct vmx_vcpu *vcpu, uint64_t rip)
 		return (EIS_EV_EXISTING | EIS_REQ_EXIT);
 	}
 
-	if (vm_entry_intinfo(vcpu->vmx->vm, vcpu->vcpuid, &entryinfo)) {
+	if (vm_entry_intinfo(vcpu->vcpu, &entryinfo)) {
 		vmx_inject_intinfo(entryinfo);
 		state = EIS_EV_INJECTED;
 	}
 
-	if (vm_nmi_pending(vcpu->vmx->vm, vcpu->vcpuid)) {
+	if (vm_nmi_pending(vcpu->vcpu)) {
 		/*
 		 * If there are no conditions blocking NMI injection then inject
 		 * it directly here otherwise enable "NMI window exiting" to
@@ -1313,7 +1313,7 @@ vmx_inject_events(struct vmx_vcpu *vcpu, uint64_t rip)
 		}
 	}
 
-	if (vm_extint_pending(vcpu->vmx->vm, vcpu->vcpuid)) {
+	if (vm_extint_pending(vcpu->vcpu)) {
 		if (state != EIS_CAN_INJECT) {
 			return (state | EIS_REQ_EXIT);
 		}
@@ -1338,7 +1338,7 @@ vmx_inject_events(struct vmx_vcpu *vcpu, uint64_t rip)
 		vmcs_write(VMCS_ENTRY_INTR_INFO,
 		    VMCS_INTR_T_HWINTR | VMCS_INTR_VALID | vector);
 
-		vm_extint_clear(vcpu->vmx->vm, vcpu->vcpuid);
+		vm_extint_clear(vcpu->vcpu);
 		vatpic_intr_accepted(vcpu->vmx->vm, vector);
 		state = EIS_EV_INJECTED;
 	}
@@ -1427,12 +1427,12 @@ static bool
 vmx_inject_recheck(struct vmx_vcpu *vcpu, enum event_inject_state state)
 {
 	if (state == EIS_CAN_INJECT) {
-		if (vm_nmi_pending(vcpu->vmx->vm, vcpu->vcpuid) &&
+		if (vm_nmi_pending(vcpu->vcpu) &&
 		    !vmx_nmi_window_exiting(vcpu)) {
 			/* queued NMI not blocked by NMI-window-exiting */
 			return (true);
 		}
-		if (vm_extint_pending(vcpu->vmx->vm, vcpu->vcpuid)) {
+		if (vm_extint_pending(vcpu->vcpu)) {
 			/* queued ExtINT not blocked by existing injection */
 			return (true);
 		}
@@ -1513,32 +1513,32 @@ vmx_emulate_xsetbv(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 
 	/* Only xcr0 is supported. */
 	if (vmxctx->guest_rcx != 0) {
-		vm_inject_gp(vcpu->vmx->vm, vcpu->vcpuid);
+		vm_inject_gp(vcpu->vcpu);
 		return (HANDLED);
 	}
 
 	/* We only handle xcr0 if both the host and guest have XSAVE enabled. */
 	if (!limits->xsave_enabled ||
 	    !(vmcs_read(VMCS_GUEST_CR4) & CR4_XSAVE)) {
-		vm_inject_ud(vcpu->vmx->vm, vcpu->vcpuid);
+		vm_inject_ud(vcpu->vcpu);
 		return (HANDLED);
 	}
 
 	xcrval = vmxctx->guest_rdx << 32 | (vmxctx->guest_rax & 0xffffffff);
 	if ((xcrval & ~limits->xcr0_allowed) != 0) {
-		vm_inject_gp(vcpu->vmx->vm, vcpu->vcpuid);
+		vm_inject_gp(vcpu->vcpu);
 		return (HANDLED);
 	}
 
 	if (!(xcrval & XFEATURE_ENABLED_X87)) {
-		vm_inject_gp(vcpu->vmx->vm, vcpu->vcpuid);
+		vm_inject_gp(vcpu->vcpu);
 		return (HANDLED);
 	}
 
 	/* AVX (YMM_Hi128) requires SSE. */
 	if (xcrval & XFEATURE_ENABLED_AVX &&
 	    (xcrval & XFEATURE_AVX) != XFEATURE_AVX) {
-		vm_inject_gp(vcpu->vmx->vm, vcpu->vcpuid);
+		vm_inject_gp(vcpu->vcpu);
 		return (HANDLED);
 	}
 
@@ -1549,7 +1549,7 @@ vmx_emulate_xsetbv(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 	if (xcrval & XFEATURE_AVX512 &&
 	    (xcrval & (XFEATURE_AVX512 | XFEATURE_AVX)) !=
 	    (XFEATURE_AVX512 | XFEATURE_AVX)) {
-		vm_inject_gp(vcpu->vmx->vm, vcpu->vcpuid);
+		vm_inject_gp(vcpu->vcpu);
 		return (HANDLED);
 	}
 
@@ -1559,7 +1559,7 @@ vmx_emulate_xsetbv(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 	 */
 	if (((xcrval & XFEATURE_ENABLED_BNDREGS) != 0) !=
 	    ((xcrval & XFEATURE_ENABLED_BNDCSR) != 0)) {
-		vm_inject_gp(vcpu->vmx->vm, vcpu->vcpuid);
+		vm_inject_gp(vcpu->vcpu);
 		return (HANDLED);
 	}
 
@@ -1769,7 +1769,7 @@ vmx_emulate_cr8_access(struct vmx_vcpu *vcpu, uint64_t exitqual)
 		return (UNHANDLED);
 	}
 
-	vlapic = vm_lapic(vcpu->vmx->vm, vcpu->vcpuid);
+	vlapic = vm_lapic(vcpu->vcpu);
 	regnum = (exitqual >> 8) & 0xf;
 	if (exitqual & 0x10) {
 		cr8 = vlapic_get_cr8(vlapic);
@@ -2108,7 +2108,7 @@ vmx_handle_apic_access(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 	}
 
 	if (allowed) {
-		vie = vm_vie_ctx(vcpu->vmx->vm, vcpu->vcpuid);
+		vie = vm_vie_ctx(vcpu->vcpu);
 		vmexit_mmio_emul(vmexit, vie, DEFAULT_APIC_BASE + offset,
 		    VIE_INVALID_GLA);
 	}
@@ -2154,23 +2154,21 @@ vmx_handle_msr(struct vmx_vcpu *vcpu, struct vm_exit *vmexit,
 	uint64_t val = 0;
 
 	if (is_wrmsr) {
-		vmm_stat_incr(vcpu->vmx->vm, vcpu->vcpuid, VMEXIT_WRMSR, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_WRMSR, 1);
 		val = vmxctx->guest_rdx << 32 | (uint32_t)vmxctx->guest_rax;
 
 		if (vlapic_owned_msr(ecx)) {
-			struct vlapic *vlapic = vm_lapic(vcpu->vmx->vm,
-			    vcpu->vcpuid);
+			struct vlapic *vlapic = vm_lapic(vcpu->vcpu);
 
 			res = vlapic_wrmsr(vlapic, ecx, val);
 		} else {
 			res = vmx_wrmsr(vcpu, ecx, val);
 		}
 	} else {
-		vmm_stat_incr(vcpu->vmx->vm, vcpu->vcpuid, VMEXIT_RDMSR, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_RDMSR, 1);
 
 		if (vlapic_owned_msr(ecx)) {
-			struct vlapic *vlapic = vm_lapic(vcpu->vmx->vm,
-			    vcpu->vcpuid);
+			struct vlapic *vlapic = vm_lapic(vcpu->vcpu);
 
 			res = vlapic_rdmsr(vlapic, ecx, &val);
 		} else {
@@ -2187,7 +2185,7 @@ vmx_handle_msr(struct vmx_vcpu *vcpu, struct vm_exit *vmexit,
 		}
 		return (HANDLED);
 	case VMR_GP:
-		vm_inject_gp(vcpu->vmx->vm, vcpu->vcpuid);
+		vm_inject_gp(vcpu->vcpu);
 		return (HANDLED);
 	case VMR_UNHANLDED:
 		vmexit->exitcode = is_wrmsr ?
@@ -2224,7 +2222,7 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 	reason = vmexit->u.vmx.exit_reason;
 	vmexit->exitcode = VM_EXITCODE_BOGUS;
 
-	vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_COUNT, 1);
+	vmm_stat_incr(vcpu->vcpu, VMEXIT_COUNT, 1);
 	SDT_PROBE3(vmm, vmx, exit, entry, vmx, vcpuid, vmexit);
 
 	/*
@@ -2254,7 +2252,7 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 		}
 
 		/* Record exit intinfo */
-		VERIFY0(vm_exit_intinfo(vmx->vm, vcpuid,
+		VERIFY0(vm_exit_intinfo(vcpu->vcpu,
 		    vmx_idtvec_to_intinfo(idtvec_info, errcode)));
 
 		/*
@@ -2334,7 +2332,7 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 		SDT_PROBE4(vmm, vmx, exit, taskswitch, vmx, vcpuid, vmexit, ts);
 		break;
 	case EXIT_REASON_CR_ACCESS:
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_CR_ACCESS, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_CR_ACCESS, 1);
 		SDT_PROBE4(vmm, vmx, exit, craccess, vmx, vcpuid, vmexit, qual);
 		switch (qual & 0xf) {
 		case 0:
@@ -2354,24 +2352,24 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 		    reason == EXIT_REASON_WRMSR);
 		break;
 	case EXIT_REASON_HLT:
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_HLT, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_HLT, 1);
 		SDT_PROBE3(vmm, vmx, exit, halt, vmx, vcpuid, vmexit);
 		vmexit->exitcode = VM_EXITCODE_HLT;
 		vmexit->u.hlt.rflags = vmcs_read(VMCS_GUEST_RFLAGS);
 		break;
 	case EXIT_REASON_MTF:
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_MTRAP, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_MTRAP, 1);
 		SDT_PROBE3(vmm, vmx, exit, mtrap, vmx, vcpuid, vmexit);
 		vmexit->exitcode = VM_EXITCODE_MTRAP;
 		vmexit->inst_length = 0;
 		break;
 	case EXIT_REASON_PAUSE:
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_PAUSE, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_PAUSE, 1);
 		SDT_PROBE3(vmm, vmx, exit, pause, vmx, vcpuid, vmexit);
 		vmexit->exitcode = VM_EXITCODE_PAUSE;
 		break;
 	case EXIT_REASON_INTR_WINDOW:
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_INTR_WINDOW, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_INTR_WINDOW, 1);
 		SDT_PROBE3(vmm, vmx, exit, intrwindow, vmx, vcpuid, vmexit);
 		ASSERT(vmx_int_window_exiting(vcpu));
 		vmx_clear_int_window_exiting(vcpu);
@@ -2405,27 +2403,27 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 		 * This is special. We want to treat this as an 'handled'
 		 * VM-exit but not increment the instruction pointer.
 		 */
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_EXTINT, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_EXTINT, 1);
 		return (1);
 	case EXIT_REASON_NMI_WINDOW:
 		SDT_PROBE3(vmm, vmx, exit, nmiwindow, vmx, vcpuid, vmexit);
 		/* Exit to allow the pending virtual NMI to be injected */
-		if (vm_nmi_pending(vmx->vm, vcpuid))
+		if (vm_nmi_pending(vcpu->vcpu))
 			vmx_inject_nmi(vcpu);
 		ASSERT(vmx_nmi_window_exiting(vcpu));
 		vmx_clear_nmi_window_exiting(vcpu);
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_NMI_WINDOW, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_NMI_WINDOW, 1);
 		return (1);
 	case EXIT_REASON_INOUT:
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_INOUT, 1);
-		vie = vm_vie_ctx(vmx->vm, vcpuid);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_INOUT, 1);
+		vie = vm_vie_ctx(vcpu->vcpu);
 		vmexit_inout(vmexit, vie, qual, (uint32_t)vmxctx->guest_rax);
 		SDT_PROBE3(vmm, vmx, exit, inout, vmx, vcpuid, vmexit);
 		break;
 	case EXIT_REASON_CPUID:
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_CPUID, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_CPUID, 1);
 		SDT_PROBE3(vmm, vmx, exit, cpuid, vmx, vcpuid, vmexit);
-		vcpu_emulate_cpuid(vmx->vm, vcpuid,
+		vcpu_emulate_cpuid(vcpu->vcpu,
 		    (uint64_t *)&vmxctx->guest_rax,
 		    (uint64_t *)&vmxctx->guest_rbx,
 		    (uint64_t *)&vmxctx->guest_rcx,
@@ -2433,7 +2431,7 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 		handled = HANDLED;
 		break;
 	case EXIT_REASON_EXCEPTION:
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_EXCEPTION, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_EXCEPTION, 1);
 		intr_info = vmcs_read(VMCS_EXIT_INTR_INFO);
 		KASSERT((intr_info & VMCS_INTR_VALID) != 0,
 		    ("VM exit interruption info invalid: %x", intr_info));
@@ -2504,7 +2502,7 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 		}
 		SDT_PROBE5(vmm, vmx, exit, exception,
 		    vmx, vcpuid, vmexit, intr_vec, errcode);
-		error = vm_inject_exception(vmx->vm, vcpuid, intr_vec,
+		error = vm_inject_exception(vcpu->vcpu, intr_vec,
 		    errcode_valid, errcode, 0);
 		KASSERT(error == 0, ("%s: vm_inject_exception error %d",
 		    __func__, error));
@@ -2517,20 +2515,20 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 		 * this must be an instruction that accesses MMIO space.
 		 */
 		gpa = vmcs_read(VMCS_GUEST_PHYSICAL_ADDRESS);
-		if (vm_mem_allocated(vmx->vm, vcpuid, gpa) ||
+		if (vm_mem_allocated(vcpu->vcpu, gpa) ||
 		    apic_access_fault(vcpu, gpa)) {
 			vmexit->exitcode = VM_EXITCODE_PAGING;
 			vmexit->inst_length = 0;
 			vmexit->u.paging.gpa = gpa;
 			vmexit->u.paging.fault_type = ept_fault_type(qual);
-			vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_NESTED_FAULT, 1);
+			vmm_stat_incr(vcpu->vcpu, VMEXIT_NESTED_FAULT, 1);
 			SDT_PROBE5(vmm, vmx, exit, nestedfault,
 			    vmx, vcpuid, vmexit, gpa, qual);
 		} else if (ept_emulation_fault(qual)) {
-			vie = vm_vie_ctx(vmx->vm, vcpuid);
+			vie = vm_vie_ctx(vcpu->vcpu);
 			vmexit_mmio_emul(vmexit, vie, gpa,
 			    vmcs_read(VMCS_GUEST_LINEAR_ADDRESS));
-			vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_MMIO_EMUL, 1);
+			vmm_stat_incr(vcpu->vcpu, VMEXIT_MMIO_EMUL, 1);
 			SDT_PROBE4(vmm, vmx, exit, mmiofault,
 			    vmx, vcpuid, vmexit, gpa);
 		}
@@ -2562,7 +2560,7 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 		 * pointing to the next instruction.
 		 */
 		vmexit->inst_length = 0;
-		vlapic = vm_lapic(vmx->vm, vcpuid);
+		vlapic = vm_lapic(vcpu->vcpu);
 		SDT_PROBE4(vmm, vmx, exit, apicwrite,
 		    vmx, vcpuid, vmexit, vlapic);
 		handled = vmx_handle_apic_write(vcpu, vlapic, qual);
@@ -2580,7 +2578,7 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 		vmexit->exitcode = VM_EXITCODE_MWAIT;
 		break;
 	case EXIT_REASON_TPR:
-		vlapic = vm_lapic(vmx->vm, vcpuid);
+		vlapic = vm_lapic(vcpu->vcpu);
 		vlapic_sync_tpr(vlapic);
 		vmexit->inst_length = 0;
 		handled = HANDLED;
@@ -2606,7 +2604,7 @@ vmx_exit_process(struct vmx_vcpu *vcpu, struct vm_exit *vmexit)
 	default:
 		SDT_PROBE4(vmm, vmx, exit, unknown,
 		    vmx, vcpuid, vmexit, reason);
-		vmm_stat_incr(vmx->vm, vcpuid, VMEXIT_UNKNOWN, 1);
+		vmm_stat_incr(vcpu->vcpu, VMEXIT_UNKNOWN, 1);
 		break;
 	}
 
@@ -2771,7 +2769,6 @@ vmx_run(void *vcpui, uint64_t rip)
 	int rc, handled, launched;
 	struct vmx *vmx;
 	struct vmx_vcpu *vcpu;
-	struct vm *vm;
 	struct vmxctx *vmxctx;
 	uintptr_t vmcs_pa;
 	struct vm_exit *vmexit;
@@ -2783,13 +2780,12 @@ vmx_run(void *vcpui, uint64_t rip)
 
 	vcpu = vcpui;
 	vmx = vcpu->vmx;
-	vm = vmx->vm;
 	vcpuid = vcpu->vcpuid;
 	vmcs_pa = vcpu->vmcs_pa;
 	vmxctx = &vcpu->ctx;
-	vlapic = vm_lapic(vm, vcpuid);
-	vmexit = vm_exitinfo(vm, vcpuid);
-	vmc = vm_get_vmclient(vm, vcpuid);
+	vlapic = vm_lapic(vcpu->vcpu);
+	vmexit = vm_exitinfo(vcpu->vcpu);
+	vmc = vm_get_vmclient(vcpu->vcpu);
 	launched = 0;
 	tpr_shadow_active = vmx_cap_en(vmx, VMX_CAP_TPR_SHADOW) &&
 	    !vmx_cap_en(vmx, VMX_CAP_APICV) &&
@@ -2861,14 +2857,14 @@ vmx_run(void *vcpui, uint64_t rip)
 		 * Check for vCPU bail-out conditions.  This must be done after
 		 * vmx_inject_events() to detect a triple-fault condition.
 		 */
-		if (vcpu_entry_bailout_checks(vmx->vm, vcpuid, rip)) {
+		if (vcpu_entry_bailout_checks(vcpu->vcpu, rip)) {
 			enable_intr();
 			break;
 		}
 
-		if (vcpu_run_state_pending(vm, vcpuid)) {
+		if (vcpu_run_state_pending(vcpu->vcpu)) {
 			enable_intr();
-			vm_exit_run_state(vmx->vm, vcpuid, rip);
+			vm_exit_run_state(vcpu->vcpu, rip);
 			break;
 		}
 
@@ -2941,14 +2937,14 @@ vmx_run(void *vcpui, uint64_t rip)
 			vmx->eptgen[curcpu] = eptgen;
 		}
 
-		vcpu_ustate_change(vm, vcpuid, VU_RUN);
+		vcpu_ustate_change(vcpu->vcpu, VU_RUN);
 		vmx_dr_enter_guest(vmxctx);
 
 		/* Perform VMX entry */
 		rc = vmx_enter_guest(vmxctx, vmx, launched);
 
 		vmx_dr_leave_guest(vmxctx);
-		vcpu_ustate_change(vm, vcpuid, VU_EMU_KERN);
+		vcpu_ustate_change(vcpu->vcpu, VU_EMU_KERN);
 
 		vcpu->vmcs_state |= VS_LAUNCHED;
 		smt_release();
@@ -3030,7 +3026,7 @@ vmx_vmcs_access_ensure(struct vmx_vcpu *vcpu)
 {
 	int hostcpu;
 
-	if (vcpu_is_running(vcpu->vmx->vm, vcpu->vcpuid, &hostcpu)) {
+	if (vcpu_is_running(vcpu->vcpu, &hostcpu)) {
 		if (hostcpu != curcpu) {
 			panic("unexpected vcpu migration %d != %d",
 			    hostcpu, curcpu);
@@ -3048,7 +3044,7 @@ vmx_vmcs_access_done(struct vmx_vcpu *vcpu)
 {
 	int hostcpu;
 
-	if (vcpu_is_running(vcpu->vmx->vm, vcpu->vcpuid, &hostcpu)) {
+	if (vcpu_is_running(vcpu->vcpu, &hostcpu)) {
 		if (hostcpu != curcpu) {
 			panic("unexpected vcpu migration %d != %d",
 			    hostcpu, curcpu);
@@ -3227,7 +3223,7 @@ vmx_setreg(void *vcpui, int reg, uint64_t val)
 			 * is updated but vmx_invvpid() does not.
 			 */
 			vmx_invvpid(vcpu,
-			    vcpu_is_running(vcpu->vmx->vm, vcpu->vcpuid, NULL));
+			    vcpu_is_running(vcpu->vcpu, NULL));
 			break;
 		case VMCS_INVALID_ENCODING:
 			err = EINVAL;
@@ -3790,6 +3786,7 @@ vmx_vlapic_init(void *vcpui)
 
 	vlapic = &vlapic_vtx->vlapic;
 	vlapic->vm = vmx->vm;
+	vlapic->vcpu = vcpu->vcpu;
 	vlapic->vcpuid = vcpu->vcpuid;
 	vlapic->apic_page = (struct LAPIC *)vcpu->apic_page;
 

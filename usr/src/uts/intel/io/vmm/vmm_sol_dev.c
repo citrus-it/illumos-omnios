@@ -338,24 +338,46 @@ vmmdev_alloc_memseg(vmm_softc_t *sc, struct vm_memseg *mseg)
  */
 
 static void
-vcpu_lock_one(vmm_softc_t *sc, int vcpu)
+vcpu_lock_one(vmm_softc_t *sc, int vcpuid)
 {
-	ASSERT(vcpu >= 0 && vcpu < VM_MAXCPU);
+	struct vcpu *vcpu = vm_vcpu(sc->vmm_vm, vcpuid);
+
+	ASSERT(vcpu != NULL);
 
 	/*
 	 * Since this state transition is utilizing from_idle=true, it should
 	 * not fail, but rather block until it can be successful.
 	 */
-	VERIFY0(vcpu_set_state(sc->vmm_vm, vcpu, VCPU_FROZEN, true));
+	VERIFY0(vcpu_set_state(vcpu, VCPU_FROZEN, true));
 }
 
 static void
-vcpu_unlock_one(vmm_softc_t *sc, int vcpu)
+vcpu_unlock_one(vmm_softc_t *sc, int vcpuid)
 {
-	ASSERT(vcpu >= 0 && vcpu < VM_MAXCPU);
+	struct vcpu *vcpu = vm_vcpu(sc->vmm_vm, vcpuid);
 
-	VERIFY3U(vcpu_get_state(sc->vmm_vm, vcpu, NULL), ==, VCPU_FROZEN);
-	VERIFY0(vcpu_set_state(sc->vmm_vm, vcpu, VCPU_IDLE, false));
+	ASSERT(vcpu != NULL);
+
+	VERIFY3U(vcpu_get_state(vcpu, NULL), ==, VCPU_FROZEN);
+	VERIFY0(vcpu_set_state(vcpu, VCPU_IDLE, false));
+}
+
+/*
+ * Translate a vCPU ID provided by userspace into its vCPU.  An ID of -1 is
+ * permitted when 'allow_any' is set, resulting in a NULL vCPU to request
+ * action on all vCPUs.  Any other out of range ID results in EINVAL.
+ */
+static int
+vmmdev_lookup_vcpu(vmm_softc_t *sc, int vcpuid, bool allow_any,
+    struct vcpu **vcpup)
+{
+	if (vcpuid == -1 && allow_any) {
+		*vcpup = NULL;
+		return (0);
+	}
+
+	*vcpup = vm_vcpu(sc->vmm_vm, vcpuid);
+	return (*vcpup == NULL ? EINVAL : 0);
 }
 
 static void
@@ -424,6 +446,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
     cred_t *credp, int *rvalp)
 {
 	int error = 0, vcpu = -1;
+	struct vcpu *vcpup;
 	void *datap = (void *)arg;
 	enum vm_lock_type {
 		LOCK_NONE = 0,
@@ -561,7 +584,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		if (!(curthread->t_schedflag & TS_VCPU))
 			smt_mark_as_vcpu();
 
-		error = vm_run(sc->vmm_vm, vcpu, &entry);
+		error = vm_run(vm_vcpu(sc->vmm_vm, vcpu), &entry);
 
 		/*
 		 * Unexpected states in vm_run() are expressed through positive
@@ -576,7 +599,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			void *outp = entry.exit_data;
 
 			error = 0;
-			vme = vm_exitinfo(sc->vmm_vm, vcpu);
+			vme = vm_exitinfo(vm_vcpu(sc->vmm_vm, vcpu));
 			if (ddi_copyout(vme, outp, sizeof (*vme), md)) {
 				error = EFAULT;
 			}
@@ -635,7 +658,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			break;
 		}
 		hrt2tv(gethrtime(), &vmstats.tv);
-		error = vmm_stat_copy(sc->vmm_vm, vmstats.cpuid, vmstats.index,
+		error = vmmdev_lookup_vcpu(sc, vmstats.cpuid, false, &vcpup);
+		if (error != 0)
+			break;
+		error = vmm_stat_copy(vcpup, vmstats.index,
 		    nitems(vmstats.statbuf),
 		    &vmstats.num_entries, vmstats.statbuf);
 		if (error == 0 &&
@@ -653,8 +679,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = ppt_setup_msi(sc->vmm_vm, pptmsi.vcpu, pptmsi.pptfd,
-		    pptmsi.addr, pptmsi.msg, pptmsi.numvec);
+		error = ppt_setup_msi(sc->vmm_vm, pptmsi.pptfd, pptmsi.addr,
+		    pptmsi.msg, pptmsi.numvec);
 		break;
 	}
 	case VM_PPTDEV_MSIX: {
@@ -664,9 +690,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = ppt_setup_msix(sc->vmm_vm, pptmsix.vcpu, pptmsix.pptfd,
-		    pptmsix.idx, pptmsix.addr, pptmsix.msg,
-		    pptmsix.vector_control);
+		error = ppt_setup_msix(sc->vmm_vm, pptmsix.pptfd, pptmsix.idx,
+		    pptmsix.addr, pptmsix.msg, pptmsix.vector_control);
 		break;
 	}
 	case VM_PPTDEV_DISABLE_MSIX: {
@@ -743,8 +768,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_inject_exception(sc->vmm_vm, vcpu, vmexc.vector,
-		    vmexc.error_code_valid != 0, vmexc.error_code,
+		error = vm_inject_exception(vm_vcpu(sc->vmm_vm, vcpu),
+		    vmexc.vector, vmexc.error_code_valid != 0, vmexc.error_code,
 		    vmexc.restart_instruction != 0);
 		break;
 	}
@@ -755,7 +780,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_inject_nmi(sc->vmm_vm, vmnmi.cpuid);
+		error = vmmdev_lookup_vcpu(sc, vmnmi.cpuid, false, &vcpup);
+		if (error != 0)
+			break;
+		error = vm_inject_nmi(vcpup);
 		break;
 	}
 	case VM_LAPIC_IRQ: {
@@ -765,7 +793,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = lapic_intr_edge(sc->vmm_vm, vmirq.cpuid, vmirq.vector);
+		error = vmmdev_lookup_vcpu(sc, vmirq.cpuid, false, &vcpup);
+		if (error != 0)
+			break;
+		error = lapic_intr_edge(vcpup, vmirq.vector);
 		break;
 	}
 	case VM_LAPIC_LOCAL_IRQ: {
@@ -775,8 +806,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = lapic_set_local_intr(sc->vmm_vm, vmirq.cpuid,
-		    vmirq.vector);
+		error = vmmdev_lookup_vcpu(sc, vmirq.cpuid, true, &vcpup);
+		if (error != 0)
+			break;
+		error = lapic_set_local_intr(sc->vmm_vm, vcpup, vmirq.vector);
 		break;
 	}
 	case VM_LAPIC_MSI: {
@@ -1045,7 +1078,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_get_register(sc->vmm_vm, vcpu, vmreg.regnum,
+		error = vm_get_register(vm_vcpu(sc->vmm_vm, vcpu), vmreg.regnum,
 		    &vmreg.regval);
 		if (error == 0 &&
 		    ddi_copyout(&vmreg, datap, sizeof (vmreg), md)) {
@@ -1061,7 +1094,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_set_register(sc->vmm_vm, vcpu, vmreg.regnum,
+		error = vm_set_register(vm_vcpu(sc->vmm_vm, vcpu), vmreg.regnum,
 		    vmreg.regval);
 		break;
 	}
@@ -1072,8 +1105,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_set_seg_desc(sc->vmm_vm, vcpu, vmsegd.regnum,
-		    &vmsegd.desc);
+		error = vm_set_seg_desc(vm_vcpu(sc->vmm_vm, vcpu),
+		    vmsegd.regnum, &vmsegd.desc);
 		break;
 	}
 	case VM_GET_SEGMENT_DESCRIPTOR: {
@@ -1083,8 +1116,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_get_seg_desc(sc->vmm_vm, vcpu, vmsegd.regnum,
-		    &vmsegd.desc);
+		error = vm_get_seg_desc(vm_vcpu(sc->vmm_vm, vcpu),
+		    vmsegd.regnum, &vmsegd.desc);
 		if (error == 0 &&
 		    ddi_copyout(&vmsegd, datap, sizeof (vmsegd), md)) {
 			error = EFAULT;
@@ -1117,8 +1150,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 				error = EINVAL;
 				break;
 			}
-			error = vm_get_register(sc->vmm_vm, vcpu, regnums[i],
-			    &regvals[i]);
+			error = vm_get_register(vm_vcpu(sc->vmm_vm, vcpu),
+			    regnums[i], &regvals[i]);
 		}
 		if (error == 0 && ddi_copyout(regvals, vrs.regvals,
 		    sizeof (uint64_t) * vrs.count, md)) {
@@ -1162,8 +1195,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 				error = EINVAL;
 				break;
 			}
-			error = vm_set_register(sc->vmm_vm, vcpu, regnums[i],
-			    regvals[i]);
+			error = vm_set_register(vm_vcpu(sc->vmm_vm, vcpu),
+			    regnums[i], regvals[i]);
 		}
 		break;
 	}
@@ -1178,14 +1211,15 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EINVAL;
 		}
 
-		error = vcpu_arch_reset(sc->vmm_vm, vcpu, vvr.kind == VRK_INIT);
+		error = vcpu_arch_reset(vm_vcpu(sc->vmm_vm, vcpu),
+		    vvr.kind == VRK_INIT);
 		break;
 	}
 	case VM_GET_RUN_STATE: {
 		struct vm_run_state vrs;
 
 		bzero(&vrs, sizeof (vrs));
-		error = vm_get_run_state(sc->vmm_vm, vcpu, &vrs.state,
+		error = vm_get_run_state(vm_vcpu(sc->vmm_vm, vcpu), &vrs.state,
 		    &vrs.sipi_vector);
 		if (error == 0) {
 			if (ddi_copyout(&vrs, datap, sizeof (vrs), md)) {
@@ -1202,7 +1236,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_set_run_state(sc->vmm_vm, vcpu, vrs.state,
+		error = vm_set_run_state(vm_vcpu(sc->vmm_vm, vcpu), vrs.state,
 		    vrs.sipi_vector);
 		break;
 	}
@@ -1220,7 +1254,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			break;
 		}
 		kbuf = kmem_zalloc(req.len, KM_SLEEP);
-		error = vm_get_fpu(sc->vmm_vm, vcpu, kbuf, req.len);
+		error = vm_get_fpu(vm_vcpu(sc->vmm_vm, vcpu), kbuf, req.len);
 		if (error == 0) {
 			if (ddi_copyout(kbuf, req.buf, req.len, md)) {
 				error = EFAULT;
@@ -1246,7 +1280,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		if (ddi_copyin(req.buf, kbuf, req.len, md)) {
 			error = EFAULT;
 		} else {
-			error = vm_set_fpu(sc->vmm_vm, vcpu, kbuf, req.len);
+			error = vm_set_fpu(vm_vcpu(sc->vmm_vm, vcpu), kbuf,
+			    req.len);
 		}
 		kmem_free(kbuf, req.len);
 		break;
@@ -1274,7 +1309,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			.vcc_nent = cfg.vvcc_nent,
 			.vcc_entries = entries,
 		};
-		error = vm_get_cpuid(sc->vmm_vm, vcpu, &vm_cfg);
+		error = vm_get_cpuid(vm_vcpu(sc->vmm_vm, vcpu), &vm_cfg);
 
 		/*
 		 * Only attempt to copy out the resultant entries if we were
@@ -1338,7 +1373,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			.vcc_nent = cfg.vvcc_nent,
 			.vcc_entries = entries,
 		};
-		error = vm_set_cpuid(sc->vmm_vm, vcpu, &vm_cfg);
+		error = vm_set_cpuid(vm_vcpu(sc->vmm_vm, vcpu), &vm_cfg);
 
 		if (entries != NULL) {
 			kmem_free(entries, entries_size);
@@ -1353,7 +1388,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 		vlc.vlc_vcpuid = vcpu;
 
-		legacy_emulate_cpuid(sc->vmm_vm, vcpu, &vlc.vlc_eax,
+		legacy_emulate_cpuid(vm_vcpu(sc->vmm_vm, vcpu), &vlc.vlc_eax,
 		    &vlc.vlc_ebx, &vlc.vlc_ecx, &vlc.vlc_edx);
 
 		if (ddi_copyout(&vlc, datap, sizeof (vlc), md)) {
@@ -1381,10 +1416,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		ASSERT(size >= 1 && size <= 8);
 
 		if (cmd == VM_SET_KERNEMU_DEV) {
-			error = vm_service_mmio_write(sc->vmm_vm, vcpu,
+			error = vm_service_mmio_write(vm_vcpu(sc->vmm_vm, vcpu),
 			    kemu.gpa, kemu.value, size);
 		} else {
-			error = vm_service_mmio_read(sc->vmm_vm, vcpu,
+			error = vm_service_mmio_read(vm_vcpu(sc->vmm_vm, vcpu),
 			    kemu.gpa, &kemu.value, size);
 		}
 
@@ -1404,8 +1439,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_get_capability(sc->vmm_vm, vcpu, vmcap.captype,
-		    &vmcap.capval);
+		error = vm_get_capability(vm_vcpu(sc->vmm_vm, vcpu),
+		    vmcap.captype, &vmcap.capval);
 		if (error == 0 &&
 		    ddi_copyout(&vmcap, datap, sizeof (vmcap), md)) {
 			error = EFAULT;
@@ -1420,8 +1455,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_set_capability(sc->vmm_vm, vcpu, vmcap.captype,
-		    vmcap.capval);
+		error = vm_set_capability(vm_vcpu(sc->vmm_vm, vcpu),
+		    vmcap.captype, vmcap.capval);
 		break;
 	}
 	case VM_SET_X2APIC_STATE: {
@@ -1431,7 +1466,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_set_x2apic_state(sc->vmm_vm, vcpu, x2apic.state);
+		error = vm_set_x2apic_state(vm_vcpu(sc->vmm_vm, vcpu),
+		    x2apic.state);
 		break;
 	}
 	case VM_GET_X2APIC_STATE: {
@@ -1441,8 +1477,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_get_x2apic_state(sc->vmm_vm, x2apic.cpuid,
-		    &x2apic.state);
+		error = vmmdev_lookup_vcpu(sc, x2apic.cpuid, false, &vcpup);
+		if (error != 0)
+			break;
+		error = vm_get_x2apic_state(vcpup, &x2apic.state);
 		if (error == 0 &&
 		    ddi_copyout(&x2apic, datap, sizeof (x2apic), md)) {
 			error = EFAULT;
@@ -1477,8 +1515,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			break;
 		}
 		gg.vcpuid = vcpu;
-		error = vm_gla2gpa(sc->vmm_vm, vcpu, &gg.paging, gg.gla,
-		    gg.prot, &gg.gpa, &gg.fault);
+		error = vm_gla2gpa(vm_vcpu(sc->vmm_vm, vcpu), &gg.paging,
+		    gg.gla, gg.prot, &gg.gpa, &gg.fault);
 		if (error == 0 && ddi_copyout(&gg, datap, sizeof (gg), md)) {
 			error = EFAULT;
 			break;
@@ -1493,8 +1531,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			break;
 		}
 		gg.vcpuid = vcpu;
-		error = vm_gla2gpa_nofault(sc->vmm_vm, vcpu, &gg.paging,
-		    gg.gla, gg.prot, &gg.gpa, &gg.fault);
+		error = vm_gla2gpa_nofault(vm_vcpu(sc->vmm_vm, vcpu),
+		    &gg.paging, gg.gla, gg.prot, &gg.gpa, &gg.fault);
 		if (error == 0 && ddi_copyout(&gg, datap, sizeof (gg), md)) {
 			error = EFAULT;
 			break;
@@ -1503,28 +1541,32 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	}
 
 	case VM_ACTIVATE_CPU:
-		error = vm_activate_cpu(sc->vmm_vm, vcpu);
+		error = vm_activate_cpu(vm_vcpu(sc->vmm_vm, vcpu));
 		break;
 
 	case VM_SUSPEND_CPU:
 		if (ddi_copyin(datap, &vcpu, sizeof (vcpu), md)) {
 			error = EFAULT;
-		} else {
-			error = vm_suspend_cpu(sc->vmm_vm, vcpu);
+		} else if ((error = vmmdev_lookup_vcpu(sc, vcpu, true,
+		    &vcpup)) == 0) {
+			error = vm_suspend_cpu(sc->vmm_vm, vcpup);
 		}
 		break;
 
 	case VM_RESUME_CPU:
 		if (ddi_copyin(datap, &vcpu, sizeof (vcpu), md)) {
 			error = EFAULT;
-		} else {
-			error = vm_resume_cpu(sc->vmm_vm, vcpu);
+		} else if ((error = vmmdev_lookup_vcpu(sc, vcpu, true,
+		    &vcpup)) == 0) {
+			error = vm_resume_cpu(sc->vmm_vm, vcpup);
 		}
 		break;
 
 	case VM_VCPU_BARRIER:
 		vcpu = arg;
-		error = vm_vcpu_barrier(sc->vmm_vm, vcpu);
+		if ((error = vmmdev_lookup_vcpu(sc, vcpu, true, &vcpup)) == 0) {
+			error = vm_vcpu_barrier(sc->vmm_vm, vcpup);
+		}
 		break;
 
 	case VM_GET_CPUS: {
@@ -1575,14 +1617,14 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vm_exit_intinfo(sc->vmm_vm, vcpu, vmii.info1);
+		error = vm_exit_intinfo(vm_vcpu(sc->vmm_vm, vcpu), vmii.info1);
 		break;
 	}
 	case VM_GET_INTINFO: {
 		struct vm_intinfo vmii;
 
 		vmii.vcpuid = vcpu;
-		error = vm_get_intinfo(sc->vmm_vm, vcpu, &vmii.info1,
+		error = vm_get_intinfo(vm_vcpu(sc->vmm_vm, vcpu), &vmii.info1,
 		    &vmii.info2);
 		if (error == 0 &&
 		    ddi_copyout(&vmii, datap, sizeof (vmii), md)) {
@@ -1646,7 +1688,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	}
 
 	case VM_RESTART_INSTRUCTION:
-		error = vm_restart_instruction(sc->vmm_vm, vcpu);
+		error = vm_restart_instruction(vm_vcpu(sc->vmm_vm, vcpu));
 		break;
 
 	case VM_SET_TOPOLOGY: {
