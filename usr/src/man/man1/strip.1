@@ -43,8 +43,9 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH STRIP 1 "Oct 5, 2007"
+.TH STRIP 1 "October 2, 2026"
 .SH NAME
 strip \- strip symbol table, debugging and line number information from an
 object file
@@ -78,12 +79,9 @@ available for that file. Therefore, this command is normally run only on
 production modules that have been debugged and tested.
 .sp
 .LP
-If \fBstrip\fR is executed on a common archive file (see \fBar.h\fR(3HEAD)) in
-addition to processing the members, \fBstrip\fR removes the archive symbol
-table. The archive symbol table must be restored by executing the \fBar\fR(1)
-command with the \fB-s\fR option before the archive can be linked by the
-\fBld\fR(1) command. \fBstrip\fR produces appropriate warning messages when
-this situation arises.
+If \fBstrip\fR is executed on a common archive file (see \fBar.h\fR(3HEAD)),
+each member is processed in turn and, if the archive has a symbol table, the
+symbol table is regenerated to match the processed members.
 .sp
 .LP
 \fBstrip\fR is used to reduce the file storage overhead taken by the object

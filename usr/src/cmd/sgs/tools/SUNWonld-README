@@ -1700,3 +1700,4 @@ Bugid   Risk Synopsis
 18149	ld(1) should support -zsysroot
 18149	backout: broke shared object dependency paths and NEEDED entries
 15091	strip(1) rips go binaries apart
+15961	strip breaks rust rlibs

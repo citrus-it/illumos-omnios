@@ -30,6 +30,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <sys/sysmacros.h>
 #include "alist.h"
 #include "mcs.h"
@@ -52,11 +53,21 @@ typedef struct {
 
 
 /*
+ * A regenerated archive symbol table, written ahead of the remaining
+ * archive members by copy_file().
+ */
+typedef struct {
+	char		*as_buf;	/* ARMAG, member header and table */
+	size_t		as_len;
+} ar_symtab_t;
+
+/*
  * Function prototypes.
  */
-static void copy_file(int, char *, Tmp_File *);
+static void copy_file(int, char *, Tmp_File *, ar_symtab_t *);
+static bool build_ar_symtab(const char *, bool, time_t, ar_symtab_t *);
 static void
-copy_non_elf_to_temp_ar(int, Elf *, int, Elf_Arhdr *, char *, Cmd_Info *);
+copy_non_elf_to_temp_ar(int, Elf *, int, Elf_Arhdr *, char *);
 static void copy_elf_file_to_temp_ar_file(int, Elf_Arhdr *, char *);
 static int process_file(Elf *, char *, Cmd_Info *);
 static void initialize(int shnum, Cmd_Info *, file_state_t *);
@@ -84,6 +95,9 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 	int fdartmp;
 	int fd;
 	int oflag;
+	bool ar_symtab = false;
+	bool ar_symtab64 = false;
+	time_t ar_symtab_date = 0;
 
 	if (CHK_OPT(cmd_info, MIGHT_CHG))
 		oflag = O_RDWR;
@@ -176,6 +190,19 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 
 			(void) snprintf(cur_filenm, len, "%s[%s]",
 			    cur_file, mem_header->ar_name);
+
+			/*
+			 * The archive symbol table is not copied to the
+			 * new archive. Note its presence so that it can be
+			 * regenerated once the remaining members have been
+			 * processed.
+			 */
+			if (strcmp(mem_header->ar_name, "/") == 0 ||
+			    strcmp(mem_header->ar_name, "/SYM64/") == 0) {
+				ar_symtab = true;
+				ar_symtab64 = mem_header->ar_name[1] == 'S';
+				ar_symtab_date = mem_header->ar_date;
+			}
 		}
 
 		if (elf_kind(elf) == ELF_K_ELF) {
@@ -188,15 +215,13 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 					return (FAILURE);
 				} else {
 					copy_non_elf_to_temp_ar(fd, elf,
-					    fdartmp, mem_header,
-					    cur_file, cmd_info);
+					    fdartmp, mem_header, cur_file);
 					error++;
 				}
 			} else if (ar_file && CHK_OPT(cmd_info, MIGHT_CHG)) {
 				if (code == DONT_BUILD)
 					copy_non_elf_to_temp_ar(fd, elf,
-					    fdartmp, mem_header,
-					    cur_file, cmd_info);
+					    fdartmp, mem_header, cur_file);
 				else
 					copy_elf_file_to_temp_ar_file(
 					    fdartmp, mem_header, cur_file);
@@ -213,8 +238,7 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 			} else {
 				if (CHK_OPT(cmd_info, MIGHT_CHG))
 					copy_non_elf_to_temp_ar(fd, elf,
-					    fdartmp, mem_header,
-					    cur_file, cmd_info);
+					    fdartmp, mem_header, cur_file);
 			}
 		}
 		cmd = elf_next(elf);
@@ -233,11 +257,25 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 	(void) elf_end(arf);
 
 	if (ar_file && CHK_OPT(cmd_info, MIGHT_CHG)) {
+		ar_symtab_t symtab = { NULL, 0 };
+
 		(void) close(fdartmp); /* done writing to ar_temp_file */
+
+		if (ar_symtab && !build_ar_symtab(artmpfile.tmp_name,
+		    ar_symtab64, ar_symtab_date, &symtab)) {
+			error_message(SYM_TAB_AR_ERROR, PLAIN_ERROR, NULL,
+			    prog, cur_file);
+			error_message(EXEC_AR_ERROR, PLAIN_ERROR, NULL,
+			    cur_file);
+		}
+
 		/* copy ar_temp_file to FILE */
-		copy_file(fd, cur_file, &artmpfile);
-	} else if (code != DONT_BUILD && CHK_OPT(cmd_info, MIGHT_CHG))
-		copy_file(fd, cur_file, &elftmpfile);
+		copy_file(fd, cur_file, &artmpfile,
+		    symtab.as_buf != NULL ? &symtab : NULL);
+		free(symtab.as_buf);
+	} else if (code != DONT_BUILD && CHK_OPT(cmd_info, MIGHT_CHG)) {
+		copy_file(fd, cur_file, &elftmpfile, NULL);
+	}
 	(void) close(fd);   /* done processing this file */
 	return (error);
 }
@@ -1261,8 +1299,7 @@ copy_non_elf_to_temp_ar(
 	Elf *elf,
 	int fdartmp,
 	Elf_Arhdr *mem_header,
-	char *cur_file,
-	Cmd_Info *cmd_info)
+	char *cur_file)
 {
 	char    mem_header_buf[sizeof (struct ar_hdr) + 1];
 	char *file_buf;
@@ -1308,10 +1345,6 @@ copy_non_elf_to_temp_ar(
 			mcs_exit(FAILURE);
 		}
 		free(file_buf);
-	} else if (CHK_OPT(cmd_info, MIGHT_CHG)) {
-		error_message(SYM_TAB_AR_ERROR, PLAIN_ERROR, NULL,
-		    prog, cur_file);
-		error_message(EXEC_AR_ERROR, PLAIN_ERROR, NULL, cur_file);
 	}
 }
 
@@ -1323,6 +1356,9 @@ copy_non_elf_to_temp_ar(
  *	fname - Name of file being processed
  *	temp_file_name - Address of pointer to temporary
  *		file containing new contents for fname.
+ *	symtab - If not NULL, the temporary file is an archive and
+ *		symtab holds the archive magic string and a symbol
+ *		table member to write in place of its magic string.
  *
  * exit:
  *	The contents of the file given by temp_file->tmp_name are
@@ -1330,7 +1366,7 @@ copy_non_elf_to_temp_ar(
  *	unlinked, and temp_file reset.
  */
 static void
-copy_file(int ofd, char *fname, Tmp_File *temp_file)
+copy_file(int ofd, char *fname, Tmp_File *temp_file, ar_symtab_t *symtab)
 {
 	enum { MMAP_USED, MMAP_UNUSED } mmap_status;
 	int		i;
@@ -1382,7 +1418,16 @@ copy_file(int ofd, char *fname, Tmp_File *temp_file)
 		    prog, fname);
 		mcs_exit(FAILURE);
 	}
-	if ((write(ofd, buf, stbuf.st_size)) != stbuf.st_size) {
+	if (symtab != NULL) {
+		if (write(ofd, symtab->as_buf, symtab->as_len) !=
+		    symtab->as_len ||
+		    write(ofd, buf + SARMAG, stbuf.st_size - SARMAG) !=
+		    stbuf.st_size - SARMAG) {
+			error_message(WRITE_MANI_ERROR2, SYSTEM_ERROR,
+			    strerror(errno), prog, fname);
+			mcs_exit(FAILURE);
+		}
+	} else if ((write(ofd, buf, stbuf.st_size)) != stbuf.st_size) {
 		error_message(WRITE_MANI_ERROR2, SYSTEM_ERROR, strerror(errno),
 		    prog, fname);
 		mcs_exit(FAILURE);
@@ -1397,6 +1442,200 @@ copy_file(int ofd, char *fname, Tmp_File *temp_file)
 		free(buf);
 	(void) close(fdtmp2);
 	free_tempfile(temp_file);
+}
+
+/*
+ * Write an integer to an archive symbol table, which is always big-endian.
+ */
+static char *
+ar_putint(uint64_t val, size_t width, char *dst)
+{
+	for (size_t i = width; i > 0; i--)
+		*dst++ = (val >> ((i - 1) * 8)) & 0xff;
+	return (dst);
+}
+
+/*
+ * Symbols collected for an archive symbol table, each with the offset of
+ * the header of the member which defines it.
+ */
+typedef struct {
+	uint64_t	*asl_offs;
+	size_t		asl_nsyms;
+	size_t		asl_noffs;
+	char		*asl_strs;
+	size_t		asl_strused;
+	size_t		asl_strsz;
+} ar_symlist_t;
+
+static void
+ar_symlist_add(ar_symlist_t *asl, uint64_t off, const char *name)
+{
+	size_t len = strlen(name) + 1;
+
+	if (asl->asl_nsyms == asl->asl_noffs) {
+		uint64_t *n;
+
+		asl->asl_noffs = MAX(asl->asl_noffs * 2, 1024);
+		n = realloc(asl->asl_offs, asl->asl_noffs * sizeof (uint64_t));
+		if (n == NULL) {
+			error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
+			mcs_exit(FAILURE);
+		}
+		asl->asl_offs = n;
+	}
+	if (asl->asl_strused + len > asl->asl_strsz) {
+		char *n;
+
+		asl->asl_strsz = MAX(asl->asl_strsz * 2,
+		    asl->asl_strused + len + 8192);
+		if ((n = realloc(asl->asl_strs, asl->asl_strsz)) == NULL) {
+			error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
+			mcs_exit(FAILURE);
+		}
+		asl->asl_strs = n;
+	}
+	asl->asl_offs[asl->asl_nsyms++] = off;
+	(void) memcpy(asl->asl_strs + asl->asl_strused, name, len);
+	asl->asl_strused += len;
+}
+
+/*
+ * Build an archive symbol table, in the same form as ar(1) produces, for
+ * the archive in the file path. The symbol table member is assembled in
+ * memory together with the archive magic string. The member offsets that
+ * it records take its own size into account, ready for it to be written
+ * ahead of the members which follow the magic string in path.
+ */
+static bool
+build_ar_symtab(const char *path, bool sym64, time_t date,
+    ar_symtab_t *symtab)
+{
+	char		hdr[sizeof (struct ar_hdr) + 1];
+	Elf_Cmd		cmd = ELF_C_READ;
+	Elf		*arf, *elf;
+	ar_symlist_t	asl = { 0 };
+	char		*dst;
+	size_t		width, tblsz, memsz;
+	bool		ret = false;
+	int		fd;
+
+	if ((fd = open(path, O_RDONLY)) == -1)
+		return (false);
+	if ((arf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
+		(void) close(fd);
+		return (false);
+	}
+	if (elf_kind(arf) != ELF_K_AR)
+		goto out;
+
+	while ((elf = elf_begin(fd, cmd, arf)) != NULL) {
+		Elf_Arhdr	*arhdr;
+		Elf_Scn		*scn = NULL;
+		off_t		off;
+
+		cmd = elf_next(elf);
+
+		if ((arhdr = elf_getarhdr(elf)) == NULL) {
+			(void) elf_end(elf);
+			goto out;
+		}
+		if (arhdr->ar_name[0] == '/' || elf_kind(elf) != ELF_K_ELF) {
+			(void) elf_end(elf);
+			continue;
+		}
+		off = elf_getbase(elf) - sizeof (struct ar_hdr);
+
+		while ((scn = elf_nextscn(elf, scn)) != NULL) {
+			GElf_Shdr	shdr;
+			Elf_Data	*data;
+			size_t		cnt;
+
+			if (gelf_getshdr(scn, &shdr) == NULL) {
+				(void) elf_end(elf);
+				goto out;
+			}
+			if (shdr.sh_type != SHT_SYMTAB || shdr.sh_entsize == 0)
+				continue;
+			if ((data = elf_getdata(scn, NULL)) == NULL) {
+				(void) elf_end(elf);
+				goto out;
+			}
+
+			cnt = shdr.sh_size / shdr.sh_entsize;
+			for (size_t i = 1; i < cnt; i++) {
+				GElf_Sym	sym;
+				const char	*name;
+
+				if (gelf_getsym(data, i, &sym) == NULL) {
+					(void) elf_end(elf);
+					goto out;
+				}
+				if ((GELF_ST_BIND(sym.st_info) != STB_GLOBAL &&
+				    GELF_ST_BIND(sym.st_info) != STB_WEAK) ||
+				    sym.st_shndx == SHN_UNDEF) {
+					continue;
+				}
+				name = elf_strptr(elf, shdr.sh_link,
+				    sym.st_name);
+				if (name == NULL) {
+					(void) elf_end(elf);
+					goto out;
+				}
+				ar_symlist_add(&asl, off, name);
+			}
+		}
+		(void) elf_end(elf);
+	}
+	if (elf_errno() != 0)
+		goto out;
+
+	/*
+	 * Size the member so that it is a multiple of 8 bytes, preserving
+	 * the alignment of the members which follow. A 64-bit symbol table
+	 * is used if the original was one, or if any of the offsets would
+	 * not fit in 32 bits.
+	 */
+	width = sym64 ? 8 : 4;
+	for (;;) {
+		tblsz = (asl.asl_nsyms + 1) * width + asl.asl_strused;
+		memsz = P2ROUNDUP(sizeof (struct ar_hdr) + tblsz, 8);
+		if (width == 8 || asl.asl_nsyms == 0 ||
+		    asl.asl_offs[asl.asl_nsyms - 1] + memsz <= UINT32_MAX) {
+			break;
+		}
+		width = 8;
+	}
+
+	if (snprintf(hdr, sizeof (hdr), FORMAT, width == 8 ? "/SYM64/" : "/",
+	    (long)date, 0, 0, 0, (long)(memsz - sizeof (struct ar_hdr)),
+	    ARFMAG) != sizeof (struct ar_hdr)) {
+		goto out;
+	}
+
+	symtab->as_len = SARMAG + memsz;
+	if ((symtab->as_buf = calloc(1, symtab->as_len)) == NULL) {
+		error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
+		mcs_exit(FAILURE);
+	}
+	dst = symtab->as_buf;
+	(void) memcpy(dst, ARMAG, SARMAG);
+	dst += SARMAG;
+	(void) memcpy(dst, hdr, sizeof (struct ar_hdr));
+	dst += sizeof (struct ar_hdr);
+	dst = ar_putint(asl.asl_nsyms, width, dst);
+	for (size_t i = 0; i < asl.asl_nsyms; i++)
+		dst = ar_putint(asl.asl_offs[i] + memsz, width, dst);
+	if (asl.asl_strused > 0)
+		(void) memcpy(dst, asl.asl_strs, asl.asl_strused);
+	ret = true;
+
+out:
+	free(asl.asl_offs);
+	free(asl.asl_strs);
+	(void) elf_end(arf);
+	(void) close(fd);
+	return (ret);
 }
 
 static uint64_t
