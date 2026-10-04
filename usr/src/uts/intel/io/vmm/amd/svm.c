@@ -155,6 +155,11 @@ svm_init(void)
 }
 
 static void
+svm_cleanup(void)
+{
+}
+
+static void
 svm_restore(void)
 {
 	/* No-op on illumos */
@@ -2625,6 +2630,7 @@ svm_freq_ratio(uint64_t guest_hz, uint64_t host_hz, uint64_t *mult)
 
 struct vmm_ops vmm_ops_amd = {
 	.init		= svm_init,
+	.cleanup	= svm_cleanup,
 	.resume		= svm_restore,
 
 	.vminit		= svm_vminit,

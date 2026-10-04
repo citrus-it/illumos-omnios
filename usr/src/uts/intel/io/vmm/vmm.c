@@ -263,6 +263,7 @@ nullop_panic(void)
 /* Do not allow use of an un-set `ops` to do anything but panic */
 static struct vmm_ops vmm_ops_null = {
 	.init		= (vmm_init_func_t)nullop_panic,
+	.cleanup	= (vmm_cleanup_func_t)nullop_panic,
 	.resume		= (vmm_resume_func_t)nullop_panic,
 	.vminit		= (vmi_init_func_t)nullop_panic,
 	.vcpu_init	= (vmi_vcpu_init_t)nullop_panic,
@@ -290,6 +291,7 @@ static struct vmm_ops vmm_ops_null = {
 static struct vmm_ops *ops = &vmm_ops_null;
 
 #define	VMM_INIT()			((*ops->init)())
+#define	VMM_CLEANUP()			((*ops->cleanup)())
 #define	VMM_RESUME()			((*ops->resume)())
 
 #define	VMINIT(vm)		((*ops->vminit)(vm))
@@ -523,6 +525,7 @@ vmm_mod_unload()
 {
 	VERIFY(vmm_initialized == 1);
 
+	VMM_CLEANUP();
 	vmm_vm_fini();
 
 	vmm_initialized = 0;
