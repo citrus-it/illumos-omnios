@@ -355,12 +355,16 @@ vcpu_unlock_one(struct vcpu *vcpu)
 }
 
 /*
- * Translate a vCPU ID provided by userspace into its vCPU.  An ID of -1 is
- * permitted when 'allow_any' is set, resulting in a NULL vCPU to request
- * action on all vCPUs.  Any other out of range ID results in EINVAL.
+ * Translate a vCPU ID provided by userspace into its vCPU, allocating the
+ * vCPU if this is the first reference to it.  An ID of -1 is permitted when
+ * 'allow_any' is set, resulting in a NULL vCPU to request action on all
+ * vCPUs.  Any other out of range ID results in EINVAL.
+ *
+ * This must not be called with the VM read lock held, since vCPU allocation is
+ * excluded for the duration of the write lock.
  */
 static int
-vmmdev_lookup_vcpu(vmm_softc_t *sc, int vcpuid, bool allow_any,
+vmmdev_alloc_vcpu(vmm_softc_t *sc, int vcpuid, bool allow_any,
     struct vcpu **vcpup)
 {
 	if (vcpuid == -1 && allow_any) {
@@ -368,7 +372,7 @@ vmmdev_lookup_vcpu(vmm_softc_t *sc, int vcpuid, bool allow_any,
 		return (0);
 	}
 
-	*vcpup = vm_vcpu(sc->vmm_vm, vcpuid);
+	*vcpup = vm_alloc_vcpu(sc->vmm_vm, vcpuid);
 	return (*vcpup == NULL ? EINVAL : 0);
 }
 
@@ -387,12 +391,19 @@ vmm_read_unlock(vmm_softc_t *sc)
 static void
 vmm_write_lock(vmm_softc_t *sc)
 {
-	int maxcpus;
+	struct vm *vm = sc->vmm_vm;
+	const int maxcpus = vm_get_maxcpus(vm);
 
-	/* First lock all the vCPUs */
-	maxcpus = vm_get_maxcpus(sc->vmm_vm);
+	/*
+	 * Prevent any further vCPUs from being allocated while the write lock
+	 * is held, then lock all those which exist.
+	 */
+	vm_vcpu_alloc_block(vm);
 	for (int vcpuid = 0; vcpuid < maxcpus; vcpuid++) {
-		vcpu_lock_one(vm_vcpu(sc->vmm_vm, vcpuid));
+		struct vcpu *vcpu = vm_vcpu(vm, vcpuid);
+
+		if (vcpu != NULL)
+			vcpu_lock_one(vcpu);
 	}
 
 	/*
@@ -402,19 +413,13 @@ vmm_write_lock(vmm_softc_t *sc)
 	vmm_lease_block(sc);
 
 	rw_enter(&sc->vmm_rwlock, RW_WRITER);
-	/*
-	 * For now, the 'maxcpus' value for an instance is fixed at the
-	 * compile-time constant of VM_MAXCPU at creation.  If this changes in
-	 * the future, allowing for dynamic vCPU resource sizing, acquisition
-	 * of the write lock will need to be wary of such changes.
-	 */
-	VERIFY(maxcpus == vm_get_maxcpus(sc->vmm_vm));
 }
 
 static void
 vmm_write_unlock(vmm_softc_t *sc)
 {
-	int maxcpus;
+	struct vm *vm = sc->vmm_vm;
+	const int maxcpus = vm_get_maxcpus(vm);
 
 	/* Allow vmm_drv leases to be acquired once write lock is dropped */
 	vmm_lease_unblock(sc);
@@ -427,10 +432,13 @@ vmm_write_unlock(vmm_softc_t *sc)
 	rw_exit(&sc->vmm_rwlock);
 
 	/* Unlock all the vCPUs */
-	maxcpus = vm_get_maxcpus(sc->vmm_vm);
 	for (int vcpuid = 0; vcpuid < maxcpus; vcpuid++) {
-		vcpu_unlock_one(vm_vcpu(sc->vmm_vm, vcpuid));
+		struct vcpu *vcpu = vm_vcpu(vm, vcpuid);
+
+		if (vcpu != NULL)
+			vcpu_unlock_one(vcpu);
 	}
+	vm_vcpu_alloc_unblock(vm);
 }
 
 static int
@@ -488,7 +496,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		if (ddi_copyin(datap, &vcpuid, sizeof (vcpuid), md)) {
 			return (EFAULT);
 		}
-		if ((vcpu = vm_vcpu(sc->vmm_vm, vcpuid)) == NULL) {
+		if ((vcpu = vm_alloc_vcpu(sc->vmm_vm, vcpuid)) == NULL) {
 			return (EINVAL);
 		}
 		vcpu_lock_one(vcpu);
@@ -511,16 +519,35 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		lock_type = LOCK_WRITE_HOLD;
 		break;
 
-	case VM_GET_MEMSEG:
-	case VM_MMAP_GETNEXT:
 	case VM_LAPIC_IRQ:
 	case VM_INJECT_NMI:
+	case VM_LAPIC_LOCAL_IRQ:
+	case VM_GET_X2APIC_STATE:
+		/*
+		 * These act on the vCPU named at the start of their argument
+		 * struct, but under the read lock rather than the lock of that
+		 * vCPU.  The vCPU is resolved (and if need be allocated) before
+		 * the read lock is taken, since allocation is excluded while
+		 * the write lock is held.
+		 */
+		if (ddi_copyin(datap, &vcpuid, sizeof (vcpuid), md)) {
+			return (EFAULT);
+		}
+		error = vmmdev_alloc_vcpu(sc, vcpuid,
+		    cmd == VM_LAPIC_LOCAL_IRQ, &vcpu);
+		if (error != 0) {
+			return (error);
+		}
+		vmm_read_lock(sc);
+		lock_type = LOCK_READ_HOLD;
+		break;
+
+	case VM_GET_MEMSEG:
+	case VM_MMAP_GETNEXT:
 	case VM_IOAPIC_ASSERT_IRQ:
 	case VM_IOAPIC_DEASSERT_IRQ:
 	case VM_IOAPIC_PULSE_IRQ:
 	case VM_LAPIC_MSI:
-	case VM_LAPIC_LOCAL_IRQ:
-	case VM_GET_X2APIC_STATE:
 	case VM_RTC_READ:
 	case VM_RTC_WRITE:
 	case VM_RTC_SETTIME:
@@ -542,7 +569,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			/* Access data for VM-wide devices */
 			vmm_write_lock(sc);
 			lock_type = LOCK_WRITE_HOLD;
-		} else if ((vcpu = vm_vcpu(sc->vmm_vm, vcpuid)) != NULL) {
+		} else if ((vcpu = vm_alloc_vcpu(sc->vmm_vm, vcpuid)) != NULL) {
 			/* Access data associated with a specific vCPU */
 			vcpu_lock_one(vcpu);
 			lock_type = LOCK_VCPU;
@@ -650,7 +677,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			break;
 		}
 		hrt2tv(gethrtime(), &vmstats.tv);
-		error = vmmdev_lookup_vcpu(sc, vmstats.cpuid, false, &vcpu);
+		error = vmmdev_alloc_vcpu(sc, vmstats.cpuid, false, &vcpu);
 		if (error != 0)
 			break;
 		error = vmm_stat_copy(vcpu, vmstats.index,
@@ -765,19 +792,9 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		    vmexc.restart_instruction != 0);
 		break;
 	}
-	case VM_INJECT_NMI: {
-		struct vm_nmi vmnmi;
-
-		if (ddi_copyin(datap, &vmnmi, sizeof (vmnmi), md)) {
-			error = EFAULT;
-			break;
-		}
-		error = vmmdev_lookup_vcpu(sc, vmnmi.cpuid, false, &vcpu);
-		if (error != 0)
-			break;
+	case VM_INJECT_NMI:
 		error = vm_inject_nmi(vcpu);
 		break;
-	}
 	case VM_LAPIC_IRQ: {
 		struct vm_lapic_irq vmirq;
 
@@ -785,9 +802,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vmmdev_lookup_vcpu(sc, vmirq.cpuid, false, &vcpu);
-		if (error != 0)
-			break;
 		error = lapic_intr_edge(vcpu, vmirq.vector);
 		break;
 	}
@@ -798,9 +812,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vmmdev_lookup_vcpu(sc, vmirq.cpuid, true, &vcpu);
-		if (error != 0)
-			break;
 		error = lapic_set_local_intr(sc->vmm_vm, vcpu, vmirq.vector);
 		break;
 	}
@@ -1469,9 +1480,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		error = vmmdev_lookup_vcpu(sc, x2apic.cpuid, false, &vcpu);
-		if (error != 0)
-			break;
 		error = vm_get_x2apic_state(vcpu, &x2apic.state);
 		if (error == 0 &&
 		    ddi_copyout(&x2apic, datap, sizeof (x2apic), md)) {
@@ -1539,7 +1547,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_SUSPEND_CPU:
 		if (ddi_copyin(datap, &vcpuid, sizeof (vcpuid), md)) {
 			error = EFAULT;
-		} else if ((error = vmmdev_lookup_vcpu(sc, vcpuid, true,
+		} else if ((error = vmmdev_alloc_vcpu(sc, vcpuid, true,
 		    &vcpu)) == 0) {
 			error = vm_suspend_cpu(sc->vmm_vm, vcpu);
 		}
@@ -1548,7 +1556,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_RESUME_CPU:
 		if (ddi_copyin(datap, &vcpuid, sizeof (vcpuid), md)) {
 			error = EFAULT;
-		} else if ((error = vmmdev_lookup_vcpu(sc, vcpuid, true,
+		} else if ((error = vmmdev_alloc_vcpu(sc, vcpuid, true,
 		    &vcpu)) == 0) {
 			error = vm_resume_cpu(sc->vmm_vm, vcpu);
 		}
@@ -1556,7 +1564,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 
 	case VM_VCPU_BARRIER:
 		vcpuid = arg;
-		error = vmmdev_lookup_vcpu(sc, vcpuid, true, &vcpu);
+		error = vmmdev_alloc_vcpu(sc, vcpuid, true, &vcpu);
 		if (error == 0)
 			error = vm_vcpu_barrier(sc->vmm_vm, vcpu);
 		break;
@@ -2741,6 +2749,8 @@ vmm_destroy_begin(vmm_softc_t *sc, vmm_destroy_opts_t opts)
 	for (int vcpuid = 0; vcpuid < maxcpus; vcpuid++) {
 		struct vcpu *vcpu = vm_vcpu(sc->vmm_vm, vcpuid);
 
+		if (vcpu == NULL)
+			continue;
 		vcpu_lock_one(vcpu);
 		vcpu_unlock_one(vcpu);
 	}

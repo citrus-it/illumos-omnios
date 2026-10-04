@@ -144,6 +144,9 @@ void vm_destroy(struct vm *vm);
 int vm_reinit(struct vm *vm, uint64_t);
 uint16_t vm_get_maxcpus(struct vm *vm);
 struct vcpu *vm_vcpu(struct vm *vm, int vcpuid);
+struct vcpu *vm_alloc_vcpu(struct vm *vm, int vcpuid);
+void vm_vcpu_alloc_block(struct vm *vm);
+void vm_vcpu_alloc_unblock(struct vm *vm);
 struct vm *vcpu_vm(struct vcpu *vcpu);
 int vcpu_vcpuid(struct vcpu *vcpu);
 void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
