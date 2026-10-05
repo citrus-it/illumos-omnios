@@ -3902,11 +3902,8 @@ vmm_kstat_update_vcpu(struct kstat *ksp, int rw)
 	const int vcpuid = vvk->vvk_vcpu.value.ui32;
 	struct vcpu *vcpu = vm_vcpu(vm, vcpuid);
 
-	ASSERT3U(vcpuid, <, vm->maxcpus);
-
-	/* A vCPU which has never been used has nothing to report */
-	if (vcpu == NULL)
-		return (0);
+	/* The kstat is created only once its vCPU exists */
+	ASSERT3P(vcpu, !=, NULL);
 
 	vvk->vvk_time_init.value.ui64 = vcpu->ustate_total[VU_INIT];
 	vvk->vvk_time_run.value.ui64 = vcpu->ustate_total[VU_RUN];
