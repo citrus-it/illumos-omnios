@@ -148,27 +148,23 @@ vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
 }
 
 void
-vmx_msr_bitmap_initialize(struct vmx *vmx)
+vmx_msr_bitmap_init(struct vmx_vcpu *vcpu)
 {
-	for (uint_t i = 0; i < VM_MAXCPU; i++) {
-		uint8_t *bitmap;
+	uint8_t *bitmap;
 
-		bitmap = kmem_alloc(PAGESIZE, KM_SLEEP);
-		VERIFY3U((uintptr_t)bitmap & PAGEOFFSET, ==, 0);
-		memset(bitmap, 0xff, PAGESIZE);
+	bitmap = kmem_alloc(PAGESIZE, KM_SLEEP);
+	VERIFY3U((uintptr_t)bitmap & PAGEOFFSET, ==, 0);
+	memset(bitmap, 0xff, PAGESIZE);
 
-		vmx->vcpus[i].msr_bitmap = bitmap;
-	}
+	vcpu->msr_bitmap = bitmap;
 }
 
 void
-vmx_msr_bitmap_destroy(struct vmx *vmx)
+vmx_msr_bitmap_fini(struct vmx_vcpu *vcpu)
 {
-	for (uint_t i = 0; i < VM_MAXCPU; i++) {
-		VERIFY3P(vmx->vcpus[i].msr_bitmap, !=, NULL);
-		kmem_free(vmx->vcpus[i].msr_bitmap, PAGESIZE);
-		vmx->vcpus[i].msr_bitmap = NULL;
-	}
+	VERIFY3P(vcpu->msr_bitmap, !=, NULL);
+	kmem_free(vcpu->msr_bitmap, PAGESIZE);
+	vcpu->msr_bitmap = NULL;
 }
 
 void
