@@ -22,6 +22,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  * Copyright 2021, Tintri by DDN. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _IPADM_IPMGMT_H
@@ -31,6 +32,7 @@
 extern "C" {
 #endif
 #include <sys/types.h>
+#include <sys/debug.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -220,7 +222,7 @@ typedef struct ipmgmt_initif_arg_s {
 	ipmgmt_door_cmd_type_t	ia_cmd;
 	uint32_t	ia_flags;
 	sa_family_t	ia_family;
-	size_t		ia_nvlsize;
+	uint32_t	ia_nvlsize;
 	/* packed nvl follows */
 } ipmgmt_initif_arg_t;
 
@@ -236,7 +238,7 @@ typedef struct ipmgmt_ipmp_update_arg_s {
 typedef struct ipmgmt_setaddr_arg_s {
 	ipmgmt_door_cmd_type_t	ia_cmd;
 	uint32_t		ia_flags;
-	size_t			ia_nvlsize;
+	uint32_t		ia_nvlsize;
 	/* packed nvl follows */
 } ipmgmt_setaddr_arg_t;
 
@@ -289,13 +291,6 @@ typedef struct ipmgmt_getprop_rval_s {
 	char		ir_pval[MAXPROPVALLEN];
 } ipmgmt_getprop_rval_t;
 
-/* IPMGMT_CMD_GETIF door_return value */
-typedef struct ipmgmt_getif_rval_s {
-	int32_t		ir_err;
-	uint32_t	ir_ifcnt;
-	ipadm_if_info_t	ir_ifinfo[1];
-} ipmgmt_getif_rval_t;
-
 /* IPMGMT_CMD_{LOOKUPADD|LIFNUM2ADDROBJ|ADDROBJ2LIFNUM} door_return value */
 typedef struct ipmgmt_aobjop_rval_s {
 	int32_t			ir_err;
@@ -307,6 +302,28 @@ typedef struct ipmgmt_aobjop_rval_s {
 	ipadm_addr_type_t	ir_atype;
 	ipmgmt_addr_type_cache_u	ir_atype_cache;
 } ipmgmt_aobjop_rval_t;
+
+/*
+ * The sizes of the door_call argument and door_return structures above form
+ * part of the protocol between libipadm and ipmgmtd, and a libipadm consumer
+ * may not be the same data model as the daemon. Changing any of them requires
+ * the corresponding check here to be updated.
+ */
+CTASSERT(sizeof (ipmgmt_door_cmd_type_t) == 4);
+CTASSERT(sizeof (ipmgmt_arg_t) == 4);
+CTASSERT(sizeof (ipmgmt_prop_arg_t) == 712);
+CTASSERT(sizeof (ipmgmt_getif_arg_t) == 40);
+CTASSERT(sizeof (ipmgmt_if_arg_t) == 48);
+CTASSERT(sizeof (ipmgmt_initif_arg_t) == 16);
+CTASSERT(sizeof (ipmgmt_ipmp_update_arg_t) == 72);
+CTASSERT(sizeof (ipmgmt_setaddr_arg_t) == 12);
+CTASSERT(sizeof (ipmgmt_getaddr_arg_t) == 108);
+CTASSERT(sizeof (ipmgmt_addr_arg_t) == 76);
+CTASSERT(sizeof (ipmgmt_aobjop_arg_t) == 116);
+CTASSERT(sizeof (ipmgmt_retval_t) == 4);
+CTASSERT(sizeof (ipmgmt_get_rval_t) == 8);
+CTASSERT(sizeof (ipmgmt_getprop_rval_t) == 516);
+CTASSERT(sizeof (ipmgmt_aobjop_rval_t) == 372);
 
 #define	ipmgmt_ir_intfid	ir_atype_cache. \
 	ipmgmt_ipv6_cache_s.ipmgmt_ifid

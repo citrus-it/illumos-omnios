@@ -23,6 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -799,6 +800,10 @@ i_ipadm_init_ifs(ipadm_handle_t iph, const char *ifs, nvlist_t **allifs)
 	err = nvlist_pack(nvl, &nvlbuf, &nvlsize, NV_ENCODE_NATIVE, 0);
 	if (err != 0) {
 		status = ipadm_errno2status(err);
+		goto done;
+	}
+	if (nvlsize > UINT32_MAX) {
+		status = IPADM_INVALID_ARG;
 		goto done;
 	}
 	bufsize = sizeof (*iargp) + nvlsize;
