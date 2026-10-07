@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -260,9 +260,17 @@ fac_prov_libhp_opt_set(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 			ret = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
 			break;
 		}
-	} else {
-		ret = fac_prov_libhp_get_opt(mod, hp, opt_name, opt_on, nvout);
+
+		if (ret != 0)
+			goto out;
 	}
+
+	/*
+	 * Whether this was a set or a get, read the option back so that the
+	 * caller receives the current state. libtopo stores the returned
+	 * nvlist as the property's value, so a set must return one too.
+	 */
+	ret = fac_prov_libhp_get_opt(mod, hp, opt_name, opt_on, nvout);
 
 out:
 	topo_mod_strfree(mod, conn);

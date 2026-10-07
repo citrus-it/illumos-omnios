@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <strings.h>
@@ -773,7 +773,7 @@ topo_prop_setprop(tnode_t *node, const char *pgname, nvlist_t *prop,
 	int ret;
 	topo_hdl_t *thp = node->tn_hdl;
 	topo_propval_t *pv;
-	nvlist_t *nvl, *args;
+	nvlist_t *nvl = NULL, *args;
 	char *name;
 	topo_type_t type;
 
@@ -845,6 +845,10 @@ topo_prop_setprop(tnode_t *node, const char *pgname, nvlist_t *prop,
 		return (-1);
 	}
 
+	/*
+	 * A method may succeed without returning a value, in which case the
+	 * property is left unset and the next get will call the method again.
+	 */
 	pv->tp_val = nvl;
 	topo_node_unlock(node);
 	return (0);
