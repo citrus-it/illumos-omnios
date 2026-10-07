@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef	_MESSAGE_H
 #define	_MESSAGE_H
 
@@ -85,6 +89,9 @@ gettext("ignoring devfsadm_create entry #%d in module %s\n")
 #define	CANT_CREATE_THREAD gettext("can not create thread %s: %s\n")
 
 #define	CANT_CREATE_DOOR gettext("can not create event door %s: %s\n")
+
+#define	CANT_SET_DOOR_PARAM \
+	gettext("can not set event door %s parameters: %s\n")
 
 #define	FAILED_FOR_MODULE gettext("%s failed for module %s\n")
 

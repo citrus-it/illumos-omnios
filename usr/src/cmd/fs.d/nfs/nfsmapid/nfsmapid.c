@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stropts.h>
@@ -261,6 +265,12 @@ start_svcs(void)
 	if ((doorfd = door_create(nfsmapid_func, NULL,
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
 		syslog(LOG_ERR, "Unable to create door: %m\n");
+		return (1);
+	}
+	if (door_setparam(doorfd, DOOR_PARAM_DATA_MIN,
+	    sizeof (struct mapid_arg)) == -1) {
+		syslog(LOG_ERR, "Unable to set door parameters: %m\n");
+		(void) door_revoke(doorfd);
 		return (1);
 	}
 

@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1039,9 +1040,7 @@ server_for_door(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	vtargp = (vt_cmd_arg_t *)args;
 
-	if (vtargp == NULL ||
-	    alen != sizeof (vt_cmd_arg_t) ||
-	    door_ucred(&uc) != 0) {
+	if (vtargp == DOOR_UNREF_DATA || door_ucred(&uc) != 0) {
 		(void) door_return(NULL, 0, NULL, 0);
 		return;
 	}
@@ -1078,6 +1077,16 @@ setup_door(void)
 	if ((vt_door = door_create(server_for_door, NULL,
 	    DOOR_UNREF | DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) < 0) {
 		syslog(LOG_ERR, "door_create failed: %s", strerror(errno));
+		return (B_FALSE);
+	}
+
+	if (door_setparam(vt_door, DOOR_PARAM_DATA_MIN,
+	    sizeof (vt_cmd_arg_t)) != 0 ||
+	    door_setparam(vt_door, DOOR_PARAM_DATA_MAX,
+	    sizeof (vt_cmd_arg_t)) != 0) {
+		syslog(LOG_ERR, "door_setparam failed: %s", strerror(errno));
+		(void) door_revoke(vt_door);
+		vt_door = -1;
 		return (B_FALSE);
 	}
 

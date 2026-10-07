@@ -216,15 +216,6 @@ nwam_backend_door_server(void *cookie, char *arg, size_t arg_size,
 	uid_t uid;
 	boolean_t write = B_TRUE;
 
-	/*
-	 * The door is accessible to all users, so validate the request before
-	 * touching it. A zero-length request arrives with a NULL argument.
-	 */
-	if (req == NULL || arg_size < sizeof (nwam_backend_door_arg_t)) {
-		(void) door_return(NULL, 0, NULL, 0);
-		return;
-	}
-
 	if (door_ucred(&ucr) != 0) {
 		req->nwbda_result = NWAM_ERROR_INTERNAL;
 		(void) door_return((char *)req, arg_size, NULL, 0);
@@ -275,6 +266,11 @@ nwam_backend_door_server(void *cookie, char *arg, size_t arg_size,
 		break;
 
 	case NWAM_BACKEND_DOOR_CMD_UPDATE_REQ:
+		if (req->nwbda_datalen >
+		    arg_size - sizeof (nwam_backend_door_arg_t)) {
+			req->nwbda_result = NWAM_INVALID_ARG;
+			break;
+		}
 		if (req->nwbda_datalen == 0) {
 			obj = NULL;
 		} else {
@@ -367,6 +363,11 @@ nwam_backend_init(void)
 	    DOOR_REFUSE_DESC);
 	if (backend_door_fd == -1)
 		return (NWAM_ERROR_BACKEND_INIT);
+	if (door_setparam(backend_door_fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (nwam_backend_door_arg_t)) == -1) {
+		(void) door_revoke(backend_door_fd);
+		return (NWAM_ERROR_BACKEND_INIT);
+	}
 
 	/* Attach the door to the file. */
 	(void) fdetach(NWAM_BACKEND_DOOR_FILE);

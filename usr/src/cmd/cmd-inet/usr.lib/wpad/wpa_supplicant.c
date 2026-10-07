@@ -4,6 +4,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * Copyright (c) 2003-2004, Jouni Malinen <jkmaline@cc.hut.fi>
  * Sun elects to license this software under the BSD license.
  * See README for more details.
@@ -572,9 +576,16 @@ event_handler(void *cookie, char *argp, size_t asize,
 {
 	wpa_event_type event;
 
-	/* LINTED E_BAD_PTR_CAST_ALIGN */
-	event = ((wl_events_t *)argp)->event;
-	wpa_event_handler(cookie, event);
+	/*
+	 * The door parameters ensure that any request is a complete
+	 * wl_events_t. The only other invocation is the unreferenced
+	 * notification, which carries no data.
+	 */
+	if (argp != DOOR_UNREF_DATA) {
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		event = ((wl_events_t *)argp)->event;
+		wpa_event_handler(cookie, event);
+	}
 
 	(void) door_return(NULL, 0, NULL, 0);
 }
@@ -596,6 +607,16 @@ wpa_supplicant_door_setup(void *cookie, char *doorname)
 	    DOOR_UNREF | DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
 
 	if (door_id < 0) {
+		error = -1;
+		goto out;
+	}
+
+	if (door_setparam(door_id, DOOR_PARAM_DATA_MIN,
+	    sizeof (wl_events_t)) < 0 ||
+	    door_setparam(door_id, DOOR_PARAM_DATA_MAX,
+	    sizeof (wl_events_t)) < 0) {
+		(void) door_revoke(door_id);
+		door_id = -1;
 		error = -1;
 		goto out;
 	}
