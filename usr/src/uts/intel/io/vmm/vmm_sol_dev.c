@@ -27,7 +27,6 @@
 #include <sys/mkdev.h>
 #include <sys/sunddi.h>
 #include <sys/fs/dv_node.h>
-#include <sys/cpuset.h>
 #include <sys/id_space.h>
 #include <sys/fs/sdev_plugin.h>
 #include <sys/smt.h>
@@ -1579,8 +1578,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 
 	case VM_GET_CPUS: {
 		struct vm_cpuset vm_cpuset;
-		cpuset_t tempset;
-		uint_t small, large;
+		vcpuset_t tempset;
 		size_t size;
 
 		if (ddi_copyin(datap, &vm_cpuset, sizeof (vm_cpuset), md)) {
@@ -1607,8 +1605,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		 * receives as much of ours as fits, provided that no member
 		 * would be lost, and any remainder of it is zeroed.
 		 */
-		cpuset_bounds(&tempset, &small, &large);
-		if (small != CPUSET_NOTINSET && large >= size * NBBY) {
+		if (size < sizeof (tempset) &&
+		    vcpuset_find(&tempset, size * NBBY) != -1) {
 			error = ERANGE;
 			break;
 		}
@@ -1617,7 +1615,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		cpuset_zero(&tempset);
+		vcpuset_zero(&tempset);
 		for (size_t off = sizeof (tempset); off < size;
 		    off += sizeof (tempset)) {
 			if (ddi_copyout(&tempset,
