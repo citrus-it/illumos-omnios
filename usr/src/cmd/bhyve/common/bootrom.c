@@ -62,6 +62,8 @@
  * from high to low, during initialization, and does not change at runtime.
  */
 static char *romptr;	/* Pointer to userspace-mapped bootrom region. */
+static char *romimg;	/* Pointer to the loaded ROM image within romptr. */
+static size_t romimg_size;
 static vm_paddr_t gpa_base;	/* GPA of low end of region. */
 static vm_paddr_t gpa_allocbot;	/* Low GPA of free region. */
 static vm_paddr_t gpa_alloctop;	/* High GPA, minus 1, of free region. */
@@ -287,6 +289,9 @@ bootrom_loadrom(struct vmctx *ctx)
 		}
 	}
 
+	romimg = ptr;
+	romimg_size = rom_size;
+
 	if (varfd >= 0) {
 #ifdef __FreeBSD__
 		var.mmap = mmap(NULL, var_size, PROT_READ | PROT_WRITE,
@@ -329,3 +334,41 @@ bootrom_boot(void)
 {
 	return (get_config_value("bootrom") != NULL);
 }
+
+#ifndef __FreeBSD__
+/*
+ * On PC hardware, the top 128KiB of the boot ROM is also decoded at
+ * 0xe0000-0xfffff, and a legacy BIOS expects to find itself there once the
+ * reset vector has made its first far jump into the F segment. bhyve backs
+ * that range with guest RAM, so when requested, copy the end of the ROM image
+ * there. This overwrites anything else that has been placed in the BIOS area
+ * (such as the MP and SMBIOS tables) so it must be done last.
+ */
+#define	LEGACY_BIOS_END		(1024 * 1024)
+#define	LEGACY_BIOS_MAXLEN	(128 * 1024)
+
+int
+bootrom_legacy_alias(struct vmctx *ctx)
+{
+	size_t len;
+	void *dst;
+
+	if (!get_config_bool_default("x86.legacy_bios", false))
+		return (0);
+
+	if (romimg == NULL) {
+		EPRINTLN("x86.legacy_bios requires a bootrom");
+		return (-1);
+	}
+
+	len = MIN(romimg_size, LEGACY_BIOS_MAXLEN);
+	dst = paddr_guest2host(ctx, LEGACY_BIOS_END - len, len);
+	if (dst == NULL) {
+		EPRINTLN("Could not map legacy BIOS region");
+		return (-1);
+	}
+	memcpy(dst, romimg + romimg_size - len, len);
+
+	return (0);
+}
+#endif /* !__FreeBSD__ */

@@ -47,5 +47,8 @@ int bootrom_alloc(struct vmctx *ctx, size_t len, int prot, int flags,
     char **region_out, uint64_t *gpa_out);
 bool bootrom_boot(void);
 int bootrom_loadrom(struct vmctx *ctx);
+#ifndef __FreeBSD__
+int bootrom_legacy_alias(struct vmctx *ctx);
+#endif
 
 #endif

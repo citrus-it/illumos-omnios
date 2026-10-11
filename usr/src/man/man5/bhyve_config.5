@@ -325,6 +325,12 @@ do not use in new configurations.
 .It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
 .It Va x86.mptable Ta bool Ta true Ta
 Generate an MPTable.
+.It Va x86.legacy_bios Ta bool Ta false Ta
+Copy the top 128KiB of the boot ROM into guest memory at
+.Ad 0xe0000 ,
+where a legacy PC BIOS such as SeaBIOS expects to find itself after the reset
+vector.
+This replaces any MPTable or SMBIOS tables placed in that region.
 .It Va x86.x2apic Ta bool Ta false Ta
 Configure guest's local APICs in x2APIC mode.
 .It Va x86.strictio Ta bool Ta false Ta

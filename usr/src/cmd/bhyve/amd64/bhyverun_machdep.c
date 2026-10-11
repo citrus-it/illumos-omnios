@@ -454,5 +454,11 @@ bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp __unused)
 		assert(error == 0);
 	}
 
+#ifndef __FreeBSD__
+	error = bootrom_legacy_alias(ctx);
+	if (error != 0)
+		return (error);
+#endif
+
 	return (0);
 }
