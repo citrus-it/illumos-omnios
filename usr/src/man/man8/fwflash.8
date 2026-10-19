@@ -1,11 +1,11 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2020 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\" Copyright 2021 Peter Tribble
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FWFLASH 8 "June 20, 2021"
+.TH FWFLASH 8 "October 19, 2026"
 .SH NAME
 fwflash \- firmware query and update utility
 .SH SYNOPSIS
@@ -47,8 +47,8 @@ The following options are supported:
 .RS 4n
 An optional parameter, valid only when used with the \fB-l\fR option. This
 option causes the command to list only devices of a specific class type.
-Currently supported classes are \fBIB\fR, \fBses\fR, \fBsd\fR, \fBufm\fR, or
-\fBALL\fR. If \fB-c\fR is not specified for the \fB-l\fR option, the class
+Currently supported classes are \fBIB\fR, \fBses\fR, \fBsd\fR, \fBufm\fR,
+\fBespi_flash\fR, or \fBALL\fR. If \fB-c\fR is not specified for the \fB-l\fR option, the class
 defaults to \fBALL\fR.
 .RE
 
@@ -119,6 +119,12 @@ identifiers and supported capabilities such as the ability to read
 firmware images or slot information is reported. For each firmware image
 on the device, each slot is displayed along with information about the
 slot's version and attributes.
+.sp
+For \fBespi_flash\fR devices, flash reached over an eSPI flash access channel,
+the size of the flash, where it is known, and the request and erase block
+sizes that the channel supports are displayed. When such a device is flashed,
+the image is written from the start of the flash and only the erase blocks
+whose contents differ from the image are erased and rewritten.
 .RE
 
 .sp
