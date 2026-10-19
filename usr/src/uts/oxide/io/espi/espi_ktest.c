@@ -22,7 +22,7 @@
  */
 
 #include <sys/ktest.h>
-#include <sys/espi_impl.h>
+#include <sys/kespi.h>
 #include <sys/hexdump.h>
 #include <sys/amdzen/mmioreg.h>
 #include <sys/io/fch/espi.h>
@@ -44,7 +44,7 @@ espi_hexdump(const uint8_t *buf, size_t len)
 static void
 espi_intr_status(mmio_reg_block_t block)
 {
-	uint32_t r = espi_intstatus(block);
+	uint32_t r = kespi_intstatus(block);
 	const struct {
 		bool set;
 		const char *descr;
@@ -111,13 +111,13 @@ espi_query_config_test(ktest_ctx_hdl_t *ctx)
 		{ ESPI_REG_CHAN3_CAP4, "flash4" },
 	};
 
-	if (espi_acquire(block) != 0) {
+	if (kespi_acquire(block) != 0) {
 		KT_ERROR(ctx, "Could not acquire semaphore");
 		goto out;
 	}
 
 	for (uint_t i = 0; i < ARRAY_SIZE(registers); i++) {
-		val = espi_get_configuration(block, registers[i].reg);
+		val = kespi_get_configuration(block, registers[i].reg);
 		cmn_err(CE_WARN, "eSPI cfg[%02x/%-7s]: 0x%x",
 		    registers[i].reg, registers[i].descr, val);
 		if (val == ESPI_CFG_INVAL32) {
@@ -127,7 +127,7 @@ espi_query_config_test(ktest_ctx_hdl_t *ctx)
 		}
 	}
 
-	espi_release(block);
+	kespi_release(block);
 
 	/*
 	 * As long as we could successfully read all registers, we consider
@@ -150,7 +150,7 @@ espi_basic_oob_test(ktest_ctx_hdl_t *ctx)
 	mmio_reg_block_t block = fch_espi_mmio_block(0);
 	uint32_t val;
 
-	if (espi_acquire(block) != 0) {
+	if (kespi_acquire(block) != 0) {
 		KT_ERROR(ctx, "Could not acquire semaphore");
 		mmio_reg_block_unmap(&block);
 		return;
@@ -160,7 +160,7 @@ espi_basic_oob_test(ktest_ctx_hdl_t *ctx)
 	 * We test for an eSPI target that implements revision 1.x of the
 	 * specification.
 	 */
-	val = espi_get_configuration(block, ESPI_REG_IDENT);
+	val = kespi_get_configuration(block, ESPI_REG_IDENT);
 	KT_ASSERT3UG(ESPI_REG_IDENT_GET_VERSION(val), ==,
 	    ESPI_REG_IDENT_VERSION_1X, ctx, out);
 
@@ -172,19 +172,19 @@ espi_basic_oob_test(ktest_ctx_hdl_t *ctx)
 	/*
 	 * Check that the OOB channel is enabled.
 	 */
-	val = espi_get_configuration(block, ESPI_REG_GEN_CAP);
+	val = kespi_get_configuration(block, ESPI_REG_GEN_CAP);
 	KT_ASSERT3UG(ESPI_REG_GEN_CAP_GET_OOB(val), ==, 1, ctx, out);
 
 	/*
 	 * Check that channel 2 (OOB) is both enabled and ready.
 	 */
-	val = espi_get_configuration(block, ESPI_REG_CHAN2_CAP);
+	val = kespi_get_configuration(block, ESPI_REG_CHAN2_CAP);
 	KT_ASSERT3UG(ESPI_REG_CHAN2_CAP_GET_EN(val), ==, 1, ctx, out);
 	KT_ASSERT3UG(ESPI_REG_CHAN2_CAP_GET_READY(val), ==, 1, ctx, out);
 
 	KT_PASS(ctx);
 out:
-	espi_release(block);
+	kespi_release(block);
 	mmio_reg_block_unmap(&block);
 }
 
@@ -197,16 +197,16 @@ espi_adhoc_tx_test(ktest_ctx_hdl_t *ctx)
 
 	ktest_get_input(ctx, &bytes, &len);
 
-	if (espi_acquire(block) != 0) {
+	if (kespi_acquire(block) != 0) {
 		KT_ERROR(ctx, "Could not acquire semaphore");
 	} else {
-		int ret = espi_oob_tx(block, bytes, &len);
+		int ret = kespi_oob_tx(block, bytes, &len);
 		if (ret == 0) {
 			KT_PASS(ctx);
 		} else {
-			KT_FAIL(ctx, "espi_oob_tx returned error %d", ret);
+			KT_FAIL(ctx, "kespi_oob_tx returned error %d", ret);
 		}
-		espi_release(block);
+		kespi_release(block);
 	}
 	espi_intr_status(block);
 	mmio_reg_block_unmap(&block);
@@ -217,20 +217,20 @@ espi_adhoc_rx_test(ktest_ctx_hdl_t *ctx)
 {
 	mmio_reg_block_t block = fch_espi_mmio_block(0);
 
-	if (espi_acquire(block) != 0) {
+	if (kespi_acquire(block) != 0) {
 		KT_ERROR(ctx, "Could not acquire semaphore");
 	} else {
 		uint8_t buf[0x1000];
 		size_t len = sizeof (buf);
-		int ret = espi_oob_rx(block, buf, &len);
+		int ret = kespi_oob_rx(block, buf, &len);
 
 		if (ret != 0) {
-			KT_FAIL(ctx, "espi_oob_rx returned error %d", ret);
+			KT_FAIL(ctx, "kespi_oob_rx returned error %d", ret);
 		} else {
 			espi_hexdump(buf, len);
 			KT_PASS(ctx);
 		}
-		espi_release(block);
+		kespi_release(block);
 	}
 	espi_intr_status(block);
 	mmio_reg_block_unmap(&block);

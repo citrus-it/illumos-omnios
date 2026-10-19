@@ -45,6 +45,7 @@ HDRS=  \
 	cram.h		\
 	ddi_subrdefs.h	\
 	debug_info.h	\
+	espi_ctl.h	\
 	ipcc.h		\
 	mach_mmu.h	\
 	machclock.h	\

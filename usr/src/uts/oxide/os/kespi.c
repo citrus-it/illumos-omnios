@@ -34,7 +34,7 @@
 #include <sys/sysmacros.h>
 #include <sys/ipcc_proto.h>
 #include <sys/platform_detect.h>
-#include <sys/espi_impl.h>
+#include <sys/kespi.h>
 #include <sys/io/fch/espi.h>
 #include <vm/kboot_mmu.h>
 
@@ -51,7 +51,7 @@ extern int standalone;
  * inspection. Only the finally selected OOB payload size (ed_targ_sel_oob_cap)
  * is used thereafter.
  */
-typedef struct espi_data {
+typedef struct kespi_data {
 	/*
 	 * The value of the target's general capabilities/config register
 	 */
@@ -74,9 +74,9 @@ typedef struct espi_data {
 	 * in bytes.
 	 */
 	size_t		ed_targ_sel_oob_cap;
-} espi_data_t;
+} kespi_data_t;
 
-static espi_data_t espi_data;
+static kespi_data_t kespi_data;
 
 /*
  * Bounce buffer for OOB receive data. Hardware delivers data in packets up to
@@ -87,13 +87,13 @@ static espi_data_t espi_data;
  */
 #define	ESPI_OOB_BOUNCE_BUFSZ	256
 
-typedef struct espi_oob_bounce {
+typedef struct kespi_oob_bounce {
 	uint8_t		eob_buf[ESPI_OOB_BOUNCE_BUFSZ];
 	size_t		eob_pos;	/* current read position */
 	size_t		eob_len;	/* amount of valid data */
-} espi_oob_bounce_t;
+} kespi_oob_bounce_t;
 
-static espi_oob_bounce_t espi_oob_bounce;
+static kespi_oob_bounce_t kespi_oob_bounce;
 
 /*
  * We place some fairly arbitrary bounds on the length of register polling. We
@@ -101,16 +101,16 @@ static espi_oob_bounce_t espi_oob_bounce;
  * operations to be quick and so we spin briefly before falling back to
  * sleeping.
  */
-uint_t espi_delay_ms = 1;
-uint_t espi_spins = 20;
-uint_t espi_retries = 100;
+uint_t kespi_delay_ms = 1;
+uint_t kespi_spins = 20;
+uint_t kespi_retries = 100;
 
 /*
  * Convert a payload size value in an eSPI register to the corresponding number
  * of bytes, returning 0 for an unknown value.
  */
 static size_t
-espi_payload_size(uint8_t val)
+kespi_payload_size(uint8_t val)
 {
 	switch (val) {
 	case ESPI_REG_CHAN2_CAP_PAYLOAD_64:
@@ -127,7 +127,7 @@ espi_payload_size(uint8_t val)
  * Convert a payload bytes value into the value used for the eSPI register.
  */
 static uint8_t
-espi_payload_key(size_t val)
+kespi_payload_key(size_t val)
 {
 	switch (val) {
 	case 64:
@@ -146,7 +146,7 @@ espi_payload_key(size_t val)
  * supported size.
  */
 static int
-espi_determine_payload(mmio_reg_block_t block)
+kespi_determine_payload(mmio_reg_block_t block)
 {
 	mmio_reg_t reg;
 	uint32_t val;
@@ -158,10 +158,10 @@ espi_determine_payload(mmio_reg_block_t block)
 	 * the same way as payload sizes in the eSPI specification. This is
 	 * fixed to 03h in Turin, meaning 256 bytes, but we read it anyway.
 	 */
-	espi_data.ed_host_max_oob_cap = espi_payload_size(
+	kespi_data.ed_host_max_oob_cap = kespi_payload_size(
 	    FCH_ESPI_MASTER_CAP_GET_OOB_MAXSZ(val));
 
-	val = espi_get_configuration(block, ESPI_REG_CHAN2_CAP);
+	val = kespi_get_configuration(block, ESPI_REG_CHAN2_CAP);
 	if (val == ESPI_CFG_INVAL32) {
 		EB_DBGMSG("eSPI: cannot retrieve OOB channel config reg\n");
 		return (ENXIO);
@@ -171,24 +171,24 @@ espi_determine_payload(mmio_reg_block_t block)
 	 * Retrieve the target's currently selected, and maximum allowed,
 	 * payload size for OOB packets.
 	 */
-	espi_data.ed_targ_sel_oob_cap = espi_payload_size(
+	kespi_data.ed_targ_sel_oob_cap = kespi_payload_size(
 	    ESPI_REG_CHAN2_CAP_GET_SELPAYLOAD(val));
-	espi_data.ed_targ_max_oob_cap = espi_payload_size(
+	kespi_data.ed_targ_max_oob_cap = kespi_payload_size(
 	    ESPI_REG_CHAN2_CAP_GET_MAXPAYLOAD(val));
 
 	/*
 	 * If we can, upgrade the payload size.
 	 */
-	const size_t maxpayload = MIN(espi_data.ed_host_max_oob_cap,
-	    espi_data.ed_targ_max_oob_cap);
+	const size_t maxpayload = MIN(kespi_data.ed_host_max_oob_cap,
+	    kespi_data.ed_targ_max_oob_cap);
 
-	if (maxpayload > espi_data.ed_targ_sel_oob_cap) {
-		uint8_t newpayload = espi_payload_key(maxpayload);
+	if (maxpayload > kespi_data.ed_targ_sel_oob_cap) {
+		uint8_t newpayload = kespi_payload_key(maxpayload);
 		int ret;
 
 		val = ESPI_REG_CHAN2_CAP_SET_SELPAYLOAD(val, newpayload);
 
-		ret = espi_set_configuration(block, ESPI_REG_CHAN2_CAP, val);
+		ret = kespi_set_configuration(block, ESPI_REG_CHAN2_CAP, val);
 		if (ret != 0) {
 			bop_panic("eSPI: failed to program OOB payload size, "
 			    "got error 0x%x\n", ret);
@@ -198,14 +198,14 @@ espi_determine_payload(mmio_reg_block_t block)
 		 * Re-read the new selected payload back from the
 		 * target.
 		 */
-		val = espi_get_configuration(block, ESPI_REG_CHAN2_CAP);
-		espi_data.ed_targ_sel_oob_cap = espi_payload_size(
+		val = kespi_get_configuration(block, ESPI_REG_CHAN2_CAP);
+		kespi_data.ed_targ_sel_oob_cap = kespi_payload_size(
 		    ESPI_REG_CHAN2_CAP_GET_SELPAYLOAD(val));
 
-		if (espi_data.ed_targ_sel_oob_cap != maxpayload) {
+		if (kespi_data.ed_targ_sel_oob_cap != maxpayload) {
 			bop_panic("eSPI: failed to upgrade OOB payload size. "
 			    "Set 0x%zx, got 0x%zx\n",
-			    maxpayload, espi_data.ed_targ_sel_oob_cap);
+			    maxpayload, kespi_data.ed_targ_sel_oob_cap);
 		}
 	}
 
@@ -223,9 +223,9 @@ espi_determine_payload(mmio_reg_block_t block)
 }
 
 /*
- * espi_init() is called from early in UNIX _start(), via the IPCC
+ * kespi_init() is called from early in UNIX _start(), via the IPCC
  * initialisation routine. We're single-threaded here and can safely populate
- * the global espi_data.
+ * the global kespi_data.
  *
  * We only end up here if we discover that the system was booted via eSPI and
  * we (mostly) assume that the eSPI initialization sequences that the PPR
@@ -236,7 +236,7 @@ espi_determine_payload(mmio_reg_block_t block)
  * re-check and assert that they are enabled.
  */
 int
-espi_init(mmio_reg_block_t block)
+kespi_init(mmio_reg_block_t block)
 {
 	const char *freq, *mode;
 	mmio_reg_t reg;
@@ -266,7 +266,7 @@ espi_init(mmio_reg_block_t block)
 		return (ENXIO);
 	}
 
-	ret = espi_acquire(block);
+	ret = kespi_acquire(block);
 
 	if (ret != 0) {
 		EB_DBGMSG("eSPI: could not acquire semaphore\n");
@@ -275,20 +275,20 @@ espi_init(mmio_reg_block_t block)
 
 	ret = ENXIO;
 
-	val = espi_get_configuration(block, ESPI_REG_IDENT);
+	val = kespi_get_configuration(block, ESPI_REG_IDENT);
 	if (ESPI_REG_IDENT_GET_VERSION(val) != ESPI_REG_IDENT_VERSION_1X) {
 		EB_DBGMSG("eSPI: Unsupported version %u\n",
 		    ESPI_REG_IDENT_GET_VERSION(val));
 		goto out;
 	}
 
-	val = espi_get_configuration(block, ESPI_REG_GEN_CAP);
+	val = kespi_get_configuration(block, ESPI_REG_GEN_CAP);
 	if (val == ESPI_CFG_INVAL32) {
 		EB_DBGMSG("eSPI: failed to read general capability register\n");
 		goto out;
 	}
 
-	espi_data.ed_reg_gencap = val;
+	kespi_data.ed_reg_gencap = val;
 	if (ESPI_REG_GEN_CAP_GET_OOB(val) == 0) {
 		EB_DBGMSG("eSPI: OOB channel is not supported\n");
 		goto out;
@@ -340,19 +340,19 @@ espi_init(mmio_reg_block_t block)
 		EB_DBGMSG(
 		    "eSPI: CRC checking is supported but disabled, enabling\n");
 		val = ESPI_REG_GEN_CAP_SET_CRC_EN(val, 1);
-		ret = espi_set_configuration(block, ESPI_REG_GEN_CAP, val);
+		ret = kespi_set_configuration(block, ESPI_REG_GEN_CAP, val);
 		if (ret != 0) {
 			bop_panic("eSPI: failed to enable CRC checking, "
 			    "got error 0x%x\n", ret);
 		}
-		val = espi_data.ed_reg_gencap =
-		    espi_get_configuration(block, ESPI_REG_GEN_CAP);
+		val = kespi_data.ed_reg_gencap =
+		    kespi_get_configuration(block, ESPI_REG_GEN_CAP);
 		if (ESPI_REG_GEN_CAP_GET_CRC_EN(val) == 0)
 			bop_panic("eSPI: target did not accept CRC enable\n");
 	}
 
-	val = espi_get_configuration(block, ESPI_REG_CHAN2_CAP);
-	espi_data.ed_reg_oobcap = val;
+	val = kespi_get_configuration(block, ESPI_REG_CHAN2_CAP);
+	kespi_data.ed_reg_oobcap = val;
 	if (ESPI_REG_CHAN2_CAP_GET_EN(val) == 0) {
 		EB_DBGMSG("eSPI: OOB channel not enabled\n");
 		goto out;
@@ -362,7 +362,7 @@ espi_init(mmio_reg_block_t block)
 		goto out;
 	}
 
-	ret = espi_determine_payload(block);
+	ret = kespi_determine_payload(block);
 	if (ret != 0)
 		goto out;
 
@@ -376,12 +376,12 @@ espi_init(mmio_reg_block_t block)
 	ret = 0;
 
 out:
-	espi_release(block);
+	kespi_release(block);
 	return (ret);
 }
 
 static int
-espi_handle_interrupt(uint32_t r)
+kespi_handle_interrupt(uint32_t r)
 {
 	const struct {
 		bool set;
@@ -461,7 +461,7 @@ espi_handle_interrupt(uint32_t r)
 /*
  * Clear out bits from the interrupt status register so we can better determine
  * if the command we're about to send is responsible for setting any of them.
- * The packet submission code will call espi_handle_interrupt() - above -
+ * The packet submission code will call kespi_handle_interrupt() - above -
  * to check and convert set bits to error codes.
  *
  * All general error bits and those related to OOB transactions are cleared;
@@ -472,7 +472,7 @@ espi_handle_interrupt(uint32_t r)
  * hardware that we're ready to receive the next packet.
  */
 static void
-espi_clear_interrupt(mmio_reg_block_t block)
+kespi_clear_interrupt(mmio_reg_block_t block)
 {
 	mmio_reg_t intsts = FCH_ESPI_S0_INT_STS_MMIO(block);
 	uint32_t val = 0;
@@ -500,7 +500,7 @@ espi_clear_interrupt(mmio_reg_block_t block)
  * Acquire ownership of the eSPI semaphore.
  */
 int
-espi_acquire(mmio_reg_block_t block)
+kespi_acquire(mmio_reg_block_t block)
 {
 	mmio_reg_t reg = FCH_ESPI_SEM_MISC_CTL_REG0_MMIO(block);
 	uint32_t val;
@@ -512,7 +512,7 @@ espi_acquire(mmio_reg_block_t block)
 		VERIFY0(FCH_ESPI_SEM_MISC_CTL_REG0_GET_SW2_OWN_STAT(val));
 	}
 
-	for (uint_t i = 0; i < espi_retries; i++) {
+	for (uint_t i = 0; i < kespi_retries; i++) {
 		/*
 		 * Poll for idle. This comes from the PPR and is the set of
 		 * fields we need to ensure are zero before we attempt to
@@ -524,10 +524,10 @@ espi_acquire(mmio_reg_block_t block)
 		    FCH_ESPI_SEM_MISC_CTL_REG0_GET_SW2_OWN_STAT(val) != 0 ||
 		    FCH_ESPI_SEM_MISC_CTL_REG0_GET_SW3_OWN_STAT(val) != 0) {
 			if (standalone == 0) {
-				DTRACE_PROBE2(espi__acquire__locked,
+				DTRACE_PROBE2(kespi__acquire__locked,
 				    uint32_t, val, uint_t, i);
 			}
-			eb_pausems(espi_delay_ms);
+			eb_pausems(kespi_delay_ms);
 			continue;
 		}
 
@@ -545,16 +545,16 @@ espi_acquire(mmio_reg_block_t block)
 		if (FCH_ESPI_SEM_MISC_CTL_REG0_GET_SW2_OWN_STAT(val) == 1) {
 			/* Success */
 			ret = 0;
-			espi_clear_interrupt(block);
+			kespi_clear_interrupt(block);
 			break;
 		}
 
 		if (standalone == 0) {
-			DTRACE_PROBE2(espi__acquire__failed, uint32_t, val,
+			DTRACE_PROBE2(kespi__acquire__failed, uint32_t, val,
 			    uint_t, i);
 		}
 
-		eb_pausems(espi_delay_ms);
+		eb_pausems(kespi_delay_ms);
 	}
 
 	return (ret);
@@ -564,7 +564,7 @@ espi_acquire(mmio_reg_block_t block)
  * Release the eSPI bus semaphore.
  */
 void
-espi_release(mmio_reg_block_t block)
+kespi_release(mmio_reg_block_t block)
 {
 	mmio_reg_t reg = FCH_ESPI_SEM_MISC_CTL_REG0_MMIO(block);
 
@@ -582,9 +582,9 @@ espi_release(mmio_reg_block_t block)
 	/* Wait for ownership status to change */
 	while (FCH_ESPI_SEM_MISC_CTL_REG0_GET_SW2_OWN_STAT(val) != 0) {
 		if (standalone == 0) {
-			DTRACE_PROBE1(espi__release__wait, uint32_t, val);
+			DTRACE_PROBE1(kespi__release__wait, uint32_t, val);
 		}
-		eb_pausems(espi_delay_ms);
+		eb_pausems(kespi_delay_ms);
 		val = mmio_reg_read(reg);
 	}
 
@@ -595,7 +595,7 @@ espi_release(mmio_reg_block_t block)
 }
 
 uint32_t
-espi_intstatus(mmio_reg_block_t block)
+kespi_intstatus(mmio_reg_block_t block)
 {
 	mmio_reg_t reg = FCH_ESPI_S0_INT_STS_MMIO(block);
 
@@ -607,25 +607,25 @@ espi_intstatus(mmio_reg_block_t block)
  * FCH::ITF::ESPI::DN_TXHDR_0th[DNCMD_STATUS] being clear.
  */
 static int
-espi_wait_idle(mmio_reg_block_t block)
+kespi_wait_idle(mmio_reg_block_t block)
 {
 	mmio_reg_t hdr0 = FCH_ESPI_DN_TXHDR0_MMIO(block);
 	uint32_t val;
 	int ret = ETIMEDOUT;
 
 	/* Wait until the hardware is ready */
-	for (uint_t i = 0; i < espi_retries; i++) {
+	for (uint_t i = 0; i < kespi_retries; i++) {
 		val = mmio_reg_read(hdr0);
 		if (FCH_ESPI_DN_TXHDR0_GET_DNCMD_STATUS(val) == 0) {
 			ret = 0;
 			break;
 		}
 		if (standalone == 0) {
-			DTRACE_PROBE2(espi__wait__idle, uint32_t, val,
+			DTRACE_PROBE2(kespi__wait__idle, uint32_t, val,
 			    uint_t, i);
 		}
-		if (i > espi_spins)
-			eb_pausems(espi_delay_ms);
+		if (i > kespi_spins)
+			eb_pausems(kespi_delay_ms);
 	}
 
 	return (ret);
@@ -637,7 +637,7 @@ espi_wait_idle(mmio_reg_block_t block)
  * it is called.
  */
 static int
-espi_submit(mmio_reg_block_t block)
+kespi_submit(mmio_reg_block_t block)
 {
 	mmio_reg_t hdr0_type = FCH_ESPI_DN_TXHDR0_TYPE_MMIO(block);
 	mmio_reg_t intsts = FCH_ESPI_S0_INT_STS_MMIO(block);
@@ -655,36 +655,36 @@ espi_submit(mmio_reg_block_t block)
 	mmio_reg_write(hdr0_type, val);
 
 	/* Poll for command completion and other interrupts */
-	for (uint_t i = 0; i < espi_retries; i++) {
+	for (uint_t i = 0; i < kespi_retries; i++) {
 		val = mmio_reg_read(intsts);
 		if (FCH_ESPI_S0_INT_STS_GET_DNCMD(val) == 1)
 			break;
 		if (standalone == 0) {
-			DTRACE_PROBE2(espi__submit__waitintr, uint32_t, val,
+			DTRACE_PROBE2(kespi__submit__waitintr, uint32_t, val,
 			    uint_t, i);
 		}
 		if (val != 0) {
-			int ret = espi_handle_interrupt(val);
+			int ret = kespi_handle_interrupt(val);
 			if (ret != 0)
 				return (ret);
 		}
-		if (i > espi_spins)
-			eb_pausems(espi_delay_ms);
+		if (i > kespi_spins)
+			eb_pausems(kespi_delay_ms);
 	}
 	if (FCH_ESPI_S0_INT_STS_GET_DNCMD(val) != 1)
 		return (ETIMEDOUT);
 
 	/* Poll for completion */
-	for (uint_t i = 0; i < espi_retries; i++) {
+	for (uint_t i = 0; i < kespi_retries; i++) {
 		val = mmio_reg_read(hdr0_type);
 		if (FCH_ESPI_DN_TXHDR0_GET_DNCMD_STATUS(val) == 0)
 			break;
 		if (standalone == 0) {
-			DTRACE_PROBE2(espi__submit__wait, uint32_t, val,
+			DTRACE_PROBE2(kespi__submit__wait, uint32_t, val,
 			    uint_t, i);
 		}
-		if (i > espi_spins)
-			eb_pausems(espi_delay_ms);
+		if (i > kespi_spins)
+			eb_pausems(kespi_delay_ms);
 	}
 	if (FCH_ESPI_DN_TXHDR0_GET_DNCMD_STATUS(val) != 0)
 		return (ETIMEDOUT);
@@ -693,7 +693,7 @@ espi_submit(mmio_reg_block_t block)
 }
 
 static uint32_t
-espi_config_reg(int cmd, uint16_t reg)
+kespi_config_reg(int cmd, uint16_t reg)
 {
 	uint32_t val = 0;
 
@@ -720,7 +720,7 @@ espi_config_reg(int cmd, uint16_t reg)
 }
 
 uint32_t
-espi_get_configuration(mmio_reg_block_t block, uint16_t reg)
+kespi_get_configuration(mmio_reg_block_t block, uint16_t reg)
 {
 	mmio_reg_t hdr0 = FCH_ESPI_DN_TXHDR0_MMIO(block);
 	mmio_reg_t hdr1 = FCH_ESPI_DN_TXHDR1_MMIO(block);
@@ -733,10 +733,10 @@ espi_get_configuration(mmio_reg_block_t block, uint16_t reg)
 	if ((reg & 0x3) != 0 || (reg >> 12) != 0)
 		return (ESPI_CFG_INVAL32);
 
-	if (espi_wait_idle(block) != 0)
+	if (kespi_wait_idle(block) != 0)
 		return (ESPI_CFG_INVAL32);
 
-	val0 = espi_config_reg(FCH_ESPI_DN_TXHDR0_TYPE_GETCONF, reg);
+	val0 = kespi_config_reg(FCH_ESPI_DN_TXHDR0_TYPE_GETCONF, reg);
 	mmio_reg_write(hdr0, val0);
 
 	/*
@@ -744,20 +744,20 @@ espi_get_configuration(mmio_reg_block_t block, uint16_t reg)
 	 */
 	mmio_reg_write(hdr1, 0);
 
-	if (espi_submit(block) != 0)
+	if (kespi_submit(block) != 0)
 		return (ESPI_CFG_INVAL32);
 
 	val = mmio_reg_read(hdr1);
 
 	if (standalone == 0) {
-		DTRACE_PROBE2(espi__get__cfg, uint16_t, reg, uint32_t, val);
+		DTRACE_PROBE2(kespi__get__cfg, uint16_t, reg, uint32_t, val);
 	}
 
 	return (val);
 }
 
 int
-espi_set_configuration(mmio_reg_block_t block, uint16_t reg, uint32_t val)
+kespi_set_configuration(mmio_reg_block_t block, uint16_t reg, uint32_t val)
 {
 	mmio_reg_t hdr0 = FCH_ESPI_DN_TXHDR0_MMIO(block);
 	mmio_reg_t hdr1 = FCH_ESPI_DN_TXHDR1_MMIO(block);
@@ -771,19 +771,19 @@ espi_set_configuration(mmio_reg_block_t block, uint16_t reg, uint32_t val)
 	if ((reg & 0x3) != 0 || (reg >> 12) != 0)
 		return (EINVAL);
 
-	if ((ret = espi_wait_idle(block)) != 0)
+	if ((ret = kespi_wait_idle(block)) != 0)
 		return (ret);
 
-	val0 = espi_config_reg(FCH_ESPI_DN_TXHDR0_TYPE_SETCONF, reg);
+	val0 = kespi_config_reg(FCH_ESPI_DN_TXHDR0_TYPE_SETCONF, reg);
 	mmio_reg_write(hdr0, val0);
 
 	/* Write the requested value */
 	mmio_reg_write(hdr1, val);
 
-	ret = espi_submit(block);
+	ret = kespi_submit(block);
 
 	if (standalone == 0) {
-		DTRACE_PROBE3(espi__set__cfg, uint16_t, reg, uint32_t, val0,
+		DTRACE_PROBE3(kespi__set__cfg, uint16_t, reg, uint32_t, val0,
 		    uint32_t, val);
 	}
 
@@ -791,12 +791,12 @@ espi_set_configuration(mmio_reg_block_t block, uint16_t reg, uint32_t val)
 }
 
 bool
-espi_oob_readable(mmio_reg_block_t block)
+kespi_oob_readable(mmio_reg_block_t block)
 {
 	mmio_reg_t reg = FCH_ESPI_S0_INT_STS_MMIO(block);
 	uint32_t val;
 
-	if (espi_oob_bounce.eob_pos < espi_oob_bounce.eob_len)
+	if (kespi_oob_bounce.eob_pos < kespi_oob_bounce.eob_len)
 		return (true);
 
 	val = mmio_reg_read(reg);
@@ -804,7 +804,7 @@ espi_oob_readable(mmio_reg_block_t block)
 }
 
 bool
-espi_oob_writable(mmio_reg_block_t block)
+kespi_oob_writable(mmio_reg_block_t block)
 {
 	mmio_reg_t reg = FCH_ESPI_DN_TXHDR0_MMIO(block);
 	uint32_t val;
@@ -814,7 +814,7 @@ espi_oob_writable(mmio_reg_block_t block)
 }
 
 void
-espi_oob_flush(mmio_reg_block_t block)
+kespi_oob_flush(mmio_reg_block_t block)
 {
 	mmio_reg_t hdr0 = FCH_ESPI_UP_RXHDR0_MMIO(block);
 
@@ -854,10 +854,10 @@ espi_oob_flush(mmio_reg_block_t block)
 	 * should be viewed as nothing more than a best-effort attempt at a
 	 * reasonable balance between robustness and practicality.
 	 */
-	eb_pausems(espi_delay_ms);
-	while (espi_oob_readable(block)) {
-		(void) espi_oob_rx(block, NULL, NULL);
-		eb_pausems(espi_delay_ms);
+	eb_pausems(kespi_delay_ms);
+	while (kespi_oob_readable(block)) {
+		(void) kespi_oob_rx(block, NULL, NULL);
+		eb_pausems(kespi_delay_ms);
 	}
 }
 
@@ -867,32 +867,32 @@ espi_oob_flush(mmio_reg_block_t block)
  * configured payload size.
  */
 static int
-espi_wait_oob_free(mmio_reg_block_t block)
+kespi_wait_oob_free(mmio_reg_block_t block)
 {
 	mmio_reg_t reg = FCH_ESPI_MISC_CTL0_MMIO(block);
 	uint32_t val;
 	int ret = EBUSY;
 
 	/* Wait until the hardware is ready */
-	for (uint_t i = 0; i < espi_retries; i++) {
+	for (uint_t i = 0; i < kespi_retries; i++) {
 		val = mmio_reg_read(reg);
 		if (FCH_ESPI_MISC_CTL0_GET_OOB_FREE(val) == 1) {
 			ret = 0;
 			break;
 		}
 		if (standalone == 0) {
-			DTRACE_PROBE2(espi__wait__oob__free, uint32_t, val,
+			DTRACE_PROBE2(kespi__wait__oob__free, uint32_t, val,
 			    uint_t, i);
 		}
-		if (i > espi_spins)
-			eb_pausems(espi_delay_ms);
+		if (i > kespi_spins)
+			eb_pausems(kespi_delay_ms);
 	}
 
 	return (ret);
 }
 
 int
-espi_oob_tx(mmio_reg_block_t block, uint8_t *buf, size_t *lenp)
+kespi_oob_tx(mmio_reg_block_t block, uint8_t *buf, size_t *lenp)
 {
 	static uint8_t tag = 0;
 	uint32_t val0, val1;
@@ -918,14 +918,14 @@ espi_oob_tx(mmio_reg_block_t block, uint8_t *buf, size_t *lenp)
 	 * That header consists of (target, opcode, count and optional PEC
 	 * byte).
 	 */
-	const size_t maxpayload = espi_data.ed_targ_sel_oob_cap - 4;
+	const size_t maxpayload = kespi_data.ed_targ_sel_oob_cap - 4;
 
 	while (len > 0) {
 		const size_t sendlen = MIN(len, maxpayload);
 
-		if ((ret = espi_wait_idle(block)) != 0)
+		if ((ret = kespi_wait_idle(block)) != 0)
 			break;
-		if ((ret = espi_wait_oob_free(block)) != 0)
+		if ((ret = kespi_wait_oob_free(block)) != 0)
 			break;
 
 		val0 = FCH_ESPI_DN_TXHDR0_SET_DNCMD_TYPE(0,
@@ -976,7 +976,8 @@ espi_oob_tx(mmio_reg_block_t block, uint8_t *buf, size_t *lenp)
 		mmio_reg_write(hdr1, val1);
 
 		if (standalone == 0) {
-			DTRACE_PROBE2(espi__tx, uint32_t, val0, uint32_t, val1);
+			DTRACE_PROBE2(kespi__tx, uint32_t, val0, uint32_t,
+			    val1);
 		}
 
 		/*
@@ -997,7 +998,7 @@ espi_oob_tx(mmio_reg_block_t block, uint8_t *buf, size_t *lenp)
 			towrite -= l;
 		}
 
-		if ((ret = espi_submit(block)) != 0)
+		if ((ret = kespi_submit(block)) != 0)
 			break;
 
 		len -= sendlen;
@@ -1015,7 +1016,7 @@ espi_oob_tx(mmio_reg_block_t block, uint8_t *buf, size_t *lenp)
  * is set before calling this.
  */
 static void
-espi_oob_rx_one(mmio_reg_block_t block)
+kespi_oob_rx_one(mmio_reg_block_t block)
 {
 	mmio_reg_t intsts = FCH_ESPI_S0_INT_STS_MMIO(block);
 	mmio_reg_t hdr0 = FCH_ESPI_UP_RXHDR0_MMIO(block);
@@ -1023,7 +1024,7 @@ espi_oob_rx_one(mmio_reg_block_t block)
 	uint32_t val0, val1;
 	size_t len;
 
-	VERIFY3U(espi_oob_bounce.eob_pos, ==, espi_oob_bounce.eob_len);
+	VERIFY3U(kespi_oob_bounce.eob_pos, ==, kespi_oob_bounce.eob_len);
 
 	val0 = mmio_reg_read(hdr0);
 	val1 = mmio_reg_read(hdr1);
@@ -1036,7 +1037,7 @@ espi_oob_rx_one(mmio_reg_block_t block)
 	len = FCH_ESPI_UP_RXHDR1_GET_HDATA5(val1);
 
 	if (standalone == 0) {
-		DTRACE_PROBE3(espi__rx, size_t, len, uint32_t, val0,
+		DTRACE_PROBE3(kespi__rx, size_t, len, uint32_t, val0,
 		    uint32_t, val1);
 	}
 
@@ -1048,12 +1049,12 @@ espi_oob_rx_one(mmio_reg_block_t block)
 
 	VERIFY3U(len, <=, ESPI_OOB_BOUNCE_BUFSZ);
 
-	bzero(espi_oob_bounce.eob_buf, ESPI_OOB_BOUNCE_BUFSZ);
-	espi_oob_bounce.eob_pos = 0;
-	espi_oob_bounce.eob_len = len;
+	bzero(kespi_oob_bounce.eob_buf, ESPI_OOB_BOUNCE_BUFSZ);
+	kespi_oob_bounce.eob_pos = 0;
+	kespi_oob_bounce.eob_len = len;
 
 	mmio_reg_t data = FCH_ESPI_UP_RXDATA_PORT_MMIO(block);
-	uint8_t *dst = espi_oob_bounce.eob_buf;
+	uint8_t *dst = kespi_oob_bounce.eob_buf;
 
 	while (len > 0) {
 		uint32_t val;
@@ -1073,7 +1074,7 @@ espi_oob_rx_one(mmio_reg_block_t block)
 }
 
 int
-espi_oob_rx(mmio_reg_block_t block, uint8_t *buf, size_t *buflen)
+kespi_oob_rx(mmio_reg_block_t block, uint8_t *buf, size_t *buflen)
 {
 	mmio_reg_t intsts = FCH_ESPI_S0_INT_STS_MMIO(block);
 	uint32_t val;
@@ -1083,9 +1084,9 @@ espi_oob_rx(mmio_reg_block_t block, uint8_t *buf, size_t *buflen)
 	 * any in the bounce buffer.
 	 */
 	if (buf == NULL) {
-		bzero(espi_oob_bounce.eob_buf, ESPI_OOB_BOUNCE_BUFSZ);
-		espi_oob_bounce.eob_pos = 0;
-		espi_oob_bounce.eob_len = 0;
+		bzero(kespi_oob_bounce.eob_buf, ESPI_OOB_BOUNCE_BUFSZ);
+		kespi_oob_bounce.eob_pos = 0;
+		kespi_oob_bounce.eob_len = 0;
 
 		for (;;) {
 			mmio_reg_t hdr0 = FCH_ESPI_UP_RXHDR0_MMIO(block);
@@ -1112,15 +1113,15 @@ espi_oob_rx(mmio_reg_block_t block, uint8_t *buf, size_t *buflen)
 		 * Serve any data remaining in the bounce buffer from a
 		 * previous read.
 		 */
-		if (espi_oob_bounce.eob_pos < espi_oob_bounce.eob_len) {
-			size_t avail = espi_oob_bounce.eob_len -
-			    espi_oob_bounce.eob_pos;
+		if (kespi_oob_bounce.eob_pos < kespi_oob_bounce.eob_len) {
+			size_t avail = kespi_oob_bounce.eob_len -
+			    kespi_oob_bounce.eob_pos;
 			size_t n = MIN(avail, space);
 
 			bcopy(
-			    &espi_oob_bounce.eob_buf[espi_oob_bounce.eob_pos],
+			    &kespi_oob_bounce.eob_buf[kespi_oob_bounce.eob_pos],
 			    buf, n);
-			espi_oob_bounce.eob_pos += n;
+			kespi_oob_bounce.eob_pos += n;
 			buf += n;
 			space -= n;
 			accum += n;
@@ -1136,7 +1137,7 @@ espi_oob_rx(mmio_reg_block_t block, uint8_t *buf, size_t *buflen)
 		if (FCH_ESPI_S0_INT_STS_GET_RXOOB(val) == 0)
 			break;
 
-		espi_oob_rx_one(block);
+		kespi_oob_rx_one(block);
 	}
 
 	*buflen = accum;
