@@ -115,6 +115,12 @@ typedef struct oxide_board_data {
 	 */
 	const oxide_espi_role_t	obd_espi[OXIDE_BOARD_ESPI];
 	/*
+	 * The size in bytes of the flash attached to the target behind each
+	 * eSPI controller, indexed by controller number, or 0 if it is not
+	 * known. eSPI provides no way to discover this.
+	 */
+	const uint64_t		obd_espi_flash_size[OXIDE_BOARD_ESPI];
+	/*
 	 * Specifies whether the APOB blob should be sent down to the SP over
 	 * IPCC. These data can be used for Enhanced Memory Context Restore
 	 * (eMCR) to speed up memory training on subsequent boots.

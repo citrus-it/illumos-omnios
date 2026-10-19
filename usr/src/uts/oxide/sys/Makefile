@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2019 Joyent, Inc.
-# Copyright 2022 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 # uts/oxide/sys/Makefile
 #
@@ -46,6 +46,7 @@ HDRS=  \
 	ddi_subrdefs.h	\
 	debug_info.h	\
 	espi_ctl.h	\
+	espi_flash.h	\
 	ipcc.h		\
 	mach_mmu.h	\
 	machclock.h	\

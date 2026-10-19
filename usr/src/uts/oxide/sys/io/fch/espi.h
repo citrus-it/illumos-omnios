@@ -123,6 +123,13 @@ MAKE_MMIO_FCH_REG_FN(ESPI, espi, 4);
 #define	FCH_ESPI_DN_TXHDR0_GET_HDATA0(r)		bitx32(r, 15, 8)
 #define	FCH_ESPI_DN_TXHDR0_SET_HDATA0(r, v)		bitset32(r, 15, 8, v)
 
+/*
+ * PUT_FLASH_NP_TRAN_ACTIVE is set while a PUT_FLASH_NP issued through these
+ * registers is outstanding. If the target defers the request, DNCMD_STATUS
+ * clears when the command has been sent but this bit stays set until the
+ * deferred completion has been received.
+ */
+#define	FCH_ESPI_DN_TXHDR0_GET_PUT_FLASH_NP_TRAN_ACTIVE(r)	bitx32(r, 4, 4)
 #define	FCH_ESPI_DN_TXHDR0_GET_DNCMD_STATUS(r)		bitx32(r, 3, 3)
 #define	FCH_ESPI_DN_TXHDR0_SET_DNCMD_STATUS(r, v)	bitset32(r, 3, 3, v)
 #define	FCH_ESPI_DN_TXHDR0_GET_DNCMD_TYPE(r)		bitx32(r, 2, 0)

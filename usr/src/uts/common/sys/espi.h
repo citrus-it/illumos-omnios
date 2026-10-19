@@ -29,6 +29,14 @@ extern "C" {
 #endif
 
 /*
+ * Channel numbers.
+ */
+#define	ESPI_CHAN_PERIPH	0
+#define	ESPI_CHAN_VW		1
+#define	ESPI_CHAN_OOB		2
+#define	ESPI_CHAN_FLASH		3
+
+/*
  * Cycle types.
  */
 
@@ -53,6 +61,22 @@ extern "C" {
 #define	ESPI_CYCLE_FLASH_READ			0x0
 #define	ESPI_CYCLE_FLASH_WRITE			0x1
 #define	ESPI_CYCLE_FLASH_ERASE			0x2
+
+/*
+ * The length field of a flash request is 12 bits. For a read or a write it is
+ * a byte count. For an erase it instead encodes the size of the block to
+ * erase, with different encodings for target attached and controller attached
+ * flash (specification Table 17).
+ */
+#define	ESPI_FLASH_LEN_MAX			0xfff
+#define	ESPI_FLASH_ERASE_LEN_TAF_4K		0
+#define	ESPI_FLASH_ERASE_LEN_TAF_32K		1
+#define	ESPI_FLASH_ERASE_LEN_TAF_64K		2
+#define	ESPI_FLASH_ERASE_LEN_TAF_128K		3
+#define	ESPI_FLASH_ERASE_LEN_CAF_4K		1
+#define	ESPI_FLASH_ERASE_LEN_CAF_64K		2
+#define	ESPI_FLASH_ERASE_LEN_CAF_128K		4
+#define	ESPI_FLASH_ERASE_LEN_CAF_256K		5
 
 /*
  * Completion cycle types, other than a successful completion without data,
