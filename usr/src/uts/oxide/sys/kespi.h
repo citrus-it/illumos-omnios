@@ -13,8 +13,8 @@
  * Copyright 2025 Oxide Computer Company
  */
 
-#ifndef _SYS_ESPI_IMPL_H
-#define	_SYS_ESPI_IMPL_H
+#ifndef _SYS_KESPI_H
+#define	_SYS_KESPI_H
 
 /*
  * Declarations for the Oxide eSPI polling kernel implementation.
@@ -35,21 +35,21 @@ extern "C" {
  */
 #define	ESPI_CFG_INVAL32	UINT32_MAX
 
-extern int espi_init(mmio_reg_block_t);
-extern uint32_t espi_intstatus(mmio_reg_block_t);
-extern int espi_acquire(mmio_reg_block_t);
-extern void espi_release(mmio_reg_block_t);
-extern uint32_t espi_get_configuration(mmio_reg_block_t, uint16_t);
-extern int espi_set_configuration(mmio_reg_block_t, uint16_t, uint32_t);
+extern int kespi_init(mmio_reg_block_t);
+extern uint32_t kespi_intstatus(mmio_reg_block_t);
+extern int kespi_acquire(mmio_reg_block_t);
+extern void kespi_release(mmio_reg_block_t);
+extern uint32_t kespi_get_configuration(mmio_reg_block_t, uint16_t);
+extern int kespi_set_configuration(mmio_reg_block_t, uint16_t, uint32_t);
 
-extern bool espi_oob_readable(mmio_reg_block_t);
-extern bool espi_oob_writable(mmio_reg_block_t);
-extern void espi_oob_flush(mmio_reg_block_t);
-extern int espi_oob_tx(mmio_reg_block_t, uint8_t *, size_t *);
-extern int espi_oob_rx(mmio_reg_block_t, uint8_t *, size_t *);
+extern bool kespi_oob_readable(mmio_reg_block_t);
+extern bool kespi_oob_writable(mmio_reg_block_t);
+extern void kespi_oob_flush(mmio_reg_block_t);
+extern int kespi_oob_tx(mmio_reg_block_t, uint8_t *, size_t *);
+extern int kespi_oob_rx(mmio_reg_block_t, uint8_t *, size_t *);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _SYS_ESPI_IMPL_H */
+#endif /* _SYS_KESPI_H */

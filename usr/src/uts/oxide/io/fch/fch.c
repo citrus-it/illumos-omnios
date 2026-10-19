@@ -661,6 +661,7 @@
 #include <sys/amdzen/fch.h>
 #include <sys/amdzen/fch/gpio.h>
 #include <sys/amdzen/fch/iomux.h>
+#include <sys/io/fch/espi.h>
 #include <sys/io/fch/i2c.h>
 #include <sys/io/fch/i3c.h>
 #include <sys/io/fch/ixbar.h>
@@ -1231,6 +1232,48 @@ DECL_I3C(2, 0x72);
 DECL_I3C(3, 0x73);
 
 /*
+ * eSPI controllers. Huashan has one and Songshan and Kunlun have two. Their
+ * registers live in the SPI region set by FCH::LPCPCICFG::SPI_BASE_ADDR, which
+ * we assume is at its reset value. The controller's interrupt source is not
+ * yet known and so none is given.
+ */
+static const fch_rangespec_t espi0_regs[] = {
+	{
+		.fr_addrsp = FA_MMIO,
+		.fr_physlo = FCH_ESPI_PHYS_BASE - ZEN_PHYSADDR_COMPAT_MMIO,
+		.fr_sizelo = FCH_ESPI_SIZE
+	}
+};
+
+static const fch_rangespec_t espi1_regs[] = {
+	{
+		.fr_addrsp = FA_MMIO,
+		.fr_physlo = FCH_ESPI_PHYS_BASE + FCH_ESPI_PHYS_STEP -
+		    ZEN_PHYSADDR_COMPAT_MMIO,
+		.fr_sizelo = FCH_ESPI_SIZE
+	}
+};
+
+#define	DECL_ESPI(n)	\
+static const fch_child_def_t espi ## n ## _def = {	\
+	.fcd_ndis = {					\
+		.ncd_nodename = "espi",			\
+		.ncd_unit_addr = (n),			\
+		.ncd_private = &espi ## n ## _def	\
+	},						\
+	.fcd_desc = "eSPI Controller",			\
+	.fcd_flags = FCF_PRIMARY,			\
+	.fcd_intr = {					\
+		.fi_src = FCH_INTRSRC_NONE		\
+	},						\
+	.fcd_nregs = ARRAY_SIZE(espi ## n ## _regs),	\
+	.fcd_regs = espi ## n ## _regs			\
+}
+
+DECL_ESPI(0);
+DECL_ESPI(1);
+
+/*
  * There are additional peripherals that exist in the FCH, most notably an SD
  * controller, an eMMC controller, and an SMBus controller.  There is also an
  * LPC bridge in Huashan that is physically part of the FCH but looks like a PCI
@@ -1257,7 +1300,8 @@ static const ndis_child_def_t *const huashan_children[] = {
 	&i2c2_def.fcd_ndis,
 	&i2c3_def.fcd_ndis,
 	&i2c4_def.fcd_ndis,
-	&i2c5_def.fcd_ndis
+	&i2c5_def.fcd_ndis,
+	&espi0_def.fcd_ndis
 };
 
 static const ndis_child_def_t *const songshan_children[] = {
@@ -1275,7 +1319,9 @@ static const ndis_child_def_t *const songshan_children[] = {
 	&i3c0_def.fcd_ndis,
 	&i3c1_def.fcd_ndis,
 	&i3c2_def.fcd_ndis,
-	&i3c3_def.fcd_ndis
+	&i3c3_def.fcd_ndis,
+	&espi0_def.fcd_ndis,
+	&espi1_def.fcd_ndis
 };
 
 static const ndis_child_def_t *const kunlun_children[] = {
@@ -1293,7 +1339,9 @@ static const ndis_child_def_t *const kunlun_children[] = {
 	&i3c0_def.fcd_ndis,
 	&i3c1_def.fcd_ndis,
 	&i3c2_def.fcd_ndis,
-	&i3c3_def.fcd_ndis
+	&i3c3_def.fcd_ndis,
+	&espi0_def.fcd_ndis,
+	&espi1_def.fcd_ndis
 };
 
 static const fch_def_t fch_defs[] = {
