@@ -120,7 +120,8 @@ firmware images or slot information is reported. For each firmware image
 on the device, each slot is displayed along with information about the
 slot's version and attributes.
 .sp
-For \fBespi_flash\fR devices, flash reached over an eSPI flash access channel,
+For \fBespi_flash\fR(4D) devices, flash reached over an eSPI flash access
+channel,
 the size of the flash, where it is known, and the request and erase block
 sizes that the channel supports are displayed. When such a device is flashed,
 the image is written from the start of the flash and only the erase blocks
@@ -415,6 +416,7 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
+.BR espi_flash (4D),
 .BR hermon (4D),
 .BR ses (4D),
 .BR tavor (4D),

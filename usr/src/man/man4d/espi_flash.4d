@@ -1,0 +1,174 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2026 Oxide Computer Company
+.\"
+.Dd October 19, 2026
+.Dt ESPI_FLASH 4D
+.Os
+.Sh NAME
+.Nm espi_flash
+.Nd eSPI flash access channel driver
+.Sh SYNOPSIS
+.Pa /devices/kunlun@0,0/espi@1/espi_flash@3:flash
+.Pp
+.In sys/espi_flash.h
+.Sh DESCRIPTION
+The
+.Nm
+driver provides access to a flash device that is attached to an eSPI target
+and reached over the flash access channel of an eSPI controller.
+It attaches as a child of
+.Xr espi 4D
+when the controller's target has flash attached to it and the channel has been
+enabled.
+.Pp
+The device is a character special file.
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr pread 2
+and
+.Xr pwrite 2
+transfer data at the file offset, which is the address within the flash.
+Transfers of any size and alignment are accepted and are divided by the driver
+into the requests that the eSPI link allows.
+.Pp
+The driver does not erase the flash before writing to it.
+As is usual for NOR flash, the blocks to be written must first be erased with
+the
+.Dv ESPI_FLASH_IOC_ERASE
+ioctl, and the data read back afterwards to verify it.
+The target may refuse to write or erase the flash, for example until the
+service processor permits it, in which case the operation fails with
+.Er EIO .
+.Pp
+The size of the flash is not reported by eSPI.
+When the platform supplies it, reads stop at the end of the flash, writes that
+start at or beyond it fail with
+.Er ENOSPC ,
+and the device registers with the
+.Xr ufm 4D
+framework so that its contents can be read with tools such as
+.Xr fwflash 8 .
+When the size is not known the whole 32-bit eSPI flash address space is
+accessible and no UFM image is registered.
+.Pp
+The device may be opened with
+.Dv O_EXCL
+to prevent other opens while the flash is being reprogrammed.
+.Sh IOCTLS
+The ioctls are defined in
+.In sys/espi_flash.h .
+.Bl -tag -width Dv
+.It Dv ESPI_FLASH_IOC_INFO
+Describes the device.
+The argument is a pointer to an
+.Vt espi_flash_info_t
+which is filled in by the driver:
+.Bd -literal
+typedef struct espi_flash_info {
+	uint64_t	efi_size;
+	uint32_t	efi_payload;
+	uint32_t	efi_maxread;
+	uint32_t	efi_erase_sizes;
+	uint32_t	efi_pad;
+} espi_flash_info_t;
+.Ed
+.Pp
+.Fa efi_size
+is the size of the flash in bytes, or 0 if it is not known.
+.Fa efi_payload
+and
+.Fa efi_maxread
+are the largest number of bytes that a single write request and a single read
+request on the eSPI link may carry.
+Transfers that are multiples of these sizes and aligned to them are the most
+efficient.
+.Fa efi_erase_sizes
+has bit
+.Em n
+set if the target has advertised that blocks of 2^n KiB can be erased.
+If it is 0 the target advertised no erase block sizes and the driver accepts
+any that the eSPI protocol can request.
+.It Dv ESPI_FLASH_IOC_ERASE
+Erases one block of the flash.
+The file descriptor must be open for writing.
+The argument is a pointer to an
+.Vt espi_flash_erase_t :
+.Bd -literal
+typedef struct espi_flash_erase {
+	uint64_t	efe_offset;
+	uint64_t	efe_length;
+} espi_flash_erase_t;
+.Ed
+.Pp
+.Fa efe_length
+is the size of the block and must be one of 4 KiB, 32 KiB, 64 KiB or 128 KiB,
+which are the sizes that the eSPI protocol can request, and, if the target
+advertised erase block sizes, one of those.
+.Fa efe_offset
+is the address of the block and must be a multiple of
+.Fa efe_length .
+.El
+.Sh ARCHITECTURE
+The
+.Nm
+driver is only available on the oxide platform.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /platform/oxide/kernel/drv/amd64/espi_flash
+64-bit AMD64 ELF kernel driver
+.El
+.Sh ERRORS
+On failure,
+.Va errno
+is set to indicate the error.
+The more common errors are listed below.
+.Bl -tag -width Er
+.It Er EBADF
+.Dv ESPI_FLASH_IOC_ERASE
+was requested on a file descriptor that is not open for writing.
+.It Er EBUSY
+The device is already open and
+.Dv O_EXCL
+was requested, or it is open with
+.Dv O_EXCL ,
+or the eSPI controller could not accept a request.
+.It Er EFAULT
+The driver could not copy data to or from the address space of the calling
+process.
+.It Er EINVAL
+The erase block size is not one that can be requested, the block is not
+aligned to its size, or it lies outside the flash.
+.It Er EIO
+The target reported that it could not complete a request, or the data it
+returned did not match what was asked for.
+.It Er ENOSPC
+A write starts at or beyond the end of the flash.
+.It Er ENOTSUP
+The erase block size is not one that the target advertised.
+.It Er ENXIO
+The device does not exist or the flash access channel is not enabled.
+.It Er ETIMEDOUT
+The target did not complete a request in time.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh SEE ALSO
+.Xr ioctl 2 ,
+.Xr open 2 ,
+.Xr pread 2 ,
+.Xr pwrite 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr espi 4D ,
+.Xr ufm 4D ,
+.Xr fwflash 8

@@ -1,0 +1,158 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2026 Oxide Computer Company
+.\"
+.Dd October 19, 2026
+.Dt ESPI 4D
+.Os
+.Sh NAME
+.Nm espi
+.Nd AMD FCH eSPI controller nexus driver
+.Sh SYNOPSIS
+.Pa /devices/kunlun@0,0/espi@0
+.Pa /devices/kunlun@0,0/espi@1
+.Sh DESCRIPTION
+The
+.Nm
+driver attaches to the Enhanced Serial Peripheral Interface
+.Pq eSPI
+controllers in the Fusion Controller Hub
+.Pq FCH
+of AMD Zen processors.
+The controllers appear as children of the FCH node, which is named after the
+FCH model
+.Pq huashan, songshan or kunlun ,
+with the controller number as the unit address.
+.Pp
+An eSPI controller communicates with a single target device over up to four
+channels.
+These are the peripheral channel, the virtual wire channel, the out-of-band
+message channel and the flash access channel.
+The
+.Nm
+driver is a nexus driver.
+Its children are the drivers for the channels that the controller's target
+provides, and each child has the channel number as its unit address.
+.Pp
+The board's platform data determines how each controller is used.
+A controller that connects the processor to the service processor is used by
+the operating system itself from early in boot, and the
+.Nm
+driver attaches to it passively.
+In that mode it maps the controller's registers and reports its state, but
+issues no commands and has no children.
+A controller that the platform data assigns to this driver is reset and
+configured by it.
+The controller's pins are first set to their eSPI functions.
+The target is reset in band and its capabilities read, the link parameters
+.Pq I/O mode, clock frequency and CRC
+are negotiated, the virtual wire channel is enabled and the platform reset
+virtual wire is deasserted, and the flash access channel is enabled if the
+target has flash attached to it.
+A controller with no target behind it does not attach.
+.Pp
+The following children may be created:
+.Bl -tag -width "espi_flash(4D)"
+.It Xr espi_flash 4D
+Provides access to a flash device attached to the target over the flash access
+channel.
+It is created only when that channel was enabled.
+.El
+.Sh PROPERTIES
+The driver records what it finds out about the controller, the link and the
+target as properties on its node, which can be read with
+.Xr prtconf 8 .
+They are informational and cannot be set.
+.Bl -tag -width Sy
+.It Sy espi-role
+How the platform uses the controller, one of
+.Sy ipcc ,
+.Sy nexus
+or
+.Sy none .
+.It Sy espi-mode
+Either
+.Sy passive
+or
+.Sy owner ,
+as described above.
+.It Sy controller-version
+The version of the eSPI specification that the controller implements.
+.It Sy controller-channels
+The channels that the controller supports, from
+.Sy peripheral ,
+.Sy vwire ,
+.Sy oob
+and
+.Sy flash .
+.It Sy init-status
+How far the controller's own hardware initialisation sequence got, which
+applies to the controller that the system booted through.
+It is
+.Sy idle
+for a controller the firmware did not initialise and
+.Sy complete
+for one it did, and otherwise names the step at which the sequence stopped.
+.It Sy io-mode
+The I/O mode in use on the link, one of
+.Sy single ,
+.Sy dual
+or
+.Sy quad .
+.It Sy clock-frequency
+The link clock frequency in Hz.
+.It Sy crc-enabled
+Whether CRC checking is enabled on the link.
+.It Sy alert-mode
+How the target signals alerts, either
+.Sy in-band
+or
+.Sy pin .
+.It Sy enabled-channels
+The channels that are enabled in the controller.
+.It Sy pins-muxed
+Whether all of the controller's pins are set to their eSPI functions.
+The driver sets them in owner mode and only checks them in passive mode.
+The property is absent when the driver has no pin data for the processor.
+.El
+.Pp
+When the driver has configured a target itself, it also records:
+.Bl -tag -width Sy
+.It Sy target-version
+The version of the eSPI specification that the target implements.
+.It Sy target-channels
+The channels that the target supports.
+.It Sy flash-payload , flash-max-read
+The largest number of bytes in a single flash write request and a single
+flash read request.
+.It Sy flash-erase-sizes
+The erase block sizes that the target advertised, with bit
+.Em n
+set for 2^n KiB blocks.
+.El
+.Sh ARCHITECTURE
+The
+.Nm
+driver is only available on the oxide platform.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /platform/oxide/kernel/drv/amd64/espi
+64-bit AMD64 ELF kernel driver
+.El
+.Sh SEE ALSO
+.Xr espi_flash 4D
+.Rs
+.%Q Intel Corporation
+.%T Enhanced Serial Peripheral Interface (eSPI) Interface Base Specification (for Client and Server Platforms)
+.%N 327432-005 Revision 1.5
+.%D May 2022
+.Re
