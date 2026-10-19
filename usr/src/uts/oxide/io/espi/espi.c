@@ -68,6 +68,30 @@
  * ready, and enabling it in the controller. A target that gives no response to
  * GET_CONFIGURATION is taken to be absent, which the specification says is not
  * an error during initialisation.
+ *
+ * Flash Access Channel
+ *
+ * We support only target attached flash sharing, in which the flash is behind
+ * the target and the controller asks for reads, writes and erases with
+ * PUT_FLASH_NP requests, following the sequences in PPR Vol 7 14.1.10.1.8.3-5.
+ * A request is non-posted. The target may answer it in the response phase of
+ * the command itself or, more usually, defer it and raise an alert once the
+ * completion is ready, whereupon the controller fetches the completion itself
+ * with GET_FLASH_C. Either way the completion header lands in
+ * FCH::ITF::ESPI::UP_RXHDR_0 and any data in the upstream FIFO, and
+ * DN_TXHDR_0th[PUT_FLASH_NP_TRAN_ACTIVE] remains set until the request has
+ * been answered. Only one request is outstanding at a time. The functions
+ * exported to the child driver for the channel split larger transfers up so
+ * that no request crosses a boundary of the negotiated maximum size.
+ *
+ * Children
+ *
+ * The children of this nexus are static and managed with the ndi_static
+ * helper. There is one potential child per channel, named for the channel and
+ * with the channel number as its unit address, and a child exists on an
+ * instance only if the channel was enabled during link initialisation. The
+ * child drivers reach the controller through the espi_c_* functions declared in
+ * espi_client.h, which find the controller from the child's dev_info_t.
  */
 
 #include <sys/types.h>
@@ -85,11 +109,14 @@
 #include <sys/cpuvar.h>
 #include <sys/x86_archext.h>
 #include <sys/platform_detect.h>
+#include <sys/ndi_static.h>
 #include <sys/espi.h>
 #include <sys/amdzen/mmioreg.h>
 #include <sys/amdzen/fch/iomux.h>
 #include <sys/io/turin/iomux.h>
 #include <sys/io/fch/espi.h>
+
+#include "espi_client.h"
 
 typedef enum espi_mode {
 	ESPI_M_PASSIVE,
@@ -138,6 +165,13 @@ typedef struct espi {
 	uint32_t		en_gen_cap;
 	uint32_t		en_chan_cap[4];
 	espi_flash_t		en_flash;
+	/*
+	 * The tag given to the next flash request. Tags are only used to match
+	 * completions to requests, and with one request outstanding at a time
+	 * any sequence will do.
+	 */
+	uint8_t			en_flash_tag;
+	ndis_t			*en_ndis;
 } espi_t;
 
 static void *espi_state;
@@ -150,13 +184,15 @@ static void *espi_state;
  * state can be examined. The remainder bound how long we wait for the
  * controller, and set the fastest link parameters we will negotiate. The PPR
  * notes that 66 MHz operation depends heavily on board loading and recommends
- * 33 MHz.
+ * 33 MHz. A deferred flash completion takes as long as the flash operation
+ * behind it, so it has its own, longer, limit.
  */
 uint_t espi_force_owner = 0;
 uint_t espi_force_passive = 0;
 uint_t espi_cmd_spins = 20;
 uint_t espi_cmd_retries = 100;
 uint_t espi_cmd_delay_us = 1000;
+uint_t espi_flash_cpl_retries = 5000;
 uint_t espi_max_freq = ESPI_REG_GEN_CAP_FREQ_33MHZ;
 uint_t espi_max_iomode = ESPI_REG_GEN_CAP_IOMODE_QUAD;
 
@@ -1062,11 +1098,21 @@ espi_flash_enable(espi_t *en)
 		return (ret);
 	}
 
+	/*
+	 * Allow the target to answer a PUT_FLASH_NP either way, with the
+	 * completion header and data in the response phase, or with a deferral
+	 * followed by a completion that the controller collects with
+	 * GET_FLASH_C. These are the reset defaults, set here so that we do
+	 * not depend on them.
+	 */
 	reg = FCH_ESPI_S0_CONFIG_MMIO(en->en_regs);
 	val = espi_read(reg);
 	val = FCH_ESPI_S0_CONFIG_SET_FLASH_SHARING_MODE(val,
 	    FCH_ESPI_S0_CONFIG_FLASH_SHARING_SAFS);
 	val = FCH_ESPI_S0_CONFIG_SET_FLASH_MPS(val, payload);
+	val = FCH_ESPI_S0_CONFIG_SET_SAFS_DEFER_VALID_EN(val, 1);
+	val = FCH_ESPI_S0_CONFIG_SET_PUT_FLASH_NP_HDR_EN(val, 1);
+	val = FCH_ESPI_S0_CONFIG_SET_PUT_FLASH_NP_HDR_DATA_EN(val, 1);
 	val = FCH_ESPI_S0_CONFIG_SET_FLASH_EN(val, 1);
 	espi_write(reg, val);
 
@@ -1135,6 +1181,444 @@ espi_owner_init(espi_t *en)
 out:
 	espi_sem_release(en);
 	mutex_exit(&en->en_lock);
+}
+
+/*
+ * Flash Access Channel
+ */
+
+/*
+ * Wait until a flash request can be issued. That requires the register
+ * interface to be idle, no earlier request to be outstanding, and the target
+ * to have room for a request, which it reports in the status returned with
+ * every response and the controller records in MISC_CTL0.
+ */
+static int
+espi_flash_wait_ready(espi_t *en)
+{
+	const mmio_reg_t hdr0 = FCH_ESPI_DN_TXHDR0_MMIO(en->en_regs);
+	const mmio_reg_t misc = FCH_ESPI_MISC_CTL0_MMIO(en->en_regs);
+
+	ASSERT(MUTEX_HELD(&en->en_lock));
+
+	for (uint_t i = 0; i < espi_cmd_retries; i++) {
+		const uint32_t h = espi_read(hdr0);
+		const uint32_t m = espi_read(misc);
+
+		if (FCH_ESPI_DN_TXHDR0_GET_DNCMD_STATUS(h) == 0 &&
+		    FCH_ESPI_DN_TXHDR0_GET_PUT_FLASH_NP_TRAN_ACTIVE(h) == 0 &&
+		    FCH_ESPI_MISC_CTL0_GET_FLASH_NP_FREE(m) == 1) {
+			return (0);
+		}
+		espi_pause(i);
+	}
+
+	return (EBUSY);
+}
+
+/*
+ * Wait for a flash completion to arrive in the upstream header register,
+ * watching for errors meanwhile.
+ */
+static int
+espi_flash_wait_cpl(espi_t *en, uint32_t *rx0p)
+{
+	const mmio_reg_t ists = FCH_ESPI_S0_INT_STS_MMIO(en->en_regs);
+	const mmio_reg_t rxh0 = FCH_ESPI_UP_RXHDR0_MMIO(en->en_regs);
+
+	for (uint_t i = 0; i < espi_flash_cpl_retries; i++) {
+		const uint32_t rx0 = espi_read(rxh0);
+		int err;
+
+		if (FCH_ESPI_UP_RXHDR0_GET_UPCMD_STAT(rx0) == 1) {
+			*rx0p = rx0;
+			return (0);
+		}
+
+		if ((err = espi_intsts_error(espi_read(ists))) != 0)
+			return (err);
+
+		espi_pause(i);
+	}
+
+	return (ETIMEDOUT);
+}
+
+/*
+ * Wait for an outstanding flash request to be retired by the controller once
+ * its completion has been dealt with.
+ */
+static int
+espi_flash_wait_done(espi_t *en)
+{
+	const mmio_reg_t hdr0 = FCH_ESPI_DN_TXHDR0_MMIO(en->en_regs);
+
+	for (uint_t i = 0; i < espi_cmd_retries; i++) {
+		const uint32_t h = espi_read(hdr0);
+
+		if (FCH_ESPI_DN_TXHDR0_GET_PUT_FLASH_NP_TRAN_ACTIVE(h) == 0)
+			return (0);
+		espi_pause(i);
+	}
+
+	return (ETIMEDOUT);
+}
+
+/*
+ * Take len bytes of completion data out of the upstream FIFO, which is read a
+ * doubleword at a time with the first byte in the low bits, and store as much
+ * of it as fits in buf. The FIFO must be drained whether or not the data is
+ * wanted.
+ */
+static void
+espi_flash_rx_data(espi_t *en, uint8_t *buf, size_t buflen, size_t len)
+{
+	const mmio_reg_t port = FCH_ESPI_UP_RXDATA_PORT_MMIO(en->en_regs);
+
+	for (size_t off = 0; off < len; off += sizeof (uint32_t)) {
+		const uint32_t val = espi_read(port);
+
+		if (off < buflen) {
+			bcopy(&val, buf + off,
+			    MIN(MIN(len, buflen) - off, sizeof (val)));
+		}
+	}
+}
+
+/*
+ * Issue one flash request and collect its completion. For a read, rbuf
+ * receives len bytes. For a write, wbuf supplies len bytes. For an erase, len
+ * is the block size encoding and both buffers are NULL. The caller must hold
+ * the lock and the semaphore.
+ *
+ * The completion of a read may arrive in several parts. We only ask for as
+ * much as fits in one completion, but handle a target that splits anyway. An
+ * unsuccessful completion, which is how the target refuses a write or erase it
+ * will not perform, is reported as EIO. Whatever happens, the FIFO is drained
+ * and the upstream header register released, so that the controller is left
+ * usable.
+ */
+static int
+espi_flash_cmd(espi_t *en, uint8_t cycle, uint32_t addr, uint32_t len,
+    const uint8_t *wbuf, uint8_t *rbuf)
+{
+	const mmio_reg_t hdr0 = FCH_ESPI_DN_TXHDR0_MMIO(en->en_regs);
+	const mmio_reg_t hdr1 = FCH_ESPI_DN_TXHDR1_MMIO(en->en_regs);
+	const mmio_reg_t hdr2 = FCH_ESPI_DN_TXHDR2_MMIO(en->en_regs);
+	const mmio_reg_t txd = FCH_ESPI_DN_TXDATA_PORT_MMIO(en->en_regs);
+	const mmio_reg_t rxh0 = FCH_ESPI_UP_RXHDR0_MMIO(en->en_regs);
+	const mmio_reg_t ists = FCH_ESPI_S0_INT_STS_MMIO(en->en_regs);
+	const size_t rbuflen = rbuf != NULL ? len : 0;
+	const uint8_t tag = en->en_flash_tag++ & 0xf;
+	uint32_t val0, val1;
+	size_t received = 0;
+	int ret;
+
+	ASSERT(MUTEX_HELD(&en->en_lock));
+	VERIFY3U(len, <=, ESPI_FLASH_LEN_MAX);
+
+	if ((ret = espi_flash_wait_ready(en)) != 0)
+		return (ret);
+
+	espi_intsts_clear(en);
+	espi_write(ists, FCH_ESPI_S0_INT_STS_CLEAR_FLASHREQ(0));
+
+	/*
+	 * Write data is loaded into the FIFO before the header, a doubleword at
+	 * a time with the first byte in the low bits.
+	 */
+	if (cycle == ESPI_CYCLE_FLASH_WRITE) {
+		for (size_t off = 0; off < len; off += sizeof (uint32_t)) {
+			uint32_t val = 0;
+
+			bcopy(wbuf + off, &val, MIN(len - off, sizeof (val)));
+			espi_write(txd, val);
+		}
+	}
+
+	val0 = FCH_ESPI_DN_TXHDR0_SET_DNCMD_TYPE(0,
+	    FCH_ESPI_DN_TXHDR0_TYPE_FLASH);
+	val0 = FCH_ESPI_DN_TXHDR0_SET_HDATA0(val0, cycle);
+	val0 = FCH_ESPI_DN_TXHDR0_SET_TAG(val0, tag);
+	val0 = FCH_ESPI_DN_TXHDR0_SET_LENH(val0, bitx32(len, 11, 8));
+	val0 = FCH_ESPI_DN_TXHDR0_SET_LENL(val0, bitx32(len, 7, 0));
+	espi_write(hdr0, val0);
+
+	/*
+	 * The address goes out most significant byte first.
+	 */
+	val1 = FCH_ESPI_DN_TXHDR1_SET_HDATA3(0, bitx32(addr, 31, 24));
+	val1 = FCH_ESPI_DN_TXHDR1_SET_HDATA4(val1, bitx32(addr, 23, 16));
+	val1 = FCH_ESPI_DN_TXHDR1_SET_HDATA5(val1, bitx32(addr, 15, 8));
+	val1 = FCH_ESPI_DN_TXHDR1_SET_HDATA6(val1, bitx32(addr, 7, 0));
+	espi_write(hdr1, val1);
+	espi_write(hdr2, 0);
+
+	DTRACE_PROBE3(espi__flash__req, espi_t *, en, uint32_t, val0,
+	    uint32_t, val1);
+
+	if ((ret = espi_cmd_submit(en, val0, true)) != 0)
+		return (ret);
+
+	for (;;) {
+		uint32_t rx0, cpl_len;
+		uint8_t type;
+		bool data = false, last = true;
+
+		if ((ret = espi_flash_wait_cpl(en, &rx0)) != 0)
+			break;
+
+		DTRACE_PROBE2(espi__flash__cpl, espi_t *, en, uint32_t, rx0);
+
+		type = FCH_ESPI_UP_RXHDR0_GET_HDATA0(rx0);
+		cpl_len = (FCH_ESPI_UP_RXHDR0_GET_LENH(rx0) << 8) |
+		    FCH_ESPI_UP_RXHDR0_GET_LENL(rx0);
+
+		switch (FCH_ESPI_UP_RXHDR0_GET_UPCMD_TYPE(rx0)) {
+		case FCH_ESPI_UP_RXHDR0_GET_UPCMD_TYPE_FLASH_C:
+		case FCH_ESPI_UP_RXHDR0_GET_UPCMD_TYPE_PUT_FLASH_NP:
+		case FCH_ESPI_UP_RXHDR0_GET_UPCMD_TYPE_GET_STATUS:
+			break;
+		default:
+			ret = EPROTO;
+			break;
+		}
+
+		if (FCH_ESPI_UP_RXHDR0_GET_TAG(rx0) != tag)
+			ret = EPROTO;
+
+		/*
+		 * A successful completion without data is a cycle type of its
+		 * own. The others carry the split completion position.
+		 */
+		if (type != ESPI_CYCLE_COMPLETION) {
+			const uint8_t split = ESPI_CYCLE_CPL_GET_SPLIT(type);
+
+			switch (ESPI_CYCLE_CPL_BASE(type)) {
+			case ESPI_CYCLE_COMPLETION_WITH_DATA:
+				data = true;
+				break;
+			case ESPI_CYCLE_UNSUCCESSFUL_COMPLETION:
+				if (ret == 0)
+					ret = EIO;
+				break;
+			default:
+				ret = EPROTO;
+				break;
+			}
+
+			last = split == ESPI_CYCLE_CPL_SPLIT_LAST ||
+			    split == ESPI_CYCLE_CPL_SPLIT_ONLY;
+		}
+
+		if (data) {
+			espi_flash_rx_data(en, rbuf + received,
+			    rbuflen > received ? rbuflen - received : 0,
+			    cpl_len);
+			received += cpl_len;
+		}
+
+		espi_write(rxh0, FCH_ESPI_UP_RXHDR0_CLEAR_UPCMD_STAT(0));
+		espi_write(ists, FCH_ESPI_S0_INT_STS_CLEAR_FLASHREQ(0));
+
+		if (ret != 0 || last)
+			break;
+	}
+
+	if (ret == 0)
+		ret = espi_flash_wait_done(en);
+
+	if (ret == 0 && cycle == ESPI_CYCLE_FLASH_READ && received != len)
+		ret = EIO;
+
+	return (ret);
+}
+
+/*
+ * Client Interface
+ *
+ * These are called by the drivers for our children, which identify themselves
+ * by their own dev_info_t.
+ */
+
+/*
+ * Find the controller for a child, checking that the child really is ours and
+ * is the one for the given channel.
+ */
+static espi_t *
+espi_c_lookup(dev_info_t *cdip, uint32_t chan)
+{
+	dev_info_t *pdip = ddi_get_parent(cdip);
+	const ndis_child_def_t *def;
+	espi_t *en;
+
+	if (pdip == NULL)
+		return (NULL);
+
+	en = ddi_get_soft_state(espi_state, ddi_get_instance(pdip));
+	if (en == NULL || en->en_dip != pdip)
+		return (NULL);
+
+	def = ndis_child_def(cdip);
+	if (def->ncd_unit_addr != chan)
+		return (NULL);
+
+	return (en);
+}
+
+int
+espi_c_flash_caps(dev_info_t *cdip, espi_flash_caps_t *caps)
+{
+	espi_t *en = espi_c_lookup(cdip, ESPI_CHAN_FLASH);
+	int ret = 0;
+
+	if (en == NULL)
+		return (ENXIO);
+
+	mutex_enter(&en->en_lock);
+	if (en->en_flash.ef_enabled) {
+		caps->efc_payload = en->en_flash.ef_payload;
+		caps->efc_maxread = en->en_flash.ef_maxread;
+		caps->efc_erase_sizes = en->en_flash.ef_erase_sizes;
+	} else {
+		ret = ENXIO;
+	}
+	mutex_exit(&en->en_lock);
+
+	return (ret);
+}
+
+/*
+ * Transfer data to or from the flash in requests no larger than the negotiated
+ * maximum, none of which crosses a boundary that is a multiple of that
+ * maximum. That keeps each request to a single completion and, for writes,
+ * within a flash page for the usual page sizes.
+ */
+static int
+espi_c_flash_xfer(dev_info_t *cdip, uint8_t cycle, uint32_t addr,
+    const uint8_t *wbuf, uint8_t *rbuf, size_t len)
+{
+	espi_t *en = espi_c_lookup(cdip, ESPI_CHAN_FLASH);
+	size_t off = 0;
+	uint32_t max;
+	int ret;
+
+	if (en == NULL)
+		return (ENXIO);
+	if (len == 0)
+		return (0);
+	if (len - 1 > UINT32_MAX - addr)
+		return (EINVAL);
+
+	mutex_enter(&en->en_lock);
+
+	if (!en->en_flash.ef_enabled) {
+		ret = ENXIO;
+		goto out;
+	}
+
+	max = cycle == ESPI_CYCLE_FLASH_READ ? en->en_flash.ef_maxread :
+	    en->en_flash.ef_payload;
+	VERIFY(ISP2(max));
+
+	if ((ret = espi_sem_acquire(en)) != 0)
+		goto out;
+
+	while (off < len) {
+		const uint32_t a = addr + off;
+		const uint32_t n = MIN(len - off, max - (a & (max - 1)));
+
+		ret = espi_flash_cmd(en, cycle, a, n,
+		    wbuf != NULL ? wbuf + off : NULL,
+		    rbuf != NULL ? rbuf + off : NULL);
+		if (ret != 0)
+			break;
+		off += n;
+	}
+
+	espi_sem_release(en);
+out:
+	mutex_exit(&en->en_lock);
+	return (ret);
+}
+
+int
+espi_c_flash_read(dev_info_t *cdip, uint32_t addr, void *buf, size_t len)
+{
+	return (espi_c_flash_xfer(cdip, ESPI_CYCLE_FLASH_READ, addr, NULL, buf,
+	    len));
+}
+
+int
+espi_c_flash_write(dev_info_t *cdip, uint32_t addr, const void *buf,
+    size_t len)
+{
+	return (espi_c_flash_xfer(cdip, ESPI_CYCLE_FLASH_WRITE, addr, buf, NULL,
+	    len));
+}
+
+/*
+ * Erase one block. The size must be one that the protocol can encode for
+ * target attached flash and, if the target advertised any erase block sizes,
+ * one of those. The PPR has the controller's watchdog disabled around an
+ * erase, as the operation can outlast it.
+ */
+int
+espi_c_flash_erase(dev_info_t *cdip, uint32_t addr, uint32_t size)
+{
+	const struct {
+		uint32_t	size;
+		uint8_t		code;
+	} sizes[] = {
+		{ 4 * 1024,	ESPI_FLASH_ERASE_LEN_TAF_4K },
+		{ 32 * 1024,	ESPI_FLASH_ERASE_LEN_TAF_32K },
+		{ 64 * 1024,	ESPI_FLASH_ERASE_LEN_TAF_64K },
+		{ 128 * 1024,	ESPI_FLASH_ERASE_LEN_TAF_128K }
+	};
+	espi_t *en = espi_c_lookup(cdip, ESPI_CHAN_FLASH);
+	mmio_reg_t reg;
+	uint32_t val;
+	uint_t i;
+	int ret;
+
+	if (en == NULL)
+		return (ENXIO);
+
+	for (i = 0; i < ARRAY_SIZE(sizes); i++) {
+		if (sizes[i].size == size)
+			break;
+	}
+	if (i == ARRAY_SIZE(sizes) || (addr & (size - 1)) != 0)
+		return (EINVAL);
+
+	mutex_enter(&en->en_lock);
+
+	if (!en->en_flash.ef_enabled) {
+		ret = ENXIO;
+		goto out;
+	}
+
+	if (en->en_flash.ef_erase_sizes != 0 &&
+	    (en->en_flash.ef_erase_sizes & (size >> 10)) == 0) {
+		ret = ENOTSUP;
+		goto out;
+	}
+
+	if ((ret = espi_sem_acquire(en)) != 0)
+		goto out;
+
+	reg = FCH_ESPI_GLOBAL_CTL0_MMIO(en->en_regs);
+	val = espi_read(reg);
+	espi_write(reg, FCH_ESPI_GLOBAL_CTL0_SET_WDG_EN(val, 0));
+
+	ret = espi_flash_cmd(en, ESPI_CYCLE_FLASH_ERASE, addr, sizes[i].code,
+	    NULL, NULL);
+
+	espi_write(reg, val);
+	espi_sem_release(en);
+out:
+	mutex_exit(&en->en_lock);
+	return (ret);
 }
 
 /*
@@ -1418,6 +1902,112 @@ espi_report(const espi_t *en)
 	}
 }
 
+/*
+ * Children
+ */
+
+static const ndis_child_def_t espi_child_flash = {
+	.ncd_nodename = "espi_flash",
+	.ncd_unit_addr = ESPI_CHAN_FLASH
+};
+
+static const ndis_child_def_t *const espi_children[] = {
+	&espi_child_flash
+};
+
+static bool
+espi_child_usable(void *arg, const ndis_child_def_t *def)
+{
+	const espi_t *en = arg;
+
+	if (en->en_mode != ESPI_M_OWNER)
+		return (false);
+
+	switch (def->ncd_unit_addr) {
+	case ESPI_CHAN_FLASH:
+		return (en->en_flash.ef_enabled);
+	default:
+		return (false);
+	}
+}
+
+/*
+ * The size of the flash behind this controller's target, from the board data,
+ * or 0 if it is not known.
+ */
+static uint64_t
+espi_flash_size(const espi_t *en)
+{
+	if (en->en_unit >= OXIDE_BOARD_ESPI)
+		return (0);
+
+	return (oxide_board_data->obd_espi_flash_size[en->en_unit]);
+}
+
+static int
+espi_child_init(void *arg, const ndis_child_def_t *def, dev_info_t *cdip)
+{
+	const espi_t *en = arg;
+
+	switch (def->ncd_unit_addr) {
+	case ESPI_CHAN_FLASH: {
+		const uint64_t size = espi_flash_size(en);
+
+		if (size != 0 && ndi_prop_update_int64(DDI_DEV_T_NONE, cdip,
+		    "flash-size", (int64_t)size) != DDI_PROP_SUCCESS) {
+			return (NDI_FAILURE);
+		}
+		break;
+	}
+	default:
+		break;
+	}
+
+	return (NDI_SUCCESS);
+}
+
+static const ndis_ops_t espi_ndis_ops = {
+	.nso_usable = espi_child_usable,
+	.nso_init_child = espi_child_init
+};
+
+static espi_t *
+espi_from_dip(dev_info_t *dip)
+{
+	espi_t *en = ddi_get_soft_state(espi_state, ddi_get_instance(dip));
+
+	VERIFY3P(en, !=, NULL);
+	VERIFY3P(en->en_dip, ==, dip);
+	return (en);
+}
+
+static int
+espi_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
+    void *arg, void *result)
+{
+	espi_t *en = espi_from_dip(dip);
+
+	return (ndis_bus_ctl(en->en_ndis, rdip, ctlop, arg, result));
+}
+
+static int
+espi_bus_config(dev_info_t *dip, uint_t flags, ddi_bus_config_op_t op,
+    void *arg, dev_info_t **childp)
+{
+	espi_t *en = espi_from_dip(dip);
+
+	return (ndis_bus_config(en->en_ndis, flags, op, arg, childp));
+}
+
+static int
+espi_bus_unconfig(dev_info_t *dip, uint_t flags, ddi_bus_config_op_t op,
+    void *arg)
+{
+	espi_t *en = espi_from_dip(dip);
+
+	return (ndis_bus_unconfig(en->en_ndis, flags, op, arg));
+}
+
 static int
 espi_probe(dev_info_t *dip)
 {
@@ -1520,6 +2110,9 @@ espi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto err;
 	}
 
+	en->en_ndis = ndis_init(dip, "espi", NDIS_UA_HEX, espi_children,
+	    ARRAY_SIZE(espi_children), &espi_ndis_ops, en, 0);
+
 	espi_set_props(en);
 	espi_report(en);
 	ddi_report_dev(dip);
@@ -1558,11 +2151,28 @@ espi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * with an in-band reset.
 	 */
 	ddi_prop_remove_all(dip);
+	ndis_fini(en->en_ndis);
 	x_ddi_reg_block_free(&en->en_regs);
 	mutex_destroy(&en->en_lock);
 	ddi_soft_state_free(espi_state, inst);
 	return (DDI_SUCCESS);
 }
+
+static struct bus_ops espi_bus_ops = {
+	.busops_rev = BUSO_REV,
+	.bus_dma_map = ddi_no_dma_map,
+	.bus_dma_allochdl = ddi_no_dma_allochdl,
+	.bus_dma_freehdl = ddi_no_dma_freehdl,
+	.bus_dma_bindhdl = ddi_no_dma_bindhdl,
+	.bus_dma_unbindhdl = ddi_no_dma_unbindhdl,
+	.bus_dma_flush = ddi_no_dma_flush,
+	.bus_dma_win = ddi_no_dma_win,
+	.bus_dma_ctl = ddi_no_dma_mctl,
+	.bus_prop_op = ddi_bus_prop_op,
+	.bus_ctl = espi_bus_ctl,
+	.bus_config = espi_bus_config,
+	.bus_unconfig = espi_bus_unconfig
+};
 
 static struct dev_ops espi_dev_ops = {
 	.devo_rev = DEVO_REV,
@@ -1573,6 +2183,7 @@ static struct dev_ops espi_dev_ops = {
 	.devo_attach = espi_attach,
 	.devo_detach = espi_detach,
 	.devo_reset = nodev,
+	.devo_bus_ops = &espi_bus_ops,
 	.devo_quiesce = ddi_quiesce_not_needed
 };
 
