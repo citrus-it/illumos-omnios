@@ -288,6 +288,8 @@ static oxide_board_def_t oxide_board_defs[] = {
 				OXIDE_ESPI_ROLE_IPCC,
 				OXIDE_ESPI_ROLE_NEXUS	/* NIC boot flash */
 			},
+			/* The NIC boot flash is a 1 Gib MT25QU01G */
+			.obd_espi_flash_size = { 0, 128 * 1024 * 1024 },
 			.obd_ipccemcr = true,
 			.obd_measure_root = true,
 			.obd_startupopts = IPCC_STARTUP_KMDB_BOOT |

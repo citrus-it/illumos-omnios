@@ -219,6 +219,7 @@ IPCC_OBJS += ipcc.o ipcc_debug.o
 
 ESPI_KTEST_OBJS += espi_ktest.o
 ESPI_OBJS += espi.o
+ESPI_FLASH_OBJS += espi_flash.o
 
 OXIDE_KTEST_OBJS += oxide_ktest.o
 
