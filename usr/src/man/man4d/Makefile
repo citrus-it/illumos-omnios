@@ -195,6 +195,7 @@ i386_MANFILES=	ahci.4d		\
 		efi.4d		\
 		elxl.4d		\
 		espi.4d		\
+		espi_flash.4d	\
 		i40e.4d		\
 		imc.4d		\
 		imcstub.4d	\

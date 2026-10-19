@@ -329,3 +329,4 @@ psp_einj 333
 psp_dpe 334
 os_rot 335
 espi 336
+espi_flash 337

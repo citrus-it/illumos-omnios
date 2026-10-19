@@ -775,6 +775,7 @@ f platform/oxide/kernel/drv/amd64/apob 0755 root sys
 f platform/oxide/kernel/drv/amd64/cpc 0755 root sys
 f platform/oxide/kernel/drv/amd64/dwu 0755 root sys
 f platform/oxide/kernel/drv/amd64/espi 0755 root sys
+f platform/oxide/kernel/drv/amd64/espi_flash 0755 root sys
 f platform/oxide/kernel/drv/amd64/fch 0755 root sys
 f platform/oxide/kernel/drv/amd64/ipcc 0755 root sys
 f platform/oxide/kernel/drv/amd64/npe 0755 root sys
