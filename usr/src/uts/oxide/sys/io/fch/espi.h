@@ -522,6 +522,27 @@ MAKE_MMIO_FCH_REG_FN(ESPI, espi, 4);
 #define	FCH_ESPI_SEM_MISC_CTL_REG0_GET_SW4_USER_ID(r)	 bitx32(r, 15, 8)
 
 /*
+ * FCH::ITF::ESPI::SEMAPHORE_MISC_CONTROL_REG0 -- as above, but only the byte
+ * that contains the SW2 and SW3 fields. The PPR requires that writes to the
+ * semaphore register use a byte enable so that one owner cannot disturb the
+ * fields of another. Both of the owners in this byte are for x86, so it is
+ * modelled as an 8-bit register of its own and all writes go through it.
+ */
+#define	FCH_ESPI_SEM_MISC_CTL_REG0_X86	0x3b
+#define	D_FCH_ESPI_SEM_MISC_CTL_REG0_X86			\
+	(const smn_reg_def_t) {					\
+		.srd_unit = SMN_UNIT_FCH_ESPI,			\
+		.srd_reg = FCH_ESPI_SEM_MISC_CTL_REG0_X86,	\
+		.srd_size = 1					\
+	}
+#define	FCH_ESPI_SEM_MISC_CTL_REG0_X86_MMIO(b)		\
+    fch_espi_mmio_reg((b), D_FCH_ESPI_SEM_MISC_CTL_REG0_X86, 0)
+
+#define	FCH_ESPI_SEM_MISC_CTL_REG0_X86_SET_SW2_OWN_CLR(r, v) bitset8(r, 2, 2, v)
+#define	FCH_ESPI_SEM_MISC_CTL_REG0_X86_SET_SW2_OWN_SET(r, v) bitset8(r, 1, 1, v)
+#define	FCH_ESPI_SEM_MISC_CTL_REG0_X86_GET_SW2_OWN_STAT(r)   bitx8(r, 0, 0)
+
+/*
  * FCH::ITF::ESPI::SLAVE0_DECODE_EN -- enables for the peripheral channel
  * address decode ranges below and for the fixed legacy I/O ports. I/O ranges
  * 0-3 are enabled by bits 8-11 and ranges 4-15 by bits 16-27. MMIO ranges 0-3

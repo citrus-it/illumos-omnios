@@ -29,6 +29,17 @@ extern "C" {
 #endif
 
 /*
+ * Channel numbers, as assigned by the specification.
+ */
+typedef enum espi_chan {
+	ESPI_CHAN_PERIPH	= 0,
+	ESPI_CHAN_VW		= 1,
+	ESPI_CHAN_OOB		= 2,
+	ESPI_CHAN_FLASH		= 3,
+	ESPI_NCHAN
+} espi_chan_t;
+
+/*
  * Cycle types.
  */
 
@@ -145,6 +156,8 @@ extern "C" {
 #define	ESPI_REG_GEN_CAP_IOMODE_DUAL		1
 #define	ESPI_REG_GEN_CAP_IOMODE_QUAD		2
 #define	ESPI_REG_GEN_CAP_GET_IOMODE_SUP(r)	bitx32(r, 25, 24)
+#define	ESPI_REG_GEN_CAP_IOMODE_SUP_DUAL	(1 << 0)
+#define	ESPI_REG_GEN_CAP_IOMODE_SUP_QUAD	(1 << 1)
 #define	ESPI_REG_GEN_CAP_GET_OD_ALERT(r)	bitx32(r, 23, 23)
 #define	ESPI_REG_GEN_CAP_SET_OD_ALERT(r, v)	bitset32(r, 23, 23, v)
 #define	ESPI_REG_GEN_CAP_GET_FREQ(r)		bitx32(r, 22, 20)

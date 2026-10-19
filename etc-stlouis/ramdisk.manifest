@@ -497,6 +497,7 @@ f kernel/misc/amd64/sha2 0755 root sys
 f kernel/misc/amd64/skein 0755 root sys
 f kernel/misc/amd64/strplumb 0755 root sys
 f kernel/misc/amd64/tlimod 0755 root sys
+f kernel/misc/amd64/zen_data 0755 root sys
 d kernel/pcbe 0755 root sys
 d kernel/pcbe/amd64 0755 root sys
 r kernel/pcbe/amd64/pcbe.AuthenticAMD=usr/kernel/pcbe/amd64/pcbe.AuthenticAMD 0755 root sys
@@ -773,6 +774,7 @@ d platform/oxide/kernel/drv/amd64 0755 root sys
 f platform/oxide/kernel/drv/amd64/apob 0755 root sys
 f platform/oxide/kernel/drv/amd64/cpc 0755 root sys
 f platform/oxide/kernel/drv/amd64/dwu 0755 root sys
+f platform/oxide/kernel/drv/amd64/espi 0755 root sys
 f platform/oxide/kernel/drv/amd64/fch 0755 root sys
 f platform/oxide/kernel/drv/amd64/ipcc 0755 root sys
 f platform/oxide/kernel/drv/amd64/npe 0755 root sys
@@ -1285,6 +1287,7 @@ d usr/platform/oxide 0755 root sys
 d usr/platform/oxide/bin 0755 root sys
 f usr/platform/oxide/bin/ipcc 0555 root sys
 f usr/platform/oxide/bin/dtrace_ipcc 0555 root sys
+f usr/platform/oxide/bin/espi 0555 root sys
 d usr/platform/oxide/lib 0755 root sys
 d usr/platform/oxide/lib/amd64 0755 root sys
 f usr/platform/oxide/lib/amd64/libipcc.so.1 0555 root sys
