@@ -1128,6 +1128,11 @@ f usr/lib/fs/tmpfs/mount 0555 root bin
 d usr/lib/fs/ufs 0755 root sys
 f usr/lib/fs/ufs/df 0555 root bin
 s usr/lib/fs/ufs/mount=../../../../etc/fs/ufs/mount
+d usr/lib/fwflash 0755 root bin
+d usr/lib/fwflash/identify 0755 root bin
+f usr/lib/fwflash/identify/espi_flash.so 0755 root bin
+d usr/lib/fwflash/verify 0755 root bin
+f usr/lib/fwflash/verify/espi_flash-GENERIC.so 0755 root bin
 d usr/lib/gss 0755 root sys
 f usr/lib/gss/mech_krb5.so.1 0555 root bin
 f usr/lib/hotplugd 0555 root bin
@@ -1316,6 +1321,7 @@ s usr/sbin/dladm=../../sbin/dladm
 s usr/sbin/dlstat=../../sbin/dlstat
 h usr/sbin/drvconfig=usr/sbin/devfsadm
 h usr/sbin/dtrace=usr/lib/isaexec
+f usr/sbin/fwflash 0555 root bin
 s usr/sbin/ipadm=../../sbin/ipadm
 f usr/sbin/lofiadm 0555 root bin
 f usr/sbin/mknod 0555 root bin

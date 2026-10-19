@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2026 Oxide Computer Company
 # Use is subject to license terms.
 #
 # cmd/fwflash/plugins
@@ -28,8 +29,10 @@ include $(SRC)/lib/Makefile.lib
 HERMON-MELLANOX_LIB=	hermon-MELLANOX.so
 TAVOR-MELLANOX_LIB=	tavor-MELLANOX.so
 SD-GENERIC_LIB=		sd-GENERIC.so
+ESPI_FLASH-GENERIC_LIB=	espi_flash-GENERIC.so
 
-PLUGINS= $(HERMON-MELLANOX_LIB) $(TAVOR-MELLANOX_LIB) $(SD-GENERIC_LIB)
+PLUGINS= $(HERMON-MELLANOX_LIB) $(TAVOR-MELLANOX_LIB) $(SD-GENERIC_LIB) \
+	$(ESPI_FLASH-GENERIC_LIB)
 
 OBJECTS= $(PLUGINS:%.so=%.o)
 DYNLIB=	$(PLUGINS:%=%)
@@ -52,16 +55,23 @@ FILEMODE = 0755
 $(HERMON-MELLANOX_LIB):= PICS= pics/$(HERMON-MELLANOX_LIB:%.so=%.o)
 $(TAVOR-MELLANOX_LIB):=	PICS = pics/$(TAVOR-MELLANOX_LIB:%.so=%.o)
 $(SD-GENERIC_LIB):= PICS= pics/$(SD-GENERIC_LIB:%.so=%.o)
+$(ESPI_FLASH-GENERIC_LIB):= PICS= pics/$(ESPI_FLASH-GENERIC_LIB:%.so=%.o)
 
 $(HERMON-MELLANOX_LIB):= SONAME = $(HERMON-MELLANOX_LIB)
 $(TAVOR-MELLANOX_LIB):=	SONAME = $(TAVOR-MELLANOX_LIB)
 $(SD-GENERIC_LIB):= SONAME = $(SD-GENERIC_LIB)
+$(ESPI_FLASH-GENERIC_LIB):= SONAME = $(ESPI_FLASH-GENERIC_LIB)
 
 $(HERMON-MELLANOX_LIB):= DYNFLAGS += -R/usr/lib/fwflash/identify
 $(HERMON-MELLANOX_LIB):= LDLIBS += -L. $(ROOT)/usr/lib/fwflash/identify/hermon.so
 
 $(SD-GENERIC_LIB):= LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi
 $(SD-GENERIC_LIB):= DYNFLAGS += -R/usr/lib/scsi
+
+# espi_flash(4D) is an oxide platform driver and its ioctl header is private
+# to that platform.
+$(ESPI_FLASH-GENERIC_LIB):= CPPFLAGS += -I$(SRC)/uts/oxide
+$(ESPI_FLASH-GENERIC_LIB):= CSTD = $(CSTD_GNU17)
 
 # Size assertions are non-constant and not useful here
 ZGUIDANCE=-Wl,-zguidance=noasserts
