@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -41,6 +42,7 @@ file path=usr/include/fwflash/fwflash.h
 dir  path=usr/lib
 dir  path=usr/lib/fwflash
 dir  path=usr/lib/fwflash/identify
+file path=usr/lib/fwflash/identify/espi_flash.so
 file path=usr/lib/fwflash/identify/hermon.so
 file path=usr/lib/fwflash/identify/sd.so
 file path=usr/lib/fwflash/identify/ses.so
@@ -48,6 +50,7 @@ link path=usr/lib/fwflash/identify/sgen.so target=ses.so
 file path=usr/lib/fwflash/identify/tavor.so
 file path=usr/lib/fwflash/identify/ufm.so
 dir  path=usr/lib/fwflash/verify
+file path=usr/lib/fwflash/verify/espi_flash-GENERIC.so
 file path=usr/lib/fwflash/verify/hermon-MELLANOX.so
 file path=usr/lib/fwflash/verify/sd-GENERIC.so
 link path=usr/lib/fwflash/verify/ses-LSILOGIC.so target=ses-SUN.so
