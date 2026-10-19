@@ -32,7 +32,7 @@
 #include <sys/sunldi.h>
 #include <sys/systm.h>
 #include <sys/uart.h>
-#include <sys/espi_impl.h>
+#include <sys/kespi.h>
 #include <vm/kboot_mmu.h>
 #include <sys/amdzen/fch/gpio.h>
 #include <sys/amdzen/fch/iomux.h>
@@ -196,7 +196,7 @@ eb_ipcc_espi_readable(void *arg)
 {
 	kernel_ipcc_data_t *data = arg;
 
-	return (espi_oob_readable(data->kid_espi_block));
+	return (kespi_oob_readable(data->kid_espi_block));
 }
 
 static bool
@@ -204,7 +204,7 @@ eb_ipcc_espi_writable(void *arg)
 {
 	kernel_ipcc_data_t *data = arg;
 
-	return (espi_oob_writable(data->kid_espi_block));
+	return (kespi_oob_writable(data->kid_espi_block));
 }
 
 static int
@@ -220,7 +220,7 @@ eb_ipcc_espi_flush(void *arg __unused)
 {
 	kernel_ipcc_data_t *data = arg;
 
-	espi_oob_flush(data->kid_espi_block);
+	kespi_oob_flush(data->kid_espi_block);
 }
 
 static int
@@ -230,7 +230,7 @@ eb_ipcc_espi_read(void *arg, uint8_t *buf, size_t *len)
 
 	ASSERT3U(*len, >, 0);
 
-	return (espi_oob_rx(data->kid_espi_block, buf, len));
+	return (kespi_oob_rx(data->kid_espi_block, buf, len));
 }
 
 static int
@@ -238,7 +238,7 @@ eb_ipcc_espi_write(void *arg, uint8_t *buf, size_t *len)
 {
 	kernel_ipcc_data_t *data = arg;
 
-	return (espi_oob_tx(data->kid_espi_block, buf, len));
+	return (kespi_oob_tx(data->kid_espi_block, buf, len));
 }
 
 static int
@@ -246,7 +246,7 @@ eb_ipcc_espi_open(void *arg)
 {
 	kernel_ipcc_data_t *data = arg;
 
-	return (espi_acquire(data->kid_espi_block));
+	return (kespi_acquire(data->kid_espi_block));
 }
 
 static void
@@ -254,7 +254,7 @@ eb_ipcc_espi_close(void *arg)
 {
 	kernel_ipcc_data_t *data = arg;
 
-	espi_release(data->kid_espi_block);
+	kespi_release(data->kid_espi_block);
 }
 
 static void
@@ -351,7 +351,7 @@ eb_ipcc_init(void)
 	case IPCC_MODE_ESPI0:
 		data->kid_espi_block = fch_espi_mmio_block(0);
 
-		if (espi_init(data->kid_espi_block) != 0)
+		if (kespi_init(data->kid_espi_block) != 0)
 			bop_panic("Cannot initialise eSPI IPCC");
 
 		kernel_ipcc_ops.io_open = eb_ipcc_espi_open;

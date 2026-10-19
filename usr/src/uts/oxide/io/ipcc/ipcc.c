@@ -30,7 +30,7 @@
 #include <sys/ddi.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
-#include <sys/espi_impl.h>
+#include <sys/kespi.h>
 #include <sys/file.h>
 #include <sys/platform_detect.h>
 #include <sys/policy.h>
@@ -356,7 +356,7 @@ ipcc_cb_read_espi(void *arg, uint8_t *buf, size_t *len)
 {
 	const ipcc_state_t *ipcc = arg;
 
-	return (espi_oob_rx(ipcc->is_espi_block, buf, len));
+	return (kespi_oob_rx(ipcc->is_espi_block, buf, len));
 }
 
 static int
@@ -364,7 +364,7 @@ ipcc_cb_write_espi(void *arg, uint8_t *buf, size_t *len)
 {
 	const ipcc_state_t *ipcc = arg;
 
-	return (espi_oob_tx(ipcc->is_espi_block, buf, len));
+	return (kespi_oob_tx(ipcc->is_espi_block, buf, len));
 }
 
 static void
@@ -372,7 +372,7 @@ ipcc_cb_flush_espi(void *arg)
 {
 	const ipcc_state_t *ipcc = arg;
 
-	espi_oob_flush(ipcc->is_espi_block);
+	kespi_oob_flush(ipcc->is_espi_block);
 }
 
 static bool
@@ -380,7 +380,7 @@ ipcc_readable_espi(void *arg)
 {
 	const ipcc_state_t *ipcc = arg;
 
-	return (espi_oob_readable(ipcc->is_espi_block));
+	return (kespi_oob_readable(ipcc->is_espi_block));
 }
 
 static bool
@@ -388,7 +388,7 @@ ipcc_writable_espi(void *arg)
 {
 	const ipcc_state_t *ipcc = arg;
 
-	return (espi_oob_writable(ipcc->is_espi_block));
+	return (kespi_oob_writable(ipcc->is_espi_block));
 }
 
 static int
@@ -408,7 +408,7 @@ ipcc_cb_open_espi(void *arg)
 	VERIFY0(ipcc->is_open);
 
 	ipcc->is_espi_block = fch_espi_mmio_block(0);
-	err = espi_acquire(ipcc->is_espi_block);
+	err = kespi_acquire(ipcc->is_espi_block);
 	if (err != 0) {
 		dev_err(ipcc_dip, CE_WARN, "Failed to acquire eSPI semaphore");
 		return (err);
@@ -431,7 +431,7 @@ ipcc_cb_close_espi(void *arg)
 
 	ipcc_close_dpio(ipcc);
 
-	espi_release(ipcc->is_espi_block);
+	kespi_release(ipcc->is_espi_block);
 	mmio_reg_block_unmap(&ipcc->is_espi_block);
 	ipcc->is_open = false;
 

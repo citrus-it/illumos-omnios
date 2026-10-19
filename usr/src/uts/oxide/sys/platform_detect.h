@@ -51,7 +51,20 @@ typedef enum {
 	IPCC_SPINTR_SP5_AGPIO2,		/* Cosmo */
 } oxide_ipcc_spintr_t;
 
+/*
+ * The role of each of the FCH's eSPI controllers on a board.
+ */
+typedef enum {
+	/* No target is attached or the controller is not used. */
+	OXIDE_ESPI_ROLE_NONE = 0,
+	/* Driven directly by the kernel for IPCC. */
+	OXIDE_ESPI_ROLE_IPCC,
+	/* Driven by the espi(4D) nexus driver. */
+	OXIDE_ESPI_ROLE_NEXUS,
+} oxide_espi_role_t;
+
 #define	OXIDE_BOARD_BSU_NUM	2
+#define	OXIDE_BOARD_ESPI	2
 
 #define	OXIDE_MAX_PERST_GPIOS	4
 
@@ -94,6 +107,13 @@ typedef struct oxide_board_data {
 	 * from the SP operates.
 	 */
 	oxide_ipcc_spintr_t	obd_ipccspintr;
+	/*
+	 * The role of each eSPI controller, indexed by controller number. A
+	 * controller used for IPCC is driven directly by the kernel and the
+	 * espi(4D) nexus driver does not take it over. The nexus driver only
+	 * configures controllers marked as its own.
+	 */
+	const oxide_espi_role_t	obd_espi[OXIDE_BOARD_ESPI];
 	/*
 	 * Specifies whether the APOB blob should be sent down to the SP over
 	 * IPCC. These data can be used for Enhanced Memory Context Restore

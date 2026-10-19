@@ -26,7 +26,7 @@
 #include <sys/io/fch/pmio.h>
 #include <sys/io/fch/misc.h>
 #include <sys/io/fch/espi.h>
-#include <sys/espi_impl.h>
+#include <sys/kespi.h>
 #include <sys/amdzen/fch.h>
 #include <sys/amdzen/fch/iomux.h>
 #include <sys/amdzen/fch/gpio.h>
@@ -284,6 +284,10 @@ static oxide_board_def_t oxide_board_defs[] = {
 			.obd_bsu_slot = { 17, 18 },
 			.obd_ipccmode = IPCC_MODE_ESPI0,
 			.obd_ipccspintr = IPCC_SPINTR_SP5_AGPIO2,
+			.obd_espi = {
+				OXIDE_ESPI_ROLE_IPCC,
+				OXIDE_ESPI_ROLE_NEXUS	/* NIC boot flash */
+			},
 			.obd_ipccemcr = true,
 			.obd_measure_root = true,
 			.obd_startupopts = IPCC_STARTUP_KMDB_BOOT |
@@ -366,6 +370,7 @@ static oxide_board_def_t oxide_board_defs[] = {
 			.obd_bsu_slot = { 17, 18 },
 			.obd_ipccmode = IPCC_MODE_ESPI0,
 			.obd_ipccspintr = IPCC_SPINTR_SP5_AGPIO2,
+			.obd_espi = { OXIDE_ESPI_ROLE_IPCC },
 			.obd_ipccemcr = true,
 			.obd_measure_root = true,
 			.obd_startupopts = IPCC_STARTUP_KMDB_BOOT |
@@ -435,6 +440,7 @@ static oxide_board_def_t oxide_board_defs[] = {
 			.obd_board = OXIDE_BOARD_RUBYRED,
 			.obd_rootnexus = "Oxide,RubyRed",
 			.obd_ipccmode = IPCC_MODE_ESPI0,
+			.obd_espi = { OXIDE_ESPI_ROLE_IPCC },
 			/*
 			 * The SP's SP_TO_SP5_INT_L line runs to the grapefruit
 			 * FPGA but does not continue on to the SP5. There
@@ -740,12 +746,12 @@ eb_eval_espi_cfg(const oxide_board_cpuinfo_t *cpuinfo __unused,
 	    FCH_ESPI_RESERVED_REG0_INIT_STAT_SUCCESS) {
 		EB_DBGMSG("eSPI: controller not initialised, cannot read "
 		    "configuration register 0x%x\n", ec->otec_reg);
-	} else if (espi_acquire(block) != 0) {
+	} else if (kespi_acquire(block) != 0) {
 		EB_DBGMSG("eSPI: could not acquire semaphore to read "
 		    "configuration register 0x%x\n", ec->otec_reg);
 	} else {
-		val = espi_get_configuration(block, ec->otec_reg);
-		espi_release(block);
+		val = kespi_get_configuration(block, ec->otec_reg);
+		kespi_release(block);
 		EB_DBGMSG("eSPI: configuration register 0x%x is 0x%x\n",
 		    ec->otec_reg, val);
 	}
@@ -907,6 +913,18 @@ oxide_derive_platform(void)
 				    oxide_board_name(data->obd_board),
 				    data->obd_cpuinfo.obc_chiprevstr);
 				bop_panic("Unsupported processor family");
+			}
+
+			/*
+			 * The eSPI controller carrying IPCC is driven by the
+			 * kernel. The espi(4D) driver relies on the board data
+			 * to know that, so the two must agree.
+			 */
+			if (data->obd_ipccmode == IPCC_MODE_ESPI0 &&
+			    data->obd_espi[0] != OXIDE_ESPI_ROLE_IPCC) {
+				bop_panic("Oxide board %s: eSPI0 carries IPCC "
+				    "but is not marked for it",
+				    oxide_board_name(data->obd_board));
 			}
 
 			oxide_board_data = data;
