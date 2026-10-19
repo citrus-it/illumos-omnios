@@ -59,6 +59,14 @@ issues no commands and has no children.
 A controller that the platform data assigns to this driver is reset and
 configured by it.
 A controller with no target behind it does not attach.
+.Pp
+The following children may be created:
+.Bl -tag -width "espi_flash(4D)"
+.It Xr espi_flash 4D
+Provides access to a flash device attached to the target over the flash access
+channel.
+It is created only when that channel was enabled.
+.El
 .Sh PROPERTIES
 The driver records what it finds out about the controller, the link and the
 target as properties on its node, which can be read with
@@ -214,7 +222,8 @@ The target did not complete a command in time.
 .Sy Uncommitted
 .Sh SEE ALSO
 .Xr ioctl 2 ,
-.Xr open 2
+.Xr open 2 ,
+.Xr espi_flash 4D
 .Rs
 .%Q Intel Corporation
 .%T Enhanced Serial Peripheral Interface (eSPI) Interface Base Specification (for Client and Server Platforms)

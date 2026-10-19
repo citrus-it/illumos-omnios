@@ -241,6 +241,7 @@ DRV_KMODS	+= apob
 DRV_KMODS	+= dwi2c
 DRV_KMODS	+= os_rot
 DRV_KMODS	+= espi
+DRV_KMODS	+= espi_flash
 
 #
 #	Platform Power Modules

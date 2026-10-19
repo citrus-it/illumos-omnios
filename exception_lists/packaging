@@ -860,9 +860,10 @@ usr/lib/libt6mfg.so
 platform/oxide/kernel/drv/amd64/cpudrv		i386
 
 #
-# The espi(4D) ioctl header is not delivered.
+# The espi(4D) and espi_flash(4D) ioctl headers are not delivered.
 #
 usr/platform/oxide/include/sys/espi_ctl.h	i386
+usr/platform/oxide/include/sys/espi_flash.h	i386
 
 #
 # Tofino kernel headers to build some user-space tools
