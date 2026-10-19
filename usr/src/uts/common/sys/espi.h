@@ -66,6 +66,24 @@ typedef enum espi_chan {
 #define	ESPI_CYCLE_FLASH_ERASE			0x2
 
 /*
+ * The length field of a flash request is 12 bits. For a read or a write it is
+ * a byte count. For an erase it instead encodes the size of the block to
+ * erase, with different encodings for target attached and controller attached
+ * flash. These are in the specification's table "eSPI Flash Access Channel
+ * Packet Format for Controller Attached and Target Attached Flash
+ * Configurations", which is Table 17 in revision 1.5.
+ */
+#define	ESPI_FLASH_LEN_MAX			0xfff
+#define	ESPI_FLASH_ERASE_LEN_TAF_4K		0
+#define	ESPI_FLASH_ERASE_LEN_TAF_32K		1
+#define	ESPI_FLASH_ERASE_LEN_TAF_64K		2
+#define	ESPI_FLASH_ERASE_LEN_TAF_128K		3
+#define	ESPI_FLASH_ERASE_LEN_CAF_4K		1
+#define	ESPI_FLASH_ERASE_LEN_CAF_64K		2
+#define	ESPI_FLASH_ERASE_LEN_CAF_128K		4
+#define	ESPI_FLASH_ERASE_LEN_CAF_256K		5
+
+/*
  * Completion cycle types, other than a successful completion without data,
  * encode the position of the completion within a split completion sequence in
  * bits 2:1 of the cycle type. The values above are the encodings with those
