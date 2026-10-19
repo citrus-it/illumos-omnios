@@ -22,7 +22,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2020 Joyent, Inc.
-# Copyright 2020 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 include $(SRC)/lib/Makefile.lib
 
@@ -31,8 +31,10 @@ TAVOR_LIB=	tavor.so
 HERMON_LIB=	hermon.so
 SD_LIB=		sd.so
 UFM_LIB=	ufm.so
+ESPI_FLASH_LIB=	espi_flash.so
 
-PLUGINS=	$(SES_LIB) $(TAVOR_LIB) $(HERMON_LIB) $(SD_LIB) $(UFM_LIB)
+PLUGINS=	$(SES_LIB) $(TAVOR_LIB) $(HERMON_LIB) $(SD_LIB) $(UFM_LIB) \
+	$(ESPI_FLASH_LIB)
 
 OBJECTS= $(PLUGINS:%.so=%.o)
 DYNLIB=	$(PLUGINS:%=%)
@@ -58,22 +60,31 @@ $(TAVOR_LIB):=	PICS= pics/$(TAVOR_LIB:%.so=%.o)
 $(HERMON_LIB):=	PICS= pics/$(HERMON_LIB:%.so=%.o)
 $(SD_LIB):=	PICS= pics/$(SD_LIB:%.so=%.o)
 $(UFM_LIB):=	PICS= pics/$(UFM_LIB:%.so=%.o)
+$(ESPI_FLASH_LIB):=	PICS= pics/$(ESPI_FLASH_LIB:%.so=%.o)
 
 $(SES_LIB):=    SONAME = $(SES_LIB)
 $(TAVOR_LIB):=  SONAME = $(TAVOR_LIB)
 $(HERMON_LIB):= SONAME = $(HERMON_LIB)
 $(SD_LIB):=     SONAME = $(SD_LIB)
 $(UFM_LIB):=     SONAME = $(UFM_LIB)
+$(ESPI_FLASH_LIB):= SONAME = $(ESPI_FLASH_LIB)
 
 $(HERMON_LIB):=	MAPFILES += ../common/mapfile-vers-hermon
 $(SD_LIB):=	MAPFILES += ../common/mapfile-vers-plus
 $(UFM_LIB):=	MAPFILES += ../common/mapfile-vers-plus
+$(ESPI_FLASH_LIB):=	MAPFILES += ../common/mapfile-vers-plus
 
 $(HERMON_LIB):=	LDLIBS += -lc
 $(TAVOR_LIB):=	LDLIBS += -lc
 $(SES_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lses -lnvpair -lc
 $(SD_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lumem -lc
 $(UFM_LIB):=	LDLIBS += -lpcidb -lnvpair -lc
+$(ESPI_FLASH_LIB):=	LDLIBS += -lc
+
+# espi_flash(4D) is an oxide platform driver and its ioctl header is private
+# to that platform.
+$(ESPI_FLASH_LIB):=	CPPFLAGS += -I$(SRC)/uts/oxide
+$(ESPI_FLASH_LIB):=	CSTD = $(CSTD_GNU17)
 
 $(SES_LIB):=	DYNFLAGS += -R/usr/lib/scsi
 $(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi
