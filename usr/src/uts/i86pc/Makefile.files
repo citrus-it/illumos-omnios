@@ -126,6 +126,7 @@ CORE_OBJS +=			\
 	tscc_hpet.o		\
 	tscc_pit.o		\
 	tscc_vmware.o		\
+	tscc_xen.o		\
 	trap.o			\
 	turbo.o			\
 	ucode_utils_amd.o	\
