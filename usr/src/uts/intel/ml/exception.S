@@ -256,7 +256,6 @@
 	 * #BP
 	 */
 	ENTRY_NP(brktrap)
-	XPV_TRAP_POP
 	cmpw	$KCS_SEL, 8(%rsp)
 	jne	bp_user
 
@@ -296,8 +295,6 @@ bp_user:
 	SET_SIZE(boundstrap)
 
 	ENTRY_NP(invoptrap)
-
-	XPV_TRAP_POP
 
 	cmpw	$KCS_SEL, 8(%rsp)
 	jne	ud_user
@@ -603,8 +600,6 @@ ud_user:
 	 * Instead we should push a real (soft?) error code
 	 * on the stack and #gp handler could know about fasttraps?
 	 */
-	XPV_TRAP_POP
-
 	subq	$2, (%rsp)	/* XXX int insn 2-bytes */
 	pushq	$_CONST(_MUL(T_FASTTRAP, GATE_DESC_SIZE) + 2)
 
@@ -621,7 +616,6 @@ ud_user:
 	 * XXX a constant would be nicer.
 	 */
 	ENTRY_NP(fast_null)
-	XPV_TRAP_POP
 	orq	$PS_C, 24(%rsp)	/* set carry bit in user flags */
 	call	x86_md_clear
 	jmp	tr_iret_auto

@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_SYS_MACHPRIVREGS_H
@@ -95,10 +96,6 @@ extern "C" {
 #define	IRET	iret
 
 #endif	/* __i386 */
-
-#define	XPV_TRAP_POP	/* empty */
-#define	XPV_TRAP_PUSH	/* empty */
-#define	CLEAN_CS	/* empty */
 
 
 /*
