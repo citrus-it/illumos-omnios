@@ -206,7 +206,6 @@ extern void patch_memops(uint_t);
 #endif	/* defined(__amd64) */
 extern void setup_xfem(void);
 #define	cpr_dprintf prom_printf
-#define	IN_XPV_PANIC() (__lintzero)
 
 #endif /* _KERNEL */
 

@@ -26,6 +26,7 @@
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -339,16 +340,7 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 
 		fm_banner();
 
-#if defined(__x86)
-		/*
-		 * A hypervisor panic originates outside of Solaris, so we
-		 * don't want to prepend the panic message with misleading
-		 * pointers from within Solaris.
-		 */
-		if (!IN_XPV_PANIC())
-#endif
-			printf("\n\rpanic[cpu%d]/thread=%p: ", cp->cpu_id,
-			    (void *)t);
+		printf("\n\rpanic[cpu%d]/thread=%p: ", cp->cpu_id, (void *)t);
 		if (panic_dip != NULL) {
 			printf("%s%d: ", ddi_driver_name(panic_dip),
 			    ddi_get_instance(panic_dip));

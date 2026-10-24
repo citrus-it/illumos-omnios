@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef _SYS_XPV_SUPPORT_H
 #define	_SYS_XPV_SUPPORT_H
 
@@ -91,8 +95,6 @@ extern pfn_t xen_shared_info_frame;
 #define	XPVF_TLB_FLUSH		5	/* boolean (tlb flush call present) */
 
 extern int xpv_feature(int);
-
-#define	IN_XPV_PANIC()	(__lintzero)
 
 #ifdef __cplusplus
 }
