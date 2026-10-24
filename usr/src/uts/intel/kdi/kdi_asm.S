@@ -610,7 +610,6 @@ no_restore_cr3:
 	KDI_RESTORE_REGS(%rsp); \
 	/* Discard state, trapno, err */ \
 	addq	$REG_OFF(KDIREG_RIP), %rsp; \
-	XPV_TRAP_PUSH; \
 	jmp	%cs:name
 
 kdi_pass_dbgtrap:

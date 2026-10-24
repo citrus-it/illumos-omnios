@@ -194,7 +194,6 @@ ptable_free(pfn_t pfn)
 		panic("ptable_free(): no page for pfn!");
 	ASSERT(PAGE_SHARED(pp));
 	ASSERT(pfn == pp->p_pagenum);
-	ASSERT(!IN_XPV_PANIC());
 
 	/*
 	 * Get an exclusive lock, might have to wait for a kmem reader.
@@ -609,9 +608,7 @@ htable_reap(void *handle)
 	/*
 	 * Let htable_steal() do the work, we just call htable_free()
 	 */
-	XPV_DISALLOW_MIGRATE();
 	list = htable_steal(reap_cnt, B_TRUE);
-	XPV_ALLOW_MIGRATE();
 	while ((ht = list) != NULL) {
 		list = ht->ht_next;
 		HATSTAT_INC(hs_reaped);

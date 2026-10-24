@@ -211,8 +211,7 @@ struct regs {
 	je	6f;				\
 	movq	$0, REGOFF_SAVFP(%rsp);		\
 	SWAPGS;					\
-6:	lfence; /* swapgs mitigation */		\
-	CLEAN_CS
+6:	lfence	/* swapgs mitigation */
 
 #define	INTR_POP			\
 	leaq	sys_lcall32(%rip), %r11;\

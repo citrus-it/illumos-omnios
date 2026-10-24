@@ -263,9 +263,6 @@ typedef struct tlb_range {
 } tlb_range_t;
 
 
-#define	XPV_DISALLOW_MIGRATE()	/* nothing */
-#define	XPV_ALLOW_MIGRATE()	/* nothing */
-
 #define	pfn_is_foreign(pfn)	__lintzero
 
 typedef enum flush_tlb_type {
