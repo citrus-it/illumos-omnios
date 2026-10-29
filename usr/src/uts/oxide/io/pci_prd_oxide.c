@@ -115,6 +115,25 @@ pci_prd_pcie_link_event(dev_info_t *bridge, boolean_t up)
 }
 
 /*
+ * The board data can mark a slot as one that we must not bring online by
+ * ourselves.
+ */
+boolean_t
+pci_prd_pcie_auto_online(dev_info_t *bridge)
+{
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(bridge);
+	pcie_req_id_t bdf;
+
+	if (bus_p == NULL)
+		return (B_TRUE);
+
+	bdf = bus_p->bus_bdf;
+
+	return (zen_pcie_auto_online_by_bdf(BUS(bdf), DEV(bdf), FUNC(bdf)) ?
+	    B_TRUE : B_FALSE);
+}
+
+/*
  * Retrieve link equalisation (EQ) data for the link below the given PCIe
  * bridge, and program its equalisation preset search mask.
  */

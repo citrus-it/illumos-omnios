@@ -142,6 +142,15 @@ typedef enum {
 	 * apply to UBM based hotplug.
 	 */
 	OXIO_HP_F_RESET_VALID	= 1 << 0,
+	/*
+	 * This flag indicates that the operating system should not power on
+	 * the slot by itself, either at boot or when a device appears in it.
+	 * Instead the slot is left present but powered off until it is
+	 * explicitly enabled, for example with cfgadm(8). This is used for
+	 * devices that must not be brought up until software has prepared
+	 * them.
+	 */
+	OXIO_HP_F_NO_AUTO_ONLINE	= 1 << 1,
 } oxio_hp_flags_t;
 
 /*

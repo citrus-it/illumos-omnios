@@ -694,6 +694,17 @@ pciehpc_uninit(dev_info_t *dip)
 	return (DDI_SUCCESS);
 }
 
+static ddi_hp_cn_state_t
+pciehpc_auto_online_state(pcie_hp_ctrl_t *ctrl_p)
+{
+	if (pcie_auto_online != 0 &&
+	    pci_prd_pcie_auto_online(ctrl_p->hc_dip)) {
+		return (DDI_HP_CN_STATE_ENABLED);
+	}
+
+	return (DDI_HP_CN_STATE_PRESENT);
+}
+
 /*
  * pciehpc_intr()
  *
@@ -822,8 +833,8 @@ pciehpc_intr(dev_info_t *dip)
 		    " on slot %d\n", slot_p->hs_phy_slot_num);
 
 		if (status & PCIE_SLOTSTS_PRESENCE_DETECTED) {
-			ddi_hp_cn_state_t tgt_state = (pcie_auto_online != 0) ?
-			    DDI_HP_CN_STATE_ENABLED : DDI_HP_CN_STATE_PRESENT;
+			ddi_hp_cn_state_t tgt_state =
+			    pciehpc_auto_online_state(ctrl_p);
 			/*
 			 * card is inserted into the slot, ask DDI Hotplug
 			 * framework to change state to Present.
@@ -1809,9 +1820,8 @@ pciehpc_enable_state_sync(pcie_hp_ctrl_t *ctrl_p)
 	uint16_t control, status;
 	ddi_hp_cn_state_t curr_state, online_targ;
 
-	online_targ = (pcie_auto_online != 0) ?  DDI_HP_CN_STATE_ENABLED :
-	    DDI_HP_CN_STATE_PRESENT;
 	ASSERT(MUTEX_HELD(&ctrl_p->hc_mutex));
+	online_targ = pciehpc_auto_online_state(ctrl_p);
 
 	/*
 	 * We manually compute the status from a single read of things rather

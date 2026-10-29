@@ -2859,10 +2859,14 @@ zen_hotplug_bridge_post_start(zen_pcie_port_t *port, void *arg)
 	 * It is possible that this may still be creating a race downstream of
 	 * this, but in that case, that'll be on the pcieb hotplug logic rather
 	 * than us to set up that world here. Only do this if there actually is
-	 * a power controller.
+	 * a power controller. A slot that the board data marks as not coming
+	 * online by itself is left powered off whether or not anything is
+	 * present.
 	 */
 	if ((cap & PCIE_SLOTCAP_POWER_CONTROLLER) != 0) {
-		if ((sts & PCIE_SLOTSTS_PRESENCE_DETECTED) != 0) {
+		if ((sts & PCIE_SLOTSTS_PRESENCE_DETECTED) != 0 &&
+		    (port->zpp_oxio->oe_hp_flags &
+		    OXIO_HP_F_NO_AUTO_ONLINE) == 0) {
 			ctl &= ~PCIE_SLOTCTL_PWR_CONTROL;
 		} else {
 			ctl |= PCIE_SLOTCTL_PWR_CONTROL;
@@ -3863,6 +3867,23 @@ zen_fabric_find_pcie_port_by_bdf(uint8_t bus, uint8_t dev, uint8_t func)
 	    zen_fabric_find_pcie_port_by_bdf_cb, &f);
 
 	return (f.zffp_port);
+}
+
+/*
+ * Determine whether the hotplug slot below the PCIe bridge with the given bus,
+ * device and function may be powered on by the operating system without an
+ * explicit request, unless the board data marks it otherwise.
+ */
+bool
+zen_pcie_auto_online_by_bdf(uint8_t bus, uint8_t dev, uint8_t func)
+{
+	const zen_pcie_port_t *port;
+
+	port = zen_fabric_find_pcie_port_by_bdf(bus, dev, func);
+	if (port == NULL || port->zpp_oxio == NULL)
+		return (true);
+
+	return ((port->zpp_oxio->oe_hp_flags & OXIO_HP_F_NO_AUTO_ONLINE) == 0);
 }
 
 typedef struct zen_fabric_find_pcie_core {

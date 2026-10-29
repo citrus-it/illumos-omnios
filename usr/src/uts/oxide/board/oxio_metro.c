@@ -144,7 +144,12 @@ const oxio_engine_t oxio_metro[] = { {
 	.oe_lane = 0,
 	.oe_nlanes = 8,
 	.oe_slot = 0x14,
-	.oe_hp_flags = 0,
+	/*
+	 * The Redhawk slots are left powered off until they are enabled
+	 * explicitly, so that the NIC's boot flash can be checked before its
+	 * links are brought up.
+	 */
+	.oe_hp_flags = OXIO_HP_F_NO_AUTO_ONLINE,
 	.oe_hp_trad = {
 		.ohp_dev = {
 			.otg_exp_type = OXIO_I2C_GPIO_EXP_T_PCA9506,
@@ -170,7 +175,7 @@ const oxio_engine_t oxio_metro[] = { {
 	.oe_lane = 8,
 	.oe_nlanes = 8,
 	.oe_slot = 0x15,
-	.oe_hp_flags = 0,
+	.oe_hp_flags = OXIO_HP_F_NO_AUTO_ONLINE,
 	.oe_hp_trad = {
 		.ohp_dev = {
 			.otg_exp_type = OXIO_I2C_GPIO_EXP_T_PCA9506,

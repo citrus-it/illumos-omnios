@@ -879,6 +879,12 @@ pci_prd_pcie_link_event(dev_info_t *bridge __unused, boolean_t up __unused)
 {
 }
 
+boolean_t
+pci_prd_pcie_auto_online(dev_info_t *bridge __unused)
+{
+	return (B_TRUE);
+}
+
 int
 pci_prd_pcie_eq(dev_info_t *bridge __unused, pcie_link_speed_t speed __unused,
     uint32_t nlanes __unused, pcie_eq_t *eq __unused)
