@@ -368,6 +368,13 @@ extern int zen_pcie_eq_by_bdf(uint8_t, uint8_t, uint8_t, pcie_link_speed_t,
 extern int zen_pcie_set_preset_mask_by_bdf(uint8_t, uint8_t, uint8_t,
     pcie_link_speed_t, uint32_t);
 
+/*
+ * Determine whether the hotplug slot below the PCIe bridge with the given bus,
+ * device and function may be powered on automatically. Returns true if no such
+ * bridge exists.
+ */
+extern bool zen_pcie_auto_online_by_bdf(uint8_t, uint8_t, uint8_t);
+
 #ifdef	__cplusplus
 }
 #endif

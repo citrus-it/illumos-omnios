@@ -151,6 +151,17 @@ extern int pci_prd_pcie_ltssm(dev_info_t *, pcie_ltssm_snap_t,
 extern void pci_prd_pcie_link_event(dev_info_t *, boolean_t);
 
 /*
+ * Ask the platform whether the hotplug slot below the bridge named by the given
+ * dev_info_t may be powered on and brought online without an explicit request,
+ * both when its state is first synchronised and when a device is inserted. A
+ * platform returns B_FALSE for a slot whose device must be prepared first, and
+ * the slot is then left present until it is enabled explicitly. The global
+ * pcie_auto_online tunable still takes precedence. This may be called in
+ * interrupt context and the platform must not block.
+ */
+extern boolean_t pci_prd_pcie_auto_online(dev_info_t *);
+
+/*
  * Retrieve PCIe link equalisation (EQ) data for the link below the named
  * bridge, and program its equalisation preset search mask. This may be called
  * outside of boot in response to a userland request. Platforms that cannot
