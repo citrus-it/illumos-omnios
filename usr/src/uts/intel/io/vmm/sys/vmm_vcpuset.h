@@ -98,12 +98,6 @@ vcpuset_isset(const vcpuset_t *set, int vcpuid)
 	return (BT_TEST(set->vcs_bits, vcpuid) != 0);
 }
 
-static inline bool
-vcpuset_isequal(const vcpuset_t *a, const vcpuset_t *b)
-{
-	return (bcmp(a, b, sizeof (*a)) == 0);
-}
-
 /*
  * Return the lowest member of the set whose vcpuid is at least 'start', or -1
  * if there is none. The members of a set can be visited in order with
@@ -118,6 +112,12 @@ vcpuset_find(const vcpuset_t *set, int start)
 	if (start >= VM_MAXCPU)
 		return (-1);
 	return (bt_getlowbit(set->vcs_bits, start, VM_MAXCPU - 1));
+}
+
+static inline bool
+vcpuset_isempty(const vcpuset_t *set)
+{
+	return (vcpuset_find(set, 0) == -1);
 }
 
 #ifdef __cplusplus

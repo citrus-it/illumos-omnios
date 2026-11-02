@@ -224,6 +224,8 @@ struct vm {
 	vcpuset_t	active_cpus;		/* (i) active vcpus */
 	vcpuset_t	debug_cpus;		/* (i) vcpus stopped for dbg */
 	vcpuset_t	halted_cpus;		/* (x) cpus in a hard halt */
+	uint_t		active_count;		/* (i) count of active_cpus */
+	uint_t		halted_count;		/* (x) count of halted_cpus */
 	int		suspend_how;		/* (i) stop VM execution */
 	int		suspend_source;		/* (i) src vcpuid of suspend */
 	hrtime_t	suspend_when;		/* (i) time suspend asserted */
@@ -638,6 +640,9 @@ vm_init(struct vm *vm, bool create)
 
 	vcpuset_zero(&vm->active_cpus);
 	vcpuset_zero(&vm->debug_cpus);
+	vm->active_count = 0;
+	ASSERT(vcpuset_isempty(&vm->halted_cpus));
+	ASSERT0(vm->halted_count);
 
 	vm->suspend_how = 0;
 	vm->suspend_source = 0;
@@ -1647,21 +1652,57 @@ vcpu_require_state_locked(struct vcpu *vcpu, enum vcpu_state newstate)
 }
 
 /*
+ * Some guests implement "halt" by having all vCPUs execute HLT with interrupts
+ * disabled. `halted_cpus` tracks the vCPUs in this state, and `halted_count`
+ * records how many there are. When the count reaches the number of active
+ * vCPUs, the VM is halted.
+ *
+ * Only a holder of a vCPU's lock changes that vCPU's bit in `halted_cpus`.
+ * The vCPU adds itself before sleeping, and is removed when it is woken so
+ * that a pending wakeup is never mistaken for a halt. `active_count` can only
+ * increase until the VM is reinitialised, so when a vCPU increments
+ * `halted_count` to that values saw every vCPU halted.
+ */
+static bool
+vcpu_halt_enter(struct vcpu *vcpu)
+{
+	struct vm *vm = vcpu->vm;
+
+	ASSERT(MUTEX_HELD(&vcpu->lock));
+
+	if (vcpuset_isset(&vm->halted_cpus, vcpu->vcpuid))
+		return (false);
+
+	vcpuset_atomic_add(&vm->halted_cpus, vcpu->vcpuid);
+	return (atomic_inc_uint_nv(&vm->halted_count) == vm->active_count);
+}
+
+static void
+vcpu_halt_leave(struct vcpu *vcpu)
+{
+	struct vm *vm = vcpu->vm;
+
+	ASSERT(MUTEX_HELD(&vcpu->lock));
+
+	if (!vcpuset_isset(&vm->halted_cpus, vcpu->vcpuid))
+		return;
+
+	vcpuset_atomic_del(&vm->halted_cpus, vcpu->vcpuid);
+	atomic_dec_uint(&vm->halted_count);
+}
+
+/*
  * Emulate a guest 'hlt' by sleeping until the vcpu is ready to run.
  */
 static int
 vm_handle_hlt(struct vcpu *vcpu, bool intr_disabled)
 {
 	struct vm *vm = vcpu->vm;
-	const int vcpuid = vcpu->vcpuid;
-	int vcpu_halted, vm_halted;
+	bool vm_halted = false;
 	bool userspace_exit = false;
 
-	KASSERT(!vcpuset_isset(&vm->halted_cpus, vcpuid),
+	KASSERT(!vcpuset_isset(&vm->halted_cpus, vcpu->vcpuid),
 	    ("vcpu already halted"));
-
-	vcpu_halted = 0;
-	vm_halted = 0;
 
 	vcpu_lock(vcpu);
 	while (1) {
@@ -1691,21 +1732,13 @@ vm_handle_hlt(struct vcpu *vcpu, bool intr_disabled)
 		}
 
 		/*
-		 * Some Linux guests implement "halt" by having all vcpus
-		 * execute HLT with interrupts disabled. 'halted_cpus' keeps
-		 * track of the vcpus that have entered this state. When all
-		 * vcpus enter the halted state the virtual machine is halted.
+		 * A wakeup removes this vCPU from the halted set, so it is
+		 * added again on each pass.
 		 */
-		if (intr_disabled) {
-			if (!vcpu_halted && halt_detection_enabled) {
-				vcpu_halted = 1;
-				vcpuset_atomic_add(&vm->halted_cpus, vcpuid);
-			}
-			if (vcpuset_isequal(&vm->halted_cpus,
-			    &vm->active_cpus)) {
-				vm_halted = 1;
-				break;
-			}
+		if (intr_disabled && halt_detection_enabled &&
+		    vcpu_halt_enter(vcpu)) {
+			vm_halted = true;
+			break;
 		}
 
 		vcpu_ustate_change(vcpu, VU_IDLE);
@@ -1715,9 +1748,7 @@ vm_handle_hlt(struct vcpu *vcpu, bool intr_disabled)
 		vcpu_ustate_change(vcpu, VU_EMU_KERN);
 	}
 
-	if (vcpu_halted)
-		vcpuset_atomic_del(&vm->halted_cpus, vcpuid);
-
+	vcpu_halt_leave(vcpu);
 	vcpu_unlock(vcpu);
 
 	if (vm_halted) {
@@ -3336,6 +3367,7 @@ vm_activate_cpu(struct vcpu *vcpu)
 	}
 
 	vcpuset_atomic_add(&vm->active_cpus, vcpuid);
+	atomic_inc_uint(&vm->active_count);
 
 	/*
 	 * It is possible that this vCPU was undergoing activation at the same
@@ -3587,6 +3619,7 @@ vcpu_notify_event_locked(struct vcpu *vcpu, vcpu_notify_t ntype)
 		KASSERT(hostcpu == NOCPU, ("vcpu state %d not consistent "
 		    "with hostcpu %d", vcpu->state, hostcpu));
 		if (vcpu->state == VCPU_SLEEPING) {
+			vcpu_halt_leave(vcpu);
 			cv_signal(&vcpu->vcpu_cv);
 		}
 	}
