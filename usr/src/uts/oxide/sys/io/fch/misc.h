@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Co.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_IO_FCH_MISC_H
@@ -128,6 +128,24 @@ MAKE_MMIO_FCH_REG_FN(MISC_B, misc_b, 4);
 
 #define	FCH_MISC_A_CLKCTL0_GET_UPDATE_REQ(r)	bitx32(r, 30, 30)
 #define	FCH_MISC_A_CLKCTL0_SET_UPDATE_REQ(r, v)	bitset32(r, 30, 30, v)
+
+/*
+ * FCH::MISC::OSCFREQCOUNTER. When enabled, the FCH counts the number of OSC
+ * clocks in each second and records the count once it is valid. The counter
+ * should be disabled again when not in use.
+ */
+/*CSTYLED*/
+#define	D_FCH_MISC_A_OSCFREQCNT		(const smn_reg_def_t){	\
+	.srd_unit = SMN_UNIT_FCH_MISC_A,	\
+	.srd_reg = 0x70				\
+}
+#define	FCH_MISC_A_OSCFREQCNT_MMIO(b)	\
+    fch_misc_a_mmio_reg((b), D_FCH_MISC_A_OSCFREQCNT, 0)
+
+#define	FCH_MISC_A_OSCFREQCNT_GET_EN(r)		bitx32(r, 31, 31)
+#define	FCH_MISC_A_OSCFREQCNT_SET_EN(r, v)	bitset32(r, 31, 31, v)
+#define	FCH_MISC_A_OSCFREQCNT_GET_VALID(r)	bitx32(r, 30, 30)
+#define	FCH_MISC_A_OSCFREQCNT_GET_COUNT(r)	bitx32(r, 27, 0)
 
 /*
  * FCH::MISC::STRAPSTATUS.  Provides bits showing the state of the FCH's straps

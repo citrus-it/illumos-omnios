@@ -26,7 +26,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  * Copyright 2020 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
@@ -56,6 +56,7 @@
 #include <sys/kobj_lex.h>
 #include <sys/tsc.h>
 #include <sys/prom_debug.h>
+#include <sys/io/fch/misc.h>
 #include <util/qsort.h>
 
 /*
@@ -889,6 +890,93 @@ tsc_pit_also(void)
 	(void) pit->tscc_calibrate(&dummy);
 }
 
+/*
+ * XXX Experimental. Once the TSC has been calibrated, repeat the PIT and HPET
+ * calibrations a number of times, about 100ms apart, and record the results
+ * so that they can be compared with each other and with the frequency in use.
+ * tscc_diag_tsc[] holds the TSC value at the start of each round and
+ * tscc_diag_cal_tsc the value when calibration began, which is shortly after
+ * spread-spectrum clocking was enabled.
+ */
+#define	TSCC_DIAG_MAX	16
+uint_t tscc_diag_rounds = 8;
+uint64_t tscc_diag_cal_tsc;
+uint64_t tscc_diag_tsc[TSCC_DIAG_MAX];
+uint64_t tscc_diag_pit[TSCC_DIAG_MAX];
+uint64_t tscc_diag_hpet[TSCC_DIAG_MAX];
+
+/*
+ * XXX Experimental. Run the FCH's OSC frequency counter for up to five seconds
+ * and record each new count of OSC clocks per second, with the TSC value when
+ * it was first seen. The spacing of the TSC values shows what times the
+ * counter's one-second gate. This register is described only in the Milan
+ * PPR.
+ */
+#define	TSCC_DIAG_OSC_MAX	4
+uint64_t tscc_diag_osc_en_tsc;
+uint64_t tscc_diag_osc_tsc[TSCC_DIAG_OSC_MAX];
+uint32_t tscc_diag_osc_count[TSCC_DIAG_OSC_MAX];
+uint_t tscc_diag_osc_samples;
+
+static void
+tsc_calibrate_diag_osc(void)
+{
+	mmio_reg_block_t block = fch_misc_a_mmio_block();
+	const mmio_reg_t reg = FCH_MISC_A_OSCFREQCNT_MMIO(block);
+	uint32_t last = 0;
+	uint_t n = 0;
+
+	mmio_reg_write(reg, FCH_MISC_A_OSCFREQCNT_SET_EN(0, 1));
+	const uint64_t start = tscc_diag_osc_en_tsc = tsc_read();
+
+	while (n < TSCC_DIAG_OSC_MAX && tsc_read() - start < 5 * tsc_freq) {
+		const uint32_t val = mmio_reg_read(reg);
+
+		if (FCH_MISC_A_OSCFREQCNT_GET_VALID(val) == 0)
+			continue;
+
+		const uint32_t count = FCH_MISC_A_OSCFREQCNT_GET_COUNT(val);
+		if (n == 0 || count != last) {
+			tscc_diag_osc_tsc[n] = tsc_read();
+			tscc_diag_osc_count[n++] = count;
+			last = count;
+		}
+	}
+
+	tscc_diag_osc_samples = n;
+	mmio_reg_write(reg, 0);
+	mmio_reg_block_unmap(&block);
+}
+
+static void
+tsc_calibrate_diag(void)
+{
+	extern uint64_t pit_tsc_hz, hpet_tsc_hz;
+	const tsc_calibrate_t *pit = tsc_calibrate_get_force("PIT");
+	const tsc_calibrate_t *hpet = tsc_calibrate_get_force("HPET");
+	const uint64_t saved_pit = pit_tsc_hz;
+	const uint64_t saved_hpet = hpet_tsc_hz;
+	const uint_t rounds = MIN(tscc_diag_rounds, TSCC_DIAG_MAX);
+
+	for (uint_t i = 0; i < rounds; i++) {
+		uint64_t start, freq;
+
+		start = tscc_diag_tsc[i] = tsc_read();
+		if (pit != NULL && pit->tscc_calibrate(&freq))
+			tscc_diag_pit[i] = freq;
+		if (hpet != NULL && hpet->tscc_calibrate(&freq))
+			tscc_diag_hpet[i] = freq;
+		while (tsc_read() - start < tsc_freq / 10) {
+			SMT_PAUSE();
+		}
+	}
+
+	pit_tsc_hz = saved_pit;
+	hpet_tsc_hz = saved_hpet;
+
+	tsc_calibrate_diag_osc();
+}
+
 uint64_t
 tsc_calibrate(void)
 {
@@ -912,6 +1000,7 @@ tsc_calibrate(void)
 		return (tsc_freq);
 
 	PRM_POINT("Calibrating the TSC...");
+	tscc_diag_cal_tsc = tsc_read();
 
 	/*
 	 * Allow an operator to explicitly specify a calibration source via
@@ -967,6 +1056,7 @@ tsc_calibrate(void)
 		tsc_calibration = NULL;
 
 		tsc_pit_also();
+		tsc_calibrate_diag();
 		return (tsc_freq);
 	}
 
@@ -1007,6 +1097,7 @@ tsc_calibrate(void)
 
 			kmem_free(tsccpp, tsc_set_size);
 			tsc_pit_also();
+			tsc_calibrate_diag();
 			return (tsc_freq);
 		}
 	}
