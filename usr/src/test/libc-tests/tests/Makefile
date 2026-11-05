@@ -60,6 +60,7 @@ PROGS = \
 	memset_s \
 	mutex_attr \
 	mutex-16200 \
+	pos4obj_lock \
 	posix_memalign \
 	printf-15294 \
 	printf-9511 \

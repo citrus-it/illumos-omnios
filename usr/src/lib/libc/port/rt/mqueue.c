@@ -380,7 +380,7 @@ mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	int		fd;
 	int		err;
 	int		cr_flag = 0;
-	int		locked = 0;
+	int		lockfd = -1;
 	uint64_t	total_size;
 	size_t		msgsize;
 	ssize_t		maxmsg;
@@ -394,9 +394,8 @@ mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 		return ((mqd_t)-1);
 
 	/* acquire MSGQ lock to have atomic operation */
-	if (__pos4obj_lock(path, MQ_LOCK_TYPE) < 0)
+	if ((lockfd = __pos4obj_lock(path, MQ_LOCK_TYPE)) < 0)
 		goto out;
-	locked = 1;
 
 	va_start(ap, oflag);
 	/* filter oflag to have READ/WRITE/CREATE modes only */
@@ -534,18 +533,17 @@ mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	mqdp->mqd_magic = MQ_MAGIC;
 	mqdp->mqd_tcd = NULL;
 	mqdp->mqd_ownerdead = 0;
-	if (__pos4obj_unlock(path, MQ_LOCK_TYPE) == 0) {
-		lmutex_lock(&mq_list_lock);
-		mqdp->mqd_next = mq_list;
-		mqdp->mqd_prev = NULL;
-		if (mq_list)
-			mq_list->mqd_prev = mqdp;
-		mq_list = mqdp;
-		lmutex_unlock(&mq_list_lock);
-		return ((mqd_t)mqdp);
-	}
+	__pos4obj_unlock(path, MQ_LOCK_TYPE, lockfd);
 
-	locked = 0;	/* fall into the error case */
+	lmutex_lock(&mq_list_lock);
+	mqdp->mqd_next = mq_list;
+	mqdp->mqd_prev = NULL;
+	if (mq_list)
+		mq_list->mqd_prev = mqdp;
+	mq_list = mqdp;
+	lmutex_unlock(&mq_list_lock);
+	return ((mqd_t)mqdp);
+
 out:
 	err = errno;
 	if ((cr_flag & DFILE_OPEN) != 0)
@@ -559,8 +557,8 @@ out:
 		(void) munmap((caddr_t)mqhp, (size_t)total_size);
 	if ((cr_flag & MQDNP_MMAP) != 0)
 		(void) munmap((caddr_t)mqdnp, sizeof (struct mq_dn));
-	if (locked)
-		(void) __pos4obj_unlock(path, MQ_LOCK_TYPE);
+	if (lockfd >= 0)
+		__pos4obj_unlock(path, MQ_LOCK_TYPE, lockfd);
 	errno = err;
 	return ((mqd_t)-1);
 }
@@ -633,11 +631,12 @@ int
 mq_unlink(const char *path)
 {
 	int err;
+	int lockfd;
 
 	if (__pos4obj_check(path) < 0)
 		return (-1);
 
-	if (__pos4obj_lock(path, MQ_LOCK_TYPE) < 0) {
+	if ((lockfd = __pos4obj_lock(path, MQ_LOCK_TYPE)) < 0) {
 		return (-1);
 	}
 
@@ -648,8 +647,7 @@ mq_unlink(const char *path)
 		err = __pos4obj_unlink(path, MQ_DATA_TYPE);
 	}
 
-	if (__pos4obj_unlock(path, MQ_LOCK_TYPE) < 0)
-		return (-1);
+	__pos4obj_unlock(path, MQ_LOCK_TYPE, lockfd);
 
 	return (err);
 

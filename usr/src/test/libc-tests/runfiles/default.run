@@ -149,6 +149,8 @@ timeout = 600
 [/opt/libc-tests/tests/mutex-16200.64]
 [/opt/libc-tests/tests/mutex_attr.32]
 [/opt/libc-tests/tests/mutex_attr.64]
+[/opt/libc-tests/tests/pos4obj_lock.32]
+[/opt/libc-tests/tests/pos4obj_lock.64]
 [/opt/libc-tests/tests/posix_memalign.32]
 [/opt/libc-tests/tests/posix_memalign.64]
 [/opt/libc-tests/tests/posix_spawn]
