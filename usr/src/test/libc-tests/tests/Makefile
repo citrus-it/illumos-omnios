@@ -60,6 +60,7 @@ PROGS = \
 	memset_s \
 	mutex_attr \
 	mutex-16200 \
+	pos4obj_lock \
 	posix_memalign \
 	printf-15294 \
 	printf-9511 \
@@ -141,6 +142,9 @@ mutex-16200.32 :=	CSTD=$(CSTD_GNU17)
 mutex-16200.64 :=	CSTD=$(CSTD_GNU17)
 mutex_attr.32 :=	CSTD=$(CSTD_GNU17)
 mutex_attr.64 :=	CSTD=$(CSTD_GNU17)
+
+pos4obj_lock.32 :=	CSTD=$(CSTD_GNU17)
+pos4obj_lock.64 :=	CSTD=$(CSTD_GNU17)
 
 ptsname.32 :=		LDLIBS += -lsocket
 ptsname.64 :=		LDLIBS64 += -lsocket

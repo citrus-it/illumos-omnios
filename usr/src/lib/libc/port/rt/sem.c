@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2025 MNX Cloud, Inc.
  */
 
@@ -65,13 +65,14 @@ sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 	int	fd = 0;
 	int	error = 0;
 	int	cr_flag = 0;
+	int	lockfd;
 	uint_t	value = 0;
 
 	if (__pos4obj_check(path) == -1)
 		return (SEM_FAILED);
 
 	/* acquire semaphore lock to have atomic operation */
-	if (__pos4obj_lock(path, SEM_LOCK_TYPE) < 0)
+	if ((lockfd = __pos4obj_lock(path, SEM_LOCK_TYPE)) < 0)
 		return (SEM_FAILED);
 
 	/* modify oflag to have RDWR and filter CREATE mode only */
@@ -122,7 +123,7 @@ sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 			    strcmp(path, next->sad_name) == 0) {
 				(void) __close_nc(fd);
 				lmutex_unlock(&semlock);
-				(void) __pos4obj_unlock(path, SEM_LOCK_TYPE);
+				__pos4obj_unlock(path, SEM_LOCK_TYPE, lockfd);
 				return (next->sad_addr);
 			}
 		}
@@ -153,18 +154,18 @@ sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 		}
 	}
 
-	if (__pos4obj_unlock(path, SEM_LOCK_TYPE) == 0) {
-		/* add to the list pointed by semheadp */
-		lmutex_lock(&semlock);
-		next->sad_next = semheadp;
-		semheadp = next;
-		next->sad_addr = sem;
-		next->sad_inode = statbuf.st_ino;
-		(void) strcpy(next->sad_name, path);
-		lmutex_unlock(&semlock);
-		return (sem);
-	}
-	/* fall into the error case */
+	__pos4obj_unlock(path, SEM_LOCK_TYPE, lockfd);
+
+	/* add to the list pointed by semheadp */
+	lmutex_lock(&semlock);
+	next->sad_next = semheadp;
+	semheadp = next;
+	next->sad_addr = sem;
+	next->sad_inode = statbuf.st_ino;
+	(void) strcpy(next->sad_name, path);
+	lmutex_unlock(&semlock);
+	return (sem);
+
 out:
 	error = errno;
 	if ((cr_flag & DFILE_OPEN) != 0)
@@ -174,7 +175,7 @@ out:
 	free(next);
 	if ((cr_flag & DFILE_MMAP) != 0)
 		(void) munmap((caddr_t)sem, sizeof (sem_t));
-	(void) __pos4obj_unlock(path, SEM_LOCK_TYPE);
+	__pos4obj_unlock(path, SEM_LOCK_TYPE, lockfd);
 	errno = error;
 	return (SEM_FAILED);
 }
@@ -204,21 +205,17 @@ int
 sem_unlink(const char *path)
 {
 	int	error;
-	int	oerrno;
+	int	lockfd;
 
 	if (__pos4obj_check(path) < 0)
 		return (-1);
 
-	if (__pos4obj_lock(path, SEM_LOCK_TYPE) < 0)
+	if ((lockfd = __pos4obj_lock(path, SEM_LOCK_TYPE)) < 0)
 		return (-1);
 
 	error =  __pos4obj_unlink(path, SEM_DATA_TYPE);
 
-	oerrno = errno;
-
-	(void) __pos4obj_unlock(path, SEM_LOCK_TYPE);
-
-	errno = oerrno;
+	__pos4obj_unlock(path, SEM_LOCK_TYPE, lockfd);
 
 	return (error);
 }

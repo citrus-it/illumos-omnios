@@ -23,6 +23,7 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2025 MNX Cloud, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_POS4OBJ_H
@@ -61,7 +62,7 @@ extern "C" {
 
 /* functions defined related to object names in POSIX.4 */
 extern	int	__pos4obj_lock(const char *, const char *);
-extern	int	__pos4obj_unlock(const char *, const char *);
+extern	void	__pos4obj_unlock(const char *, const char *, int);
 extern	int	__pos4obj_unlink(const char *, const char *);
 extern	int	__pos4obj_open(const char *, char *, int, mode_t, int *);
 extern	int	__pos4obj_check(const char *);

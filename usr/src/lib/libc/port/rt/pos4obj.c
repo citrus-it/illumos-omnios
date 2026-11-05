@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "lint.h"
@@ -288,8 +289,8 @@ __pos4obj_md5toa(unsigned char *dest, unsigned char *src)
  * It returns the crflag as 1 if file is created else 0.
  */
 int
-__pos4obj_open(const char *name, char *type, int oflag,
-		mode_t mode, int *crflag)
+__pos4obj_open(const char *name, char *type, int oflag, mode_t mode,
+    int *crflag)
 {
 	int fd;
 	char *dfile;
@@ -300,6 +301,8 @@ __pos4obj_open(const char *name, char *type, int oflag,
 	if ((dfile = __pos4obj_name(name, type)) == NULL) {
 		return (-1);
 	}
+
+	oflag |= O_CLOEXEC;
 
 	if (!(oflag & O_CREAT)) {
 		if ((fd = __open_nc(dfile, oflag, mode)) == -1)
@@ -358,46 +361,182 @@ __pos4obj_unlink(const char *name, const char *type)
 	return (err);
 }
 
+static int
+__pos4obj_setlock(int fd, short type)
+{
+	struct flock	fl;
+	int		ret;
+
+	(void) memset(&fl, 0, sizeof (fl));
+	fl.l_type = type;
+	fl.l_whence = SEEK_SET;
+
+	while ((ret = fcntl(fd, F_OFD_SETLKW, &fl)) == -1 && errno == EINTR)
+		;
+
+	return (ret);
+}
+
 /*
- * This function opens the lock file for each named object
- * the presence of this file in the file system is the lock
+ * Create the lock file with mode 0666. The file is created under a temporary
+ * name and linked into place once its mode has been set, so that it never
+ * appears in the namespace with a mode restricted by the umask. If the
+ * creator was killed between the create and the fchmod(), such a file would
+ * block other users indefinitely. A process killed part way through this
+ * leaves the temporary file behind instead, which nothing depends on.
+ *
+ * The temporary file is in the same directory as the lock file, with a prefix
+ * that no object type uses. If it already exists and cannot be removed, the
+ * lock file is created directly.
+ *
+ * Returns a descriptor for the new lock file, or -1 with errno set to EEXIST
+ * if it already exists.
+ */
+static int
+__pos4obj_lock_create(const char *dfile)
+{
+	const int	oflag = O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC;
+	const char	*slash;
+	char		*tfile;
+	size_t		len;
+	int		err;
+	int		fd;
+
+	slash = strrchr(dfile, '/');
+	len = (slash - dfile) + sizeof ("/.pos4tmp.") + 2 * 10 + 1;
+	if ((tfile = malloc(len)) == NULL)
+		return (-1);
+	(void) snprintf(tfile, len, "%.*s/.pos4tmp.%d.%u",
+	    (int)(slash - dfile), dfile, (int)getpid(), (uint_t)thr_self());
+
+	/* Any file with this name was left by a process that has gone. */
+	(void) unlink(tfile);
+
+	if ((fd = __open_nc(tfile, oflag, 0666)) < 0) {
+		free(tfile);
+		if ((fd = __open_nc(dfile, oflag, 0666)) >= 0)
+			(void) fchmod(fd, 0666);
+		return (fd);
+	}
+
+	if (fchmod(fd, 0666) != 0 || link(tfile, dfile) != 0) {
+		err = errno;
+		(void) __close_nc(fd);
+		errno = err;
+		fd = -1;
+	}
+
+	err = errno;
+	(void) unlink(tfile);
+	free(tfile);
+	errno = err;
+
+	return (fd);
+}
+
+/*
+ * Serialise operations on a named object. On success this returns a descriptor
+ * which must be passed to __pos4obj_unlock(), otherwise -1.
+ *
+ * The lock is an OFD lock on a per-object file. Waiters block in the kernel
+ * rather than polling, and the lock is released if the holder dies, so a file
+ * left behind by a process which was killed is harmless. A child that inherits
+ * the descriptor from a fork() in another thread keeps the lock alive if the
+ * holder then dies without unlocking.
+ *
+ * The file is removed on unlock unless it belongs to another user, since /tmp
+ * is sticky. Once the lock is held, we have to check that the file is still
+ * the one in the namespace, and try again if it is not.
+ *
+ * The file is created with mode 0666 regardless of umask so that other users
+ * can lock it; see __pos4obj_lock_create(). A file left by an older libc may
+ * be mode restricted, so EACCES is retried for a limited time. /tmp is world
+ * writable, so
+ * an existing file must not be followed if it is a symbolic link and is never
+ * modified other than to lock it.
  */
 int
 __pos4obj_lock(const char *name, const char *ltype)
 {
-	char	*dfile;
-	int	fd;
-	int	limit = 64;
+	struct stat64	fst, pst;
+	char		*dfile;
+	int		cancel_state;
+	int		err;
+	int		fd;
+	int		limit = 64;
 
 	if ((dfile = __pos4obj_name(name, ltype)) == NULL) {
 		return (-1);
 	}
 
-	while (limit-- > 0) {
-		if ((fd = __open_nc(dfile, O_RDWR | O_CREAT | O_EXCL, 0666))
-		    < 0) {
-			if (errno != EEXIST)
-				break;
-			(void) sleep(1);
-			continue;
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
+
+	for (;;) {
+		if ((fd = __pos4obj_lock_create(dfile)) < 0 &&
+		    errno == EEXIST) {
+			fd = __open_nc(dfile, O_RDWR | O_NOFOLLOW | O_CLOEXEC,
+			    0);
+			if (fd < 0 && errno == ENOENT)
+				continue;
+			if (fd < 0 && errno == EACCES && limit-- > 0) {
+				(void) sleep(1);
+				continue;
+			}
 		}
 
+		if (fd < 0)
+			break;
+
+		if (fstat64(fd, &fst) != 0) {
+			goto fail;
+		} else if (!S_ISREG(fst.st_mode)) {
+			errno = EINVAL;
+			goto fail;
+		}
+
+		if (__pos4obj_setlock(fd, F_WRLCK) != 0)
+			goto fail;
+
+		if (lstat64(dfile, &pst) == 0 && pst.st_dev == fst.st_dev &&
+		    pst.st_ino == fst.st_ino) {
+			break;
+		}
+
+		/* The holder we waited for removed the file. */
 		(void) __close_nc(fd);
-		free(dfile);
-		return (1);
+		continue;
+
+fail:
+		err = errno;
+		(void) __close_nc(fd);
+		errno = err;
+		fd = -1;
+		break;
 	}
 
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	free(dfile);
-	return (-1);
+	return (fd);
 }
 
 /*
- * Unlocks the file by unlinking it from the filesystem
+ * Release a lock taken with __pos4obj_lock(). The file is removed before the
+ * lock is released so that the next holder never has to deal with it going
+ * away. The lock is released explicitly, since a child created by a fork() in
+ * another thread could have a copy of the descriptor. errno is preserved
+ * because callers use this on their error paths, and removing the file is
+ * allowed to fail if it was created by another user.
  */
-int
-__pos4obj_unlock(const char *path, const char *type)
+void
+__pos4obj_unlock(const char *path, const char *type, int fd)
 {
-	return (__pos4obj_unlink(path, type));
+	int	olderrno = errno;
+
+	(void) __pos4obj_unlink(path, type);
+	(void) __pos4obj_setlock(fd, F_UNLCK);
+	(void) __close_nc(fd);
+
+	errno = olderrno;
 }
 
 /*

@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "lint.h"
@@ -37,34 +38,24 @@ shm_open(const char *path, int oflag, mode_t mode)
 {
 	int crflag;
 	int fd;
-	int flags;
+	int lockfd;
 
 	if (__pos4obj_check(path) == -1)
 		return (-1);
 
 	/* acquire semaphore lock to have atomic operation */
-	if (__pos4obj_lock(path, SHM_LOCK_TYPE) < 0)
+	if ((lockfd = __pos4obj_lock(path, SHM_LOCK_TYPE)) < 0)
 		return (-1);
 
 	fd = __pos4obj_open(path, SHM_DATA_TYPE, oflag, mode, &crflag);
 
 	if (fd < 0) {
-		(void) __pos4obj_unlock(path, SHM_LOCK_TYPE);
-		return (-1);
-	}
-
-	if ((flags = fcntl(fd, F_GETFD)) < 0 ||
-	    fcntl(fd, F_SETFD, flags | FD_CLOEXEC) < 0) {
-		(void) __pos4obj_unlock(path, SHM_LOCK_TYPE);
-		(void) __close_nc(fd);
+		__pos4obj_unlock(path, SHM_LOCK_TYPE, lockfd);
 		return (-1);
 	}
 
 	/* relase semaphore lock operation */
-	if (__pos4obj_unlock(path, SHM_LOCK_TYPE) < 0) {
-		(void) __close_nc(fd);
-		return (-1);
-	}
+	__pos4obj_unlock(path, SHM_LOCK_TYPE, lockfd);
 
 	return (fd);
 }
@@ -72,22 +63,19 @@ shm_open(const char *path, int oflag, mode_t mode)
 int
 shm_unlink(const char *path)
 {
-	int	oerrno;
 	int	err;
+	int	lockfd;
 
 	if (__pos4obj_check(path) < 0)
 		return (-1);
 
-	if (__pos4obj_lock(path, SHM_LOCK_TYPE) < 0)
+	if ((lockfd = __pos4obj_lock(path, SHM_LOCK_TYPE)) < 0)
 		return (-1);
 
 	err = __pos4obj_unlink(path, SHM_DATA_TYPE);
 
-	oerrno = errno;
+	__pos4obj_unlock(path, SHM_LOCK_TYPE, lockfd);
 
-	(void) __pos4obj_unlock(path, SHM_LOCK_TYPE);
-
-	errno = oerrno;
 	return (err);
 
 }

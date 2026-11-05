@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2025 MNX Cloud, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "lint.h"
@@ -371,6 +372,55 @@ owner_dead(mqdes_t *mqdp, int error)
 	errno = EBADMSG;
 }
 
+/*
+ * A message queue consists of a permission file and a data file. It is
+ * complete once both files exist and the first field of the data file has
+ * been set. The queue lock is held across the whole of mq_open() and
+ * mq_unlink() and is released if its holder dies, so with the lock held,
+ * any other combination of files is left over from a process that died
+ * part way through. Remove any such files so that the name can be used
+ * again. Files that cannot be examined are left alone, for the caller to
+ * report the error.
+ */
+static void
+mq_remove_incomplete(const char *path)
+{
+	int		fd, cr, err;
+	int64_t		size;
+	boolean_t	perm, data, complete = B_FALSE;
+
+	err = errno;
+
+	if ((fd = __pos4obj_open(path, MQ_PERM_TYPE, O_RDONLY, 0, &cr)) >= 0) {
+		(void) __close_nc(fd);
+		perm = B_TRUE;
+	} else if (errno == ENOENT) {
+		perm = B_FALSE;
+	} else {
+		/* The permission file exists, but cannot be opened */
+		perm = B_TRUE;
+	}
+
+	if ((fd = __pos4obj_open(path, MQ_DATA_TYPE, O_RDONLY, 0, &cr)) >= 0) {
+		data = B_TRUE;
+		complete = read(fd, &size, sizeof (size)) == sizeof (size) &&
+		    size != 0;
+		(void) __close_nc(fd);
+	} else if (errno == ENOENT) {
+		data = B_FALSE;
+	} else {
+		errno = err;
+		return;
+	}
+
+	if (data && !(perm && complete))
+		(void) __pos4obj_unlink(path, MQ_DATA_TYPE);
+	if (perm && !(data && complete))
+		(void) __pos4obj_unlink(path, MQ_PERM_TYPE);
+
+	errno = err;
+}
+
 mqd_t
 mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 {
@@ -380,7 +430,7 @@ mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	int		fd;
 	int		err;
 	int		cr_flag = 0;
-	int		locked = 0;
+	int		lockfd = -1;
 	uint64_t	total_size;
 	size_t		msgsize;
 	ssize_t		maxmsg;
@@ -394,9 +444,8 @@ mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 		return ((mqd_t)-1);
 
 	/* acquire MSGQ lock to have atomic operation */
-	if (__pos4obj_lock(path, MQ_LOCK_TYPE) < 0)
+	if ((lockfd = __pos4obj_lock(path, MQ_LOCK_TYPE)) < 0)
 		goto out;
-	locked = 1;
 
 	va_start(ap, oflag);
 	/* filter oflag to have READ/WRITE/CREATE modes only */
@@ -406,6 +455,9 @@ mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 		attr = va_arg(ap, struct mq_attr *);
 	}
 	va_end(ap);
+
+	if ((oflag & O_CREAT) != 0)
+		mq_remove_incomplete(path);
 
 	if ((fd = __pos4obj_open(path, MQ_PERM_TYPE, oflag,
 	    mode, &cr_flag)) < 0)
@@ -534,18 +586,17 @@ mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 	mqdp->mqd_magic = MQ_MAGIC;
 	mqdp->mqd_tcd = NULL;
 	mqdp->mqd_ownerdead = 0;
-	if (__pos4obj_unlock(path, MQ_LOCK_TYPE) == 0) {
-		lmutex_lock(&mq_list_lock);
-		mqdp->mqd_next = mq_list;
-		mqdp->mqd_prev = NULL;
-		if (mq_list)
-			mq_list->mqd_prev = mqdp;
-		mq_list = mqdp;
-		lmutex_unlock(&mq_list_lock);
-		return ((mqd_t)mqdp);
-	}
+	__pos4obj_unlock(path, MQ_LOCK_TYPE, lockfd);
 
-	locked = 0;	/* fall into the error case */
+	lmutex_lock(&mq_list_lock);
+	mqdp->mqd_next = mq_list;
+	mqdp->mqd_prev = NULL;
+	if (mq_list)
+		mq_list->mqd_prev = mqdp;
+	mq_list = mqdp;
+	lmutex_unlock(&mq_list_lock);
+	return ((mqd_t)mqdp);
+
 out:
 	err = errno;
 	if ((cr_flag & DFILE_OPEN) != 0)
@@ -559,8 +610,8 @@ out:
 		(void) munmap((caddr_t)mqhp, (size_t)total_size);
 	if ((cr_flag & MQDNP_MMAP) != 0)
 		(void) munmap((caddr_t)mqdnp, sizeof (struct mq_dn));
-	if (locked)
-		(void) __pos4obj_unlock(path, MQ_LOCK_TYPE);
+	if (lockfd >= 0)
+		__pos4obj_unlock(path, MQ_LOCK_TYPE, lockfd);
 	errno = err;
 	return ((mqd_t)-1);
 }
@@ -633,13 +684,16 @@ int
 mq_unlink(const char *path)
 {
 	int err;
+	int lockfd;
 
 	if (__pos4obj_check(path) < 0)
 		return (-1);
 
-	if (__pos4obj_lock(path, MQ_LOCK_TYPE) < 0) {
+	if ((lockfd = __pos4obj_lock(path, MQ_LOCK_TYPE)) < 0) {
 		return (-1);
 	}
+
+	mq_remove_incomplete(path);
 
 	err = __pos4obj_unlink(path, MQ_PERM_TYPE);
 
@@ -648,8 +702,7 @@ mq_unlink(const char *path)
 		err = __pos4obj_unlink(path, MQ_DATA_TYPE);
 	}
 
-	if (__pos4obj_unlock(path, MQ_LOCK_TYPE) < 0)
-		return (-1);
+	__pos4obj_unlock(path, MQ_LOCK_TYPE, lockfd);
 
 	return (err);
 
