@@ -21,6 +21,8 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2026 Oxide Computer Company
+#
 
 MODULE = ext-event-transport
 CLASS = common
@@ -29,6 +31,7 @@ SRCS = fmevt_main.c \
 	fmevt_inbound.c \
 	fmevt_inbound_default.c \
 	fmevt_inbound_on.c \
+	fmevt_inbound_oxide.c \
 	fmevt_inbound_smf.c \
 	fmevt_inbound_sunos.c
 

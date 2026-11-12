@@ -10,13 +10,13 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
-PROG= t6init
-OBJS=	t6init.o
-MANIFEST= t6init.xml
-SVCMETHOD= svc-t6init
+PROG= nicinit
+OBJS=	nicinit.o nicinit_t6.o nicinit_redhawk.o nicinit_sha3.o bitext.o
+MANIFEST= nicinit.xml
+SVCMETHOD= svc-nicinit
 
 include ../Makefile.cmd
 include ../Makefile.cmd.64
@@ -32,7 +32,9 @@ CSTD= $(CSTD_GNU99)
 CPPFLAGS += -I$(SRC)/uts/oxide -I$(ROOTPLATFORM)/include
 CPPFLAGS += -I$(SRC)/uts/common/io/pciex/
 LDFLAGS += -L$(ROOTPLATFORM)/lib/$(MACH64) -R$(PLATFORM)/lib/$(MACH64)
+LDFLAGS += -L$(ROOT)/usr/lib/fm/$(MACH64) -R/usr/lib/fm/$(MACH64)
 LDLIBS += -lt6mfg -lcfgadm -ldevinfo -lsocket -lumem -lipcc
+LDLIBS += -lfmevent -lnvpair -lxpio
 
 .KEEP_STATE:
 
@@ -54,5 +56,9 @@ $(ROOTUSRARCHBIN)/%: $(ROOTUSRARCHBIN) %
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
+
+%.o: $(SRC)/common/bitext/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 include ../Makefile.targ
