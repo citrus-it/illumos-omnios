@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2019 by Chelsio Communications, Inc. All rights reserved.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 # Copyright 2024 MNX Cloud, Inc.
 #
 
@@ -41,17 +41,11 @@ file path=kernel/firmware/cxgbe/t5fw_cfg.txt
 file path=kernel/firmware/cxgbe/t6fw-1.27.5.0.bin
 link path=kernel/firmware/cxgbe/t6fw.bin target=t6fw-1.27.5.0.bin
 file path=kernel/firmware/cxgbe/t6fw_cfg.txt
-file path=lib/svc/manifest/system/t6init.xml group=sys mode=0444
-file path=lib/svc/method/svc-t6init mode=0555
 dir  path=usr group=sys
 dir  path=usr/lib
 dir  path=usr/lib/$(ARCH64)
 file path=usr/lib/$(ARCH64)/libt6mfg.so.1
 file path=usr/lib/libt6mfg.so.1
-dir  path=usr/platform group=sys
-dir  path=usr/platform/oxide group=sys
-dir  path=usr/platform/oxide/bin group=sys
-file path=usr/platform/oxide/bin/t6init mode=0555
 dir  path=usr/sbin
 file path=usr/sbin/cxgbetool mode=0555
 file path=usr/sbin/t6mfgadm mode=0555
@@ -166,3 +160,12 @@ driver name=t4nex perms="* 0666 root sys" clone_perms="t4nex 0666 root sys" \
 driver name=t6mfg alias=pciex1425,b000
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+#
+# The service that initialises the NIC on Oxide boards used to be delivered by
+# this package. Depend on the package that it has moved to so that a system
+# which only installs this one still gets it.
+#
+# XXX This is only here to avoid a flag day and should be removed once the
+# package lists of the images that need the service include it.
+#
+depend type=require fmri=system/oxide/nicinit

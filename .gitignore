@@ -45,7 +45,7 @@ usr/src/cmd/mc/mcmargins
 usr/src/cmd/mc/spddump
 usr/src/cmd/osrotc/osrotc
 usr/src/cmd/psp/pspeinj
-usr/src/cmd/t6init/t6init
+usr/src/cmd/nicinit/nicinit
 usr/src/cmd/t6mfgadm/t6mfgadm
 usr/src/cmd/tmpx/tmpx
 usr/src/lib/libipcc/common/libipcc_dt.h

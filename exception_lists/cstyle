@@ -1236,6 +1236,7 @@ usr/src/cmd/bhyve/common/virtio.[ch]
 usr/src/cmd/bhyve/common/vmgenc.c
 usr/src/cmd/bhyve/test/tests/mevent/mevent_test.c
 usr/src/cmd/bhyvectl/bhyvectl.c
+usr/src/cmd/nicinit/nicinit_sha3.[ch]
 usr/src/compat/bhyve/*
 usr/src/contrib/bhyve/*
 usr/src/lib/libvmmapi/common/vmmapi.[ch]

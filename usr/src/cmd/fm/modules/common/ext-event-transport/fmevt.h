@@ -23,6 +23,10 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef _FMEVT_H
 #define	_FMEVT_H
 
@@ -129,6 +133,7 @@ extern fmevt_pp_func_t fmevt_pp_on_ereport;
 extern fmevt_pp_func_t fmevt_pp_smf;
 extern fmevt_pp_func_t fmevt_pp_on_sunos;
 extern fmevt_pp_func_t fmevt_pp_on_private;
+extern fmevt_pp_func_t fmevt_pp_oxide_ireport;
 extern fmevt_pp_func_t fmevt_pp_unregistered;
 
 #ifdef __cplusplus

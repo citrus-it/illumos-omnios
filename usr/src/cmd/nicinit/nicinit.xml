@@ -10,10 +10,10 @@
  source. A copy of the CDDL is also available via the Internet at
  http://www.illumos.org/license/CDDL.
 
- Copyright 2023 Oxide Computer Company
+ Copyright 2026 Oxide Computer Company
 -->
 <service_bundle type="manifest"
-                name="t6init">
+                name="nicinit">
 
     <service name="system/t6init"
              type="service"
@@ -49,17 +49,17 @@
             <service_fmri value="svc:/system/ipcc" />
         </dependency>
 
-	<!-- The full programming process takes around 51 seconds.
-	     Allow five minutes before going to maintenance. -->
+	<!-- The full programming process takes around 51 seconds for a T6.
+		XXX not yet timed for a Redhawk. -->
         <exec_method name="start"
                      type="method"
-                     timeout_seconds="300"
-                     exec="/lib/svc/method/svc-t6init %m" />
+                     timeout_seconds="600"
+                     exec="/lib/svc/method/svc-nicinit %m" />
 
         <exec_method name="stop"
                      type="method"
                      timeout_seconds="60"
-                     exec="/lib/svc/method/svc-t6init %m" />
+                     exec="/lib/svc/method/svc-nicinit %m" />
 
         <property_group name="startd"
                         type="framework">
@@ -72,7 +72,7 @@
 
         <template>
           <common_name>
-            <loctext xml:lang="C">Verify, program and initialise the T6</loctext>
+            <loctext xml:lang="C">Verify, program and initialise the NIC</loctext>
           </common_name>
         </template>
 

@@ -1,0 +1,37 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source. A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2026 Oxide Computer Company
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/oxide/nicinit@$(PKGVERS)
+set name=pkg.summary value="Oxide NIC service"
+set name=pkg.description \
+    value="Service that verifies, programs and brings online the NIC on Oxide boards"
+set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=variant.arch value=i386
+file path=lib/svc/manifest/system/nicinit.xml group=sys mode=0444
+file path=lib/svc/method/svc-nicinit mode=0555
+dir  path=usr group=sys
+dir  path=usr/platform group=sys
+dir  path=usr/platform/oxide group=sys
+dir  path=usr/platform/oxide/bin group=sys
+file path=usr/platform/oxide/bin/nicinit mode=0555
+license lic_CDDL license=lic_CDDL
+license usr/src/cmd/nicinit/THIRDPARTYLICENSE \
+    license=usr/src/cmd/nicinit/THIRDPARTYLICENSE

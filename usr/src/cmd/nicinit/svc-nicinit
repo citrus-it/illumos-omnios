@@ -1,0 +1,164 @@
+#!/bin/ksh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2026 Oxide Computer Company
+#
+
+. /lib/svc/share/smf_include.sh
+
+# This service attempts to bring the NIC on an Oxide board online.
+#
+# This script creates the DPIO (Dedicated Purpose I/O) for the pin that
+# controls whether a Chelsio T6 comes up in manufacturing or mission mode, on
+# platforms that have one. That needs hard-coded knowledge of where the pin
+# is.
+
+# GPIO location based on platform
+typeset -rA GPIOMAP=(
+	[Oxide,Gimlet]=(
+		[controller]=zen_gpio0
+		[gpio]=EGPIO9_3
+	)
+	[Oxide,Cosmo]=(
+		[controller]=zen_gpio0
+		[gpio]=AGPIO87
+	)
+)
+
+smf_is_globalzone || exit $SMF_EXIT_OK
+
+# Running this script with "mfgmode" as the sole argument is a development aid
+# that allows for quick switching back to manufacturing mode and does not have
+# to be run from smf(7).
+if [[ "$1" != "mfgmode" && -z "$SMF_FMRI" ]]; then
+        echo "this script can only be invoked by smf(7)"
+        exit $SMF_EXIT_ERR_NOSMF
+fi
+
+function scream {
+	logger -p kern.notice -t nicinit "$@"
+	cat <<-EOM | tee -a /dev/console
+
+		$(printf "%0.s#" {1..78})
+		#### NOTE: NIC PROBLEM
+		#### $@
+		$(printf "%0.s#" {1..78})
+	EOM
+}
+
+function fatal {
+	scream "$@"
+	echo "$@" >&2
+	exit $SMF_EXIT_ERR_FATAL
+}
+
+typeset -r GPIOADM=/usr/sbin/gpioadm
+
+typeset -r PLATFORM=$(prtconf /devices)
+typeset -r ARCH=$(uname -m)
+
+typeset -r DPIO_NAME=t6mission
+
+typeset -r NICINIT=/usr/platform/$ARCH/bin/nicinit
+
+# The exit status nicinit uses when it doesn't know of a NIC on this platform.
+typeset -r EXIT_UNSUPPORTED=4
+
+# The options that tell nicinit about the DPIO, on platforms that have one.
+typeset -a DPIOARGS=()
+
+function create_dpio {
+	typeset -r ctrl="${GPIOMAP[$PLATFORM][controller]}"
+	typeset -r gpio="${GPIOMAP[$PLATFORM][gpio]}"
+
+	[[ -n "${GPIOMAP[$PLATFORM]}" ]] || return
+
+	if [[ -z "$ctrl" || -z "$gpio" ]]; then
+		echo "Could not determine controller/gpio for $PLATFORM"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+
+	DPIOARGS=(-D $DPIO_NAME)
+
+	typeset existing=$($GPIOADM dpio list -Hpo controller,gpionum \
+	    $DPIO_NAME 2>/dev/null)
+
+	if (($? == 0)) && [[ -n "$existing" ]]; then
+		return
+	fi
+
+	echo "Configuring GPIO attributes"
+
+	typeset cur=$($GPIOADM gpio attr get -po value "$ctrl/$gpio" zen:output)
+	if [[ "$cur" == "disabled" ]]; then
+		$GPIOADM gpio attr set "$ctrl/$gpio" "zen:output=low" ||
+		    fatal "Failed to configure GPIO output"
+	fi
+
+	$GPIOADM gpio attr set "$ctrl/$gpio" "zen:pull=disabled" ||
+	    fatal "Failed to disable GPIO pulldown/up"
+
+	echo "Creating DPIO $DPIO_NAME over $ctrl/$gpio"
+	$GPIOADM dpio define -rw "$ctrl/$gpio" "$DPIO_NAME" || \
+	    fatal "Failed to define DPIO"
+
+	# Work around stlouis#294
+	echo "Waiting for DPIO device to appear"
+	while [[ ! -r /dev/dpio/$DPIO_NAME ]]; do
+		sleep 1
+		echo "  ... waiting"
+	done
+}
+
+# Run nicinit and pass the result on to smf(7). nicinit reports the problems
+# that it finds, including to the console, but it can also fail without having
+# reported anything there. Any failure is therefore reported to the console
+# from here as well.
+function run_nicinit {
+	$NICINIT -v "${DPIOARGS[@]}" "$@"
+	typeset -r rc=$?
+
+	case $rc in
+	0)
+		;;
+	$EXIT_UNSUPPORTED)
+		echo "$SMF_FMRI is not supported for $PLATFORM"
+		smf_method_exit $SMF_EXIT_TEMP_DISABLE \
+		    "not supported for $PLATFORM"
+		;;
+	*)
+		fatal "nicinit failed with status $rc"
+		;;
+	esac
+}
+
+case "$1" in
+start)
+	create_dpio
+	echo "Attempting to bring the NIC online"
+	run_nicinit
+	;;
+stop)
+	# No action taken on stop
+	;;
+mfgmode)
+	create_dpio
+	echo "Attempting to take the NIC offline"
+	run_nicinit -M
+	;;
+*)
+	fatal "ERROR: $0: unsupported command '$1'"
+	;;
+esac
+
+exit $SMF_EXIT_OK

@@ -406,6 +406,7 @@ usr/src/cmd/bhyve/common/tpm_emul.h
 usr/src/cmd/bhyve/common/tpm_intf.h
 usr/src/cmd/bhyve/common/tpm_ppi.h
 usr/src/cmd/bhyve/common/vmgenc.h
+usr/src/cmd/nicinit/nicinit_sha3.h
 usr/src/compat/bhyve/*
 usr/src/contrib/bhyve/*
 usr/src/lib/libvmmapi/common/vmmapi.h

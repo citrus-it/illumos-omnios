@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * Receive (on GPEC channels) raw events published by a few select producers
  * using the private libfmevent publication interfaces, and massage those
  * raw events into full protocol events.  Each raw event selects a "ruleset"
@@ -135,6 +139,7 @@ static struct fmevt_rs {
 	{ FMEV_RULESET_ON_EREPORT, fmevt_pp_on_ereport },
 	{ FMEV_RULESET_ON_SUNOS, fmevt_pp_on_sunos },
 	{ FMEV_RULESET_ON_PRIVATE, fmevt_pp_on_private },
+	{ FMEV_RULESET_OXIDE_IREPORT, fmevt_pp_oxide_ireport },
 	{ FMEV_RULESET_UNREGISTERED, fmevt_pp_unregistered }
 };
 
