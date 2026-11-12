@@ -23,6 +23,10 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef _LIBFMEVENT_RULESET_H
 #define	_LIBFMEVENT_RULESET_H
 
@@ -52,6 +56,7 @@
  */
 #define	FMEV_V_ALL		"*"
 #define	FMEV_V_SOLARIS_ON	"solaris-osnet"	/* Solaris ON Consolidation */
+#define	FMEV_V_OXIDE		"oxide"		/* Oxide platform */
 
 /*
  * Generic and namespace-agnostic rulesets
@@ -66,6 +71,12 @@
 #define	FMEV_RULESET_ON_EREPORT		FMEV_MKRS(SOLARIS_ON, "ereport")
 #define	FMEV_RULESET_ON_SUNOS		FMEV_MKRS(SOLARIS_ON, "sunos")
 #define	FMEV_RULESET_ON_PRIVATE		FMEV_MKRS(SOLARIS_ON, "private")
+
+/*
+ * Oxide rulesets. An event published with FMEV_RULESET_OXIDE_IREPORT becomes
+ * one of class ireport.oxide.<class>.<subclass>.
+ */
+#define	FMEV_RULESET_OXIDE_IREPORT	FMEV_MKRS(OXIDE, "ireport")
 
 #ifdef __cplusplus
 extern "C" {

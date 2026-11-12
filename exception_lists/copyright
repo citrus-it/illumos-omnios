@@ -505,6 +505,10 @@ usr/src/uts/intel/io/viona/THIRDPARTYLICENSE
 usr/src/uts/intel/io/viona/THIRDPARTYLICENSE.descrip
 usr/src/cmd/bhyve/README.license
 usr/src/cmd/bhyvectl/README.license
+usr/src/cmd/nicinit/THIRDPARTYLICENSE
+usr/src/cmd/nicinit/THIRDPARTYLICENSE.descrip
+usr/src/cmd/nicinit/nicinit_sha3.c
+usr/src/cmd/nicinit/nicinit_sha3.h
 usr/src/lib/libvmmapi/README.license
 
 #
