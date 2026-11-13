@@ -435,7 +435,14 @@ typedef enum pcie_quirk {
 	 * If this device is part of the root complex then the error source
 	 * ID may be wrong, and the whole fabric has to be scanned for errors.
 	 */
-	PCIE_QUIRK_RC_FULLSCAN		= 1 << 9
+	PCIE_QUIRK_RC_FULLSCAN		= 1 << 9,
+	/*
+	 * The device stops responding if it is sent a request which carries
+	 * an ECRC and which it has to forward. The ECRC enables of a root
+	 * port which has such a device directly below it are left however
+	 * firmware set them up.
+	 */
+	PCIE_QUIRK_ECRC_FORWARD		= 1 << 10
 } pcie_quirk_t;
 
 /*

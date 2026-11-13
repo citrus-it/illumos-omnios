@@ -618,6 +618,17 @@ typedef struct pcie_quirk_table {
 
 static const pcie_quirk_table_t pcie_quirks[] = {
 	/*
+	 * The ASPEED AST1150 PCIe-to-PCI bridge, which a BMC's video and USB
+	 * devices are behind. Revision 0x11 does not advertise support for
+	 * ECRC generation or checking. It answers a request which carries an
+	 * ECRC if the request is addressed to the bridge itself, but it stops
+	 * responding altogether once it is sent one which it has to forward.
+	 * The devices behind it are then lost until the system is power
+	 * cycled, and an access to one of them can hang the system.
+	 */
+	{ 0x1a03, 0x1150, 0x1150, 0, UINT8_MAX, PCIE_QUIRK_ECRC_FORWARD },
+
+	/*
 	 * Intel. Due to an erratum in the ESB2 southbridge, ECRC generation
 	 * and checking are not used on a system with an Intel root complex.
 	 * There is a workaround which sets a proprietary bit in the ESB2, but
@@ -2433,6 +2444,48 @@ pcie_fab_fini_bus(dev_info_t *rcdip, uint8_t flags)
 	ndi_devi_exit(rcdip);
 }
 
+/*
+ * Determine which of the ECRC functions selected by pcie_ecrc_value are to be
+ * enabled on a device, given the value of its AER capability and control
+ * register. Generation and checking are each enabled only if the device
+ * advertises that it is capable of them.
+ *
+ * Neither is enabled on a root port which has a device directly below it that
+ * cannot forward a request which carries an ECRC. The enables of that root
+ * port are left however firmware set them up. The device is only found if
+ * its node exists when the root port is initialised.
+ */
+static uint32_t
+pcie_ecrc_enables(dev_info_t *dip, uint32_t aerctl)
+{
+	const pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+	uint32_t ecrc = 0;
+
+	if ((aerctl & PCIE_AER_CTL_ECRC_GEN_CAP) != 0)
+		ecrc |= PCIE_AER_CTL_ECRC_GEN_ENA;
+	if ((aerctl & PCIE_AER_CTL_ECRC_CHECK_CAP) != 0)
+		ecrc |= PCIE_AER_CTL_ECRC_CHECK_ENA;
+	ecrc &= pcie_ecrc_value;
+
+	if (ecrc == 0 || !PCIE_IS_RP(bus_p))
+		return (ecrc);
+
+	ndi_devi_enter(dip);
+	for (dev_info_t *cdip = ddi_get_child(dip); cdip != NULL;
+	    cdip = ddi_get_next_sibling(cdip)) {
+		const pcie_bus_t *cbus_p = PCIE_DIP2BUS(cdip);
+
+		if (cbus_p != NULL &&
+		    (cbus_p->bus_quirks & PCIE_QUIRK_ECRC_FORWARD) != 0) {
+			ecrc = 0;
+			break;
+		}
+	}
+	ndi_devi_exit(dip);
+
+	return (ecrc);
+}
+
 void
 pcie_enable_errors(dev_info_t *dip)
 {
@@ -2506,7 +2559,7 @@ pcie_enable_errors(dev_info_t *dip)
 	/* Enable ECRC generation and checking */
 	if ((reg32 = PCIE_AER_GET(32, bus_p, PCIE_AER_CTL)) !=
 	    PCI_CAP_EINVAL32) {
-		tmp32 = reg32 | pcie_ecrc_value;
+		tmp32 = reg32 | pcie_ecrc_enables(dip, reg32);
 		PCIE_AER_PUT(32, bus_p, PCIE_AER_CTL, tmp32);
 		PCIE_DBG_AER(dip, bus_p, "AER CTL", 32, PCIE_AER_CTL, reg32);
 	}
