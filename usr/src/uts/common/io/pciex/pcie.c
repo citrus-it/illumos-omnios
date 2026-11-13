@@ -2316,6 +2316,49 @@ pcie_fab_fini_bus(dev_info_t *rcdip, uint8_t flags)
 	ndi_devi_exit(rcdip);
 }
 
+/*
+ * The combined device and vendor ID of the ASPEED AST1150 PCIe-to-PCI bridge,
+ * as held in bus_dev_ven_id. A BMC's VGA and USB devices are behind this
+ * bridge.
+ */
+#define	PCIE_ASPEED_AST1150	0x11501a03
+
+/*
+ * Determine whether ECRC may be enabled on a device.
+ *
+ * Revision 0x11 of the AST1150 does not advertise support for ECRC generation
+ * or checking. When it is directly below an AMD root port, enabling ECRC on
+ * that root port stops the BMC's video output, and a warm reset does not
+ * bring it back. It is not known which of the two devices is at fault, so
+ * ECRC is left as firmware configured it on any root port which has this
+ * bridge directly below it. The bridge is only found if its node exists when
+ * the root port is initialised.
+ */
+static boolean_t
+pcie_ecrc_allowed(dev_info_t *dip)
+{
+	const pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+	boolean_t allowed = B_TRUE;
+
+	if (!PCIE_IS_RP(bus_p))
+		return (B_TRUE);
+
+	ndi_devi_enter(dip);
+	for (dev_info_t *cdip = ddi_get_child(dip); cdip != NULL;
+	    cdip = ddi_get_next_sibling(cdip)) {
+		const pcie_bus_t *cbus_p = PCIE_DIP2BUS(cdip);
+
+		if (cbus_p != NULL &&
+		    cbus_p->bus_dev_ven_id == PCIE_ASPEED_AST1150) {
+			allowed = B_FALSE;
+			break;
+		}
+	}
+	ndi_devi_exit(dip);
+
+	return (allowed);
+}
+
 void
 pcie_enable_errors(dev_info_t *dip)
 {
@@ -2389,7 +2432,9 @@ pcie_enable_errors(dev_info_t *dip)
 	/* Enable ECRC generation and checking */
 	if ((reg32 = PCIE_AER_GET(32, bus_p, PCIE_AER_CTL)) !=
 	    PCI_CAP_EINVAL32) {
-		tmp32 = reg32 | pcie_ecrc_value;
+		tmp32 = reg32;
+		if (pcie_ecrc_allowed(dip))
+			tmp32 |= pcie_ecrc_value;
 		PCIE_AER_PUT(32, bus_p, PCIE_AER_CTL, tmp32);
 		PCIE_DBG_AER(dip, bus_p, "AER CTL", 32, PCIE_AER_CTL, reg32);
 	}
