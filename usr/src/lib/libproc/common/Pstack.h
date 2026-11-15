@@ -23,6 +23,9 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
 
 #ifndef	_PSTACK_H
 #define	_PSTACK_H
@@ -50,7 +53,10 @@ void init_uclist(uclist_t *ucl, struct ps_prochandle *P);
 void free_uclist(uclist_t *ucl);
 int find_uclink(uclist_t *ucl, uintptr_t addr);
 
-
+#if defined(__x86)
+boolean_t stack_realigned_args(struct ps_prochandle *P, uintptr_t pc,
+    uint32_t fp, uint32_t retpc, uint32_t *argpp);
+#endif
 
 #ifdef	__cplusplus
 }

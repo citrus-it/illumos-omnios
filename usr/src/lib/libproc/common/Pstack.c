@@ -23,6 +23,9 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
 
 /*
  * Pstack.c
@@ -35,6 +38,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/sysmacros.h>
 
 #include "libproc.h"
 #include "Pcontrol.h"
@@ -284,3 +288,116 @@ find_uclink(uclist_t *ucl, uintptr_t addr)
 
 	return (0);
 }
+
+#if defined(__x86)
+
+/*
+ * Realigned Stack Frames
+ *
+ * On illumos, GCC assumes only that the stack is aligned to four bytes on
+ * entry to a 32-bit function, which is all that the ABI requires. A function
+ * that needs more than that, as is the case when it stores an SSE type or a
+ * long double on the stack, has to realign the stack for itself. GCC also
+ * does this in main(). The prologue of such a function is as follows.
+ *
+ *	leal	0x4(%esp), %ecx		address of the first argument
+ *	andl	$-16, %esp		align the stack
+ *	pushl	-0x4(%ecx)		copy the return address
+ *	pushl	%ebp
+ *	movl	%esp, %ebp
+ *	pushl	%ebx			save callee-saved registers, if any
+ *	pushl	%ecx
+ *
+ * The result is a frame which looks like any other in that it has the saved
+ * frame pointer and a return address at its base, and so the stack can still
+ * be walked in the usual way. The arguments to the function are not directly
+ * above that frame though. They are above the original return address, and
+ * between the two is whatever padding was needed to align the stack.
+ *
+ *	+--------------+
+ *	|  arguments   |
+ *	+--------------+ <- saved %ecx points here
+ *	| return addr  |
+ *	+--------------+
+ *	|   padding    | 0 to (alignment - 4) bytes
+ *	+--------------+
+ *	| return addr  | copy
+ *	+--------------+
+ *	|  saved %ebp  |
+ *	+--------------+ <- %ebp
+ *	|  saved regs  | up to three callee-saved registers
+ *	+--------------+
+ *	|  saved %ecx  |
+ *	+--------------+
+ *
+ * Given an address within a function, the base of its frame and the return
+ * address found there, stack_realigned_args() determines whether the function
+ * has a prologue of this form. If it does, the address of its arguments is
+ * taken from the copy of %ecx which the prologue saved. That is found by
+ * looking for a value which points to just above a second copy of the return
+ * address, and which is no further from the frame than the alignment allows.
+ */
+boolean_t
+stack_realigned_args(struct ps_prochandle *P, uintptr_t pc, uint32_t fp,
+    uint32_t retpc, uint32_t *argpp)
+{
+	static const uint8_t prologue[] = {
+		0x8d, 0x4c, 0x24, 0x04,		/* leal 0x4(%esp), %ecx */
+		0x83, 0xe4, 0x00,		/* andl $imm8, %esp */
+		0xff, 0x71, 0xfc,		/* pushl -0x4(%ecx) */
+		0x55,				/* pushl %ebp */
+		0x89, 0xe5			/* movl %esp, %ebp */
+	};
+	const size_t imm = 6;
+	uint8_t ins[sizeof (prologue)];
+	uint32_t saved[4];
+	uint32_t align;
+	GElf_Sym sym;
+
+	/*
+	 * Until the function has established its frame, the one that we have
+	 * been given belongs to its caller.
+	 */
+	if (Pxlookup_by_addr(P, pc, NULL, 0, &sym, NULL) != 0 ||
+	    pc - sym.st_value < sizeof (ins) ||
+	    Pread(P, ins, sizeof (ins), sym.st_value) != sizeof (ins)) {
+		return (B_FALSE);
+	}
+
+	/*
+	 * The immediate operand is a mask with at least its top bit set, from
+	 * which we can recover the alignment.
+	 */
+	if ((ins[imm] & 0x80) == 0)
+		return (B_FALSE);
+	align = 0x100 - ins[imm];
+	ins[imm] = 0;
+	if (memcmp(ins, prologue, sizeof (ins)) != 0)
+		return (B_FALSE);
+
+	if (Pread(P, saved, sizeof (saved), fp - sizeof (saved)) !=
+	    sizeof (saved)) {
+		return (B_FALSE);
+	}
+
+	for (uint_t i = 0; i < ARRAY_SIZE(saved); i++) {
+		uint32_t argp = saved[i], ret;
+
+		/*
+		 * The arguments start one word beyond the padding, which is
+		 * itself above the two words at the base of the frame.
+		 */
+		if (argp - fp - 3 * sizeof (uint32_t) >= align)
+			continue;
+
+		if (Pread(P, &ret, sizeof (ret), argp - sizeof (ret)) ==
+		    sizeof (ret) && ret == retpc) {
+			*argpp = argp;
+			return (B_TRUE);
+		}
+	}
+
+	return (B_FALSE);
+}
+
+#endif	/* __x86 */

@@ -31,6 +31,11 @@ file path=opt/libproc-tests/tests/agent/agent_destroy.32 mode=0555
 file path=opt/libproc-tests/tests/agent/agent_destroy.64 mode=0555
 file path=opt/libproc-tests/tests/agent/agent_target.32 mode=0555
 file path=opt/libproc-tests/tests/agent/agent_target.64 mode=0555
+$(i386_ONLY)dir path=opt/libproc-tests/tests/stack
+$(i386_ONLY)file path=opt/libproc-tests/tests/stack/stack_iter mode=0555
+$(i386_ONLY)file path=opt/libproc-tests/tests/stack/stack_iter.32 mode=0555
+$(i386_ONLY)file path=opt/libproc-tests/tests/stack/stack_iter.64 mode=0555
+$(i386_ONLY)file path=opt/libproc-tests/tests/stack/stack_target.32 mode=0555
 dir  path=opt/libproc-tests/tests/syscall
 file path=opt/libproc-tests/tests/syscall/pr_inject mode=0555
 file path=opt/libproc-tests/tests/syscall/pr_inject.32 mode=0555

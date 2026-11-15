@@ -15,6 +15,8 @@
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = agent syscall
+SUBDIRS_i386 = stack
+
+SUBDIRS = agent syscall $(SUBDIRS_$(MACH))
 
 include $(SRC)/test/Makefile.com

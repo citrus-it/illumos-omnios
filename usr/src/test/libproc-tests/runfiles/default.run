@@ -23,4 +23,7 @@ outputdir = /var/tmp/test_results
 
 [/opt/libproc-tests/tests/agent/agent_destroy]
 
+[/opt/libproc-tests/tests/stack/stack_iter]
+arch = i86pc
+
 [/opt/libproc-tests/tests/syscall/pr_inject]

@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/stack.h>
@@ -239,15 +240,30 @@ Pstack_iter(struct ps_prochandle *P, const prgregset_t regs,
 			break;
 
 		if (fp != 0 &&
-		    (sz = Pread(P, &frame, sizeof (frame), (uintptr_t)fp)
-		    >= (ssize_t)(2* sizeof (long)))) {
+		    (sz = Pread(P, &frame, sizeof (frame), (uintptr_t)fp)) >=
+		    (ssize_t)(2 * sizeof (long))) {
 			/*
 			 * One more trick for signal frames: the kernel sets
 			 * the return pc of the signal frame to 0xffffffff on
 			 * Intel IA32, so argcount won't work.
 			 */
 			if (frame.pc != -1L) {
-				sz -= 2* sizeof (long);
+				uint32_t argp;
+
+				sz -= 2 * sizeof (long);
+
+				/*
+				 * If the function realigned its stack then its
+				 * arguments are not adjacent to the frame.
+				 */
+				if (stack_realigned_args(P, ctf_pc, fp,
+				    frame.pc, &argp)) {
+					sz = Pread(P, frame.args,
+					    sizeof (frame.args), argp);
+					if (sz < 0)
+						sz = 0;
+				}
+
 				if (argcount_ctf(P, ctf_pc, &argc)) {
 					argc = MIN(argc, 32);
 				} else {
