@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -44,15 +45,12 @@
  */
 void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 int	npe_disable_empty_bridges_workaround(dev_info_t *child);
-void	npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl);
-void	npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl);
+void	npe_error_workaround(ddi_acc_handle_t cfg_hdl);
 boolean_t npe_is_child_pci(dev_info_t *dip);
 int	npe_enable_htmsi(ddi_acc_handle_t cfg_hdl);
 void	npe_enable_htmsi_children(dev_info_t *dip);
 
 int	npe_enable_htmsi_flag = 1;
-
-extern uint32_t npe_aer_uce_mask;
 
 /*
  * Enable reporting of AER capability next pointer.
@@ -64,12 +62,12 @@ void
 npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl)
 {
 	ushort_t cya1;
+	const pcie_quirk_t quirks = pcie_quirks_lookup(
+	    pci_config_get16(cfg_hdl, PCI_CONF_VENID),
+	    pci_config_get16(cfg_hdl, PCI_CONF_DEVID),
+	    pci_config_get8(cfg_hdl, PCI_CONF_REVID));
 
-	if ((pci_config_get16(cfg_hdl, PCI_CONF_VENID) == NVIDIA_VENDOR_ID) &&
-	    (pci_config_get16(cfg_hdl, PCI_CONF_DEVID) ==
-	    NVIDIA_CK804_DEVICE_ID) &&
-	    (pci_config_get8(cfg_hdl, PCI_CONF_REVID) >=
-	    NVIDIA_CK804_AER_VALID_REVID)) {
+	if ((quirks & PCIE_QUIRK_AER_PTR) != 0) {
 		cya1 =  pci_config_get16(cfg_hdl, NVIDIA_CK804_VEND_CYA1_OFF);
 		if (!(cya1 & ~NVIDIA_CK804_VEND_CYA1_ERPT_MASK))
 			(void) pci_config_put16(cfg_hdl,
@@ -99,62 +97,34 @@ npe_disable_empty_bridges_workaround(dev_info_t *child)
 	return (0);
 }
 
+/*
+ * Apply the quirks of a device in the root complex which affect error
+ * handling across the whole system.
+ */
 void
-npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl)
+npe_error_workaround(ddi_acc_handle_t cfg_hdl)
 {
-	uint32_t regs;
-	uint16_t vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
-	uint16_t dev_id = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
+	const pcie_quirk_t quirks = pcie_quirks_lookup(
+	    pci_config_get16(cfg_hdl, PCI_CONF_VENID),
+	    pci_config_get16(cfg_hdl, PCI_CONF_DEVID),
+	    pci_config_get8(cfg_hdl, PCI_CONF_REVID));
 
-	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(dev_id)) {
-		/* Disable ECRC for all devices */
-		regs = pcie_get_aer_uce_mask() | npe_aer_uce_mask |
-		    PCIE_AER_UCE_ECRC;
-		pcie_set_aer_uce_mask(regs);
+	/*
+	 * Disable ECRC generation/checking by masking ECRC in the AER UE
+	 * Mask. The pcie misc module would then automatically disable ECRC
+	 * generation/checking in the AER Control register.
+	 */
+	if ((quirks & PCIE_QUIRK_RC_NO_ECRC) != 0) {
+		pcie_set_aer_uce_mask(pcie_get_aer_uce_mask() |
+		    PCIE_AER_UCE_ECRC);
+	}
 
-		/*
-		 * Turn full scan on since the Error Source ID register may not
-		 * have the correct ID.
-		 */
+	/*
+	 * Turn full scan on since the Error Source ID register may not have
+	 * the correct ID.
+	 */
+	if ((quirks & PCIE_QUIRK_RC_FULLSCAN) != 0)
 		pcie_force_fullscan();
-	}
-}
-
-void
-npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl)
-{
-	uint32_t regs;
-	uint16_t vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
-	uint16_t dev_id = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
-
-	if (vendor_id == INTEL_VENDOR_ID) {
-		/*
-		 * Due to an errata in Intel's ESB2 southbridge, all ECRCs
-		 * generation/checking need to be disabled.  There is a
-		 * workaround by setting a proprietary bit in the ESB2, but it
-		 * is not well documented or understood.  If that bit is set in
-		 * the future, then ECRC generation/checking should be enabled
-		 * again.
-		 *
-		 * Disable ECRC generation/checking by masking ECRC in the AER
-		 * UE Mask.  The pcie misc module would then automatically
-		 * disable ECRC generation/checking in the AER Control register.
-		 */
-		regs = pcie_get_aer_uce_mask() | PCIE_AER_UCE_ECRC;
-		pcie_set_aer_uce_mask(regs);
-
-		if (INTEL_NB5500_PCIE_DEV_ID(dev_id) ||
-		    INTEL_NB5520_PCIE_DEV_ID(dev_id)) {
-			/*
-			 * Turn full scan on since the Error Source ID register
-			 * may not have the correct ID. See Intel 5520 and
-			 * Intel 5500 Chipsets errata #34 and #54 in the August
-			 * 2009 specification update, document number
-			 * 321329-006.
-			 */
-			pcie_force_fullscan();
-		}
-	}
 }
 
 /*

@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_SYS_PCIE_IMPL_H
@@ -111,6 +111,7 @@ extern "C" {
 
 #define	PCIE_VENID(bus_p)	(bus_p->bus_dev_ven_id & 0xffff)
 #define	PCIE_DEVID(bus_p)	((bus_p->bus_dev_ven_id >> 16) & 0xffff)
+#define	PCIE_REVID(bus_p)	(bus_p->bus_rev_id)
 
 /* PCIE Cap/AER shortcuts */
 #define	PCIE_GET(sz, bus_p, off) \
@@ -381,6 +382,63 @@ typedef struct pice_fabric_data {
 } pcie_fabric_data_t;
 
 /*
+ * Quirks of particular devices. These are assigned by the table in pcie.c,
+ * which matches a device on its vendor, device and revision IDs, and are
+ * held in the bus_quirks member of its pcie_bus_t.
+ */
+typedef enum pcie_quirk {
+	/*
+	 * SERR must not be enabled in the bridge control register of this
+	 * bridge as it could lead to bogus NMIs.
+	 */
+	PCIE_QUIRK_NO_BDG_SERR		= 1 << 0,
+	/*
+	 * When a function of this multi-function bridge attaches, its sibling
+	 * needs its maximum payload and read request sizes set if they have
+	 * not been already.
+	 */
+	PCIE_QUIRK_SIBLING_MPS		= 1 << 1,
+	/*
+	 * A root port from this vendor takes PME through an MSI, and has to
+	 * fall back to INTx unless every MSI it asks for is allocated.
+	 */
+	PCIE_QUIRK_RP_PME_MSI		= 1 << 2,
+	/*
+	 * The device cannot use MSIs for hotplug.
+	 */
+	PCIE_QUIRK_NO_HP_MSI		= 1 << 3,
+	/*
+	 * Read completion coalescing has to be disabled on this device if
+	 * the maximum payload size is 256 bytes.
+	 */
+	PCIE_QUIRK_NO_COALESCE		= 1 << 4,
+	/*
+	 * A switch from this vendor needs SERR enabled in its command
+	 * register in order to forward error messages.
+	 */
+	PCIE_QUIRK_SW_SERR		= 1 << 5,
+	/*
+	 * The AER capability of this device cannot be used.
+	 */
+	PCIE_QUIRK_NO_AER		= 1 << 6,
+	/*
+	 * The device only reports the next pointer of its AER capability
+	 * once a vendor-specific register has been set.
+	 */
+	PCIE_QUIRK_AER_PTR		= 1 << 7,
+	/*
+	 * If this device is part of the root complex then ECRC cannot be
+	 * used anywhere in the system.
+	 */
+	PCIE_QUIRK_RC_NO_ECRC		= 1 << 8,
+	/*
+	 * If this device is part of the root complex then the error source
+	 * ID may be wrong, and the whole fabric has to be scanned for errors.
+	 */
+	PCIE_QUIRK_RC_FULLSCAN		= 1 << 9
+} pcie_quirk_t;
+
+/*
  * For hot plugged device, these data are init'ed during during probe
  * For non-hotplugged device, these data are init'ed in pci_autoconfig (on x86),
  * or in px_attach()(on sparc).
@@ -464,6 +522,9 @@ typedef struct pcie_bus {
 	 * corresponding root port dip information.
 	 */
 	pcie_fabric_data_t	*bus_fab;
+
+	/* The quirks which apply to this device. */
+	pcie_quirk_t		bus_quirks;
 } pcie_bus_t;
 
 /*
@@ -714,6 +775,7 @@ extern int pf_hdl_lookup(dev_info_t *, uint64_t, uint32_t, uint64_t,
     pcie_req_id_t);
 extern int pf_tlp_decode(pcie_bus_t *, pf_pcie_adv_err_regs_t *);
 extern void pcie_force_fullscan();
+extern pcie_quirk_t pcie_quirks_lookup(uint16_t, uint16_t, uint8_t);
 
 #ifdef	DEBUG
 extern uint_t pcie_debug_flags;

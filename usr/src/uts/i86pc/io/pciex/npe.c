@@ -27,7 +27,7 @@
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -211,8 +211,7 @@ static int npe_initchild(dev_info_t *child);
  */
 extern void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
-extern void	npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl);
-extern void	npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl);
+extern void	npe_error_workaround(ddi_acc_handle_t cfg_hdl);
 extern boolean_t npe_is_mmcfg_supported(dev_info_t *dip);
 extern void	npe_enable_htmsi_children(dev_info_t *dip);
 extern int	npe_save_htconfig_children(dev_info_t *dip);
@@ -1054,21 +1053,14 @@ npe_initchild(dev_info_t *child)
 
 	if (pci_config_setup(child, &cfg_hdl) == DDI_SUCCESS) {
 		npe_ck804_fix_aer_ptr(cfg_hdl);
-		npe_nvidia_error_workaround(cfg_hdl);
-		npe_intel_error_workaround(cfg_hdl);
+		npe_error_workaround(cfg_hdl);
 		pci_config_teardown(&cfg_hdl);
 	}
 
 	bus_p = PCIE_DIP2BUS(child);
 	if (bus_p) {
-		uint16_t device_id = (uint16_t)(bus_p->bus_dev_ven_id >> 16);
-		uint16_t vendor_id = (uint16_t)(bus_p->bus_dev_ven_id & 0xFFFF);
-		uint16_t rev_id = bus_p->bus_rev_id;
-
-		/* Disable AER for certain NVIDIA Chipsets */
-		if ((vendor_id == NVIDIA_VENDOR_ID) &&
-		    (device_id == NVIDIA_CK804_DEVICE_ID) &&
-		    (rev_id < NVIDIA_CK804_AER_VALID_REVID))
+		/* Disable AER for devices which cannot use it */
+		if ((bus_p->bus_quirks & PCIE_QUIRK_NO_AER) != 0)
 			bus_p->bus_aer_off = 0;
 
 		pcie_init_dom(child);

@@ -3588,12 +3588,12 @@ ck804_fix_aer_ptr(dev_info_t *dip, pcie_req_id_t bdf)
 	rcdip = pcie_get_rc_dip(dip);
 	ASSERT(rcdip != NULL);
 
-	if ((pci_cfgacc_get16(rcdip, bdf, PCI_CONF_VENID) ==
-	    NVIDIA_VENDOR_ID) &&
-	    (pci_cfgacc_get16(rcdip, bdf, PCI_CONF_DEVID) ==
-	    NVIDIA_CK804_DEVICE_ID) &&
-	    (pci_cfgacc_get8(rcdip, bdf, PCI_CONF_REVID) >=
-	    NVIDIA_CK804_AER_VALID_REVID)) {
+	const pcie_quirk_t quirks = pcie_quirks_lookup(
+	    pci_cfgacc_get16(rcdip, bdf, PCI_CONF_VENID),
+	    pci_cfgacc_get16(rcdip, bdf, PCI_CONF_DEVID),
+	    pci_cfgacc_get8(rcdip, bdf, PCI_CONF_REVID));
+
+	if ((quirks & PCIE_QUIRK_AER_PTR) != 0) {
 		cya1 = pci_cfgacc_get16(rcdip, bdf, NVIDIA_CK804_VEND_CYA1_OFF);
 		if (!(cya1 & ~NVIDIA_CK804_VEND_CYA1_ERPT_MASK))
 			(void) pci_cfgacc_put16(rcdip, bdf,

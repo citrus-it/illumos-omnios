@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_PCIEX_PCI_INTEL_NB5000_H
@@ -32,25 +33,6 @@ extern "C" {
 #endif
 
 #define	INTEL_VENDOR_ID	0x8086
-
-#define	INTEL_NB5000_PCIE_DEV_ID(did) (((did) >= 0x3600 && (did) <= 0x360a) || \
-	((did) == 0x25d8 || (did) == 0x25d4 || (did) == 0x25c0 || \
-	(did) == 0x25d0 || ((did) >= 0x25e2 && (did) <= 0x25e7)) || \
-	((did) >= 0x25f7 && (did) <= 0x25fa) || \
-	(did) == 0x4000 || (did) == 0x4001 || (did) == 0x4003 || \
-	((did) >= 0x4021 && (did) <= 0x402e))
-
-#define	INTEL_NB5100_PCIE_DEV_ID(did) (((did) >= 0x65e2 && (did) <= 0x65e7) || \
-	((did) >= 0x65f7 && (did) <= 0x65fa))
-
-#define	INTEL_NB5500_PCIE_DEV_ID(did) (((did) >= 0x3408 && (did) <= 0x3411) || \
-	(did) == 0x3420 || (did) == 0x3403)
-
-#define	INTEL_NB5520_PCIE_DEV_ID(did) (((did) >= 0x3408 && (did) <= 0x3411) || \
-	(did) == 0x3421 || (did) == 0x3406)
-
-#define	INTEL_ESB2_SW_PCIE_DEV_ID(did) (((did) >= 0x3500 && (did) <= 0x3503) ||\
-	((did) >= 0x3510 && (did) <= 0x351B))
 
 #define	INTEL_NB5000_PEXCTRL_OFFSET		0x48
 #define	INTEL_NB5000_PEXCTRL_COALESCE_EN	0x400

@@ -603,6 +603,120 @@ int pcie_disable_ari = 0;
 int pcie_disable_lbw = 0;
 
 /*
+ * Devices which have quirks. A device is matched on its vendor ID, an
+ * inclusive range of device IDs and an inclusive range of revision IDs. It is
+ * given the quirks of every entry which it matches.
+ */
+typedef struct pcie_quirk_table {
+	uint16_t	pq_vid;
+	uint16_t	pq_did_lo;
+	uint16_t	pq_did_hi;
+	uint8_t		pq_rev_lo;
+	uint8_t		pq_rev_hi;
+	pcie_quirk_t	pq_quirks;
+} pcie_quirk_table_t;
+
+static const pcie_quirk_table_t pcie_quirks[] = {
+	/*
+	 * Intel. Due to an erratum in the ESB2 southbridge, ECRC generation
+	 * and checking are not used on a system with an Intel root complex.
+	 * There is a workaround which sets a proprietary bit in the ESB2, but
+	 * it is not well documented or understood. Intel switches need SERR
+	 * enabled to forward error messages, which is not what the PCIe
+	 * specification describes.
+	 */
+	{ 0x8086, 0, UINT16_MAX, 0, UINT8_MAX,
+	    PCIE_QUIRK_RC_NO_ECRC | PCIE_QUIRK_SW_SERR },
+	/*
+	 * Intel 41210 PCIe-to-PCI bridge, functions 0 and 2. This is an
+	 * undocumented hardware erratum.
+	 */
+	{ 0x8086, 0x0340, 0x0341, 0, UINT8_MAX, PCIE_QUIRK_SIBLING_MPS },
+	/*
+	 * Intel 5000 chipset. An erratum requires read completion coalescing
+	 * to be disabled if the maximum payload size is 256 bytes.
+	 */
+	{ 0x8086, 0x25c0, 0x25c0, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x25d0, 0x25d0, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x25d4, 0x25d4, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x25d8, 0x25d8, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x25e2, 0x25e7, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x25f7, 0x25fa, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x3600, 0x360a, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x4000, 0x4001, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x4003, 0x4003, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x4021, 0x402e, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	/* Intel 5100 chipset */
+	{ 0x8086, 0x65e2, 0x65e7, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	{ 0x8086, 0x65f7, 0x65fa, 0, UINT8_MAX, PCIE_QUIRK_NO_COALESCE },
+	/*
+	 * Intel 5500 and 5520 chipsets. See errata 34 and 54 in the August
+	 * 2009 specification update, document number 321329-006.
+	 */
+	{ 0x8086, 0x3403, 0x3403, 0, UINT8_MAX, PCIE_QUIRK_RC_FULLSCAN },
+	{ 0x8086, 0x3406, 0x3406, 0, UINT8_MAX, PCIE_QUIRK_RC_FULLSCAN },
+	{ 0x8086, 0x3408, 0x3411, 0, UINT8_MAX, PCIE_QUIRK_RC_FULLSCAN },
+	{ 0x8086, 0x3420, 0x3421, 0, UINT8_MAX, PCIE_QUIRK_RC_FULLSCAN },
+	/*
+	 * Intel ESB2 switches. An erratum prevents the use of MSIs for
+	 * hotplug.
+	 */
+	{ 0x8086, 0x3500, 0x3503, 0, UINT8_MAX, PCIE_QUIRK_NO_HP_MSI },
+	{ 0x8086, 0x3510, 0x351b, 0, UINT8_MAX, PCIE_QUIRK_NO_HP_MSI },
+
+	/* Nvidia. The MSI erratum is known for MCP55 and other chipsets. */
+	{ 0x10de, 0, UINT16_MAX, 0, UINT8_MAX, PCIE_QUIRK_RP_PME_MSI },
+	/*
+	 * Nvidia CK8-04. AER is usable from revision 0xa3, where the BIOS
+	 * disables the reporting of the capability's next pointer.
+	 */
+	{ 0x10de, 0x005d, 0x005d, 0, 0xa2, PCIE_QUIRK_NO_AER },
+	{ 0x10de, 0x005d, 0x005d, 0xa3, UINT8_MAX, PCIE_QUIRK_AER_PTR },
+	/* Nvidia CK8-04, C51, MCP55, MCP61 and MCP65 root complexes */
+	{ 0x10de, 0x005d, 0x005d, 0, UINT8_MAX,
+	    PCIE_QUIRK_RC_NO_ECRC | PCIE_QUIRK_RC_FULLSCAN },
+	{ 0x10de, 0x02fb, 0x02fd, 0, UINT8_MAX,
+	    PCIE_QUIRK_RC_NO_ECRC | PCIE_QUIRK_RC_FULLSCAN },
+	{ 0x10de, 0x0374, 0x0378, 0, UINT8_MAX,
+	    PCIE_QUIRK_RC_NO_ECRC | PCIE_QUIRK_RC_FULLSCAN },
+	{ 0x10de, 0x03e8, 0x03e9, 0, UINT8_MAX,
+	    PCIE_QUIRK_RC_NO_ECRC | PCIE_QUIRK_RC_FULLSCAN },
+	{ 0x10de, 0x0458, 0x045a, 0, UINT8_MAX,
+	    PCIE_QUIRK_RC_NO_ECRC | PCIE_QUIRK_RC_FULLSCAN },
+	/*
+	 * An Nvidia bridge. Enabling SERR in its bridge control register
+	 * could lead to bogus NMIs.
+	 */
+	{ 0x10de, 0x0370, 0x0370, 0, UINT8_MAX, PCIE_QUIRK_NO_BDG_SERR },
+
+	/* PLX switches need SERR enabled as Intel ones do. */
+	{ 0x10b5, 0, UINT16_MAX, 0, UINT8_MAX, PCIE_QUIRK_SW_SERR }
+};
+
+/*
+ * Return the quirks of a device, given its vendor, device and revision IDs.
+ * Most callers want the bus_quirks member of the device's pcie_bus_t instead.
+ * This is for use where that does not exist yet.
+ */
+pcie_quirk_t
+pcie_quirks_lookup(uint16_t vid, uint16_t did, uint8_t rev)
+{
+	pcie_quirk_t quirks = 0;
+
+	for (uint_t i = 0; i < ARRAY_SIZE(pcie_quirks); i++) {
+		const pcie_quirk_table_t *pq = &pcie_quirks[i];
+
+		if (vid == pq->pq_vid &&
+		    did >= pq->pq_did_lo && did <= pq->pq_did_hi &&
+		    rev >= pq->pq_rev_lo && rev <= pq->pq_rev_hi) {
+			quirks |= pq->pq_quirks;
+		}
+	}
+
+	return (quirks);
+}
+
+/*
  * Amount of time to wait for an in-progress retraining. The default is to try
  * 500 times in 10ms chunks, thus a total of 5s.
  */
@@ -1120,11 +1234,11 @@ pcie_initchild(dev_info_t *cdip)
 
 		tmp16 |= PCI_BCNF_BCNTRL_SERR_ENABLE;
 		/*
-		 * Workaround for this Nvidia bridge. Don't enable the SERR
+		 * Workaround for some bridges. Don't enable the SERR
 		 * enable bit in the bridge control register as it could lead to
 		 * bogus NMIs.
 		 */
-		if (bus_p->bus_dev_ven_id == 0x037010DE)
+		if ((bus_p->bus_quirks & PCIE_QUIRK_NO_BDG_SERR) != 0)
 			tmp16 &= ~PCI_BCNF_BCNTRL_SERR_ENABLE;
 
 		if (pcie_command_default & PCI_COMM_PARITY_DETECT)
@@ -1900,6 +2014,7 @@ pcie_capture_speeds(dev_info_t *dip)
  * int			bus_mps
  * uint64_t		bus_cfgacc_base
  * void	*		<bus_plat_private>
+ * pcie_quirk_t		bus_quirks
  */
 
 pcie_bus_t *
@@ -1927,6 +2042,8 @@ pcie_init_bus(dev_info_t *dip, pcie_req_id_t bdf, uint8_t flags)
 	/* Save the Vendor ID, Device ID and revision ID */
 	bus_p->bus_dev_ven_id = pci_cfgacc_get32(rcdip, bdf, PCI_CONF_VENID);
 	bus_p->bus_rev_id = pci_cfgacc_get8(rcdip, bdf, PCI_CONF_REVID);
+	bus_p->bus_quirks = pcie_quirks_lookup(PCIE_VENID(bus_p),
+	    PCIE_DEVID(bus_p), PCIE_REVID(bus_p));
 	/* Save the Header Type */
 	bus_p->bus_hdr_type = pci_cfgacc_get8(rcdip, bdf, PCI_CONF_HEADER);
 	bus_p->bus_hdr_type &= PCI_HEADER_TYPE_M;
@@ -3006,6 +3123,7 @@ pcie_print_bus(pcie_bus_t *bus_p)
 	pcie_dbg("\tbus_bdf = 0x%x\n", bus_p->bus_bdf);
 	pcie_dbg("\tbus_dev_ven_id = 0x%x\n", bus_p->bus_dev_ven_id);
 	pcie_dbg("\tbus_rev_id = 0x%x\n", bus_p->bus_rev_id);
+	pcie_dbg("\tbus_quirks = 0x%x\n", bus_p->bus_quirks);
 	pcie_dbg("\tbus_hdr_type = 0x%x\n", bus_p->bus_hdr_type);
 	pcie_dbg("\tbus_dev_type = 0x%x\n", bus_p->bus_dev_type);
 	pcie_dbg("\tbus_bdg_secbus = 0x%x\n", bus_p->bus_bdg_secbus);

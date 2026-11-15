@@ -24,7 +24,7 @@
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -398,11 +398,10 @@ pcieb_probe(dev_info_t *devi)
 }
 
 /*
- * This is a workaround for an undocumented HW erratum with the
- * multi-function, F0 and F2, Intel 41210 PCIe-to-PCI bridge. When
- * Fn (cdip) attaches, this workaround is called to initialize Fn's
- * sibling (sdip) with MPS/MRRS if it isn't already configured.
- * Doing so prevents a malformed TLP panic.
+ * This is a workaround for a HW erratum with some multi-function
+ * bridges. When Fn (cdip) attaches, this workaround is called to
+ * initialize Fn's sibling (sdip) with MPS/MRRS if it isn't already
+ * configured. Doing so prevents a malformed TLP panic.
  */
 static void
 pcieb_41210_mps_wkrnd(dev_info_t *cdip)
@@ -422,15 +421,18 @@ pcieb_41210_mps_wkrnd(dev_info_t *cdip)
 	for (sdip = ddi_get_child(ddi_get_parent(cdip)); sdip;
 	    sdip = ddi_get_next_sibling(sdip)) {
 		uint16_t sdip_dev_ctrl, sdip_mrrs_mps, cap_ptr;
-		uint32_t bus_dev_ven_id;
 
 		if (sdip == cdip || pci_config_setup(sdip, &cfg_hdl)
 		    != DDI_SUCCESS)
 			continue;
 
-		/* must be an Intel 41210 bridge */
-		bus_dev_ven_id = pci_config_get32(cfg_hdl, PCI_CONF_VENID);
-		if (!PCIEB_IS_41210_BRIDGE(bus_dev_ven_id)) {
+		const pcie_quirk_t sdip_quirks = pcie_quirks_lookup(
+		    pci_config_get16(cfg_hdl, PCI_CONF_VENID),
+		    pci_config_get16(cfg_hdl, PCI_CONF_DEVID),
+		    pci_config_get8(cfg_hdl, PCI_CONF_REVID));
+
+		/* must be a bridge with the same quirk */
+		if ((sdip_quirks & PCIE_QUIRK_SIBLING_MPS) == 0) {
 			pci_config_teardown(&cfg_hdl);
 			continue;
 		}
@@ -580,9 +582,9 @@ pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if (pcie_init(devi, NULL) != DDI_SUCCESS)
 		goto fail;
 
-	/* Intel PCIe-to-PCI 41210 bridge workaround -- if applicable */
+	/* Sibling MPS/MRRS workaround -- if applicable */
 	if (pcieb_disable_41210_wkarnd == 0 &&
-	    PCIEB_IS_41210_BRIDGE(bus_p->bus_dev_ven_id))
+	    (bus_p->bus_quirks & PCIE_QUIRK_SIBLING_MPS) != 0)
 		pcieb_41210_mps_wkrnd(devi);
 
 	/*
@@ -1126,7 +1128,6 @@ pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 	int		inum = 0;
 	int		ret;
 	pcie_bus_t	*bus_p = PCIE_DIP2UPBUS(dip);
-	uint16_t	vendorid = bus_p->bus_dev_ven_id & 0xFFFF;
 	boolean_t	is_hp = B_FALSE;
 	boolean_t	is_pme = B_FALSE;
 	boolean_t	is_lbw = B_FALSE;
@@ -1140,7 +1141,7 @@ pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 	}
 
 	if ((intr_type == DDI_INTR_TYPE_MSI) && PCIE_IS_RP(bus_p) &&
-	    (vendorid == NVIDIA_VENDOR_ID)) {
+	    (bus_p->bus_quirks & PCIE_QUIRK_RP_PME_MSI) != 0) {
 		is_pme = B_TRUE;
 	}
 
@@ -1213,11 +1214,12 @@ pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 	}
 
 	/*
-	 * NVidia (MCP55 and other) chipsets have a errata that if the number
-	 * of requested MSI intrs is not allocated we have to fall back to INTx.
+	 * Some root ports have an erratum that if the number of requested MSI
+	 * intrs is not allocated we have to fall back to INTx.
 	 */
 	if (intr_type == DDI_INTR_TYPE_MSI) {
-		if (PCIE_IS_RP(bus_p) && (vendorid == NVIDIA_VENDOR_ID)) {
+		if (PCIE_IS_RP(bus_p) &&
+		    (bus_p->bus_quirks & PCIE_QUIRK_RP_PME_MSI) != 0) {
 			if (request != count)
 				goto FAIL;
 		}

@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /* x86 specific code used by the pcieb driver */
@@ -152,17 +153,14 @@ pcieb_plat_pwr_disable(dev_info_t *dip)
 boolean_t
 pcieb_plat_msi_supported(dev_info_t *dip)
 {
-	pcie_bus_t *bus_p = PCIE_DIP2UPBUS(dip);
-	uint16_t vendor_id, device_id;
-	vendor_id = bus_p->bus_dev_ven_id & 0xFFFF;
-	device_id = bus_p->bus_dev_ven_id >> 16;
+	const pcie_bus_t *bus_p = PCIE_DIP2UPBUS(dip);
 
 	/*
-	 * Intel ESB2 switches have a errata which prevents using MSIs
+	 * Some switches have an erratum which prevents using MSIs
 	 * for hotplug.
 	 */
-	return (((vendor_id == INTEL_VENDOR_ID) &&
-	    INTEL_ESB2_SW_PCIE_DEV_ID(device_id)) ? B_FALSE : B_TRUE);
+	return ((bus_p->bus_quirks & PCIE_QUIRK_NO_HP_MSI) != 0 ?
+	    B_FALSE : B_TRUE);
 }
 
 void
@@ -576,21 +574,16 @@ pcieb_intel_rber_workaround(dev_info_t *dip)
 }
 
 /*
- * The Intel 5000 Chipset has an errata that requires read completion
+ * Some chipsets have an erratum that requires read completion
  * coalescing to be disabled if the Max Payload Size is set to 256 bytes.
  */
 void
 pcieb_intel_mps_workaround(dev_info_t *dip)
 {
-	uint16_t		vid, did;
 	uint32_t		pexctrl;
-	pcie_bus_t		*bus_p = PCIE_DIP2UPBUS(dip);
+	const pcie_bus_t	*bus_p = PCIE_DIP2UPBUS(dip);
 
-	vid = bus_p->bus_dev_ven_id & 0xFFFF;
-	did = bus_p->bus_dev_ven_id >> 16;
-
-	if ((vid == INTEL_VENDOR_ID) && (INTEL_NB5000_PCIE_DEV_ID(did) ||
-	    INTEL_NB5100_PCIE_DEV_ID(did))) {
+	if ((bus_p->bus_quirks & PCIE_QUIRK_NO_COALESCE) != 0) {
 
 		pexctrl = pci_config_get32(bus_p->bus_cfg_hdl,
 		    INTEL_NB5000_PEXCTRL_OFFSET);
@@ -610,8 +603,8 @@ pcieb_intel_mps_workaround(dev_info_t *dip)
 void
 pcieb_intel_sw_workaround(dev_info_t *dip)
 {
-	uint16_t		vid, regw;
-	pcie_bus_t		*bus_p = PCIE_DIP2UPBUS(dip);
+	uint16_t		regw;
+	const pcie_bus_t	*bus_p = PCIE_DIP2UPBUS(dip);
 	ddi_acc_handle_t	cfg_hdl = bus_p->bus_cfg_hdl;
 
 	if (pcieb_intel_workaround_disable)
@@ -620,15 +613,14 @@ pcieb_intel_sw_workaround(dev_info_t *dip)
 	if (!PCIE_IS_SW(PCIE_DIP2BUS(dip)))
 		return;
 
-	vid = bus_p->bus_dev_ven_id & 0xFFFF;
 	/*
-	 * Intel and PLX switches require SERR in CMD reg to foward error
+	 * Some switches require SERR in CMD reg to forward error
 	 * messages, though this is not PCIE spec-compliant behavior.
 	 * To prevent the switches themselves from reporting errors on URs
 	 * when the CMD reg has SERR enabled (which is expected according to
 	 * the PCIE spec) we rely on masking URs in the AER cap.
 	 */
-	if (vid == 0x8086 || vid == 0x10B5) {
+	if ((bus_p->bus_quirks & PCIE_QUIRK_SW_SERR) != 0) {
 		regw = pci_config_get16(cfg_hdl, PCI_CONF_COMM);
 		pci_config_put16(cfg_hdl, PCI_CONF_COMM,
 		    regw | PCI_COMM_SERR_ENABLE);

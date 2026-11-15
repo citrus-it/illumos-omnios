@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_PCIEX_PCI_NVIDIA_H
@@ -45,12 +46,10 @@ void		add_nvidia_isa_bridge_props(dev_info_t *, uchar_t, uchar_t,
 #define	NVIDIA_INTR_BCR_OFF			0x3C	/* NV_XVR_INTR_BCR */
 #define	NVIDIA_INTR_BCR_SERR_FORWARD_BIT	0x02	/* SERR_FORWARD bit */
 
-/* CK8-04 PCIe RC and LPC-PCI Bridge device IDs */
-#define	NVIDIA_CK804_DEVICE_ID			0x5d	/* ck8-04 dev id */
+/* CK8-04 LPC-PCI Bridge device IDs */
 #define	NVIDIA_CK804_DEFAULT_ISA_BRIDGE_DEVID	0x50	/* LPC Default Bridge */
 #define	NVIDIA_CK804_PRO_ISA_BRIDGE_DEVID	0x51	/* LPC Bridge */
 #define	NVIDIA_CK804_SLAVE_ISA_BRIDGE_DEVID	0xd3	/* Slave LPC Bridge */
-#define	NVIDIA_CK804_AER_VALID_REVID		0xa3	/* RID w/ AER enabled */
 
 #define	NVIDIA_CK804_LPC2PCI_DEVICE_ID(did) \
 	(((did) == NVIDIA_CK804_DEFAULT_ISA_BRIDGE_DEVID) || \
@@ -71,36 +70,8 @@ void		add_nvidia_isa_bridge_props(dev_info_t *, uchar_t, uchar_t,
 #define	NVIDIA_CK804_VEND_CYA1_ERPT_MASK	0xdfff	/* CYA1 ERPT mask */
 
 /*
- * C51 related defines
- */
-
-/* C51 PCIe Root Complex Device ID defines */
-#define	NVIDIA_C51_DEVICE_ID_XVR16		0x2fb
-#define	NVIDIA_C51_DEVICE_ID_XVR1_0		0x2fc
-#define	NVIDIA_C51_DEVICE_ID_XVR1_1		0x2fd
-
-#define	NVIDIA_C51_DEVICE_ID(did) \
-	(((did) == NVIDIA_C51_DEVICE_ID_XVR16) || \
-	((did) == NVIDIA_C51_DEVICE_ID_XVR1_0) || \
-	((did) == NVIDIA_C51_DEVICE_ID_XVR1_1))
-
-/*
  * MCP55 related defines
  */
-
-/* MCP55 PCIe Root Complex Device ID defines */
-#define	NVIDIA_MCP55_DEVICE_ID_XVR4		0x374
-#define	NVIDIA_MCP55_DEVICE_ID_XVR8		0x375
-#define	NVIDIA_MCP55_DEVICE_ID_XVR8_VC1		0x376
-#define	NVIDIA_MCP55_DEVICE_ID_XVR16		0x377
-#define	NVIDIA_MCP55_DEVICE_ID_XVR4_VC1		0x378
-
-#define	NVIDIA_MCP55_DEVICE_ID(did) \
-	(((did) == NVIDIA_MCP55_DEVICE_ID_XVR4) || \
-	((did) == NVIDIA_MCP55_DEVICE_ID_XVR8) || \
-	((did) == NVIDIA_MCP55_DEVICE_ID_XVR16) || \
-	((did) == NVIDIA_MCP55_DEVICE_ID_XVR4_VC1) || \
-	((did) == NVIDIA_MCP55_DEVICE_ID_XVR8_VC1))
 
 /* MCP55 LPC-PCI Bridge Device ID defines */
 #define	NVIDIA_MCP55_PCI2LPC_DEVICE_ID_OP0	0x360
@@ -123,46 +94,12 @@ void		add_nvidia_isa_bridge_props(dev_info_t *, uchar_t, uchar_t,
 	((did) == NVIDIA_MCP55_PCI2LPC_DEVICE_ID_OP7))
 
 /*
- * MCP61 related defines
- */
-
-/* MCP61 PCIe Root Complex Device ID defines */
-#define	NVIDIA_MCP61_DEVICE_ID_XVR4		0x3e8
-#define	NVIDIA_MCP61_DEVICE_ID_XVR8		0x3e9
-
-#define	NVIDIA_MCP61_DEVICE_ID(did) \
-	(((did) == NVIDIA_MCP61_DEVICE_ID_XVR4) || \
-	((did) == NVIDIA_MCP61_DEVICE_ID_XVR8))
-
-/*
- * MCP65 related defines
- */
-
-/* MCP65 PCIe Root Complex Device ID defines */
-#define	NVIDIA_MCP65_DEVICE_ID_XVR4		0x458
-#define	NVIDIA_MCP65_DEVICE_ID_XVR8		0x459
-#define	NVIDIA_MCP65_DEVICE_ID_XVR16		0x45a
-
-#define	NVIDIA_MCP65_DEVICE_ID(did) \
-	(((did) == NVIDIA_MCP65_DEVICE_ID_XVR4) || \
-	((did) == NVIDIA_MCP65_DEVICE_ID_XVR8) || \
-	((did) == NVIDIA_MCP65_DEVICE_ID_XVR16))
-
-/*
  * Check if the given device is a Nvidia's LPC bridge
  */
 #define	NVIDIA_IS_LPC_BRIDGE(vid, did) \
 	    (((vid) == NVIDIA_VENDOR_ID) && \
 	    (NVIDIA_CK804_LPC2PCI_DEVICE_ID(did) || \
 	    NVIDIA_MCP55_LPC2PCI_DEVICE_ID(did)))
-
-/* Check for PCIe RC Device ID */
-#define	NVIDIA_PCIE_RC_DEV_ID(did) \
-	    (((did) == NVIDIA_CK804_DEVICE_ID) || \
-	    NVIDIA_C51_DEVICE_ID(did) || \
-	    NVIDIA_MCP55_DEVICE_ID(did) || \
-	    NVIDIA_MCP61_DEVICE_ID(did) || \
-	    NVIDIA_MCP65_DEVICE_ID(did))
 
 #ifdef	__cplusplus
 }
