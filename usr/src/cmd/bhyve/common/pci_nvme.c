@@ -217,6 +217,7 @@ struct pci_nvme_ioreq {
 	STAILQ_ENTRY(pci_nvme_ioreq) link;
 	struct nvme_submission_queue *nvme_sq;
 	uint16_t	sqid;
+	uint32_t	reset_gen;	/* sc->reset_gen at submission */
 
 	/* command information */
 	uint16_t	opc;
@@ -271,6 +272,7 @@ typedef enum {
 struct pci_nvme_aer {
 	STAILQ_ENTRY(pci_nvme_aer) link;
 	uint16_t	cid;	/* Command ID of the submitted AER */
+	uint32_t	reset_gen;	/* sc->reset_gen at submission */
 };
 
 /** Asynchronous Event Information - Error */
@@ -354,6 +356,14 @@ struct pci_nvme_softc {
 	struct nvme_completion_queue *compl_queues;
 	struct nvme_submission_queue *submit_queues;
 
+	/*
+	 * The number of times that the controller has been reset. This is
+	 * changed with every queue lock and sc->mtx held, so it can be read
+	 * while holding any one of those. A completion is only posted if this
+	 * has the same value that it had when the command was submitted.
+	 */
+	uint32_t	reset_gen;
+
 	struct nvme_feature_obj feat[NVME_FID_MAX];
 
 	enum nvme_dsm_type dataset_management;
@@ -376,12 +386,13 @@ struct pci_nvme_softc {
 };
 
 
-static void pci_nvme_cq_update(struct pci_nvme_softc *sc,
+static bool pci_nvme_cq_update(struct pci_nvme_softc *sc,
     struct nvme_completion_queue *cq,
     uint32_t cdw0,
     uint16_t cid,
     uint16_t sqid,
-    uint16_t status);
+    uint16_t status,
+    uint32_t reset_gen);
 static struct pci_nvme_ioreq *pci_nvme_get_ioreq(struct pci_nvme_softc *);
 static void pci_nvme_release_ioreq(struct pci_nvme_softc *, struct pci_nvme_ioreq *);
 static void pci_nvme_io_done(struct blockif_req *, int);
@@ -797,6 +808,7 @@ pci_nvme_aer_add(struct pci_nvme_softc *sc, uint16_t cid)
 
 	/* Save the Command ID for use in the completion message */
 	aer->cid = cid;
+	aer->reset_gen = sc->reset_gen;
 
 	pthread_mutex_lock(&sc->aer_mtx);
 	sc->aer_count++;
@@ -909,6 +921,7 @@ pci_nvme_aen_process(struct pci_nvme_softc *sc)
 	uint32_t mask;
 	uint16_t status;
 	uint8_t lid;
+	bool posted;
 
 #ifndef __FreeBSD__
 	lid = 0;
@@ -989,15 +1002,20 @@ pci_nvme_aen_process(struct pci_nvme_softc *sc)
 			break;
 		}
 
+		/* The AERs are freed when the controller is reset */
 		aer = pci_nvme_aer_get(sc);
-		assert(aer != NULL);
+		if (aer == NULL)
+			break;
 
 		DPRINTF("%s: CID=%#x CDW0=%#x", __func__, aer->cid, (lid << 16) | (aen->event_data << 8) | atype);
-		pci_nvme_cq_update(sc, &sc->compl_queues[0],
+		posted = pci_nvme_cq_update(sc, &sc->compl_queues[0],
 		    (lid << 16) | (aen->event_data << 8) | atype, /* cdw0 */
 		    aer->cid,
 		    0,		/* SQID */
-		    status);
+		    status, aer->reset_gen);
+		free(aer);
+		if (!posted)
+			break;
 
 		aen->event_data = 0;
 		aen->posted = false;
@@ -1026,6 +1044,44 @@ aen_thr(void *arg)
 	return (NULL);
 }
 
+/*
+ * A write to the Controller Configuration register can reset or enable the
+ * controller, and both of those change the state of the queues. That is done
+ * with every queue lock held so that it cannot happen while a queue is being
+ * processed or a completion is being posted.
+ *
+ * A thread that is processing a submission queue holds the lock for that
+ * queue. With it held, the thread takes a completion queue lock to post a
+ * completion, and takes sc->mtx. The locks are taken in the same order here
+ * so that there cannot be a deadlock with such a thread. That is every
+ * submission queue lock, then every completion queue lock, and the caller
+ * takes sc->mtx last.
+ */
+static void
+pci_nvme_queues_lock(struct pci_nvme_softc *sc)
+{
+	uint32_t i;
+
+	for (i = 0; i < sc->max_queues + 1; i++)
+		pthread_mutex_lock(&sc->submit_queues[i].mtx);
+	for (i = 0; i < sc->max_queues + 1; i++)
+		pthread_mutex_lock(&sc->compl_queues[i].mtx);
+}
+
+static void
+pci_nvme_queues_unlock(struct pci_nvme_softc *sc)
+{
+	uint32_t i;
+
+	for (i = 0; i < sc->max_queues + 1; i++)
+		pthread_mutex_unlock(&sc->compl_queues[i].mtx);
+	for (i = 0; i < sc->max_queues + 1; i++)
+		pthread_mutex_unlock(&sc->submit_queues[i].mtx);
+}
+
+/*
+ * Called with every queue lock and sc->mtx held.
+ */
 static void
 pci_nvme_reset_locked(struct pci_nvme_softc *sc)
 {
@@ -1045,7 +1101,13 @@ pci_nvme_reset_locked(struct pci_nvme_softc *sc)
 
 	assert(sc->submit_queues != NULL);
 
-	for (i = 0; i < sc->num_squeues + 1; i++) {
+	/*
+	 * Reset every submission and completion queue, and not only those
+	 * within the number of queues that the guest has set. The guest can
+	 * lower that number after it has created queues, and those queues
+	 * must not keep their state across a reset.
+	 */
+	for (i = 0; i < sc->max_queues + 1; i++) {
 		sc->submit_queues[i].qbase = NULL;
 		sc->submit_queues[i].size = 0;
 		sc->submit_queues[i].cqid = 0;
@@ -1055,7 +1117,7 @@ pci_nvme_reset_locked(struct pci_nvme_softc *sc)
 
 	assert(sc->compl_queues != NULL);
 
-	for (i = 0; i < sc->num_cqueues + 1; i++) {
+	for (i = 0; i < sc->max_queues + 1; i++) {
 		sc->compl_queues[i].qbase = NULL;
 		sc->compl_queues[i].size = 0;
 		sc->compl_queues[i].tail = 0;
@@ -1063,6 +1125,7 @@ pci_nvme_reset_locked(struct pci_nvme_softc *sc)
 	}
 
 	sc->num_q_is_set = false;
+	sc->reset_gen++;
 
 	pci_nvme_aer_destroy(sc);
 	pci_nvme_aen_destroy(sc);
@@ -1077,9 +1140,11 @@ pci_nvme_reset_locked(struct pci_nvme_softc *sc)
 static void
 pci_nvme_reset(struct pci_nvme_softc *sc)
 {
+	pci_nvme_queues_lock(sc);
 	pthread_mutex_lock(&sc->mtx);
 	pci_nvme_reset_locked(sc);
 	pthread_mutex_unlock(&sc->mtx);
+	pci_nvme_queues_unlock(sc);
 }
 
 static int
@@ -1188,22 +1253,28 @@ nvme_prp_memcpy(struct vmctx *ctx, uint64_t prp1, uint64_t prp2, uint8_t *b,
 /*
  * Write a Completion Queue Entry update
  *
- * Write the completion and update the doorbell value
+ * Write the completion and update the doorbell value. Returns false, without
+ * writing anything, if the queue is not mapped or if the controller has been
+ * reset since the command was submitted.
  */
-static void
+static bool
 pci_nvme_cq_update(struct pci_nvme_softc *sc,
 		struct nvme_completion_queue *cq,
 		uint32_t cdw0,
 		uint16_t cid,
 		uint16_t sqid,
-		uint16_t status)
+		uint16_t status,
+		uint32_t reset_gen)
 {
 	struct nvme_submission_queue *sq = &sc->submit_queues[sqid];
 	struct nvme_completion *cqe;
 
-	assert(cq->qbase != NULL);
-
 	pthread_mutex_lock(&cq->mtx);
+
+	if (cq->qbase == NULL || reset_gen != sc->reset_gen) {
+		pthread_mutex_unlock(&cq->mtx);
+		return (false);
+	}
 
 	cqe = &cq->qbase[cq->tail];
 
@@ -1222,6 +1293,8 @@ pci_nvme_cq_update(struct pci_nvme_softc *sc,
 	}
 
 	pthread_mutex_unlock(&cq->mtx);
+
+	return (true);
 }
 
 static int
@@ -1240,8 +1313,11 @@ nvme_opc_delete_io_sq(struct pci_nvme_softc* sc, struct nvme_command* command,
 		return (1);
 	}
 
+	/* Another vCPU may be processing commands from this queue */
+	pthread_mutex_lock(&sc->submit_queues[qid].mtx);
 	sc->submit_queues[qid].qbase = NULL;
 	sc->submit_queues[qid].cqid = 0;
+	pthread_mutex_unlock(&sc->submit_queues[qid].mtx);
 	pci_nvme_status_genc(&compl->status, NVME_SC_SUCCESS);
 	return (1);
 }
@@ -1351,7 +1427,10 @@ nvme_opc_delete_io_cq(struct pci_nvme_softc* sc, struct nvme_command* command,
 			return (1);
 		}
 
+	/* Another thread may be posting a completion to this queue */
+	pthread_mutex_lock(&sc->compl_queues[qid].mtx);
 	sc->compl_queues[qid].qbase = NULL;
+	pthread_mutex_unlock(&sc->compl_queues[qid].mtx);
 	pci_nvme_status_genc(&compl->status, NVME_SC_SUCCESS);
 	return (1);
 }
@@ -2078,6 +2157,12 @@ pci_nvme_handle_admin_cmd(struct pci_nvme_softc* sc, uint64_t value)
 
 	pthread_mutex_lock(&sq->mtx);
 
+	/* The controller may have been reset since the doorbell was written */
+	if (sq->qbase == NULL) {
+		pthread_mutex_unlock(&sq->mtx);
+		return;
+	}
+
 	sqhead = sq->head;
 	DPRINTF("sqhead %u, tail %u", sqhead, sq->tail);
 
@@ -2164,7 +2249,7 @@ pci_nvme_handle_admin_cmd(struct pci_nvme_softc* sc, uint64_t value)
 			    compl.cdw0,
 			    cmd->cid,
 			    0,		/* SQID */
-			    compl.status);
+			    compl.status, sc->reset_gen);
 		}
 	}
 
@@ -2311,7 +2396,8 @@ pci_nvme_append_iov_req(struct pci_nvme_softc *sc __unused,
 
 static void
 pci_nvme_set_completion(struct pci_nvme_softc *sc,
-    struct nvme_submission_queue *sq, int sqid, uint16_t cid, uint16_t status)
+    struct nvme_submission_queue *sq, int sqid, uint16_t cid, uint16_t status,
+    uint32_t reset_gen)
 {
 	struct nvme_completion_queue *cq = &sc->compl_queues[sq->cqid];
 
@@ -2319,7 +2405,8 @@ pci_nvme_set_completion(struct pci_nvme_softc *sc,
 		 __func__, sqid, sq->cqid, cid, NVME_STATUS_GET_SCT(status),
 		 NVME_STATUS_GET_SC(status));
 
-	pci_nvme_cq_update(sc, cq, 0, cid, sqid, status);
+	if (!pci_nvme_cq_update(sc, cq, 0, cid, sqid, status, reset_gen))
+		return;
 
 	if (cq->head != cq->tail) {
 		if (cq->intr_en & NVME_CQ_INTEN) {
@@ -2366,6 +2453,7 @@ pci_nvme_get_ioreq(struct pci_nvme_softc *sc)
 	STAILQ_REMOVE_HEAD(&sc->ioreqs_free, link);
 
 	req->sc = sc;
+	req->reset_gen = sc->reset_gen;
 
 	sc->pending_ios++;
 
@@ -2395,7 +2483,8 @@ pci_nvme_io_done(struct blockif_req *br, int err)
 	status = 0;
 	pci_nvme_status_genc(&status, code);
 
-	pci_nvme_set_completion(req->sc, sq, req->sqid, req->cid, status);
+	pci_nvme_set_completion(req->sc, sq, req->sqid, req->cid, status,
+	    req->reset_gen);
 	pci_nvme_stats_write_read_update(req->sc, req->opc,
 	    req->bytes, status);
 	pci_nvme_release_ioreq(req->sc, req);
@@ -2628,7 +2717,7 @@ pci_nvme_dealloc_sm(struct blockif_req *br, int err)
 
 	if (done) {
 		pci_nvme_set_completion(sc, req->nvme_sq, req->sqid, req->cid,
-		    status);
+		    status, req->reset_gen);
 		pci_nvme_release_ioreq(sc, req);
 	}
 }
@@ -2770,6 +2859,12 @@ pci_nvme_handle_io_cmd(struct pci_nvme_softc* sc, uint16_t idx)
 
 	pthread_mutex_lock(&sq->mtx);
 
+	/* The controller may have been reset since the doorbell was written */
+	if (sq->qbase == NULL) {
+		pthread_mutex_unlock(&sq->mtx);
+		return;
+	}
+
 	sqhead = sq->head;
 	DPRINTF("nvme_handle_io qid %u head %u tail %u cmdlist %p",
 	         idx, sqhead, sq->tail, sq->qbase);
@@ -2835,7 +2930,8 @@ pci_nvme_handle_io_cmd(struct pci_nvme_softc* sc, uint16_t idx)
 		}
 complete:
 		if (!pending) {
-			pci_nvme_set_completion(sc, sq, idx, cmd->cid, status);
+			pci_nvme_set_completion(sc, sq, idx, cmd->cid, status,
+			    sc->reset_gen);
 			if (req != NULL)
 				pci_nvme_release_ioreq(sc, req);
 		}
@@ -2886,6 +2982,8 @@ pci_nvme_handle_doorbell(struct pci_nvme_softc* sc,
 	        idx, is_sq ? "SQ" : "CQ", value & 0xFFFF);
 
 	if (is_sq) {
+		struct nvme_submission_queue *sq;
+
 		if (idx > sc->num_squeues) {
 			WPRINTF("%s queue index %lu overflow from "
 			         "guest (max %u)",
@@ -2895,7 +2993,16 @@ pci_nvme_handle_doorbell(struct pci_nvme_softc* sc,
 			return;
 		}
 
-		if (sc->submit_queues[idx].qbase == NULL) {
+		/*
+		 * The new tail is checked and stored with the queue lock held
+		 * so that the queue cannot be reset or deleted in between,
+		 * which would leave a tail that does not belong to it.
+		 */
+		sq = &sc->submit_queues[idx];
+		pthread_mutex_lock(&sq->mtx);
+
+		if (sq->qbase == NULL) {
+			pthread_mutex_unlock(&sq->mtx);
 			WPRINTF("%s write to SQ %lu before created", __func__,
 			    idx);
 			pci_nvme_aen_post(sc, PCI_NVME_AE_TYPE_ERROR,
@@ -2903,7 +3010,8 @@ pci_nvme_handle_doorbell(struct pci_nvme_softc* sc,
 			return;
 		}
 
-		if (!pci_nvme_sq_doorbell_valid(&sc->submit_queues[idx], value)) {
+		if (!pci_nvme_sq_doorbell_valid(sq, value)) {
+			pthread_mutex_unlock(&sq->mtx);
 			EPRINTLN("%s write to SQ %lu of %lu invalid", __func__,
 			    idx, value);
 			pci_nvme_aen_post(sc, PCI_NVME_AE_TYPE_ERROR,
@@ -2911,8 +3019,9 @@ pci_nvme_handle_doorbell(struct pci_nvme_softc* sc,
 			return;
 		}
 
-		atomic_store_short(&sc->submit_queues[idx].tail,
-		                   (uint16_t)value);
+		atomic_store_short(&sq->tail, (uint16_t)value);
+
+		pthread_mutex_unlock(&sq->mtx);
 
 		if (idx == 0)
 			pci_nvme_handle_admin_cmd(sc, value);
@@ -3041,6 +3150,8 @@ pci_nvme_write_bar_0(struct pci_nvme_softc *sc, uint64_t offset, int size,
 
 	pci_nvme_bar0_reg_dumps(__func__, offset, 1);
 
+	if (offset == NVME_CR_CC)
+		pci_nvme_queues_lock(sc);
 	pthread_mutex_lock(&sc->mtx);
 
 	switch (offset) {
@@ -3123,6 +3234,8 @@ pci_nvme_write_bar_0(struct pci_nvme_softc *sc, uint64_t offset, int size,
 		         __func__, offset, value, size);
 	}
 	pthread_mutex_unlock(&sc->mtx);
+	if (offset == NVME_CR_CC)
+		pci_nvme_queues_unlock(sc);
 }
 
 static void
