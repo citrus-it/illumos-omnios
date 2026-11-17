@@ -709,11 +709,13 @@ vi_legacy_vq_init(struct virtio_softc *vs, uint32_t pfn)
 
 /*
  * Helper inline for vq_getchain(): record the i'th "real"
- * descriptor.
+ * descriptor.  The caller passes in its snapshot of the descriptor's flags.
+ * Returns false if the descriptor describes a region that is not within
+ * guest memory.
  */
-static inline void
+static inline bool
 _vq_record(struct virtio_softc *vs, int i, struct vring_desc *vd,
-    struct iovec *iov, int n_iov, struct vi_req *reqp)
+    uint16_t flags, struct iovec *iov, int n_iov, struct vi_req *reqp)
 {
 	struct vmctx *ctx;
 	uint32_t len;
@@ -722,15 +724,22 @@ _vq_record(struct virtio_softc *vs, int i, struct vring_desc *vd,
 	ctx = vs->vs_pi->pi_vmctx;
 
 	if (i >= n_iov)
-		return;
+		return (true);
 	len = atomic_load_32(&vd->len);
 	addr = atomic_load_64(&vd->addr);
 	iov[i].iov_len = len;
 	iov[i].iov_base = paddr_guest2host(ctx, addr, len);
-	if ((vd->flags & VRING_DESC_F_WRITE) == 0)
+	if (iov[i].iov_base == NULL) {
+		vi_error(vs,
+		    "%s: descriptor GPA 0x%" PRIx64 "/0x%x is unmappable, "
+		    "driver confused?", vs->vs_vc->vc_name, addr, len);
+		return (false);
+	}
+	if ((flags & VRING_DESC_F_WRITE) == 0)
 		reqp->readable++;
 	else
 		reqp->writable++;
+	return (true);
 }
 #define	VQ_MAX_DESCRIPTORS	512	/* see below */
 
@@ -821,6 +830,10 @@ vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
 	req.idx = next = vq->vq_avail->ring[idx & (vq->vq_qsize - 1)];
 	vq->vq_last_avail++;
 	for (i = 0; i < VQ_MAX_DESCRIPTORS; next = vdir->next) {
+		uint32_t len;
+		uint64_t addr;
+		uint16_t flags;
+
 		if (next >= vq->vq_qsize) {
 			vi_error(vs,
 			    "%s: descriptor index %u out of range, "
@@ -829,8 +842,12 @@ vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
 			return (-1);
 		}
 		vdir = &vq->vq_desc[next];
-		if ((vdir->flags & VRING_DESC_F_INDIRECT) == 0) {
-			_vq_record(vs, i, vdir, iov, niov, &req);
+		len = atomic_load_32(&vdir->len);
+		addr = atomic_load_64(&vdir->addr);
+		flags = atomic_load_16(&vdir->flags);
+		if ((flags & VRING_DESC_F_INDIRECT) == 0) {
+			if (!_vq_record(vs, i, vdir, flags, iov, niov, &req))
+				return (-1);
 			i++;
 		} else if ((vs->vs_negotiated_caps &
 		    VIRTIO_RING_F_INDIRECT_DESC) == 0) {
@@ -840,16 +857,21 @@ vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
 			    name);
 			return (-1);
 		} else {
-			n_indir = vdir->len / 16;
-			if ((vdir->len & 0xf) || n_indir == 0) {
+			n_indir = len / 16;
+			if ((len & 0xf) || n_indir == 0) {
 				vi_error(vs,
 				    "%s: invalid indir len 0x%x, "
-				    "driver confused?",
-				    name, (u_int)vdir->len);
+				    "driver confused?", name, (u_int)len);
 				return (-1);
 			}
-			vindir = paddr_guest2host(ctx,
-			    vdir->addr, vdir->len);
+			vindir = paddr_guest2host(ctx, addr, len);
+			if (vindir == NULL) {
+				vi_error(vs,
+				    "%s: indirect table GPA 0x%" PRIx64
+				    "/0x%x is unmappable, driver confused?",
+				    name, addr, len);
+				return (-1);
+			}
 			/*
 			 * Indirects start at the 0th, then follow
 			 * their own embedded "next"s until those run
@@ -859,18 +881,24 @@ vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
 			 */
 			next = 0;
 			for (;;) {
+				uint16_t vflags;
+
 				vp = &vindir[next];
-				if (vp->flags & VRING_DESC_F_INDIRECT) {
+				vflags = atomic_load_16(&vp->flags);
+				if (vflags & VRING_DESC_F_INDIRECT) {
 					vi_error(vs,
 					    "%s: indirect desc has INDIR flag,"
 					    " driver confused?",
 					    name);
 					return (-1);
 				}
-				_vq_record(vs, i, vp, iov, niov, &req);
+				if (!_vq_record(vs, i, vp, vflags, iov, niov,
+				    &req)) {
+					return (-1);
+				}
 				if (++i > VQ_MAX_DESCRIPTORS)
 					goto loopy;
-				if ((vp->flags & VRING_DESC_F_NEXT) == 0)
+				if ((vflags & VRING_DESC_F_NEXT) == 0)
 					break;
 				next = vp->next;
 				if (next >= n_indir) {
@@ -882,7 +910,7 @@ vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
 				}
 			}
 		}
-		if ((vdir->flags & VRING_DESC_F_NEXT) == 0)
+		if ((flags & VRING_DESC_F_NEXT) == 0)
 			goto done;
 	}
 
