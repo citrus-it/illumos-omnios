@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2014 Leon Dang <ldang@nahannisys.com>
+ * Copyright 2026 Oxide Computer Company
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,6 +28,7 @@
  */
 
 
+#include <sys/param.h>
 #include <sys/time.h>
 
 #include <pthread.h>
@@ -362,6 +364,14 @@ umouse_request(void *scarg, struct usb_data_xfer *xfer)
 	index = UGETW(xfer->ureq->wIndex);
 	len = UGETW(xfer->ureq->wLength);
 
+	/*
+	 * The guest chooses the length in the request and the size of the
+	 * buffer for the data stage, and they may not agree. Nothing below
+	 * writes more than len bytes, so limit it to the buffer size.
+	 */
+	if (data != NULL && len > data->blen)
+		len = data->blen;
+
 	DPRINTF(("umouse_request: port %d, type 0x%x, req 0x%x, val 0x%x, "
 	         "idx 0x%x, len %u",
 	         sc->hci->hci_port, xfer->ureq->bmRequestType,
@@ -373,10 +383,12 @@ umouse_request(void *scarg, struct usb_data_xfer *xfer)
 		if (!data)
 			break;
 
-		*udata = umouse_confd.confd.bConfigurationValue;
+		if (len > 0) {
+			*udata = umouse_confd.confd.bConfigurationValue;
+			data->bdone += 1;
+		}
 		data->blen = len > 0 ? len - 1 : 0;
 		eshort = data->blen > 0;
-		data->bdone += 1;
 		break;
 
 	case UREQ(UR_GET_DESCRIPTOR, UT_READ_DEVICE):
@@ -428,35 +440,36 @@ umouse_request(void *scarg, struct usb_data_xfer *xfer)
 				goto done;
 
 			if ((value & 0xFF) == UMSTR_LANG) {
-				udata[0] = 4;
-				udata[1] = UDESC_STRING;
-				data->blen = len - 2;
-				len -= 2;
-				data->bdone += 2;
+				const uint8_t lang[4] = {
+					4, UDESC_STRING, str[0], str[1]
+				};
 
-				if (len >= 2) {
-					udata[2] = str[0];
-					udata[3] = str[1];
-					data->blen -= 2;
-					data->bdone += 2;
+				if (len > sizeof(lang)) {
+					data->blen = len - sizeof(lang);
+					len = sizeof(lang);
 				} else
 					data->blen = 0;
+				memcpy(udata, lang, len);
+				data->bdone += len;
 
 				goto done;
 			}
 
 			slen = 2 + strlen(str) * 2;
-			udata[0] = slen;
-			udata[1] = UDESC_STRING;
 
 			if (len > slen) {
 				data->blen = len - slen;
 				len = slen;
 			} else
 				data->blen = 0;
+			if (len > 0)
+				udata[0] = slen;
+			if (len > 1)
+				udata[1] = UDESC_STRING;
 			for (i = 2; i < len; i += 2) {
 				udata[i] = *str++;
-				udata[i+1] = '\0';
+				if (i + 1 < len)
+					udata[i+1] = '\0';
 			}
 			data->bdone += slen;
 
@@ -759,12 +772,15 @@ umouse_data_handler(void *scarg, struct usb_data_xfer *xfer, int dir,
 		sc->polling = 1;
 
 		if (len > 0) {
+			/* The buffer may be smaller than a report */
+			const int rlen = MIN(len, 6);
+
 			sc->newdata = 0;
 
 			data->processed = 1;
-			data->bdone += 6;
-			memcpy(udata, &sc->um_report, 6);
-			data->blen = len - 6;
+			data->bdone += rlen;
+			memcpy(udata, &sc->um_report, rlen);
+			data->blen = len - rlen;
 			if (data->blen > 0)
 				err = USB_ERR_SHORT_XFER;
 		}
