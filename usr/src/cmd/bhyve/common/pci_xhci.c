@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2014 Leon Dang <ldang@nahannisys.com>
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -586,8 +587,13 @@ pci_xhci_get_dev_ctx(struct pci_xhci_softc *sc, uint32_t slot)
 	struct xhci_dev_ctx *devctx;
 
 	assert(slot > 0 && slot <= XHCI_MAX_SLOTS);
-	assert(XHCI_SLOTDEV_PTR(sc, slot) != NULL);
-	assert(sc->opregs.dcbaa_p != NULL);
+
+	/*
+	 * The guest can refer to a slot which has no device, and can do so
+	 * before it has set the device context base address array pointer.
+	 */
+	if (XHCI_SLOTDEV_PTR(sc, slot) == NULL || sc->opregs.dcbaa_p == NULL)
+		return (NULL);
 
 	devctx_addr = sc->opregs.dcbaa_p->dcba[slot];
 
@@ -663,10 +669,17 @@ pci_xhci_init_ep(struct pci_xhci_dev_emu *dev, int epid)
 	dev_ctx = dev->dev_ctx;
 	ep_ctx = &dev_ctx->ctx_ep[epid];
 	devep = &dev->eps[epid];
+
+	/*
+	 * The guest can add an endpoint that is already configured. Free the
+	 * stream state from the previous configuration, if there is any.
+	 */
+	if (devep->ep_MaxPStreams > 0)
+		free(devep->ep_sctx_trbs);
+
 	pstreams = XHCI_EPCTX_0_MAXP_STREAMS_GET(ep_ctx->dwEpCtx0);
 	if (pstreams > 0) {
 		DPRINTF(("init_ep %d with pstreams %u", epid, pstreams));
-		assert(devep->ep_sctx_trbs == NULL);
 
 		devep->ep_sctx = XHCI_GADDR(dev->xsc, ep_ctx->qwEpCtx2 &
 		                            XHCI_EPCTX_2_TR_DQ_PTR_MASK);
@@ -1036,8 +1049,12 @@ pci_xhci_cmd_config_ep(struct pci_xhci_softc *sc, uint32_t slot,
 	if (cmderr != XHCI_TRB_ERROR_SUCCESS)
 		goto done;
 
+	/* The slot has no device context until it has been addressed. */
 	dev = XHCI_SLOTDEV_PTR(sc, slot);
-	assert(dev != NULL);
+	if (dev == NULL || dev->dev_ctx == NULL) {
+		cmderr = XHCI_TRB_ERROR_PARAMETER;
+		goto done;
+	}
 
 	if ((trb->dwTrb3 & XHCI_TRB_3_DCEP_BIT) != 0) {
 		DPRINTF(("pci_xhci config_ep - deconfigure ep slot %u",
@@ -1162,7 +1179,10 @@ pci_xhci_cmd_reset_ep(struct pci_xhci_softc *sc, uint32_t slot,
 		goto done;
 
 	dev = XHCI_SLOTDEV_PTR(sc, slot);
-	assert(dev != NULL);
+	if (dev == NULL) {
+		cmderr = XHCI_TRB_ERROR_PARAMETER;
+		goto done;
+	}
 
 	type = XHCI_TRB_3_TYPE_GET(trb->dwTrb3);
 
@@ -1182,7 +1202,10 @@ pci_xhci_cmd_reset_ep(struct pci_xhci_softc *sc, uint32_t slot,
 		USB_DATA_XFER_RESET(devep->ep_xfer);
 
 	dev_ctx = dev->dev_ctx;
-	assert(dev_ctx != NULL);
+	if (dev_ctx == NULL) {
+		cmderr = XHCI_TRB_ERROR_PARAMETER;
+		goto done;
+	}
 
 	ep_ctx = &dev_ctx->ctx_ep[epid];
 
@@ -1253,7 +1276,10 @@ pci_xhci_cmd_set_tr(struct pci_xhci_softc *sc, uint32_t slot,
 		goto done;
 
 	dev = XHCI_SLOTDEV_PTR(sc, slot);
-	assert(dev != NULL);
+	if (dev == NULL) {
+		cmderr = XHCI_TRB_ERROR_PARAMETER;
+		goto done;
+	}
 
 	DPRINTF(("pci_xhci set_tr: new-tr x%016lx, SCT %u DCS %u",
 	         (trb->qwTrb0 & ~0xF),  (uint32_t)((trb->qwTrb0 >> 1) & 0x7),
@@ -1271,7 +1297,10 @@ pci_xhci_cmd_set_tr(struct pci_xhci_softc *sc, uint32_t slot,
 	}
 
 	dev_ctx = dev->dev_ctx;
-	assert(dev_ctx != NULL);
+	if (dev_ctx == NULL) {
+		cmderr = XHCI_TRB_ERROR_PARAMETER;
+		goto done;
+	}
 
 	ep_ctx = &dev_ctx->ctx_ep[epid];
 	devep = &dev->eps[epid];
@@ -1588,6 +1617,8 @@ pci_xhci_xfer_complete(struct pci_xhci_softc *sc, struct usb_data_xfer *xfer,
 	int i, err;
 
 	dev = XHCI_SLOTDEV_PTR(sc, slot);
+	if (dev == NULL)
+		return XHCI_TRB_ERROR_PARAMETER;
 	devep = &dev->eps[epid];
 	dev_ctx = pci_xhci_get_dev_ctx(sc, slot);
 	if (dev_ctx == NULL) {
@@ -1981,11 +2012,12 @@ pci_xhci_device_doorbell(struct pci_xhci_softc *sc, uint32_t slot,
 	}
 
 	dev = XHCI_SLOTDEV_PTR(sc, slot);
+	if (dev == NULL)
+		return;
 	devep = &dev->eps[epid];
 	dev_ctx = pci_xhci_get_dev_ctx(sc, slot);
-	if (!dev_ctx) {
+	if (dev_ctx == NULL)
 		return;
-	}
 	ep_ctx = &dev_ctx->ctx_ep[epid];
 
 	sctx_tr = NULL;
@@ -1995,6 +2027,10 @@ pci_xhci_device_doorbell(struct pci_xhci_softc *sc, uint32_t slot,
 	        ep_ctx->dwEpCtx4));
 
 	if (ep_ctx->qwEpCtx2 == 0)
+		return;
+
+	/* The transfer state is allocated when the endpoint is configured. */
+	if (devep->ep_xfer == NULL)
 		return;
 
 	/* handle pending transfers */
