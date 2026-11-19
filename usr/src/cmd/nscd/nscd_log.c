@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdlib.h>
@@ -153,10 +154,7 @@ _nscd_set_lf(
 
 /* log an entry to the configured nscd log file */
 void
-_nscd_logit(
-	char		*funcname,
-	char		*format,
-	...)
+_nscd_logit(const char *funcname, const char *format, ...)
 {
 	static mutex_t	loglock = DEFAULTMUTEX;
 	struct timeval	tv;
