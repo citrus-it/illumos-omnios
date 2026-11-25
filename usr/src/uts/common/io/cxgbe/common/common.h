@@ -22,7 +22,7 @@
 
 /*
  * Copyright 2020 RackTop Systems, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef __CHELSIO_COMMON_H
@@ -377,6 +377,7 @@ struct adapter_params {
 
 	unsigned int sf_size;             /* serial flash size in bytes */
 	unsigned int sf_nsec;             /* # of flash sectors */
+	unsigned int sf_id;               /* serial flash JEDEC ID */
 
 	unsigned int fw_vers;		/* firmware version */
 	unsigned int bs_vers;		/* bootstrap version */

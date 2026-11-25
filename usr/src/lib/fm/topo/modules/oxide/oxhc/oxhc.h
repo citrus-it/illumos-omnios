@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _OXHC_H
@@ -40,6 +40,7 @@ extern "C" {
 #define	TOPO_PGROUP_OXHC_REFDES		"refdes"
 #define	TOPO_PGROUP_OXHC_MFGCODE	"mfg-code"
 #define	TOPO_PGROUP_OXHC_MFGNAME	"mfg-name"
+#define	TOPO_PGROUP_OXHC_JEDECID	"jedec-id"
 
 /*
  * MGS remote sensor and property group.

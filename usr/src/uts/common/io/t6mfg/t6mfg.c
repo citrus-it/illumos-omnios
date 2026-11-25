@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/conf.h>
@@ -156,6 +156,9 @@
 #define	SF_OP_BUSY_MASK		((1U << SF_OP_BUSY_BITS) - 1)
 #define	SF_OP_BUSY(x)		(((x) >> SF_OP_BUSY_SHIFT) & SF_OP_BUSY_MASK)
 
+#define	SF_CMD_RDID		0x9f
+#define	SF_RDID_LEN		3
+
 typedef struct t6mfg_devstate {
 	dev_info_t		*t6mfg_dip;
 	dev_t			t6mfg_dev;
@@ -194,6 +197,8 @@ static int t6mfg_spidev_read(t6mfg_devstate_t *, struct uio *, cred_t *);
 static int t6mfg_spidev_write(t6mfg_devstate_t *, struct uio *, cred_t *);
 static int t6mfg_spidev_ioctl(t6mfg_devstate_t *,
 	int, intptr_t, int, cred_t *, int *);
+
+static void t6mfg_sf_read_id(t6mfg_devstate_t *);
 
 struct cb_ops t6mfg_cb_ops = {
 	.cb_open =		t6mfg_cb_open,
@@ -381,6 +386,8 @@ t6mfg_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto done;
 	}
 
+	t6mfg_sf_read_id(devstate_p);
+
 	/*
 	 * Create minor nodes for SROM and SPIDEV
 	 */
@@ -426,6 +433,7 @@ t6mfg_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_SUCCESS);
 
 	ddi_remove_minor_node(dip, NULL);
+	ddi_prop_remove_all(dip);
 
 	mutex_destroy(&devstate_p->t6mfg_sf_lock);
 	mutex_destroy(&devstate_p->t6mfg_srom_lock);
@@ -873,6 +881,62 @@ t6mfg_reg_write(t6mfg_devstate_t *devstate_p, uint32_t reg, uint32_t val)
 	ddi_put32(devstate_p->t6mfg_pio_kernel_regs_handle, (void *)addr, val);
 }
 
+static boolean_t
+t6mfg_sf_idle(t6mfg_devstate_t *devstate_p)
+{
+	for (int ii = 0; ii < 10; ++ii) {
+		if (!SF_OP_BUSY(t6mfg_reg_read(devstate_p, SF_OP_ADDR)))
+			return (B_TRUE);
+
+		drv_usecwait(1);
+	}
+
+	return (!SF_OP_BUSY(t6mfg_reg_read(devstate_p, SF_OP_ADDR)));
+}
+
+static void
+t6mfg_sf_read_id(t6mfg_devstate_t *devstate_p)
+{
+	boolean_t ok = B_FALSE;
+	uint32_t id = 0;
+	uint8_t bytes[SF_RDID_LEN];
+
+	mutex_enter(&devstate_p->t6mfg_sf_lock);
+
+	if (!t6mfg_sf_idle(devstate_p))
+		goto done;
+
+	t6mfg_reg_write(devstate_p, SF_DATA_ADDR, SF_CMD_RDID);
+	t6mfg_reg_write(devstate_p, SF_OP_ADDR,
+	    SF_OP(SF_OP_OP_WRITE, 1, 1, 1));
+	if (!t6mfg_sf_idle(devstate_p))
+		goto done;
+
+	t6mfg_reg_write(devstate_p, SF_OP_ADDR,
+	    SF_OP(SF_OP_OP_READ, SF_RDID_LEN, 0, 1));
+	if (!t6mfg_sf_idle(devstate_p))
+		goto done;
+
+	id = t6mfg_reg_read(devstate_p, SF_DATA_ADDR);
+	ok = B_TRUE;
+
+done:
+	t6mfg_reg_write(devstate_p, SF_OP_ADDR, SF_OP(SF_OP_OP_READ, 0, 0, 0));
+	mutex_exit(&devstate_p->t6mfg_sf_lock);
+
+	if (!ok) {
+		dev_err(devstate_p->t6mfg_dip, CE_WARN,
+		    "failed to read SPI flash ID");
+		return;
+	}
+
+	for (uint_t i = 0; i < SF_RDID_LEN; i++)
+		bytes[i] = (id >> (i * 8)) & 0xff;
+
+	(void) ddi_prop_update_byte_array(DDI_DEV_T_NONE,
+	    devstate_p->t6mfg_dip, "flash-jedec-id", bytes, SF_RDID_LEN);
+}
+
 static int
 t6mfg_spidev_ioctl(t6mfg_devstate_t *devstate_p,
     int cmd, intptr_t arg, int mode, cred_t *cred_p, int *rval_p)
@@ -892,14 +956,7 @@ t6mfg_spidev_ioctl(t6mfg_devstate_t *devstate_p,
 	int rc = 0;
 	mutex_enter(&devstate_p->t6mfg_sf_lock);
 
-	for (int ii = 0; ii < 10; ++ii) {
-		if (!SF_OP_BUSY(t6mfg_reg_read(devstate_p, SF_OP_ADDR)))
-			break;
-
-		drv_usecwait(1);
-	}
-
-	if (SF_OP_BUSY(t6mfg_reg_read(devstate_p, SF_OP_ADDR))) {
+	if (!t6mfg_sf_idle(devstate_p)) {
 		mutex_exit(&devstate_p->t6mfg_sf_lock);
 		return (EBUSY);
 	}
@@ -977,18 +1034,7 @@ t6mfg_spidev_ioctl(t6mfg_devstate_t *devstate_p,
 			t6mfg_reg_write(devstate_p, SF_OP_ADDR, op);
 
 			/* Poll until controller has finished the operation */
-			for (int ii = 0; ii < 10; ++ii) {
-				uint32_t op_status =
-				    t6mfg_reg_read(devstate_p, SF_OP_ADDR);
-				if (!SF_OP_BUSY(op_status))
-					break;
-
-				drv_usecwait(1);
-			}
-
-			uint32_t op_status =
-			    t6mfg_reg_read(devstate_p, SF_OP_ADDR);
-			if (SF_OP_BUSY(op_status)) {
+			if (!t6mfg_sf_idle(devstate_p)) {
 				rc = EIO;
 				goto done;
 			}

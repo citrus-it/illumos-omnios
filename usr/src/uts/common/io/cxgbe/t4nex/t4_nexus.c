@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/ddi.h>
@@ -173,6 +173,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int i, instance, rc = DDI_SUCCESS, rqidx, tqidx, q;
 	int irq = 0, nxg = 0, n1g = 0;
 	char name[16];
+	uint8_t flash_id[3];
 	struct driver_properties *prp;
 	struct intrs_and_queues iaq;
 	ddi_device_acc_attr_t da = {
@@ -259,6 +260,11 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		cxgb_printf(dip, CE_WARN, "failed to prepare adapter: %d", rc);
 		goto done;
 	}
+
+	for (uint_t j = 0; j < ARRAY_SIZE(flash_id); j++)
+		flash_id[j] = (sc->params.sf_id >> (j * 8)) & 0xff;
+	(void) ddi_prop_update_byte_array(DDI_DEV_T_NONE, dip, "flash-jedec-id",
+	    flash_id, ARRAY_SIZE(flash_id));
 
 	/*
 	 * Enable BAR2 access.

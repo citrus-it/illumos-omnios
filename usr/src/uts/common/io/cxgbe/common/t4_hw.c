@@ -22,6 +22,7 @@
 
 /*
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "common.h"
@@ -9864,6 +9865,8 @@ int t4_get_flash_params(struct adapter *adapter)
 	t4_write_reg(adapter, A_SF_OP, 0);	/* unlock SF */
 	if (ret < 0)
 		return ret;
+
+	adapter->params.sf_id = flashid;
 
 	/*
 	 * Check to see if it's one of our non-standard supported Flash parts.

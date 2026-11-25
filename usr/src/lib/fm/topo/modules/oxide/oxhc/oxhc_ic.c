@@ -674,6 +674,22 @@ topo_oxhc_ic_tmp11x_fmri(topo_mod_t *mod, const oxhc_ic_info_t *ic_info,
 	return (OXHC_IC_FMRI_OK);
 }
 
+static di_node_t
+topo_oxhc_ic_t6_devi(di_node_t bridge)
+{
+	for (di_node_t di = di_child_node(bridge); di != DI_NODE_NIL;
+	    di = di_sibling_node(di)) {
+		const char *drv = di_driver_name(di);
+		if (drv == NULL)
+			continue;
+
+		if (strcmp(drv, "t6mfg") == 0 || strcmp(drv, "t4nex") == 0)
+			return (di);
+	}
+
+	return (DI_NODE_NIL);
+}
+
 /*
  * For the T6 IC we would like to enumerate a UFM and the I/O property group. To
  * do this we need to find the root port that refers to this on the board and
@@ -687,6 +703,7 @@ topo_oxhc_ic_t6_enum(topo_mod_t *mod, const oxhc_ic_info_t *ic_info,
     const oxhc_ic_hc_t *hc, tnode_t *tn)
 {
 	di_node_t bridge = topo_oxhc_slot_to_devi(mod, 0x10);
+	di_node_t di;
 
 	if (bridge == DI_NODE_NIL) {
 		topo_mod_dprintf(mod, "failed to find T6 bridge pcie16!");
@@ -699,17 +716,102 @@ topo_oxhc_ic_t6_enum(topo_mod_t *mod, const oxhc_ic_info_t *ic_info,
 	 * snapshot. That will the basis for which we'll try to construct an I/O
 	 * property group and UFMs.
 	 */
-	for (di_node_t di = di_child_node(bridge); di != DI_NODE_NIL;
-	    di = di_sibling_node(di)) {
-		const char *drv = di_driver_name(di);
-		if (drv == NULL)
-			continue;
+	if ((di = topo_oxhc_ic_t6_devi(bridge)) == DI_NODE_NIL)
+		return (true);
 
-		if (strcmp(drv, "t6mfg") == 0 || strcmp(drv, "t4nex") == 0) {
-			return (topo_oxhc_enum_pcie(mod, tn, di) == 0);
+	return (topo_oxhc_enum_pcie(mod, tn, di) == 0);
+}
+
+#define	OXHC_FLASH_ID_LEN	3
+
+typedef struct {
+	uint8_t ofi_id[OXHC_FLASH_ID_LEN];
+	const char *ofi_mpn;
+} oxhc_flash_id_t;
+
+static const oxhc_flash_id_t oxhc_ic_t6_flash_ids[] = {
+	{ { 0x20, 0xba, 0x18 }, "MT25QL128ABB8E12-0AUT" },
+	{ { 0x20, 0xba, 0x19 }, "MT25QL256ABA8E12-0AUT" }
+};
+
+static bool
+topo_oxhc_ic_t6_flash_id(topo_mod_t *mod, const oxhc_ic_info_t *ic_info,
+    uchar_t **idp)
+{
+	di_node_t bridge, di;
+
+	if ((bridge = topo_oxhc_slot_to_devi(mod, 0x10)) == DI_NODE_NIL ||
+	    (di = topo_oxhc_ic_t6_devi(bridge)) == DI_NODE_NIL) {
+		topo_mod_dprintf(mod, "no T6 instance for %s\n",
+		    ic_info->ic_refdes);
+		return (false);
+	}
+
+	if (di_prop_lookup_bytes(DDI_DEV_T_ANY, di, "flash-jedec-id", idp) !=
+	    OXHC_FLASH_ID_LEN) {
+		topo_mod_dprintf(mod, "no flash ID for %s on %s%d\n",
+		    ic_info->ic_refdes, di_driver_name(di), di_instance(di));
+		return (false);
+	}
+
+	return (true);
+}
+
+/*
+ * The JEDEC ID that t4nex and t6mfg read from the T6 flash identifies the
+ * manufacturer and density but not the full ordering part number, so the table
+ * above has to list the part that is fitted for each ID.
+ */
+static oxhc_ic_fmri_ret_t
+topo_oxhc_ic_t6_flash_fmri(topo_mod_t *mod, const oxhc_ic_info_t *ic_info,
+    oxhc_ic_hc_t *hc)
+{
+	uchar_t *id;
+
+	if (!topo_oxhc_ic_t6_flash_id(mod, ic_info, &id))
+		return (OXHC_IC_FMRI_OK);
+
+	for (size_t i = 0; i < ARRAY_SIZE(oxhc_ic_t6_flash_ids); i++) {
+		const oxhc_flash_id_t *f = &oxhc_ic_t6_flash_ids[i];
+
+		if (memcmp(id, f->ofi_id, OXHC_FLASH_ID_LEN) == 0) {
+			hc->oih_pn = f->ofi_mpn;
+			return (OXHC_IC_FMRI_OK);
 		}
 	}
 
+	topo_mod_dprintf(mod, "unknown flash ID %02x%02x%02x for %s\n",
+	    id[0], id[1], id[2], ic_info->ic_refdes);
+	return (OXHC_IC_FMRI_OK);
+}
+
+static bool
+topo_oxhc_ic_t6_flash_enum(topo_mod_t *mod, const oxhc_ic_info_t *ic_info,
+    const oxhc_ic_hc_t *hc, tnode_t *tn)
+{
+	uchar_t *id;
+	char *jedec;
+
+	if (!topo_oxhc_ic_t6_flash_id(mod, ic_info, &id))
+		return (true);
+
+	if (topo_mod_asprintf(mod, &jedec, "%02x%02x%02x", id[0], id[1],
+	    id[2]) == -1) {
+		topo_mod_dprintf(mod, "failed to create JEDEC ID string for "
+		    "%s: %s\n", ic_info->ic_refdes, strerror(errno));
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		return (false);
+	}
+
+	if (topo_create_props(mod, tn, TOPO_PROP_IMMUTABLE, &oxhc_pgroup,
+	    TOPO_PGROUP_OXHC_JEDECID, TOPO_TYPE_STRING, jedec, NULL) != 0) {
+		topo_mod_dprintf(mod, "failed to create %s properties for "
+		    "%s[%" PRIu64 "]: %s\n", oxhc_pgroup.tpi_name,
+		    topo_node_name(tn), topo_node_instance(tn),
+		    topo_mod_errmsg(mod));
+	}
+
+	topo_mod_strfree(mod, jedec);
 	return (true);
 }
 
@@ -998,6 +1100,11 @@ static const oxhc_ic_info_t oxhc_ic_at2526b = {
 static const oxhc_ic_info_t oxhc_ic_mt25ql128 = {
 	.ic_cpn = "225-0000006", .ic_mfg = "Micron",
 	.ic_mpn = "MT25QL128ABB8E12-0AUT"
+};
+
+static const oxhc_ic_info_t oxhc_ic_t6_flash = {
+	.ic_fmri = topo_oxhc_ic_t6_flash_fmri,
+	.ic_enum = topo_oxhc_ic_t6_flash_enum
 };
 
 static const oxhc_ic_info_t oxhc_ic_tmp451 = {
@@ -1449,12 +1556,7 @@ const oxhc_ic_board_t oxhc_ic_gimlet_main[] = {
 	{ .ib_refdes = "U305", .ib_info = &oxhc_ic_pca9535 },
 	{ .ib_refdes = "U308", .ib_info = &oxhc_ic_pca9535 },
 	{ .ib_refdes = "U312", .ib_info = &oxhc_ic_at2526b },
-	/*
-	 * When we come back and add the T6 here, we should not assume that this
-	 * is actually a Micron part and instead use the information (whether
-	 * via libispi or devinfo) about the device and its vpd directly.
-	 */
-	{ .ib_refdes = "U314", .ib_info = &oxhc_ic_mt25ql128 },
+	{ .ib_refdes = "U314", .ib_info = &oxhc_ic_t6_flash },
 	{ .ib_refdes = "U491", .ib_info = &oxhc_ic_tmp451 },
 	{
 		.ib_refdes = "U565",
@@ -1591,11 +1693,7 @@ const oxhc_ic_board_t oxhc_ic_cosmo_main[] = {
 		.ib_nlabels = ARRAY_SIZE(oxhc_ic_ltc4242_mcio_labels)
 	},
 	{ .ib_refdes = "U17", .ib_info = &oxhc_ic_t6 },
-	/*
-	 * Like Gimlet, this should be replaced with dynamic information via
-	 * libispi or similar some day.
-	 */
-	{ .ib_refdes = "U18", .ib_info = &oxhc_ic_mt25ql128 },
+	{ .ib_refdes = "U18", .ib_info = &oxhc_ic_t6_flash },
 	{ .ib_refdes = "UU19", .ib_info = &oxhc_ic_at2526b },
 	{ .ib_refdes = "U53", .ib_info = &oxhc_ic_tmp451 },
 	{ .ib_refdes = "U20", .ib_info = &oxhc_ic_stm32h7 },
