@@ -417,6 +417,8 @@ vq_has_descs(struct vqueue_info *vq)
 	return (vq_ring_ready(vq) && vq->vq_last_avail != vq->vq_avail->idx);
 }
 
+bool	vi_is_modern(struct virtio_softc *);
+
 /*
  * Deliver an interrupt to the guest for a specific MSI-X queue or
  * event.
@@ -424,8 +426,14 @@ vq_has_descs(struct vqueue_info *vq)
 static inline void
 vi_interrupt(struct virtio_softc *vs, uint8_t isr, uint16_t msix_idx)
 {
-	if (!(vs->vs_status & VIRTIO_CONFIG_STATUS_DRIVER_OK))
+	/*
+	 * A driver using the legacy interface may use a queue before it sets
+	 * DRIVER_OK, and a transitional device must support that.
+	 */
+	if ((vs->vs_status & VIRTIO_CONFIG_STATUS_DRIVER_OK) == 0 &&
+	    (isr != VIRTIO_PCI_ISR_INTR || vi_is_modern(vs))) {
 		return;
+	}
 
 	if (pci_msix_enabled(vs->vs_pi)) {
 		pci_generate_msix(vs->vs_pi, msix_idx);
@@ -534,7 +542,6 @@ virtio_pci_capcfg_t *vi_pci_cfg_bybaraddr(struct virtio_softc *,
     uint8_t, uint64_t, uint32_t);
 void	vi_reset_dev(struct virtio_softc *);
 void	vi_set_debug(struct virtio_softc *, bool);
-bool	vi_is_modern(struct virtio_softc *);
 void	vi_error(struct virtio_softc *, const char *, ...) __PRINTFLIKE(2);
 
 int	vq_getchain(struct vqueue_info *vq, struct iovec *iov, int niov,
